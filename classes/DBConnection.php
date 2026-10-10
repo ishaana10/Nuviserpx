@@ -55,6 +55,7 @@ class DBConnection{
                 $this->check_fiji_payroll_migrations();
                 $this->check_invoicing_migrations();
                 $this->check_stock_migrations();
+                $this->check_api_migrations();
             }
         }    
         
@@ -214,6 +215,46 @@ class DBConnection{
               KEY `invoice_id` (`invoice_id`),
               CONSTRAINT `alloc_payment_fk` FOREIGN KEY (`payment_id`) REFERENCES `payment_list` (`id`) ON DELETE CASCADE,
               CONSTRAINT `alloc_invoice_fk` FOREIGN KEY (`invoice_id`) REFERENCES `invoice_list` (`id`) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+        );
+
+        foreach ($queries as $sql) {
+            @$this->conn->query($sql);
+        }
+    }
+
+    public function check_api_migrations(){
+        if (!$this->conn) return;
+
+        $queries = array(
+            "CREATE TABLE IF NOT EXISTS `api_keys` (
+              `id` int(30) NOT NULL AUTO_INCREMENT,
+              `tenant_id` int(30) NOT NULL DEFAULT 1,
+              `name` varchar(150) NOT NULL,
+              `api_key` varchar(100) NOT NULL,
+              `api_secret` varchar(100) NOT NULL,
+              `permissions` text DEFAULT NULL,
+              `status` tinyint(1) NOT NULL DEFAULT 1,
+              `last_used_at` datetime DEFAULT NULL,
+              `created_by` int(30) DEFAULT NULL,
+              `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+              `date_updated` datetime DEFAULT NULL ON UPDATE current_timestamp(),
+              PRIMARY KEY (`id`),
+              KEY `tenant_id` (`tenant_id`),
+              UNIQUE KEY `key_tenant` (`tenant_id`, `api_key`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+            "CREATE TABLE IF NOT EXISTS `webhooks` (
+              `id` int(30) NOT NULL AUTO_INCREMENT,
+              `tenant_id` int(30) NOT NULL DEFAULT 1,
+              `event` varchar(100) NOT NULL,
+              `target_url` varchar(255) NOT NULL,
+              `secret_token` varchar(100) DEFAULT NULL,
+              `status` tinyint(1) NOT NULL DEFAULT 1,
+              `created_by` int(30) DEFAULT NULL,
+              `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+              PRIMARY KEY (`id`),
+              KEY `tenant_id` (`tenant_id`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
         );
 

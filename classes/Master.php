@@ -203,6 +203,66 @@ Class Master extends DBConnection {
 		}
 	}
 
+	function save_api_key(){
+		extract($_POST);
+		$tenant_id = $this->settings->active_tenant_id();
+		$user_id = $this->settings->userdata('id');
+		$id = !empty($id) ? $this->conn->real_escape_string($id) : '';
+
+		$name = $this->conn->real_escape_string($name);
+		$permissions = isset($permissions) && is_array($permissions) ? implode(',', $permissions) : '*';
+		$status = isset($status) ? (int)$status : 1;
+
+		if(empty($id)){
+			$api_key = 'erpx_' . bin2hex(random_bytes(16));
+			$api_secret = bin2hex(random_bytes(32));
+
+			$sql = "INSERT INTO `api_keys` SET
+				`tenant_id` = '{$tenant_id}',
+				`name` = '{$name}',
+				`api_key` = '{$api_key}',
+				`api_secret` = '{$api_secret}',
+				`permissions` = '{$permissions}',
+				`status` = '{$status}',
+				`created_by` = '{$user_id}'";
+		} else {
+			$sql = "UPDATE `api_keys` SET
+				`name` = '{$name}',
+				`permissions` = '{$permissions}',
+				`status` = '{$status}'
+				WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'";
+		}
+
+		$save = $this->conn->query($sql);
+		if($save){
+			$resp['status'] = 'success';
+			$resp['msg'] = empty($id) ? " API Key generated successfully." : " API Key updated successfully.";
+			$this->settings->set_flashdata('success', $resp['msg']);
+		} else {
+			$resp['status'] = 'failed';
+			$resp['msg'] = "An error occurred while saving API Key.";
+			$resp['err'] = $this->conn->error;
+		}
+
+		return json_encode($resp);
+	}
+
+	function delete_api_key(){
+		extract($_POST);
+		$id = $this->conn->real_escape_string($id);
+		$tenant_id = $this->settings->active_tenant_id();
+
+		$del = $this->conn->query("DELETE FROM `api_keys` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'");
+		if($del){
+			$resp['status'] = 'success';
+			$this->settings->set_flashdata('success', " API Key revoked and deleted successfully.");
+		} else {
+			$resp['status'] = 'failed';
+			$resp['error'] = $this->conn->error;
+		}
+		return json_encode($resp);
+	}
+
 	function save_stock_adjustment(){
 		extract($_POST);
 		$tenant_id = $this->settings->active_tenant_id();
@@ -1993,6 +2053,12 @@ switch ($action) {
 	break;
 	case 'save_stock_adjustment':
 		echo $Master->save_stock_adjustment();
+	break;
+	case 'save_api_key':
+		echo $Master->save_api_key();
+	break;
+	case 'delete_api_key':
+		echo $Master->delete_api_key();
 	break;
 	case 'email_invoice':
 		echo $Master->email_invoice();
