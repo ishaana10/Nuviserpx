@@ -17,26 +17,42 @@ class Login extends DBConnection {
 	}
 	public function login(){
 		extract($_POST);
-		$stmt = $this->conn->prepare("SELECT * from users where username = ? and password = ? ");
-		$pw = md5($password);
-		$stmt->bind_param('ss',$username,$pw);
+		$stmt = $this->conn->prepare("SELECT * FROM users WHERE username = ? LIMIT 1");
+		$stmt->bind_param('s', $username);
 		$stmt->execute();
 		$qry = $stmt->get_result();
+
 		if($qry->num_rows > 0){
 			$res = $qry->fetch_array();
 			if($res['status'] != 1){
 				return json_encode(array('status'=>'notverified'));
 			}
-			foreach($res as $k => $v){
-				if(!is_numeric($k) && $k != 'password'){
-					$this->settings->set_userdata($k,$v);
-				}
+
+			$db_pass = $res['password'];
+			$authenticated = false;
+
+			if (password_verify($password, $db_pass)) {
+				$authenticated = true;
+			} elseif (md5($password) === $db_pass) {
+				$authenticated = true;
+				$new_hash = password_hash($password, PASSWORD_BCRYPT);
+				$this->conn->query("UPDATE `users` SET `password` = '{$new_hash}' WHERE id = '{$res['id']}'");
 			}
-			$this->settings->set_userdata('login_type',1);
-		return json_encode(array('status'=>'success'));
-		}else{
-		return json_encode(array('status'=>'incorrect','error'=>$this->conn->error));
+
+			if ($authenticated) {
+				session_regenerate_id(true);
+
+				foreach($res as $k => $v){
+					if(!is_numeric($k) && $k != 'password'){
+						$this->settings->set_userdata($k, $v);
+					}
+				}
+				$this->settings->set_userdata('login_type', 1);
+				return json_encode(array('status'=>'success'));
+			}
 		}
+
+		return json_encode(array('status'=>'incorrect', 'error'=>$this->conn->error));
 	}
 	public function logout(){
 		if($this->settings->sess_des()){
@@ -115,7 +131,7 @@ class Login extends DBConnection {
 		extract($_POST);
 		$user_id = $this->conn->real_escape_string($user_id);
 		$otp_code = $this->conn->real_escape_string($otp_code);
-		$new_password = md5($password);
+		$new_password = password_hash($password, PASSWORD_BCRYPT);
 
 		$qry = $this->conn->query("SELECT * FROM `otp_tokens` WHERE `user_id` = '{$user_id}' AND `otp_code` = '{$otp_code}' AND `status` = 0 AND `expires_at` >= NOW() ORDER BY id DESC LIMIT 1");
 

@@ -18,7 +18,8 @@ Class Users extends DBConnection {
 		$oid = $id;
 		$data = '';
 		if(isset($oldpassword)){
-			if(md5($oldpassword) != $this->settings->userdata('password')){
+			$curr_pass = $this->settings->userdata('password');
+			if (!password_verify($oldpassword, $curr_pass) && md5($oldpassword) !== $curr_pass) {
 				return 4;
 			}
 		}
@@ -34,9 +35,9 @@ Class Users extends DBConnection {
 			}
 		}
 		if(!empty($password)){
-			$password = md5($password);
+			$password_hash = password_hash($password, PASSWORD_BCRYPT);
 			if(!empty($data)) $data .=" , ";
-			$data .= " `password` = '{$password}' ";
+			$data .= " `password` = '{$password_hash}' ";
 		}
 
 		if(empty($id)){
@@ -127,7 +128,8 @@ Class Users extends DBConnection {
 		extract($_POST);
 		$data = '';
 		if(isset($oldpassword)){
-			if(md5($oldpassword) != $this->settings->userdata('password')){
+			$curr_pass = $this->settings->userdata('password');
+			if (!password_verify($oldpassword, $curr_pass) && md5($oldpassword) !== $curr_pass) {
 				return json_encode(array("status"=>'failed',
 										 "msg"=>'Old Password is Incorrect'));
 			}
@@ -144,9 +146,9 @@ Class Users extends DBConnection {
 			}
 		}
 		if(!empty($password)){
-			$password = md5($password);
+			$password_hash = password_hash($password, PASSWORD_BCRYPT);
 			if(!empty($data)) $data .=" , ";
-			$data .= " `password` = '{$password}' ";
+			$data .= " `password` = '{$password_hash}' ";
 		}
 
 		if(empty($id)){

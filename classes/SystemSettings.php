@@ -247,6 +247,23 @@ class SystemSettings extends DBConnection{
 		return false;
 	}
 
+	function csrf_token(){
+		if(empty($_SESSION['csrf_token'])){
+			$_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+		}
+		return $_SESSION['csrf_token'];
+	}
+
+	function verify_csrf(){
+		if($_SERVER['REQUEST_METHOD'] === 'POST'){
+			$token = isset($_POST['csrf_token']) ? $_POST['csrf_token'] : (isset($_SERVER['HTTP_X_CSRF_TOKEN']) ? $_SERVER['HTTP_X_CSRF_TOKEN'] : '');
+			if(empty($token) || !isset($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $token)){
+				return false;
+			}
+		}
+		return true;
+	}
+
 	function send_test_email(){
 		require_once(__DIR__ . '/Emailer.php');
 		$to = isset($_POST['test_email']) ? trim($_POST['test_email']) : '';

@@ -58,8 +58,16 @@
     <script src="<?php echo base_url ?>plugins/toastr/toastr.min.js"></script>
     <!-- ApexCharts -->
     <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <meta name="csrf-token" content="<?php echo $_settings->csrf_token() ?>">
     <script>
         var _base_url_ = '<?php echo base_url ?>';
+        $(document).ready(function(){
+            $.ajaxSetup({
+                headers: {
+                    'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                }
+            });
+        });
     </script>
     <script src="<?php echo base_url ?>dist/js/script.js"></script>
 
