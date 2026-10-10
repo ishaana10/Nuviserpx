@@ -31,6 +31,14 @@
                         </p>
                       </a>
                     </li>
+                    <li class="nav-item dropdown">
+                      <a href="<?php echo base_url ?>admin/?page=roles" class="nav-link text-light nav-roles">
+                        <i class="nav-icon fas fa-user-shield"></i>
+                        <p>
+                          User Roles & Permissions
+                        </p>
+                      </a>
+                    </li>
                     <li class="nav-item">
                       <a href="<?php echo base_url ?>admin/?page=journals" class="nav-link text-light nav-journals">
                         <i class="nav-icon fas fa-book"></i>

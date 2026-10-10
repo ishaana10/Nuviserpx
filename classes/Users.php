@@ -28,9 +28,9 @@ Class Users extends DBConnection {
 			exit;
 		}
 		foreach($_POST as $k => $v){
-			if(in_array($k,array('firstname','middlename','lastname','username','type'))){
+			if(in_array($k,array('firstname','middlename','lastname','username','type','role_id'))){
 				if(!empty($data)) $data .=" , ";
-				$data .= " {$k} = '{$v}' ";
+				$data .= " `{$k}` = '{$v}' ";
 			}
 		}
 		if(!empty($password)){

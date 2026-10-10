@@ -255,6 +255,21 @@ CREATE TABLE `otp_tokens` (
 -- Table structure for table `users`
 --
 
+CREATE TABLE IF NOT EXISTS `roles` (
+  `id` int(30) NOT NULL AUTO_INCREMENT,
+  `tenant_id` int(30) NOT NULL DEFAULT 1,
+  `name` varchar(150) NOT NULL,
+  `description` text DEFAULT NULL,
+  `permissions` text DEFAULT NULL,
+  `status` tinyint(1) NOT NULL DEFAULT 1,
+  `delete_flag` tinyint(1) NOT NULL DEFAULT 0,
+  `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+  `date_updated` datetime DEFAULT NULL ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `tenant_id` (`tenant_id`),
+  UNIQUE KEY `role_tenant_name` (`tenant_id`, `name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE `users` (
   `id` int(50) NOT NULL,
   `tenant_id` int(30) NOT NULL DEFAULT 1,
@@ -266,6 +281,7 @@ CREATE TABLE `users` (
   `avatar` text DEFAULT NULL,
   `last_login` datetime DEFAULT NULL,
   `type` tinyint(1) NOT NULL DEFAULT 0,
+  `role_id` int(30) DEFAULT NULL,
   `status` int(1) NOT NULL DEFAULT 1 COMMENT '0=not verified, 1 = verified',
   `date_added` datetime NOT NULL DEFAULT current_timestamp(),
   `date_updated` datetime DEFAULT NULL ON UPDATE current_timestamp()

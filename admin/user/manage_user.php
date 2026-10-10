@@ -38,10 +38,25 @@ if(isset($_GET['id']) && $_GET['id'] > 0){
                     <?php endif; ?>
 				</div>
 				<div class="form-group col-6">
-					<label for="type">User Type</label>
-					<select name="type" id="type" class="custom-select"  required>
-						<option value="1" <?php echo isset($meta['type']) && $meta['type'] == 1 ? 'selected': '' ?>>Administrator</option>
-						<option value="2" <?php echo isset($meta['type']) && $meta['type'] == 2 ? 'selected': '' ?>>Staff</option>
+					<label for="type">User Type / Privilege Level</label>
+					<select name="type" id="type" class="custom-select" required>
+						<option value="1" <?php echo isset($meta['type']) && $meta['type'] == 1 ? 'selected': '' ?>>Super Administrator (Full Access)</option>
+						<option value="2" <?php echo isset($meta['type']) && $meta['type'] == 2 ? 'selected': '' ?>>Staff (Custom Role Assignment)</option>
+					</select>
+				</div>
+				<div class="form-group col-6" id="role-group" style="<?php echo isset($meta['type']) && $meta['type'] == 1 ? 'display:none;' : '' ?>">
+					<label for="role_id">Assigned Custom Role</label>
+					<select name="role_id" id="role_id" class="custom-select select2">
+						<option value="0">Default Staff Access</option>
+						<?php
+						$tenant_id = $_settings->active_tenant_id();
+						$roles = $conn->query("SELECT * FROM `roles` WHERE tenant_id = '{$tenant_id}' AND delete_flag = 0 AND status = 1 ORDER BY name ASC");
+						while($r = $roles->fetch_assoc()):
+						?>
+						<option value="<?php echo $r['id'] ?>" <?php echo isset($meta['role_id']) && $meta['role_id'] == $r['id'] ? 'selected' : '' ?>>
+							<?php echo htmlspecialchars($r['name']) ?>
+						</option>
+						<?php endwhile; ?>
 					</select>
 				</div>
 				<div class="form-group col-6">
@@ -77,8 +92,15 @@ if(isset($_GET['id']) && $_GET['id'] > 0){
 <script>
 	$(function(){
 		$('.select2').select2({
-			width:'resolve'
-		})
+			width:'100%'
+		});
+		$('#type').change(function(){
+			if($(this).val() == 1){
+				$('#role-group').slideUp();
+			} else {
+				$('#role-group').slideDown();
+			}
+		});
 	})
 	function displayImg(input,_this) {
 	    if (input.files && input.files[0]) {

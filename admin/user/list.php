@@ -46,15 +46,20 @@
 				<tbody>
 					<?php 
 						$i = 1;
-						$qry = $conn->query("SELECT *,concat(firstname,' ',lastname) as name from `users` where id != '1' order by concat(firstname,' ',lastname) asc ");
+						$qry = $conn->query("SELECT u.*, concat(u.firstname,' ',u.lastname) as name, r.name as role_name
+							from `users` u
+							left join `roles` r on u.role_id = r.id
+							where u.id != '1'
+							order by concat(u.firstname,' ',u.lastname) asc ");
 						while($row = $qry->fetch_assoc()):
+							$role_label = ($row['type'] == 1) ? "Super Administrator" : (!empty($row['role_name']) ? $row['role_name'] : "Standard Staff");
 					?>
 						<tr>
 							<td class="text-center"><?php echo $i++; ?></td>
 							<td class="text-center"><img src="<?php echo validate_image($row['avatar']) ?>" class="img-avatar img-thumbnail p-0 border-2" alt="user_avatar"></td>
 							<td><?php echo ucwords($row['name']) ?></td>
 							<td ><p class="m-0 truncate-1"><?php echo $row['username'] ?></p></td>
-							<td ><p class="m-0"><?php echo ($row['type'] == 1 )? "Adminstrator" : "Staff" ?></p></td>
+							<td ><span class="badge badge-<?php echo $row['type'] == 1 ? 'navy' : 'info' ?> px-2 py-1"><?php echo htmlspecialchars($role_label) ?></span></td>
 							<td align="center">
 								 <button type="button" class="btn btn-flat btn-default btn-sm dropdown-toggle dropdown-icon" data-toggle="dropdown">
 				                  		Action

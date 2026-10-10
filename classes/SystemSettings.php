@@ -212,6 +212,41 @@ class SystemSettings extends DBConnection{
 		}
 	}
 
+	function get_user_role(){
+		$role_id = $this->userdata('role_id');
+		$user_type = $this->userdata('type');
+
+		if($user_type == 1){
+			return ['name' => 'Super Administrator', 'permissions' => ['*']];
+		}
+
+		if($role_id > 0){
+			$tenant_id = $this->active_tenant_id();
+			$qry = $this->conn->query("SELECT * FROM `roles` WHERE id = '{$role_id}' AND tenant_id = '{$tenant_id}' AND status = 1 AND delete_flag = 0");
+			if($qry && $qry->num_rows > 0){
+				$role = $qry->fetch_assoc();
+				$perms = !empty($role['permissions']) ? explode(',', $role['permissions']) : [];
+				return ['name' => $role['name'], 'permissions' => $perms];
+			}
+		}
+
+		return ['name' => 'Standard Staff', 'permissions' => ['journals_view', 'invoices_view', 'payments_view', 'products_view', 'sales_orders_view', 'employees_view', 'payroll_view', 'reports_view']];
+	}
+
+	function can_access($permission_key){
+		$user_type = $this->userdata('type');
+		if($user_type == 1) return true;
+
+		$role = $this->get_user_role();
+		$perms = $role['permissions'];
+
+		if(in_array('*', $perms) || in_array($permission_key, $perms)){
+			return true;
+		}
+
+		return false;
+	}
+
 	function send_test_email(){
 		require_once(__DIR__ . '/Emailer.php');
 		$to = isset($_POST['test_email']) ? trim($_POST['test_email']) : '';

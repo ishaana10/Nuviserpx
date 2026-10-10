@@ -56,6 +56,7 @@ class DBConnection{
                 $this->check_invoicing_migrations();
                 $this->check_stock_migrations();
                 $this->check_api_migrations();
+                $this->check_rbac_migrations();
             }
         }    
         
@@ -220,6 +221,33 @@ class DBConnection{
 
         foreach ($queries as $sql) {
             @$this->conn->query($sql);
+        }
+    }
+
+    public function check_rbac_migrations(){
+        if (!$this->conn) return;
+
+        // Check roles table
+        $sql = "CREATE TABLE IF NOT EXISTS `roles` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `tenant_id` int(30) NOT NULL DEFAULT 1,
+          `name` varchar(150) NOT NULL,
+          `description` text DEFAULT NULL,
+          `permissions` text DEFAULT NULL,
+          `status` tinyint(1) NOT NULL DEFAULT 1,
+          `delete_flag` tinyint(1) NOT NULL DEFAULT 0,
+          `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+          `date_updated` datetime DEFAULT NULL ON UPDATE current_timestamp(),
+          PRIMARY KEY (`id`),
+          KEY `tenant_id` (`tenant_id`),
+          UNIQUE KEY `role_tenant_name` (`tenant_id`, `name`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+        @$this->conn->query($sql);
+
+        // Check role_id column in users table
+        $res = @$this->conn->query("SHOW COLUMNS FROM `users` LIKE 'role_id'");
+        if ($res && $res->num_rows == 0) {
+            @$this->conn->query("ALTER TABLE `users` ADD COLUMN `role_id` int(30) DEFAULT NULL AFTER `type` ");
         }
     }
 
