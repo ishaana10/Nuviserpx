@@ -19,14 +19,15 @@
         <section class="content">
           <div class="container-fluid">
             <?php 
-              if(!file_exists($page.".php") && !is_dir($page)){
-                  include '404.html';
-              }else{
-                if(is_dir($page))
-                  include $page.'/index.php';
-                else
-                  include $page.'.php';
+              $view_file = $page . '.php';
+              if(is_dir($page)){
+                $view_file = $page . '/index.php';
+              }
 
+              if(file_exists($view_file)){
+                include $view_file;
+              } else {
+                include '404.html';
               }
             ?>
           </div>
