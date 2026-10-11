@@ -2,6 +2,10 @@
 require_once('../../config.php');
 require_once(base_app . 'classes/FijiPayroll.php');
 
+if(!$_settings->userdata('id')){
+    die("Access Denied: Authentication required.");
+}
+
 $type = isset($_GET['type']) ? strtolower($_GET['type']) : 'generic';
 $ref = isset($_GET['ref']) ? $_GET['ref'] : '';
 $month = isset($_GET['month']) ? $_GET['month'] : '';

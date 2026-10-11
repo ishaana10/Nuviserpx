@@ -92,8 +92,9 @@
 		</div>
 		<div class="card-footer">
 			<div class="col-md-12">
-				<div class="row">
-					<button class="btn btn-sm btn-primary" form="system-frm">Update</button>
+				<div class="row d-flex justify-content-between align-items-center">
+					<button class="btn btn-sm btn-primary" form="system-frm"><i class="fas fa-save mr-1"></i> Save Settings</button>
+					<button type="button" class="btn btn-sm btn-info" id="btn_send_test_email"><i class="fas fa-paper-plane mr-1"></i> Send Test Email</button>
 				</div>
 			</div>
 		</div>
@@ -135,6 +136,31 @@
 	    }
 	}
 	$(document).ready(function(){
+		$('#btn_send_test_email').click(function(){
+			var test_email = prompt("Enter email address to receive test email:", "<?php echo $_settings->info('smtp_user') ?>");
+			if(test_email){
+				start_loader();
+				$.ajax({
+					url: _base_url_ + "classes/SystemSettings.php?f=send_test_email",
+					method: "POST",
+					data: { test_email: test_email },
+					dataType: "json",
+					error: err => {
+						console.log(err);
+						alert_toast("An error occurred.", 'error');
+						end_loader();
+					},
+					success: function(resp){
+						end_loader();
+						if(resp.status == 'success'){
+							alert_toast(resp.msg, 'success');
+						} else {
+							alert_toast(resp.msg || "Failed to send test email.", 'error');
+						}
+					}
+				});
+			}
+		});
 		 $('.summernote').summernote({
 		        height: '60vh',
 		        toolbar: [

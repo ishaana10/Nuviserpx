@@ -1,7 +1,7 @@
 <?php
 if(!class_exists('DBConnection')){
-	require_once('../config.php');
-	require_once('DBConnection.php');
+	require_once(__DIR__ . '/../config.php');
+	require_once(__DIR__ . '/DBConnection.php');
 }
 class SystemSettings extends DBConnection{
 	public function __construct(){
@@ -211,6 +211,79 @@ class SystemSettings extends DBConnection{
 			$_SESSION['system_info'][$field] = $value;
 		}
 	}
+
+	function get_user_role(){
+		$role_id = $this->userdata('role_id');
+		$user_type = $this->userdata('type');
+
+		if($user_type == 1){
+			return ['name' => 'Super Administrator', 'permissions' => ['*']];
+		}
+
+		if($role_id > 0){
+			$tenant_id = $this->active_tenant_id();
+			$qry = $this->conn->query("SELECT * FROM `roles` WHERE id = '{$role_id}' AND tenant_id = '{$tenant_id}' AND status = 1 AND delete_flag = 0");
+			if($qry && $qry->num_rows > 0){
+				$role = $qry->fetch_assoc();
+				$perms = !empty($role['permissions']) ? explode(',', $role['permissions']) : [];
+				return ['name' => $role['name'], 'permissions' => $perms];
+			}
+		}
+
+		return ['name' => 'Standard Staff', 'permissions' => ['journals_view', 'invoices_view', 'payments_view', 'products_view', 'sales_orders_view', 'employees_view', 'payroll_view', 'reports_view']];
+	}
+
+	function can_access($permission_key){
+		$user_type = $this->userdata('type');
+		if($user_type == 1) return true;
+
+		$role = $this->get_user_role();
+		$perms = $role['permissions'];
+
+		if(in_array('*', $perms) || in_array($permission_key, $perms)){
+			return true;
+		}
+
+		return false;
+	}
+
+	function csrf_token(){
+		if(empty($_SESSION['csrf_token'])){
+			$_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+		}
+		return $_SESSION['csrf_token'];
+	}
+
+	function verify_csrf(){
+		if($_SERVER['REQUEST_METHOD'] === 'POST'){
+			$token = isset($_POST['csrf_token']) ? $_POST['csrf_token'] : (isset($_SERVER['HTTP_X_CSRF_TOKEN']) ? $_SERVER['HTTP_X_CSRF_TOKEN'] : '');
+			if(empty($token) || !isset($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $token)){
+				return false;
+			}
+		}
+		return true;
+	}
+
+	function send_test_email(){
+		require_once(__DIR__ . '/Emailer.php');
+		$to = isset($_POST['test_email']) ? trim($_POST['test_email']) : '';
+		if(empty($to)){
+			return json_encode(['status' => 'failed', 'msg' => 'Please enter a test email address.']);
+		}
+
+		$body = "
+		<h3>Nuvis ERPX Email Test</h3>
+		<p>Congratulations! Your email notification settings are working properly.</p>
+		<p><b>SMTP Host:</b> " . htmlspecialchars($this->info('smtp_host')) . "<br>
+		<b>SMTP Port:</b> " . htmlspecialchars($this->info('smtp_port')) . "</p>";
+
+		$send = Emailer::send_email($to, "Nuvis ERPX - Test Email", $body);
+		if($send){
+			return json_encode(['status' => 'success', 'msg' => "Test email successfully sent to {$to}."]);
+		} else {
+			return json_encode(['status' => 'failed', 'msg' => "Failed to send test email. Please check your email configuration."]);
+		}
+	}
 }
 $_settings = new SystemSettings();
 $_settings->load_system_info();
@@ -219,6 +292,9 @@ $sysset = new SystemSettings();
 switch ($action) {
 	case 'update_settings':
 		echo $sysset->update_settings_info();
+		break;
+	case 'send_test_email':
+		echo $sysset->send_test_email();
 		break;
 	case 'switch_tenant':
 		if(isset($_POST['tenant_id'])){

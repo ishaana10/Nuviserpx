@@ -31,6 +31,14 @@
                         </p>
                       </a>
                     </li>
+                    <li class="nav-item dropdown">
+                      <a href="<?php echo base_url ?>admin/?page=roles" class="nav-link text-light nav-roles">
+                        <i class="nav-icon fas fa-user-shield"></i>
+                        <p>
+                          User Roles & Permissions
+                        </p>
+                      </a>
+                    </li>
                     <li class="nav-item">
                       <a href="<?php echo base_url ?>admin/?page=journals" class="nav-link text-light nav-journals">
                         <i class="nav-icon fas fa-book"></i>
@@ -39,7 +47,31 @@
                         </p>
                       </a>
                     </li>
-                    <li class="nav-header">Invoicing & Sales</li>
+                    <li class="nav-header">Commercial Stock & Sales</li>
+                    <li class="nav-item">
+                      <a href="<?php echo base_url ?>admin/?page=products" class="nav-link text-light nav-products">
+                        <i class="nav-icon fas fa-boxes"></i>
+                        <p>
+                          Products & Stock
+                        </p>
+                      </a>
+                    </li>
+                    <li class="nav-item">
+                      <a href="<?php echo base_url ?>admin/?page=sales_orders" class="nav-link text-light nav-sales_orders">
+                        <i class="nav-icon fas fa-mobile-alt"></i>
+                        <p>
+                          On-The-Go Orders / Proforma
+                        </p>
+                      </a>
+                    </li>
+                    <li class="nav-item">
+                      <a href="<?php echo base_url ?>admin/?page=stock_adjustments" class="nav-link text-light nav-stock_adjustments">
+                        <i class="nav-icon fas fa-cubes"></i>
+                        <p>
+                          Stock Movements & Ledger
+                        </p>
+                      </a>
+                    </li>
                     <li class="nav-item">
                       <a href="<?php echo base_url ?>admin/?page=parties" class="nav-link text-light nav-parties">
                         <i class="nav-icon fas fa-address-book"></i>
@@ -52,7 +84,7 @@
                       <a href="<?php echo base_url ?>admin/?page=invoices" class="nav-link text-light nav-invoices">
                         <i class="nav-icon fas fa-file-invoice"></i>
                         <p>
-                          Invoices
+                          Sales Invoices
                         </p>
                       </a>
                     </li>
@@ -97,7 +129,47 @@
                         </p>
                       </a>
                     </li>
-                    <li class="nav-header">Report</li>
+                    <li class="nav-header">Financial Statements & Reports</li>
+                    <li class="nav-item">
+                      <a href="<?php echo base_url ?>admin/?page=reports/general_ledger" class="nav-link text-light nav-reports_general_ledger">
+                        <i class="nav-icon fas fa-book-open"></i>
+                        <p>
+                          General Ledger
+                        </p>
+                      </a>
+                    </li>
+                    <li class="nav-item">
+                      <a href="<?php echo base_url ?>admin/?page=reports/balance_sheet" class="nav-link text-light nav-reports_balance_sheet">
+                        <i class="nav-icon fas fa-balance-scale"></i>
+                        <p>
+                          Balance Sheet
+                        </p>
+                      </a>
+                    </li>
+                    <li class="nav-item">
+                      <a href="<?php echo base_url ?>admin/?page=reports/income_statement" class="nav-link text-light nav-reports_income_statement">
+                        <i class="nav-icon fas fa-chart-line"></i>
+                        <p>
+                          Income Statement (P&L)
+                        </p>
+                      </a>
+                    </li>
+                    <li class="nav-item">
+                      <a href="<?php echo base_url ?>admin/?page=reports/ar_aging" class="nav-link text-light nav-reports_ar_aging">
+                        <i class="nav-icon fas fa-history"></i>
+                        <p>
+                          Accounts Receivable Aging
+                        </p>
+                      </a>
+                    </li>
+                    <li class="nav-item">
+                      <a href="<?php echo base_url ?>admin/?page=reports/payroll_accounting" class="nav-link text-light nav-reports_payroll_accounting">
+                        <i class="nav-icon fas fa-calculator"></i>
+                        <p>
+                          Payroll Accounting
+                        </p>
+                      </a>
+                    </li>
                     <li class="nav-item">
                       <a href="<?php echo base_url ?>admin/?page=reports/working_trial_balance" class="nav-link text-light nav-reports_working_trial_balance">
                         <i class="nav-icon fas fa-file"></i>
@@ -145,6 +217,14 @@
                         <i class="nav-icon fas fa-building"></i>
                         <p>
                           Tenants / Companies
+                        </p>
+                      </a>
+                    </li>
+                    <li class="nav-item dropdown">
+                      <a href="<?php echo base_url ?>admin/?page=api_keys" class="nav-link text-light nav-api_keys">
+                        <i class="nav-icon fas fa-plug"></i>
+                        <p>
+                          API Keys & Integrations
                         </p>
                       </a>
                     </li>

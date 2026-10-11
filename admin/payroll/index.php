@@ -84,6 +84,7 @@
 				                  </button>
 				                  <div class="dropdown-menu" role="menu">
 				                    <a class="dropdown-item view_payslip" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>"><span class="fa fa-file-invoice-dollar text-info"></span> Fiji Payslip</a>
+				                    <a class="dropdown-item email_payslip" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>"><span class="fa fa-envelope text-warning"></span> Email Payslip</a>
 				                    <a class="dropdown-item edit_data" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>"><span class="fa fa-edit text-primary"></span> Edit</a>
 				                    <div class="dropdown-divider"></div>
 				                    <a class="dropdown-item delete_data" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>"><span class="fa fa-trash text-danger"></span> Delete</a>
@@ -113,6 +114,32 @@
 		$('.view_payslip').click(function(){
 			uni_modal("<i class='fa fa-file-alt'></i> Employee Fiji Payslip","payroll/view_payslip.php?id="+$(this).attr('data-id'), 'large')
 		})
+		$('.email_payslip').click(function(){
+			var id = $(this).attr('data-id');
+			var email = prompt("Enter employee email address:");
+			if(email){
+				start_loader();
+				$.ajax({
+					url: _base_url_ + "classes/Master.php?f=email_payslip",
+					method: "POST",
+					data: { id: id, custom_email: email },
+					dataType: "json",
+					error: err => {
+						console.log(err);
+						alert_toast("An error occurred.", 'error');
+						end_loader();
+					},
+					success: function(resp){
+						end_loader();
+						if(resp.status == 'success'){
+							alert_toast(resp.msg, 'success');
+						} else {
+							alert_toast(resp.msg || "Failed to send email.", 'error');
+						}
+					}
+				});
+			}
+		});
 		$('#list').dataTable({
 			columnDefs: [
 					{ orderable: false, targets: [8] }

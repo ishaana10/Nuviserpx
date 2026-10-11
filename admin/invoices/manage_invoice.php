@@ -1,10 +1,11 @@
 <?php
-require_once('../config.php');
+require_once('../../config.php');
 
 $tenant_id = $_settings->active_tenant_id();
 
-if(isset($_GET['id']) && $_GET['id'] > 0){
-    $qry = $conn->query("SELECT * from `invoice_list` where id = '{$_GET['id']}' and tenant_id = '{$tenant_id}' ");
+if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
+    $inv_id_clean = intval($_GET['id']);
+    $qry = $conn->query("SELECT * from `invoice_list` where id = '{$inv_id_clean}' and tenant_id = '{$tenant_id}' ");
     if($qry->num_rows > 0){
         foreach($qry->fetch_assoc() as $k => $v){
             $$k=$v;

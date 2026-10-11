@@ -71,6 +71,7 @@
 				                  </button>
 				                  <div class="dropdown-menu" role="menu">
 				                    <a class="dropdown-item" href="./?page=payments/view&id=<?php echo $row['id'] ?>"><span class="fa fa-receipt text-success"></span> View Receipt</a>
+				                    <a class="dropdown-item send_email" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>" data-email="<?php echo htmlspecialchars($row['party_email'] ?? '') ?>"><span class="fa fa-envelope text-warning"></span> Send Email</a>
 				                    <a class="dropdown-item" href="./?page=payments/manage_payment&id=<?php echo $row['id'] ?>"><span class="fa fa-edit text-primary"></span> Edit</a>
 				                    <div class="dropdown-divider"></div>
 				                    <a class="dropdown-item delete_data" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>"><span class="fa fa-trash text-danger"></span> Delete</a>
@@ -88,6 +89,33 @@
 		$('.delete_data').click(function(){
 			_conf("Are you sure to delete this payment receipt permanently? Associated invoice balances and journal entries will be updated.","delete_payment",[$(this).attr('data-id')])
 		})
+		$('.send_email').click(function(){
+			var id = $(this).attr('data-id');
+			var email = $(this).attr('data-email');
+			var target_email = prompt("Enter customer email address:", email);
+			if(target_email){
+				start_loader();
+				$.ajax({
+					url: _base_url_ + "classes/Master.php?f=email_payment_receipt",
+					method: "POST",
+					data: { id: id, custom_email: target_email },
+					dataType: "json",
+					error: err => {
+						console.log(err);
+						alert_toast("An error occurred.", 'error');
+						end_loader();
+					},
+					success: function(resp){
+						end_loader();
+						if(resp.status == 'success'){
+							alert_toast(resp.msg, 'success');
+						} else {
+							alert_toast(resp.msg || "Failed to send email.", 'error');
+						}
+					}
+				});
+			}
+		});
 		$('#list').dataTable({
 			columnDefs: [
 					{ orderable: false, targets: [7] }

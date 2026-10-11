@@ -74,6 +74,9 @@ $status_class = [
                 <i class="fa fa-money-bill-wave"></i> Record Receipt
             </a>
             <?php endif; ?>
+            <button type="button" id="btn_email_inv" class="btn btn-sm btn-warning">
+                <i class="fa fa-envelope"></i> Email Invoice
+            </button>
             <button onclick="window.print()" class="btn btn-sm btn-secondary">
                 <i class="fa fa-print"></i> Print Invoice
             </button>
@@ -232,7 +235,35 @@ $status_class = [
             </div>
         </div>
 
-        <!-- Footer Signatures -->
+        <script>
+        $(document).ready(function(){
+            $('#btn_email_inv').click(function(){
+                var email = prompt("Enter customer email address:", "<?= htmlspecialchars($invoice['party_email'] ?? '') ?>");
+                if(email){
+                    start_loader();
+                    $.ajax({
+                        url: _base_url_ + "classes/Master.php?f=email_invoice",
+                        method: "POST",
+                        data: { id: "<?= $invoice['id'] ?>", custom_email: email },
+                        dataType: "json",
+                        error: err => {
+                            console.log(err);
+                            alert_toast("An error occurred.", 'error');
+                            end_loader();
+                        },
+                        success: function(resp){
+                            end_loader();
+                            if(resp.status == 'success'){
+                                alert_toast(resp.msg, 'success');
+                            } else {
+                                alert_toast(resp.msg || "Failed to send email.", 'error');
+                            }
+                        }
+                    });
+                }
+            });
+        });
+        </script>
         <div class="row mt-5 pt-4">
             <div class="col-6 text-center">
                 <p class="border-top pt-2 mb-0 font-weight-bold">Customer Signature</p>

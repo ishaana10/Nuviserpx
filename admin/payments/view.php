@@ -242,6 +242,9 @@ $type_label = $payment['type'] === 'receipt' ? 'Payment Receipt' : 'Payment Vouc
 </style>
 
 <div class="no-print text-center mb-3" style="max-width:850px;margin:15px auto;">
+    <button type="button" id="btn_email_receipt" class="btn btn-warning btn-sm">
+        <i class="fa fa-envelope"></i> Email Receipt
+    </button>
     <button onclick="window.print()" class="btn btn-primary btn-sm">
         <i class="fa fa-print"></i> Print Receipt
     </button>
@@ -367,6 +370,35 @@ $type_label = $payment['type'] === 'receipt' ? 'Payment Receipt' : 'Payment Vouc
             </div>
         </div>
 
+        <script>
+        $(document).ready(function(){
+            $('#btn_email_receipt').click(function(){
+                var email = prompt("Enter customer email address:", "<?= htmlspecialchars($payment['party_email'] ?? '') ?>");
+                if(email){
+                    start_loader();
+                    $.ajax({
+                        url: _base_url_ + "classes/Master.php?f=email_payment_receipt",
+                        method: "POST",
+                        data: { id: "<?= $payment['id'] ?>", custom_email: email },
+                        dataType: "json",
+                        error: err => {
+                            console.log(err);
+                            alert_toast("An error occurred.", 'error');
+                            end_loader();
+                        },
+                        success: function(resp){
+                            end_loader();
+                            if(resp.status == 'success'){
+                                alert_toast(resp.msg, 'success');
+                            } else {
+                                alert_toast(resp.msg || "Failed to send email.", 'error');
+                            }
+                        }
+                    });
+                }
+            });
+        });
+        </script>
         <div class="footer-note">
             This is a computer-generated receipt and is valid without a physical signature.<br>
             Thank you for your business.

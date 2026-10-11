@@ -72,6 +72,7 @@
 				                  </button>
 				                  <div class="dropdown-menu" role="menu">
 				                    <a class="dropdown-item" href="./?page=invoices/view&id=<?php echo $row['id'] ?>"><span class="fa fa-eye text-info"></span> View Invoice</a>
+				                    <a class="dropdown-item send_email" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>" data-email="<?php echo htmlspecialchars($row['party_email'] ?? '') ?>"><span class="fa fa-envelope text-warning"></span> Send Email</a>
 				                    <a class="dropdown-item" href="./?page=invoices/manage_invoice&id=<?php echo $row['id'] ?>"><span class="fa fa-edit text-primary"></span> Edit</a>
 				                    <?php if($row['balance'] > 0): ?>
 				                    <a class="dropdown-item" href="./?page=payments/manage_payment&party_id=<?php echo $row['party_id'] ?>&invoice_id=<?php echo $row['id'] ?>"><span class="fa fa-money-bill-wave text-success"></span> Record Receipt</a>
@@ -92,6 +93,33 @@
 		$('.delete_data').click(function(){
 			_conf("Are you sure to delete this invoice permanently? Associated journal entry will also be removed.","delete_invoice",[$(this).attr('data-id')])
 		})
+		$('.send_email').click(function(){
+			var id = $(this).attr('data-id');
+			var email = $(this).attr('data-email');
+			var target_email = prompt("Enter customer email address:", email);
+			if(target_email){
+				start_loader();
+				$.ajax({
+					url: _base_url_ + "classes/Master.php?f=email_invoice",
+					method: "POST",
+					data: { id: id, custom_email: target_email },
+					dataType: "json",
+					error: err => {
+						console.log(err);
+						alert_toast("An error occurred.", 'error');
+						end_loader();
+					},
+					success: function(resp){
+						end_loader();
+						if(resp.status == 'success'){
+							alert_toast(resp.msg, 'success');
+						} else {
+							alert_toast(resp.msg || "Failed to send email.", 'error');
+						}
+					}
+				});
+			}
+		});
 		$('#list').dataTable({
 			columnDefs: [
 					{ orderable: false, targets: [8] }
