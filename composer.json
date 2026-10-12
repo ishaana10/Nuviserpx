@@ -1,0 +1,18 @@
+{
+    "name": "nuvis/erpx",
+    "description": "Nuvis ERPX - Multi-Tenant Enterprise Resource Planning & Accounting System",
+    "type": "project",
+    "license": "proprietary",
+    "require": {
+        "php": ">=8.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "src/"
+        }
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "sort-packages": true
+    }
+}
