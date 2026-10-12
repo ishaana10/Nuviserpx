@@ -19,6 +19,14 @@
 	}
 </style>
 <div class="col-lg-12">
+	<ul class="nav nav-tabs mb-3" id="settingsTab" role="tablist">
+	  <li class="nav-item">
+	    <a class="nav-link active font-weight-bold" href="<?php echo base_url ?>admin/?page=system_info"><i class="fas fa-cogs mr-1"></i> System Information & Email</a>
+	  </li>
+	  <li class="nav-item">
+	    <a class="nav-link text-secondary font-weight-bold" href="<?php echo base_url ?>admin/?page=roles"><i class="fas fa-user-shield mr-1"></i> User Roles & Permissions</a>
+	  </li>
+	</ul>
 	<div class="card card-outline card-primary rounded-0 shadow">
 		<div class="card-header">
 			<h5 class="card-title">System Information</h5>

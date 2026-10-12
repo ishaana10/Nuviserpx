@@ -31,22 +31,6 @@
                         </p>
                       </a>
                     </li>
-                    <li class="nav-item dropdown">
-                      <a href="<?php echo base_url ?>admin/?page=roles" class="nav-link text-light nav-roles">
-                        <i class="nav-icon fas fa-user-shield"></i>
-                        <p>
-                          User Roles & Permissions
-                        </p>
-                      </a>
-                    </li>
-                    <li class="nav-item">
-                      <a href="<?php echo base_url ?>admin/?page=journals" class="nav-link text-light nav-journals">
-                        <i class="nav-icon fas fa-book"></i>
-                        <p>
-                          Journal Entries
-                        </p>
-                      </a>
-                    </li>
                     <li class="nav-header">Commercial Stock & Sales</li>
                     <li class="nav-item">
                       <a href="<?php echo base_url ?>admin/?page=products" class="nav-link text-light nav-products">
@@ -131,6 +115,14 @@
                     </li>
                     <li class="nav-header">Financial Statements & Reports</li>
                     <li class="nav-item">
+                      <a href="<?php echo base_url ?>admin/?page=journals" class="nav-link text-light nav-journals">
+                        <i class="nav-icon fas fa-book"></i>
+                        <p>
+                          Journal Entries
+                        </p>
+                      </a>
+                    </li>
+                    <li class="nav-item">
                       <a href="<?php echo base_url ?>admin/?page=reports/general_ledger" class="nav-link text-light nav-reports_general_ledger">
                         <i class="nav-icon fas fa-book-open"></i>
                         <p>
@@ -187,7 +179,7 @@
                       </a>
                     </li>
                     <?php if($_settings->userdata('type') == 1): ?>
-                    <li class="nav-header">Maintenance</li>
+                    <li class="nav-header">Maintenance & Settings</li>
                     <li class="nav-item dropdown">
                       <a href="<?php echo base_url ?>admin/?page=groups" class="nav-link text-light nav-groups">
                         <i class="nav-icon fas fa-th-list"></i>
@@ -229,10 +221,18 @@
                       </a>
                     </li>
                     <li class="nav-item dropdown">
+                      <a href="<?php echo base_url ?>admin/?page=roles" class="nav-link text-light nav-roles">
+                        <i class="nav-icon fas fa-user-shield"></i>
+                        <p>
+                          User Roles & Permissions
+                        </p>
+                      </a>
+                    </li>
+                    <li class="nav-item dropdown">
                       <a href="<?php echo base_url ?>admin/?page=system_info" class="nav-link text-light nav-system_info">
                         <i class="nav-icon fas fa-cogs"></i>
                         <p>
-                          Settings
+                          System Settings
                         </p>
                       </a>
                     </li>
