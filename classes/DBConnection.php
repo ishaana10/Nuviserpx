@@ -58,6 +58,12 @@ class DBConnection{
                 $this->check_api_migrations();
                 $this->check_rbac_migrations();
             }
+
+            // Run versioned migrations
+            if (class_exists('App\Database\MigrationRunner')) {
+                $runner = new \App\Database\MigrationRunner($this->conn);
+                $runner->run(base_app . 'database/migrations');
+            }
         }    
         
     }
