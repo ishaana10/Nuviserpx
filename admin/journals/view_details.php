@@ -1,5 +1,5 @@
 <?php
-require_once('./../../config.php');
+require_once(__DIR__ . '/../../config.php');
 if(isset($_GET['id'])){
     $qry = $conn->query("SELECT b.*,h.name as `hall`,concat(c.lastname,', ',c.firstname,' ', c.middlename) as fullname, c.contact, c.address from `booking_list` b inner join `hall_list` h on b.hall_id = h.id inner join client_list c on b.client_id = c.id where b.id = '{$_GET['id']}' ");
     if($qry->num_rows > 0){

@@ -1,5 +1,5 @@
 <?php
-require_once('../../config.php');
+require_once(__DIR__ . '/../../config.php');
 
 if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
     echo "<script>alert('Invalid Payment ID'); location.replace('./?page=payments');</script>";

@@ -1,5 +1,5 @@
 <?php 
-require_once('./../../config.php');
+require_once(__DIR__ . '/../../config.php');
 $account_arr = [];
 $group_arr = [];
 if(isset($_GET['id'])){
