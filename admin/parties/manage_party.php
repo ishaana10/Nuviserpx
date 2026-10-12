@@ -1,5 +1,5 @@
 <?php
-require_once('../../config.php');
+require_once(__DIR__ . '/../../config.php');
 if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
     $tenant_id = $_settings->active_tenant_id();
     $party_id_clean = intval($_GET['id']);

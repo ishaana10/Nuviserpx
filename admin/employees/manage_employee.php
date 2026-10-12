@@ -1,5 +1,5 @@
 <?php
-require_once('../../config.php');
+require_once(__DIR__ . '/../../config.php');
 if(isset($_GET['id']) && $_GET['id'] > 0){
     $qry = $conn->query("SELECT * from `employee_list` where id = '{$_GET['id']}' ");
     if($qry->num_rows > 0){

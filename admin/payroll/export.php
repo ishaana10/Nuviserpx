@@ -1,5 +1,5 @@
 <?php
-require_once('../../config.php');
+require_once(__DIR__ . '/../../config.php');
 require_once(base_app . 'classes/FijiPayroll.php');
 
 if(!$_settings->userdata('id')){

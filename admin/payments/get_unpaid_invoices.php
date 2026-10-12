@@ -1,5 +1,5 @@
 <?php
-require_once('../../config.php');
+require_once(__DIR__ . '/../../config.php');
 
 $tenant_id = $_settings->active_tenant_id();
 $party_id = isset($_POST['party_id']) ? (int)$_POST['party_id'] : 0;
