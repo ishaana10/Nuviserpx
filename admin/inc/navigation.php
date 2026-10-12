@@ -115,6 +115,14 @@
                     </li>
                     <li class="nav-header">Financial Statements & Reports</li>
                     <li class="nav-item">
+                      <a href="<?php echo base_url ?>admin/?page=reports" class="nav-link text-light nav-reports">
+                        <i class="nav-icon fas fa-chart-pie"></i>
+                        <p>
+                          Reports Center
+                        </p>
+                      </a>
+                    </li>
+                    <li class="nav-item">
                       <a href="<?php echo base_url ?>admin/?page=journals" class="nav-link text-light nav-journals">
                         <i class="nav-icon fas fa-book"></i>
                         <p>
