@@ -288,7 +288,7 @@ $show_maintenance = $_settings->info('sidenav_show_maintenance') !== '0';
                                     <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=system_info" class="nav-link text-light nav-system_info tree-item">
                                             <i class="nav-icon fas fa-sliders-h"></i>
-                                            <p>System Settings</p>
+                                            <p>System & VMS Settings</p>
                                         </a>
                                     </li>
                                 </ul>

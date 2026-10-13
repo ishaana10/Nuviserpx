@@ -98,6 +98,27 @@
 			</div>
 
 			<hr class="border-primary my-4">
+			<h5 class="text-primary font-weight-bold mb-3"><i class="fas fa-microchip mr-2"></i> FRCS VMS (VAT Monitoring System) Integration</h5>
+			<div class="row">
+				<div class="col-md-6 form-group">
+					<label for="vms_url" class="control-label">SDC Server / VMS API Endpoint URL</label>
+					<input type="text" class="form-control form-control-sm" name="vms_url" id="vms_url" value="<?php echo $_settings->info('vms_url') ? $_settings->info('vms_url') : 'http://localhost:8088/api/v1/sdc' ?>" placeholder="e.g. http://sdc.frcs.org.fj/api/v1">
+				</div>
+				<div class="col-md-3 form-group">
+					<label for="vms_tin" class="control-label">Taxpayer TIN</label>
+					<input type="text" class="form-control form-control-sm" name="vms_tin" id="vms_tin" value="<?php echo $_settings->info('vms_tin') ?>" placeholder="e.g. 50-00000-0-0">
+				</div>
+				<div class="col-md-3 form-group">
+					<label for="vms_status" class="control-label">VMS Integration Mode</label>
+					<select name="vms_status" id="vms_status" class="form-control form-control-sm">
+						<option value="1" <?php echo $_settings->info('vms_status') == '1' ? 'selected' : '' ?>>Enabled (Production / SDC Live)</option>
+						<option value="2" <?php echo $_settings->info('vms_status') == '2' ? 'selected' : '' ?>>Sandbox / Test Environment</option>
+						<option value="0" <?php echo $_settings->info('vms_status') == '0' || !$_settings->info('vms_status') ? 'selected' : '' ?>>Disabled</option>
+					</select>
+				</div>
+			</div>
+
+			<hr class="border-primary my-4">
 			<h5 class="text-primary font-weight-bold mb-3"><i class="fas fa-sliders-h mr-2"></i> Sidebar Navigation Customization</h5>
 			<div class="row">
 				<div class="col-md-4 form-group">
