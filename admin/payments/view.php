@@ -256,14 +256,19 @@ $type_label = $payment['type'] === 'receipt' ? 'Payment Receipt' : 'Payment Vouc
 <div class="receipt-wrapper">
     <!-- Header -->
     <div class="receipt-header">
-        <div class="d-flex justify-content-between align-items-start">
-            <div>
-                <div class="company-name"><?= htmlspecialchars($sys['name'] ?? 'Nuvis ERPX') ?></div>
-                <div style="font-size:0.9rem;opacity:0.9;">
-                    <?= htmlspecialchars($sys['email'] ?? '') ?>
-                    <?php if (!empty($sys['contact'])): ?>
-                        &nbsp;|&nbsp; <?= htmlspecialchars($sys['contact']) ?>
-                    <?php endif; ?>
+        <div class="d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center">
+                <?php if(!empty($_settings->info('logo'))): ?>
+                    <img src="<?= validate_image($_settings->info('logo')) ?>" alt="Logo" class="mr-3 bg-white p-1 rounded" style="max-height: 60px; width: auto; object-fit: contain;">
+                <?php endif; ?>
+                <div>
+                    <div class="company-name"><?= htmlspecialchars($sys['name'] ?? 'Nuvis ERPX') ?></div>
+                    <div style="font-size:0.9rem;opacity:0.9;">
+                        <?= htmlspecialchars($sys['email'] ?? '') ?>
+                        <?php if (!empty($sys['contact'])): ?>
+                            &nbsp;|&nbsp; <?= htmlspecialchars($sys['contact']) ?>
+                        <?php endif; ?>
+                    </div>
                 </div>
             </div>
             <div class="text-right">
