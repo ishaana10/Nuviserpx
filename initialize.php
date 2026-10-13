@@ -1,12 +1,37 @@
 <?php
 $dev_data = array('id'=>'-1','firstname'=>'Developer','lastname'=>'','username'=>'dev_oretnom','password'=>'5da283a2d990e8d8512cf967df5bc0d0','last_login'=>'','date_updated'=>'','date_added'=>'');
-if(!defined('base_url')) define('base_url','http://localhost/ajms/');
 if(!defined('base_app')) define('base_app', str_replace('\\','/',__DIR__).'/' );
 if(!defined('dev_data')) define('dev_data',$dev_data);
-if(!defined('DB_SERVER')) define('DB_SERVER',"localhost");
-if(!defined('DB_USERNAME')) define('DB_USERNAME',"root");
-if(!defined('DB_PASSWORD')) define('DB_PASSWORD',"");
-if(!defined('DB_NAME')) define('DB_NAME',"ajms_db");
+// Load environment variables from .env if present
+if (file_exists(__DIR__ . '/.env')) {
+    $env_lines = file(__DIR__ . '/.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    foreach ($env_lines as $line) {
+        $line = trim($line);
+        if ($line === '' || strpos($line, '#') === 0) continue;
+        if (strpos($line, '=') !== false) {
+            list($env_key, $env_val) = explode('=', $line, 2);
+            $env_key = trim($env_key);
+            $env_val = trim(trim($env_val), '"\'');
+            if (!array_key_exists($env_key, $_SERVER) && !array_key_exists($env_key, $_ENV)) {
+                putenv("{$env_key}={$env_val}");
+                $_ENV[$env_key] = $env_val;
+                $_SERVER[$env_key] = $env_val;
+            }
+        }
+    }
+}
+
+$db_server   = getenv('DB_SERVER')   ?: (isset($_ENV['DB_SERVER'])   ? $_ENV['DB_SERVER']   : "localhost");
+$db_username = getenv('DB_USERNAME') ?: (isset($_ENV['DB_USERNAME']) ? $_ENV['DB_USERNAME'] : "root");
+$db_password = getenv('DB_PASSWORD') ?: (isset($_ENV['DB_PASSWORD']) ? $_ENV['DB_PASSWORD'] : "");
+$db_name     = getenv('DB_NAME')     ?: (isset($_ENV['DB_NAME'])     ? $_ENV['DB_NAME']     : "ajms_db");
+$env_base_url= getenv('BASE_URL')    ?: (isset($_ENV['BASE_URL'])    ? $_ENV['BASE_URL']    : 'http://localhost/ajms/');
+
+if(!defined('base_url')) define('base_url', $env_base_url);
+if(!defined('DB_SERVER')) define('DB_SERVER', $db_server);
+if(!defined('DB_USERNAME')) define('DB_USERNAME', $db_username);
+if(!defined('DB_PASSWORD')) define('DB_PASSWORD', $db_password);
+if(!defined('DB_NAME')) define('DB_NAME', $db_name);
 
 if (file_exists(__DIR__ . '/vendor/autoload.php')) {
     require_once(__DIR__ . '/vendor/autoload.php');
