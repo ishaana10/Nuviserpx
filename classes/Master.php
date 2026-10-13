@@ -408,6 +408,11 @@ class Master extends DBConnection
         return $this->container->make(PayrollService::class)->savePayroll($_POST);
     }
 
+    public function save_batch_payroll()
+    {
+        return $this->container->make(PayrollService::class)->saveBatchPayroll($_POST);
+    }
+
     public function delete_payroll()
     {
         return $this->container->make(PayrollService::class)->deletePayroll(intval($_POST['id'] ?? 0));
@@ -526,6 +531,9 @@ switch ($action) {
         break;
     case 'save_payroll':
         echo $Master->save_payroll();
+        break;
+    case 'save_batch_payroll':
+        echo $Master->save_batch_payroll();
         break;
     case 'delete_payroll':
         echo $Master->delete_payroll();

@@ -1,0 +1,104 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Nuvis ERPX RESTful API",
+    "description": "Multi-tenant Enterprise Resource Planning & Accounting API v1 for Nuvis ERPX.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "Nuvis Technologies",
+      "url": "https://nuvistechnologies.com.fj"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost/ajms/api/v1",
+      "description": "Local Sandbox API Server"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-KEY"
+      }
+    }
+  },
+  "security": [
+    {
+      "ApiKeyAuth": []
+    }
+  ],
+  "paths": {
+    "/health.php": {
+      "get": {
+        "summary": "System Health Check & Operational Metrics",
+        "responses": {
+          "200": {
+            "description": "Healthy System Status"
+          }
+        }
+      }
+    },
+    "/auth.php": {
+      "post": {
+        "summary": "Authenticate User / Key",
+        "responses": {
+          "200": {
+            "description": "Authentication Successful"
+          }
+        }
+      }
+    },
+    "/products.php": {
+      "get": {
+        "summary": "List Products Catalog",
+        "responses": {
+          "200": {
+            "description": "Product List"
+          }
+        }
+      }
+    },
+    "/invoices.php": {
+      "get": {
+        "summary": "List Invoices",
+        "responses": {
+          "200": {
+            "description": "Invoice List"
+          }
+        }
+      }
+    },
+    "/payments.php": {
+      "get": {
+        "summary": "List Payment Receipts",
+        "responses": {
+          "200": {
+            "description": "Payment Receipt List"
+          }
+        }
+      }
+    },
+    "/payroll.php": {
+      "get": {
+        "summary": "List Fiji Payroll Runs",
+        "responses": {
+          "200": {
+            "description": "Payroll List"
+          }
+        }
+      }
+    },
+    "/attendance.php": {
+      "post": {
+        "summary": "Log Mobile or Biometric Clock-In / Clock-Out",
+        "responses": {
+          "200": {
+            "description": "Attendance Logged"
+          }
+        }
+      }
+    }
+  }
+}
