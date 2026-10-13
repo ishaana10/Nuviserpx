@@ -11,6 +11,7 @@ use App\Services\PaymentService;
 use App\Services\PayrollService;
 use App\Services\RoleService;
 use App\Services\TenantService;
+use App\Services\VmsService;
 
 require_once(__DIR__ . '/../config.php');
 
@@ -408,6 +409,11 @@ class Master extends DBConnection
         return $this->container->make(PayrollService::class)->savePayroll($_POST);
     }
 
+    public function save_batch_payroll()
+    {
+        return $this->container->make(PayrollService::class)->saveBatchPayroll($_POST);
+    }
+
     public function delete_payroll()
     {
         return $this->container->make(PayrollService::class)->deletePayroll(intval($_POST['id'] ?? 0));
@@ -474,6 +480,38 @@ class Master extends DBConnection
     {
         return $this->container->make(TenantService::class)->deleteTenant(intval($_POST['id'] ?? 0));
     }
+
+    /* VMS Actions */
+    public function save_vms_config()
+    {
+        return $this->container->make(VmsService::class)->saveConfig($_POST);
+    }
+
+    public function enqueue_vms_invoice()
+    {
+        $invoice_id = intval($_POST['invoice_id'] ?? 0);
+        $res = $this->container->make(VmsService::class)->enqueueInvoice($invoice_id);
+        if ($res['status'] === 'success') {
+            $this->settings->set_flashdata('success', $res['msg']);
+        }
+        return json_encode($res);
+    }
+
+    public function process_vms_queue()
+    {
+        $res = $this->container->make(VmsService::class)->processQueue();
+        return json_encode($res);
+    }
+
+    public function retry_vms_queue()
+    {
+        $queue_id = intval($_POST['queue_id'] ?? 0);
+        $res = $this->container->make(VmsService::class)->retryFailedQueue($queue_id);
+        if ($res['status'] === 'success') {
+            $this->settings->set_flashdata('success', $res['msg']);
+        }
+        return json_encode($res);
+    }
 }
 
 $Master = new Master();
@@ -526,6 +564,9 @@ switch ($action) {
         break;
     case 'save_payroll':
         echo $Master->save_payroll();
+        break;
+    case 'save_batch_payroll':
+        echo $Master->save_batch_payroll();
         break;
     case 'delete_payroll':
         echo $Master->delete_payroll();
@@ -592,6 +633,18 @@ switch ($action) {
         break;
     case 'delete_tenant':
         echo $Master->delete_tenant();
+        break;
+    case 'save_vms_config':
+        echo $Master->save_vms_config();
+        break;
+    case 'enqueue_vms_invoice':
+        echo $Master->enqueue_vms_invoice();
+        break;
+    case 'process_vms_queue':
+        echo $Master->process_vms_queue();
+        break;
+    case 'retry_vms_queue':
+        echo $Master->retry_vms_queue();
         break;
     default:
         break;

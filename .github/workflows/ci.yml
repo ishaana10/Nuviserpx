@@ -1,0 +1,38 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main, master, 'feature/*' ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  tests:
+    name: Lint, Static Analysis & PHPUnit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mysqli, pdo, mbstring
+          coverage: none
+
+      - name: Validate Composer
+        run: composer validate --strict
+
+      - name: Install Dependencies
+        run: composer install --prefer-dist --no-progress
+
+      - name: PHP Syntax Check
+        run: find src classes admin api -name "*.php" -exec php -l {} +
+
+      - name: Run PHPStan Static Analysis
+        run: ./vendor/bin/phpstan analyse --no-progress
+
+      - name: Run PHPUnit Tests
+        run: ./vendor/bin/phpunit

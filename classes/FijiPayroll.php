@@ -344,6 +344,46 @@ class FijiPayroll {
     }
 
     /**
+     * Generate FRCS EMS (Employer Monthly Summary / Year-End) CSV
+     */
+    public static function generate_frcs_ems_export($rows, $employerTin = '', $taxYear = '') {
+        $csvRows = [];
+        $csvRows[] = [
+            'Employer TIN',
+            'Tax Year',
+            'Employee Code',
+            'Employee Name',
+            'TIN',
+            'FNPF Number',
+            'Tax Code',
+            'Total Gross Earnings',
+            'Total FNPF Employee',
+            'Total Taxable Income',
+            'Total PAYE Deducted',
+            'Total SRT Deducted'
+        ];
+
+        foreach ($rows as $r) {
+            $csvRows[] = [
+                $employerTin,
+                !empty($taxYear) ? $taxYear : date('Y'),
+                $r['employee_code'] ?? '',
+                $r['emp_name'] ?? '',
+                $r['tin'] ?? '',
+                $r['fnpf_no'] ?? '',
+                $r['tax_code'] ?? 'P',
+                number_format((float)($r['gross_salary'] ?? 0), 2, '.', ''),
+                number_format((float)($r['employee_fnpf'] ?? 0), 2, '.', ''),
+                number_format((float)($r['taxable_income'] ?? 0), 2, '.', ''),
+                number_format((float)($r['paye_tax'] ?? 0), 2, '.', ''),
+                number_format((float)($r['srt_tax'] ?? 0), 2, '.', '')
+            ];
+        }
+
+        return self::to_csv($csvRows);
+    }
+
+    /**
      * Generate FNPF Schedule Export CSV
      */
     public static function generate_fnpf_schedule_export($rows, $employerFnpfRef = '', $runRef = 'PAYROLL') {

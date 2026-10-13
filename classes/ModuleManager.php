@@ -115,4 +115,5 @@ ModuleManager::register_module('invoicing', 'Invoicing & Sales', 'Tax Invoices, 
 ModuleManager::register_module('inventory', 'Commercial Stock & Sales', 'Product Catalog, Stock Movements, Mobile Orders & Proforma');
 ModuleManager::register_module('payroll', 'Fiji Payroll & HR', 'PAYE Tax, FNPF, Batch Processing, Payslips, Compliance Exporters');
 ModuleManager::register_module('emailer', 'Email Notifications', 'SMTP & Mail Delivery Engine for Invoices, Receipts, and OTPs');
+ModuleManager::register_module('vms', 'VAT Monitoring System (VMS 3.0)', 'Fiji FRCS VMS Fiscalization, SDC Integration, Async Queue, Multi-tenant Audit & Fail Logs');
 ?>
