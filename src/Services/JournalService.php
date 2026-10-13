@@ -14,9 +14,26 @@ class JournalService
         private readonly SystemSettings $settings
     ) {}
 
+    public function isPeriodLocked(string $date): bool
+    {
+        $tenant_id = $this->settings->active_tenant_id();
+        $dateEsc = $this->conn->real_escape_string($date);
+        $qry = $this->conn->query("SELECT * FROM `accounting_periods` WHERE tenant_id = '{$tenant_id}' AND status IN ('closed', 'locked') AND start_date <= '{$dateEsc}' AND end_date >= '{$dateEsc}'");
+        return ($qry && $qry->num_rows > 0);
+    }
+
     public function saveJournal(array $post): string
     {
         $tenant_id = $this->settings->active_tenant_id();
+        $journal_date = !empty($post['journal_date']) ? $post['journal_date'] : date('Y-m-d');
+
+        if ($this->isPeriodLocked($journal_date)) {
+            return json_encode([
+                'status' => 'failed',
+                'msg' => "Accounting period for date {$journal_date} is closed or locked. Cannot post journal entry."
+            ]);
+        }
+
         if (empty($post['id'])) {
             $prefix = date("Ym-");
             $code = sprintf("%'.05d", 1);
@@ -128,6 +145,69 @@ class JournalService
             $resp['status'] = 'failed';
             $resp['error'] = $this->conn->error;
         }
+        return json_encode($resp);
+    }
+
+    public function closeAccountingPeriod(array $post): string
+    {
+        $tenant_id = $this->settings->active_tenant_id();
+        $user_id = $this->settings->userdata('id');
+        $name = $this->conn->real_escape_string((string)($post['period_name'] ?? 'Closed Period ' . date('Y-m')));
+        $start = $this->conn->real_escape_string((string)($post['start_date'] ?? date('Y-m-01')));
+        $end = $this->conn->real_escape_string((string)($post['end_date'] ?? date('Y-m-t')));
+
+        $save = $this->conn->query("INSERT INTO `accounting_periods` SET
+            `tenant_id` = '{$tenant_id}',
+            `period_name` = '{$name}',
+            `start_date` = '{$start}',
+            `end_date` = '{$end}',
+            `status` = 'closed',
+            `closed_by` = '{$user_id}',
+            `closed_at` = NOW()");
+
+        if ($save) {
+            $resp['status'] = 'success';
+            $resp['msg'] = "Accounting period '{$name}' closed successfully. Transactions in this period are now locked.";
+            $this->settings->set_flashdata('success', $resp['msg']);
+        } else {
+            $resp['status'] = 'failed';
+            $resp['msg'] = "An error occurred while closing period.";
+            $resp['err'] = $this->conn->error;
+        }
+
+        return json_encode($resp);
+    }
+
+    public function processBankReconciliation(array $post): string
+    {
+        $tenant_id = $this->settings->active_tenant_id();
+        $user_id = $this->settings->userdata('id');
+        $account_id = intval($post['account_id'] ?? 0);
+        $date = $this->conn->real_escape_string((string)($post['statement_date'] ?? date('Y-m-d')));
+        $stmt_bal = (float)($post['statement_balance'] ?? 0.0);
+        $gl_bal = (float)($post['gl_balance'] ?? 0.0);
+        $diff = round($stmt_bal - $gl_bal, 2);
+        $status = ($diff == 0.0) ? 'reconciled' : 'draft';
+
+        $save = $this->conn->query("INSERT INTO `bank_reconciliations` SET
+            `tenant_id` = '{$tenant_id}',
+            `account_id` = '{$account_id}',
+            `statement_date` = '{$date}',
+            `statement_balance` = '{$stmt_bal}',
+            `gl_balance` = '{$gl_bal}',
+            `difference` = '{$diff}',
+            `status` = '{$status}',
+            `reconciled_by` = '{$user_id}'");
+
+        if ($save) {
+            $resp['status'] = 'success';
+            $resp['msg'] = "Bank Reconciliation statement for " . date('M Y', strtotime($date)) . " saved with status: " . strtoupper($status) . ".";
+            $this->settings->set_flashdata('success', $resp['msg']);
+        } else {
+            $resp['status'] = 'failed';
+            $resp['msg'] = "Failed to save bank reconciliation.";
+        }
+
         return json_encode($resp);
     }
 }
