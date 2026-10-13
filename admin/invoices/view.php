@@ -51,24 +51,57 @@ $status_class = [
     'paid'           => 'success',
     'cancelled'      => 'dark'
 ][$invoice['status']] ?? 'secondary';
+
+$inv_view = isset($_GET['view']) ? $_GET['view'] : ($_settings->info('invoice_default_view') ?: 'modern');
+$inv_color = isset($_GET['color']) ? $_GET['color'] : ($_settings->info('invoice_theme_color') ?: '#1e3a8a');
 ?>
 
 <style>
+    :root {
+        --inv-primary: <?= htmlspecialchars($inv_color) ?>;
+    }
     @media print {
         .no-print { display: none !important; }
         .card { border: none !important; box-shadow: none !important; }
         .card-header, .card-footer { display: none !important; }
         body { background: #fff !important; }
     }
-    .invoice-title { font-size: 1.8rem; font-weight: 700; color: #1e3a8a; }
+    .invoice-title { font-size: 1.8rem; font-weight: 700; color: var(--inv-primary); }
+    .bg-inv-primary { background-color: var(--inv-primary) !important; color: #ffffff !important; }
+    .text-inv-primary { color: var(--inv-primary) !important; }
+    .border-inv-primary { border-color: var(--inv-primary) !important; }
+
+    /* Classic View Specific Styling */
+    .invoice-classic-table { border: 2px solid #000 !important; }
+    .invoice-classic-table th, .invoice-classic-table td { border: 1px solid #000 !important; }
+    .invoice-classic-header { border-bottom: 3px double #000 !important; }
 </style>
 
 <div class="card card-outline card-primary">
-    <div class="card-header no-print">
-        <h3 class="card-title">
+    <div class="card-header no-print d-flex justify-content-between align-items-center">
+        <h3 class="card-title m-0">
             Invoice <strong>#<?= htmlspecialchars($invoice['invoice_no']) ?></strong>
         </h3>
-        <div class="card-tools">
+        <div class="card-tools d-flex align-items-center gap-2">
+            <!-- View Selector Dropdown -->
+            <div class="btn-group mr-2">
+                <button type="button" class="btn btn-sm btn-outline-navy dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                    <i class="fas fa-palette mr-1"></i> View Style: <?= ucfirst($inv_view) ?>
+                </button>
+                <div class="dropdown-menu dropdown-menu-right">
+                    <a class="dropdown-menu-item dropdown-item <?= $inv_view == 'modern' ? 'active' : '' ?>" href="./?page=invoices/view&id=<?= $id ?>&view=modern&color=<?= urlencode($inv_color) ?>">Modern View</a>
+                    <a class="dropdown-menu-item dropdown-item <?= $inv_view == 'classic' ? 'active' : '' ?>" href="./?page=invoices/view&id=<?= $id ?>&view=classic&color=<?= urlencode($inv_color) ?>">Classic View</a>
+                    <a class="dropdown-menu-item dropdown-item <?= $inv_view == 'minimalist' ? 'active' : '' ?>" href="./?page=invoices/view&id=<?= $id ?>&view=minimalist&color=<?= urlencode($inv_color) ?>">Minimalist View</a>
+                    <div class="dropdown-divider"></div>
+                    <div class="dropdown-header">Accent Color Theme</div>
+                    <a class="dropdown-item" href="./?page=invoices/view&id=<?= $id ?>&view=<?= $inv_view ?>&color=%231e3a8a"><span class="badge badge-primary mr-1">&nbsp;</span> Navy Blue</a>
+                    <a class="dropdown-item" href="./?page=invoices/view&id=<?= $id ?>&view=<?= $inv_view ?>&color=%23059669"><span class="badge badge-success mr-1">&nbsp;</span> Emerald Green</a>
+                    <a class="dropdown-item" href="./?page=invoices/view&id=<?= $id ?>&view=<?= $inv_view ?>&color=%237c3aed"><span class="badge badge-purple mr-1" style="background:#7c3aed;color:#fff;">&nbsp;</span> Royal Purple</a>
+                    <a class="dropdown-item" href="./?page=invoices/view&id=<?= $id ?>&view=<?= $inv_view ?>&color=%23dc2626"><span class="badge badge-danger mr-1">&nbsp;</span> Crimson Red</a>
+                    <a class="dropdown-item" href="./?page=invoices/view&id=<?= $id ?>&view=<?= $inv_view ?>&color=%23111827"><span class="badge badge-dark mr-1">&nbsp;</span> Charcoal Black</a>
+                </div>
+            </div>
+
             <?php if($invoice['balance'] > 0): ?>
             <a href="./?page=payments/manage_payment&party_id=<?= $invoice['party_id'] ?>&invoice_id=<?= $invoice['id'] ?>" class="btn btn-sm btn-success">
                 <i class="fa fa-money-bill-wave"></i> Record Receipt
