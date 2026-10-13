@@ -307,8 +307,10 @@ class SystemSettings extends DBConnection{
 		}
 	}
 }
-$_settings = new SystemSettings();
-$_settings->load_system_info();
+if (!defined('PHPUNIT_TEST_MODE') || !PHPUNIT_TEST_MODE) {
+    $_settings = new SystemSettings();
+    $_settings->load_system_info();
+}
 $action = !isset($_GET['f']) ? 'none' : strtolower($_GET['f']);
 $sysset = new SystemSettings();
 switch ($action) {
