@@ -459,6 +459,14 @@ $tenant_id = $_settings->active_tenant_id();
     </div>
 </div>
 
+        <!-- Tenant & Module Scope Info Banner -->
+        <div class="alert alert-light border shadow-sm mb-4 d-flex justify-content-between align-items-center">
+            <div>
+                <i class="fas fa-building text-primary mr-1"></i> Active Tenant Scope: <strong><?= htmlspecialchars($_settings->info('name') ?: 'Active Tenant') ?></strong> (Tenant ID: <?= $tenant_id ?>)
+            </div>
+            <span class="badge badge-primary px-3 py-1 font-weight-normal"><i class="fas fa-user-shield mr-1"></i> Access Level: <?= htmlspecialchars($_settings->get_user_role()['name'] ?? 'User') ?></span>
+        </div>
+
 <!-- Modal for Report Parameter Customization -->
 <div class="modal fade" id="reportCustomizeModal" tabindex="-1" role="dialog" aria-labelledby="reportCustomizeModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered" role="document">
