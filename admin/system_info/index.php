@@ -96,6 +96,64 @@
 					<input type="password" class="form-control form-control-sm" name="smtp_pass" id="smtp_pass" value="<?php echo $_settings->info('smtp_pass') ?>">
 				</div>
 			</div>
+
+			<hr class="border-primary my-4">
+			<h5 class="text-primary font-weight-bold mb-3"><i class="fas fa-sliders-h mr-2"></i> Sidebar Navigation Customization</h5>
+			<div class="row">
+				<div class="col-md-4 form-group">
+					<label for="sidenav_theme" class="control-label">Sidebar Theme</label>
+					<select name="sidenav_theme" id="sidenav_theme" class="form-control form-control-sm">
+						<option value="sidebar-dark-navy" <?php echo $_settings->info('sidenav_theme') == 'sidebar-dark-navy' ? 'selected' : '' ?>>Navy Dark (Default)</option>
+						<option value="sidebar-dark-primary" <?php echo $_settings->info('sidenav_theme') == 'sidebar-dark-primary' ? 'selected' : '' ?>>Primary Dark</option>
+						<option value="sidebar-dark-dark" <?php echo $_settings->info('sidenav_theme') == 'sidebar-dark-dark' ? 'selected' : '' ?>>Charcoal Dark</option>
+						<option value="sidebar-light-primary" <?php echo $_settings->info('sidenav_theme') == 'sidebar-light-primary' ? 'selected' : '' ?>>Clean Light</option>
+					</select>
+				</div>
+				<div class="col-md-4 form-group">
+					<label for="sidenav_mode" class="control-label">Navigation Style</label>
+					<select name="sidenav_mode" id="sidenav_mode" class="form-control form-control-sm">
+						<option value="accordion" <?php echo $_settings->info('sidenav_mode') == 'accordion' || !$_settings->info('sidenav_mode') ? 'selected' : '' ?>>Accordion Collapsible Groups</option>
+						<option value="expanded" <?php echo $_settings->info('sidenav_mode') == 'expanded' ? 'selected' : '' ?>>Always Expanded Groups</option>
+					</select>
+				</div>
+				<div class="col-md-4 form-group">
+					<label for="sidenav_compact" class="control-label">Compact Density</label>
+					<select name="sidenav_compact" id="sidenav_compact" class="form-control form-control-sm">
+						<option value="1" <?php echo $_settings->info('sidenav_compact') == '1' || !$_settings->info('sidenav_compact') ? 'selected' : '' ?>>Compact (Modern)</option>
+						<option value="0" <?php echo $_settings->info('sidenav_compact') == '0' ? 'selected' : '' ?>>Normal Spacing</option>
+					</select>
+				</div>
+			</div>
+			<div class="row">
+				<div class="col-md-3 form-group">
+					<label class="control-label d-block">Show Commercial Group</label>
+					<select name="sidenav_show_commercial" class="form-control form-control-sm">
+						<option value="1" <?php echo $_settings->info('sidenav_show_commercial') !== '0' ? 'selected' : '' ?>>Show</option>
+						<option value="0" <?php echo $_settings->info('sidenav_show_commercial') === '0' ? 'selected' : '' ?>>Hide</option>
+					</select>
+				</div>
+				<div class="col-md-3 form-group">
+					<label class="control-label d-block">Show Payroll & HR Group</label>
+					<select name="sidenav_show_payroll" class="form-control form-control-sm">
+						<option value="1" <?php echo $_settings->info('sidenav_show_payroll') !== '0' ? 'selected' : '' ?>>Show</option>
+						<option value="0" <?php echo $_settings->info('sidenav_show_payroll') === '0' ? 'selected' : '' ?>>Hide</option>
+					</select>
+				</div>
+				<div class="col-md-3 form-group">
+					<label class="control-label d-block">Show Financial Group</label>
+					<select name="sidenav_show_financial" class="form-control form-control-sm">
+						<option value="1" <?php echo $_settings->info('sidenav_show_financial') !== '0' ? 'selected' : '' ?>>Show</option>
+						<option value="0" <?php echo $_settings->info('sidenav_show_financial') === '0' ? 'selected' : '' ?>>Hide</option>
+					</select>
+				</div>
+				<div class="col-md-3 form-group">
+					<label class="control-label d-block">Show Maintenance Group</label>
+					<select name="sidenav_show_maintenance" class="form-control form-control-sm">
+						<option value="1" <?php echo $_settings->info('sidenav_show_maintenance') !== '0' ? 'selected' : '' ?>>Show</option>
+						<option value="0" <?php echo $_settings->info('sidenav_show_maintenance') === '0' ? 'selected' : '' ?>>Hide</option>
+					</select>
+				</div>
+			</div>
 			</form>
 		</div>
 		<div class="card-footer">
