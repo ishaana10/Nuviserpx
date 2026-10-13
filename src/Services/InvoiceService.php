@@ -166,6 +166,20 @@ class InvoiceService
             $resp['status'] = 'success';
             $resp['msg'] = empty($id) ? " Invoice created successfully." : " Invoice updated successfully.";
             $this->settings->set_flashdata('success', $resp['msg']);
+
+            // Auto-enqueue for FRCS VMS Fiscalization if enabled
+            try {
+                $vmsService = new VmsService($this->conn, $this->settings);
+                $vmsConfig = $vmsService->getConfig($tenant_id);
+                if (!empty($vmsConfig['auto_fiscalize'])) {
+                    $vmsService->enqueueInvoice((int)$invoice_id, $tenant_id);
+                    if (!empty($vmsConfig['is_sandbox'])) {
+                        $vmsService->processQueue($tenant_id);
+                    }
+                }
+            } catch (\Throwable $t) {
+                // Ignore VMS auto-enqueue error so invoice save is not interrupted
+            }
         } else {
             $resp['status'] = 'failed';
             $resp['msg'] = "An error occurred while saving invoice.";

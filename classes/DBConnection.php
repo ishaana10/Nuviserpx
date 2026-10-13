@@ -19,6 +19,10 @@ class DBConnection{
                 mysqli_report(MYSQLI_REPORT_OFF);
             }
 
+            if (defined('PHPUNIT_TEST_MODE') && PHPUNIT_TEST_MODE) {
+                return;
+            }
+
             // Attempt connection to host and database
             @$this->conn = new mysqli($this->host, $this->username, $this->password, $this->database);
             
