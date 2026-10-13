@@ -57,6 +57,7 @@ class DBConnection{
                 $this->check_stock_migrations();
                 $this->check_api_migrations();
                 $this->check_rbac_migrations();
+                $this->check_audit_migrations();
             }
 
             // Run versioned migrations
@@ -228,6 +229,28 @@ class DBConnection{
         foreach ($queries as $sql) {
             @$this->conn->query($sql);
         }
+    }
+
+    public function check_audit_migrations(){
+        if (!$this->conn) return;
+
+        $sql = "CREATE TABLE IF NOT EXISTS `audit_logs` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `tenant_id` int(30) NOT NULL DEFAULT 1,
+          `user_id` int(30) DEFAULT NULL,
+          `username` varchar(150) DEFAULT NULL,
+          `module` varchar(100) NOT NULL DEFAULT 'System',
+          `action` varchar(100) NOT NULL,
+          `details` text DEFAULT NULL,
+          `ip_address` varchar(45) DEFAULT NULL,
+          `user_agent` text DEFAULT NULL,
+          `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+          PRIMARY KEY (`id`),
+          KEY `tenant_id` (`tenant_id`),
+          KEY `user_id` (`user_id`),
+          KEY `created_at` (`created_at`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+        @$this->conn->query($sql);
     }
 
     public function check_rbac_migrations(){
