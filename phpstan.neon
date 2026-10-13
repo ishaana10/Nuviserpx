@@ -1,0 +1,13 @@
+parameters:
+    level: 5
+    paths:
+        - src
+    scanFiles:
+        - initialize.php
+        - config.php
+        - classes/DBConnection.php
+        - classes/SystemSettings.php
+        - classes/FijiPayroll.php
+        - classes/Emailer.php
+    bootstrapFiles:
+        - vendor/autoload.php
