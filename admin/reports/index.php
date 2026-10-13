@@ -464,7 +464,7 @@ $tenant_id = $_settings->active_tenant_id();
             <div>
                 <i class="fas fa-building text-primary mr-1"></i> Active Tenant Scope: <strong><?= htmlspecialchars($_settings->info('name') ?: 'Active Tenant') ?></strong> (Tenant ID: <?= $tenant_id ?>)
             </div>
-            <span class="badge badge-primary px-3 py-1 font-weight-normal"><i class="fas fa-user-shield mr-1"></i> Access Level: <?= htmlspecialchars($_settings->get_user_role()['name'] ?? 'User') ?></span>
+            <span class="badge badge-primary px-3 py-1 font-weight-normal"><i class="fas fa-user-shield mr-1"></i> Access Level: <?= htmlspecialchars(method_exists($_settings, 'get_user_role') ? ($_settings->get_user_role()['name'] ?? 'User') : ($_settings->userdata('type') == 1 ? 'Administrator' : 'Staff User')) ?></span>
         </div>
 
 <!-- Modal for Report Parameter Customization -->
