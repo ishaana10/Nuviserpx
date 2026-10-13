@@ -173,11 +173,40 @@ $show_maintenance = $_settings->info('sidenav_show_maintenance') !== '0';
                                 </a>
                                 <ul class="nav nav-treeview">
                                     <?php if($_settings->can_access('reports_view')): ?>
-                                    <li class="nav-item">
+                                    <li class="nav-item has-treeview">
                                         <a href="<?php echo base_url ?>admin/?page=reports" class="nav-link text-light nav-reports tree-item">
                                             <i class="nav-icon fas fa-chart-pie"></i>
-                                            <p>Reports Center</p>
+                                            <p>
+                                                Reports Center
+                                                <i class="right fas fa-angle-left"></i>
+                                            </p>
                                         </a>
+                                        <ul class="nav nav-treeview pl-3">
+                                            <li class="nav-item">
+                                                <a href="<?php echo base_url ?>admin/?page=reports&tab=sales" class="nav-link text-light py-1">
+                                                    <i class="fas fa-shopping-cart nav-icon font-size-xs"></i>
+                                                    <p class="small">Sales & AR Reports</p>
+                                                </a>
+                                            </li>
+                                            <li class="nav-item">
+                                                <a href="<?php echo base_url ?>admin/?page=reports&tab=purchases" class="nav-link text-light py-1">
+                                                    <i class="fas fa-wallet nav-icon font-size-xs"></i>
+                                                    <p class="small">Purchases & Expenses</p>
+                                                </a>
+                                            </li>
+                                            <li class="nav-item">
+                                                <a href="<?php echo base_url ?>admin/?page=reports&tab=financial" class="nav-link text-light py-1">
+                                                    <i class="fas fa-chart-line nav-icon font-size-xs"></i>
+                                                    <p class="small">Financials & Taxes</p>
+                                                </a>
+                                            </li>
+                                            <li class="nav-item">
+                                                <a href="<?php echo base_url ?>admin/?page=reports&tab=payroll" class="nav-link text-light py-1">
+                                                    <i class="fas fa-users nav-icon font-size-xs"></i>
+                                                    <p class="small">Payroll & HR Reports</p>
+                                                </a>
+                                            </li>
+                                        </ul>
                                     </li>
                                     <?php endif; ?>
 
