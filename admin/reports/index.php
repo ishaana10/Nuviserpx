@@ -1,5 +1,5 @@
 <?php
-$tenant_id = $_settings->active_tenant_id();
+$tenant_id = method_exists($_settings, 'active_tenant_id') ? $_settings->active_tenant_id() : 1;
 $active_tab = isset($_GET['tab']) ? $_GET['tab'] : 'all';
 ?>
 
