@@ -88,13 +88,18 @@ $status_class = [
 
     <div class="card-body p-4" id="print-area">
         <!-- Header -->
-        <div class="row border-bottom pb-3 mb-4">
-            <div class="col-md-6">
-                <h3 class="font-weight-bold text-navy mb-1"><?= htmlspecialchars($sys['name'] ?? 'Nuvis ERPX') ?></h3>
-                <p class="mb-0 text-muted small"><?= htmlspecialchars($sys['address'] ?? 'Fiji Islands') ?></p>
-                <p class="mb-0 text-muted small">
-                    <b>Email:</b> <?= htmlspecialchars($sys['email'] ?? '') ?> | <b>Phone:</b> <?= htmlspecialchars($sys['contact'] ?? '') ?>
-                </p>
+        <div class="row border-bottom pb-3 mb-4 align-items-center">
+            <div class="col-md-6 d-flex align-items-center">
+                <?php if(!empty($_settings->info('logo'))): ?>
+                    <img src="<?= validate_image($_settings->info('logo')) ?>" alt="Logo" class="mr-3 rounded" style="max-height: 75px; width: auto; object-fit: contain;">
+                <?php endif; ?>
+                <div>
+                    <h3 class="font-weight-bold text-navy mb-1"><?= htmlspecialchars($sys['name'] ?? 'Nuvis ERPX') ?></h3>
+                    <p class="mb-0 text-muted small"><?= htmlspecialchars($sys['address'] ?? 'Fiji Islands') ?></p>
+                    <p class="mb-0 text-muted small">
+                        <b>Email:</b> <?= htmlspecialchars($sys['email'] ?? '') ?> | <b>Phone:</b> <?= htmlspecialchars($sys['contact'] ?? '') ?>
+                    </p>
+                </div>
             </div>
             <div class="col-md-6 text-right">
                 <div class="invoice-title">TAX INVOICE</div>
