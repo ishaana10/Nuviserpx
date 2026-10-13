@@ -82,6 +82,17 @@ class InventoryService
         if ($save) {
             $resp['status'] = 'success';
             $resp['msg'] = empty($id) ? " Product added successfully." : " Product details updated successfully.";
+            $resp['product'] = [
+                'id' => !empty($id) ? (int)$id : (int)$product_id,
+                'product_code' => $product_code,
+                'name' => $name,
+                'category' => $category,
+                'unit' => $unit,
+                'cost_price' => $cost_price,
+                'selling_price' => $selling_price,
+                'stock_quantity' => $stock_quantity,
+                'description' => $description
+            ];
             $this->settings->set_flashdata('success', $resp['msg']);
         } else {
             $resp['status'] = 'failed';
