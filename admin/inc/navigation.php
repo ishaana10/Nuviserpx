@@ -400,6 +400,27 @@ if($t_qry && $t_qry->num_rows > 0){
                             </li>
                             <?php endif; ?>
 
+                            <!-- 10. Developer Tools (Admin / Developer only) -->
+                            <?php if($_settings->userdata('type') == 1): ?>
+                            <li class="nav-item has-treeview">
+                                <a href="#" class="nav-link nav-is-tree">
+                                    <i class="nav-icon fas fa-code text-warning"></i>
+                                    <p>
+                                        Developer
+                                        <i class="right fas fa-chevron-right text-xs"></i>
+                                    </p>
+                                </a>
+                                <ul class="nav nav-treeview">
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=developer/git_update" class="nav-link nav-developer_git_update tree-item">
+                                            <i class="nav-icon fas fa-code-branch text-info"></i>
+                                            <p>Git Update Module</p>
+                                        </a>
+                                    </li>
+                                </ul>
+                            </li>
+                            <?php endif; ?>
+
                         </ul>
                     </nav>
                 </div>

@@ -474,6 +474,28 @@ class Master extends DBConnection
     {
         return $this->container->make(TenantService::class)->deleteTenant(intval($_POST['id'] ?? 0));
     }
+
+    public function git_pull()
+    {
+        if ($this->settings->userdata('type') != 1) {
+            return json_encode(['status' => 'failed', 'msg' => 'Access denied']);
+        }
+        $branch = trim((string)shell_exec('git rev-parse --abbrev-ref HEAD 2>&1'));
+        if (empty($branch)) {
+            $branch = 'main';
+        }
+        $output = shell_exec("git pull origin {$branch} 2>&1");
+        return json_encode(['status' => 'success', 'msg' => 'Git pull executed.', 'output' => $output]);
+    }
+
+    public function git_fetch()
+    {
+        if ($this->settings->userdata('type') != 1) {
+            return json_encode(['status' => 'failed', 'msg' => 'Access denied']);
+        }
+        $output = shell_exec("git fetch 2>&1 && git status 2>&1");
+        return json_encode(['status' => 'success', 'msg' => 'Git fetch executed.', 'output' => $output]);
+    }
 }
 
 $Master = new Master();
@@ -592,6 +614,12 @@ switch ($action) {
         break;
     case 'delete_tenant':
         echo $Master->delete_tenant();
+        break;
+    case 'git_pull':
+        echo $Master->git_pull();
+        break;
+    case 'git_fetch':
+        echo $Master->git_fetch();
         break;
     default:
         break;
