@@ -1,134 +1,146 @@
-# Nuvis ERPX - Multi-Tenant Enterprise Resource Planning & Accounting System
+# Nuvis ERPX — Enterprise Resource Planning & Accounting System
 
-**Property of Nuvis Technologies** ([nuvistechnologies.com.fj](https://nuvistechnologies.com.fj))
-
-Nuvis ERPX is a modern, high-performance, multi-tenant Enterprise Resource Planning (ERP) and Financial Accounting software suite engineered for regional and international enterprise compliance, featuring localized Fiji Payroll, Commercial Invoicing, Inventory & Stock Movement, General Ledger Financial Reporting, RESTful API v1 Engine, Email Notifications, and Granular Role-Based Access Control (RBAC).
+**Nuvis ERPX** is a complete, multi-tenant Enterprise Resource Planning (ERP), Accounting Journal Management, and HR/Payroll system developed by **Nuvis Technologies** ([nuvistechnologies.com.fj](https://nuvistechnologies.com.fj)).
 
 ---
 
-## 🚀 Key Features & Modules
+## Key Features
 
-### 1. 🇫🇯 Localized Fiji Compliance Payroll Engine (`classes/FijiPayroll.php`)
-- **PAYE Progressive Tax Brackets**: Automatically calculates Fiji resident progressive tax (0%, 18%, 20%) across Monthly, Fortnightly, Weekly, and Bi-weekly frequencies.
-- **Social Responsibility Tax (SRT)**: Progressive SRT calculation for annual high earners above FJD $270,000.
-- **Non-Resident Flat Tax**: 20% flat PAYE tax calculation for non-resident employees.
-- **FNPF Contributions**: 8% Employee and 8% Employer FNPF deduction calculation on eligible wage base.
-- **Workcare & Training Levies**: 1% Workcare levy calculations for employer liability compliance.
-- **Compliance CSV Exporters**:
-  - **FRCS TPOS PAYE Return Export**
-  - **FRCS EMS Year-End Summary Export**
-  - **FNPF Schedule Return Export**
-  - **Bank File Exporters**: Direct CSV file generation for BSP, ANZ, HFC, BRED, and generic bank ABA formats.
-
-### 2. 🧾 Invoicing & Payment Receipts (`admin/invoices/`, `admin/payments/`)
-- Tax Invoices with line item VAT calculations (15% default), discounts, subtotal, and total due tracking.
-- Multi-invoice payment receipting with partial and full balance allocations.
-- Automated double-entry General Ledger journal postings on invoice creation and payment receipt posting.
-- Printable, professional PDF/HTML payment receipts and tax invoices.
-
-### 3. 📦 Commercial Stock & On-The-Go Mobile Order Taking (`admin/products/`, `admin/sales_orders/`)
-- Product SKU catalog with cost price, selling price, units, stock quantities, and low stock warnings.
-- Mobile-responsive sales order taker and proforma invoice generator.
-- Automatic inventory stock deduction and COGS journal entries upon sale confirmation.
-- Inventory movement audit logs for stock adjustments and receiving.
-
-### 4. 📊 Financial Accounting & Reporting (`admin/reports/`)
-- Real-time **General Ledger (GL)** query and drill-down.
-- **Balance Sheet**: Assets = Liabilities + Equity balance verification.
-- **Income Statement (P&L)**: Revenue vs Expense reporting.
-- **Accounts Receivable (AR) Aging**: Outstanding balance aging breakdown (0-30, 31-60, 61-90, 90+ days).
-- **Payroll Accounting Summary**: Total gross, PAYE, FNPF, and employer cost summaries.
-
-### 5. 🛡️ Security, RBAC & Multi-Tenant Scoping
-- **Password Hashing**: Bcrypt (`password_hash()`) security with seamless backward-compatible migration from legacy MD5 hashes upon login.
-- **CSRF Protection**: Form & AJAX token headers (`X-CSRF-TOKEN`).
-- **Session Hardening**: `HttpOnly` and `SameSite=Lax` cookie flags.
-- **Granular RBAC**: Module permission matrix allowing custom role templates per company.
-- **Multi-Tenant Scoping**: All database queries strictly scoped by `$tenant_id`.
-
-### 6. 🌐 RESTful API v1 & Webhooks (`api/v1/`)
-- Token/API Key authenticated RESTful JSON endpoints (`/api/v1/products.php`, `/invoices.php`, `/payments.php`, `/payroll.php`, `/journals.php`, `/attendance.php`, `/health.php`).
-- HMAC-SHA256 signature calculation (`X-Hub-Signature-256`) for webhook delivery.
-- OpenAPI 3.0 specification in `api/v1/openapi.json`.
+- **Multi-Tenant Architecture:** Multi-company support with instant active tenant switching and complete data isolation.
+- **Accounting & Journal Management:** Double-entry journal vouchers, account groups, chart of accounts, trial balance, and working trial balance reports.
+- **Payroll & Human Resources:** Employee master profiles, attendance logging, leave request workflow, automated payroll processing with printable payslips.
+- **Automated Journal Postings:** Payroll disbursements automatically create and post balanced GL journal entries (Debits: Salaries Expense, Credits: Cash/Payable).
+- **Executive ApexCharts Dashboard:** Interactive real-time analytics for financial movement (Debits vs. Credits), department payroll expense distribution, and workforce attendance analytics.
+- **Modern UI & Security:** Glassmorphism dashboard cards, responsive navigation, email OTP password resets, and SMTP settings.
 
 ---
 
-## 🏗️ Architecture & Modern PHP 8.3 Design
+## System Requirements
 
-```
-                     ┌─────────────────────────────┐
-                     │   Nginx / Web Browser / API │
-                     └──────────────┬──────────────┘
-                                    │
-                     ┌──────────────▼──────────────┐
-                     │   App\Core\Container (DI)   │
-                     └──────────────┬──────────────┘
-                                    │
-        ┌───────────────────────────┼───────────────────────────┐
-        │                           │                           │
-┌───────▼────────┐          ┌───────▼────────┐          ┌───────▼────────┐
-│ InvoiceService │          │ PayrollService │          │JournalService  │
-└───────┬────────┘          └───────┬────────┘          └───────┬────────┘
-        │                           │                           │
-        └───────────────────────────┼───────────────────────────┘
-                                    │
-                     ┌──────────────▼──────────────┐
-                     │    MySQL 8.0 / SQLite DB    │
-                     └─────────────────────────────┘
-```
-
-The system uses PSR-4 autoloading (`App\`) with a lightweight Reflection-based Dependency Injection Container (`App\Core\Container`), domain services under `src/Services/`, Enums (`App\Enums\*`), and versioned SQL migrations in `database/migrations/`.
+- **PHP:** Version 7.4 or 8.0+
+- **Database:** MySQL 5.7+ or MariaDB 10.3+
+- **Web Server:** Apache 2.4 (with `mod_rewrite` enabled) or Nginx
+- **Required PHP Extensions:**
+  - `mysqli`
+  - `gd`
+  - `mbstring`
+  - `session`
+  - `json`
 
 ---
 
-## 🛠️ Installation & Setup
+## Step-by-Step Setup & Installation Guide
 
-### Prerequisites
-- PHP 8.2 or 8.3+
-- Composer 2.x
-- MySQL 8.0+ or MariaDB 10.5+
+### Step 1: Download / Clone the Repository
+Clone or place the project files into your web server's root directory (e.g. `/var/www/html/nuvis-erpx` or `C:/xampp/htdocs/nuvis-erpx`).
 
-### Quick Start
 ```bash
-# Clone the repository
-git clone https://github.com/nuvis/erpx.git
-cd erpx
-
-# Install dependencies
-composer install
-
-# Configure database in initialize.php or .env
-cp .env.example .env
-
-# Run PHPUnit tests
-./vendor/bin/phpunit
-
-# Run PHPStan static analysis
-./vendor/bin/phpstan analyse
+git clone https://github.com/ishaana10/Nuvis-payrollx.git nuvis-erpx
+cd nuvis-erpx
 ```
-
-### Docker Compose Setup
-```bash
-docker-compose up -d --build
-```
-Access the application at `http://localhost:8080/admin/`.
 
 ---
 
-## 🧪 Testing & CI Pipeline
-
-Run tests and static analysis:
-```bash
-# Unit & Integration Tests
-./vendor/bin/phpunit
-
-# Static Analysis (Level 5)
-./vendor/bin/phpstan analyse
-```
-
-Continuous Integration is powered by GitHub Actions in `.github/workflows/ci.yml`.
+### Step 2: Create MySQL Database & Import Schema
+1. Open phpMyAdmin or your MySQL CLI client.
+2. Create a new database named `ajms_db` (or your preferred database name):
+   ```sql
+   CREATE DATABASE ajms_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+   ```
+3. Import the SQL file located at `database/ajms_db.sql`:
+   ```bash
+   mysql -u root -p ajms_db < database/ajms_db.sql
+   ```
 
 ---
 
-## 📄 License
-Nuvis ERPX is proprietary software owned by **Nuvis Technologies**. All rights reserved.
+### Step 3: Configure Database & Application Settings (`initialize.php`)
+Open `initialize.php` in the root directory and update your database credentials and `base_url`:
+
+```php
+<?php
+if(!defined('base_url')) define('base_url','http://localhost/nuvis-erpx/'); // Update to match your domain or path
+if(!defined('base_app')) define('base_app', str_replace('\\','/',__DIR__).'/' );
+if(!defined('DB_SERVER')) define('DB_SERVER',"localhost");
+if(!defined('DB_USERNAME')) define('DB_USERNAME',"root");       // Your Database Username
+if(!defined('DB_PASSWORD')) define('DB_PASSWORD',"");           // Your Database Password
+if(!defined('DB_NAME')) define('DB_NAME',"ajms_db");            // Your Database Name
+?>
+```
+
+---
+
+### Step 4: Set Directory Permissions
+Ensure the web server has write permissions for upload folders and directories:
+
+```bash
+chmod -R 775 uploads/
+chmod -R 775 build/
+```
+
+---
+
+### Step 5: Web Server Configuration
+
+#### For Apache (`.htaccess`)
+Ensure `mod_rewrite` and `mod_headers` are enabled in Apache:
+```bash
+sudo a2enmod rewrite headers
+sudo systemctl restart apache2
+```
+
+Ensure your Apache VirtualHost or Directory allows `.htaccess` overrides:
+```apache
+<Directory /var/www/html/nuvis-erpx>
+    Options Indexes FollowSymLinks
+    AllowOverride All
+    Require all granted
+</Directory>
+```
+
+---
+
+## Default Login Credentials
+
+Access the administrator portal at: `http://localhost/nuvis-erpx/admin/`
+
+- **Username:** `admin`
+- **Password:** `admin123`
+
+---
+
+## 🛠️ Troubleshooting HTTP 500 Internal Server Error
+
+If you encounter an **HTTP 500 Internal Server Error** after installation, follow these troubleshooting steps to identify and resolve the root cause:
+
+### 1. Enable PHP Error Display to See the Exact Error
+Open `initialize.php` or `config.php` and temporarily add the following lines at the top:
+```php
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+```
+
+### 2. Verify Database Connection & Credentials
+HTTP 500 errors frequently occur when PHP cannot connect to MySQL due to incorrect database settings or if the database server is stopped.
+- Open `initialize.php` and verify `DB_SERVER`, `DB_USERNAME`, `DB_PASSWORD`, and `DB_NAME`.
+- Ensure MySQL service is running (`systemctl status mysql` or XAMPP Control Panel).
+- Verify database tables exist by running `SHOW TABLES;` inside MySQL.
+
+### 3. Check Apache `.htaccess` Directives
+If `mod_headers` is disabled in Apache, the `Header set Access-Control-Allow-Origin "*"` line in `.htaccess` can cause an HTTP 500 error.
+- Enable `mod_headers`: `sudo a2enmod headers && sudo systemctl restart apache2`
+- Alternatively, temporarily comment out `Header set Access-Control-Allow-Origin "*"` in `.htaccess`.
+
+### 4. Inspect Server Error Logs
+Check your web server error logs for detailed PHP stack traces:
+- **Apache Log (Ubuntu/Debian):** `/var/log/apache2/error.log`
+- **Apache Log (CentOS/RHEL):** `/var/log/httpd/error_log`
+- **XAMPP Log:** `C:/xampp/apache/logs/error.log`
+- **PHP FPM Log:** `/var/log/php8.0-fpm.log`
+
+---
+
+## License & Branding
+
+**Nuvis ERPX** is a property of **Nuvis Technologies** ([nuvistechnologies.com.fj](https://nuvistechnologies.com.fj)). All rights reserved.

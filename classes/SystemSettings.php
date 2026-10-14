@@ -150,28 +150,6 @@ class SystemSettings extends DBConnection{
 		}
 	}
 
-	function log_audit($action, $module = 'System', $details = ''){
-		$tenant_id = $this->active_tenant_id();
-		$user_id = $this->userdata('id') ? (int)$this->userdata('id') : 'NULL';
-		$username = $this->userdata('username') ? $this->conn->real_escape_string($this->userdata('username')) : 'system';
-		$moduleEsc = $this->conn->real_escape_string($module);
-		$actionEsc = $this->conn->real_escape_string($action);
-		$detailsEsc = $this->conn->real_escape_string(is_array($details) || is_object($details) ? json_encode($details) : (string)$details);
-		$ip = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
-		$ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
-
-		$sql = "INSERT INTO `audit_logs` SET
-			`tenant_id` = '{$tenant_id}',
-			`user_id` = {$user_id},
-			`username` = '{$username}',
-			`module` = '{$moduleEsc}',
-			`action` = '{$actionEsc}',
-			`details` = '{$detailsEsc}',
-			`ip_address` = '{$ip}',
-			`user_agent` = '{$ua}'";
-		@$this->conn->query($sql);
-	}
-
 	function active_tenant_id(){
 		if(isset($_SESSION['userdata']['active_tenant_id']) && $_SESSION['userdata']['active_tenant_id'] > 0){
 			return (int)$_SESSION['userdata']['active_tenant_id'];
@@ -307,10 +285,8 @@ class SystemSettings extends DBConnection{
 		}
 	}
 }
-if (!defined('PHPUNIT_TEST_MODE') || !PHPUNIT_TEST_MODE) {
-    $_settings = new SystemSettings();
-    $_settings->load_system_info();
-}
+$_settings = new SystemSettings();
+$_settings->load_system_info();
 $action = !isset($_GET['f']) ? 'none' : strtolower($_GET['f']);
 $sysset = new SystemSettings();
 switch ($action) {
@@ -325,18 +301,6 @@ switch ($action) {
 			$sysset->set_active_tenant($_POST['tenant_id']);
 			echo json_encode(['status' => 'success']);
 		}
-		break;
-	case 'clear_error_log':
-		$log_file = base_app . 'error_log';
-		if(is_file($log_file)){
-			file_put_contents($log_file, '');
-		}
-		echo json_encode(['status' => 'success', 'msg' => 'Error log cleared successfully.']);
-		break;
-	case 'clear_audit_log':
-		$tenant_id = $sysset->active_tenant_id();
-		$sysset->conn->query("DELETE FROM `audit_logs` WHERE tenant_id = '{$tenant_id}'");
-		echo json_encode(['status' => 'success', 'msg' => 'Audit logs cleared successfully.']);
 		break;
 	default:
 		// echo $sysset->index();
