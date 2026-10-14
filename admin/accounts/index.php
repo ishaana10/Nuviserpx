@@ -38,14 +38,15 @@
 				<tbody>
 					<?php 
 						$i = 1;
-						$qry = $conn->query("SELECT * from `account_list` where delete_flag = 0 order by `name` asc ");
+						$tenant_id = $_settings->active_tenant_id();
+						$qry = $conn->query("SELECT * from `account_list` where tenant_id = '{$tenant_id}' and delete_flag = 0 order by `name` asc ");
 						while($row = $qry->fetch_assoc()):
 					?>
 						<tr>
 							<td class="text-center"><?php echo $i++; ?></td>
 							<td class=""><?php echo date("Y-m-d H:i",strtotime($row['date_created'])) ?></td>
-							<td class=""><?php echo $row['name'] ?></td>
-							<td class=""><p class="m-0 truncate-1"><?php echo $row['description'] ?></p></td>
+							<td class=""><?php echo htmlspecialchars($row['name']) ?></td>
+							<td class=""><p class="m-0 truncate-1"><?php echo htmlspecialchars($row['description']) ?></p></td>
 							<td class="text-center">
 								<?php 
 									switch($row['status']){
@@ -71,7 +72,7 @@
 								<div class="dropdown-divider"></div>
 								<a class="dropdown-item edit_data" href="javascript:void(0)" data-id ="<?php echo $row['id'] ?>"><span class="fa fa-edit text-primary"></span> Edit</a>
 								<div class="dropdown-divider"></div>
-								<a class="dropdown-item delete_data" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>"  data-name="<?php echo $row['name'] ?>"><span class="fa fa-trash text-danger"></span> Delete</a>
+								<a class="dropdown-item delete_data" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>"  data-name="<?php echo htmlspecialchars($row['name']) ?>"><span class="fa fa-trash text-danger"></span> Delete</a>
 								</div>
 							</td>
 						</tr>

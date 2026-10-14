@@ -5,8 +5,9 @@ function format_num($number){
 	$decimals = isset($num_ex[1]) ? strlen($num_ex[1]) : 0 ;
 	return number_format($number,$decimals);
 }
-$from = isset($_GET['from']) ? $_GET['from'] : date("Y-m-d",strtotime(date('Y-m-d')." -1 week"));
-$to = isset($_GET['to']) ? $_GET['to'] : date("Y-m-d");
+$tenant_id = $_settings->active_tenant_id();
+$from = isset($_GET['from']) ? $conn->real_escape_string($_GET['from']) : date("Y-m-d",strtotime(date('Y-m-d')." -1 week"));
+$to = isset($_GET['to']) ? $conn->real_escape_string($_GET['to']) : date("Y-m-d");
 ?>
 <div class="card card-outline card-primary">
 	<div class="card-header">
@@ -71,7 +72,7 @@ $to = isset($_GET['to']) ? $_GET['to'] : date("Y-m-d");
 					<?php 
 					$total_debit = 0;
 					$total_credit = 0;
-					$journals = $conn->query("SELECT * FROM `journal_entries` where date(journal_date) BETWEEN '{$from}' and '{$to}' order by date(journal_date) asc");
+					$journals = $conn->query("SELECT * FROM `journal_entries` WHERE tenant_id = '{$tenant_id}' AND date(journal_date) BETWEEN '{$from}' AND '{$to}' ORDER BY date(journal_date) ASC");
 					while($row = $journals->fetch_assoc()):
 					?>
 					<tr>
@@ -79,12 +80,12 @@ $to = isset($_GET['to']) ? $_GET['to'] : date("Y-m-d");
 						<td class=""><?= $row['code'] ?></td>
 						<td class="p-0">
 							<div class="d-flex w-100">
-								<div class="col-6 border"><?= $row['description'] ?></div>
+								<div class="col-6 border"><?= htmlspecialchars($row['description']) ?></div>
 								<div class="col-3 border"></div>
 								<div class="col-3 border"></div>
 							</div>
 							<?php 
-							$jitems = $conn->query("SELECT j.*,a.name as account, g.type as `type` FROM `journal_items` j inner join account_list a on j.account_id = a.id inner join group_list g on j.group_id = g.id where j.journal_id = '{$row['id']}'");
+							$jitems = $conn->query("SELECT j.*, a.name as account, g.type as `type` FROM `journal_items` j INNER JOIN `account_list` a ON j.account_id = a.id INNER JOIN `group_list` g ON j.group_id = g.id WHERE j.journal_id = '{$row['id']}' AND a.tenant_id = '{$tenant_id}'");
 							while($rowss = $jitems->fetch_assoc()):
                                 if($rowss['type'] == 1)
                                     $total_debit += $rowss['amount'];
@@ -92,7 +93,7 @@ $to = isset($_GET['to']) ? $_GET['to'] : date("Y-m-d");
                                     $total_credit += $rowss['amount'];
 							?>
 							<div class="d-flex w-100">
-								<div class="col-6 border"><span class="pl-4"><?= $rowss['account'] ?></span></div>
+								<div class="col-6 border"><span class="pl-4"><?= htmlspecialchars($rowss['account']) ?></span></div>
 								<div class="col-3 border text-right"><?= $rowss['type'] == 1 ? format_num($rowss['amount']) : '' ?></div>
 								<div class="col-3 border text-right"><?= $rowss['type'] == 2 ? format_num($rowss['amount']) : '' ?></div>
 							</div>
@@ -105,7 +106,7 @@ $to = isset($_GET['to']) ? $_GET['to'] : date("Y-m-d");
                     <th colspan="2" class="text-center"></th>
                     <th class="text-right p-0">
                         <div class="d-flex w-100">
-                            <div class="col-6 border text-center">Total</span></div>
+                            <div class="col-6 border text-center">Total</div>
                             <div class="col-3 border text-right"><?= format_num($total_debit) ?></div>
                             <div class="col-3 border text-right"><?= format_num($total_credit) ?></div>
                         </div>
@@ -144,5 +145,4 @@ $to = isset($_GET['to']) ? $_GET['to'] : date("Y-m-d");
 		
 		$('.table td,.table th').addClass('py-1 px-2 align-middle')
 	})
-	
 </script>

@@ -1,7 +1,9 @@
 <?php
 require_once(__DIR__ . '/../../config.php');
+$tenant_id = $_settings->active_tenant_id();
+
 if(isset($_GET['id'])){
-    $qry = $conn->query("SELECT * FROM `account_list` where id = '{$_GET['id']}'");
+    $qry = $conn->query("SELECT * FROM `account_list` where id = '{$_GET['id']}' and tenant_id = '{$tenant_id}'");
     if($qry->num_rows > 0){
         $res = $qry->fetch_array();
         foreach($res as $k => $v){
@@ -16,7 +18,7 @@ if(isset($_GET['id'])){
         <input type="hidden" name="id" value="<?php echo isset($id) ? $id : '' ?>">
         <div class="form-group">
             <label for="name" class="control-label">Name</label>
-            <input type="text" name="name" id="name" class="form-control form-control-border" placeholder="Enter account Name" value ="<?php echo isset($name) ? $name : '' ?>" required>
+            <input type="text" name="name" id="name" class="form-control form-control-border" placeholder="Enter account Name" value ="<?php echo isset($name) ? htmlspecialchars($name) : '' ?>" required>
         </div>
         <div class="form-group">
             <label for="description" class="control-label">Description</label>
