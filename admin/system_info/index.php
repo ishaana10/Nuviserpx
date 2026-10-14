@@ -195,6 +195,7 @@
                     <a href="#section-branding" class="nav-link active"><i class="fas fa-building text-primary"></i> Branding & Identification</a>
                     <a href="#section-smtp" class="nav-link"><i class="fas fa-envelope-open-text text-info"></i> Email & SMTP Settings</a>
                     <a href="#section-vms" class="nav-link"><i class="fas fa-microchip text-warning"></i> FRCS VMS Integration</a>
+                    <a href="#section-redis" class="nav-link"><i class="fas fa-database text-danger"></i> Redis Cache Store</a>
                     <a href="#section-navigation" class="nav-link"><i class="fas fa-bars text-secondary"></i> Sidebar Navigation</a>
                 </div>
             </div>
@@ -249,6 +250,54 @@
                                 </div>
                                 <input type="file" id="coverInput" name="cover" class="d-none" onchange="displayImg2(this)">
                                 <span class="text-muted text-xs mt-1 d-block">Recommended ratio 4:1 (e.g., 1200x300px)</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CARD 4: REDIS CACHE & IN-MEMORY STORE -->
+                <div class="settings-card" id="section-redis">
+                    <div class="settings-card-header d-flex justify-content-between align-items-center">
+                        <h2 class="settings-card-title"><i class="fas fa-database text-danger"></i> Redis Cache & In-Memory Store</h2>
+                        <div class="d-flex align-items-center">
+                            <button type="button" class="btn btn-xs btn-outline-danger font-weight-bold mr-2" id="btn_flush_redis">
+                                <i class="fas fa-trash-alt mr-1"></i> Flush Cache
+                            </button>
+                            <button type="button" class="btn btn-xs btn-outline-primary font-weight-bold" id="btn_test_redis">
+                                <i class="fas fa-plug mr-1"></i> Test Connection
+                            </button>
+                        </div>
+                    </div>
+                    <div class="settings-card-body">
+                        <div class="row mb-3">
+                            <div class="col-md-3 form-group">
+                                <label for="redis_enabled" class="form-label-custom">Redis Module Status</label>
+                                <select name="redis_enabled" id="redis_enabled" class="form-control form-control-modern">
+                                    <option value="1" <?php echo $_settings->info('redis_enabled') == '1' ? 'selected' : '' ?>>Enabled</option>
+                                    <option value="0" <?php echo $_settings->info('redis_enabled') == '0' || !$_settings->info('redis_enabled') ? 'selected' : '' ?>>Disabled</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4 form-group">
+                                <label for="redis_host" class="form-label-custom">Redis Host</label>
+                                <input type="text" name="redis_host" id="redis_host" class="form-control form-control-modern" value="<?php echo htmlspecialchars($_settings->info('redis_host') ?: '127.0.0.1') ?>" placeholder="127.0.0.1">
+                            </div>
+                            <div class="col-md-2 form-group">
+                                <label for="redis_port" class="form-label-custom">Port</label>
+                                <input type="number" name="redis_port" id="redis_port" class="form-control form-control-modern" value="<?php echo htmlspecialchars($_settings->info('redis_port') ?: '6379') ?>" placeholder="6379">
+                            </div>
+                            <div class="col-md-3 form-group">
+                                <label for="redis_db" class="form-label-custom">Database Index</label>
+                                <input type="number" name="redis_db" id="redis_db" class="form-control form-control-modern" value="<?php echo htmlspecialchars($_settings->info('redis_db') ?: '0') ?>" placeholder="0">
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 form-group">
+                                <label for="redis_password" class="form-label-custom">Auth Password / Token</label>
+                                <input type="password" name="redis_password" id="redis_password" class="form-control form-control-modern" value="<?php echo htmlspecialchars($_settings->info('redis_password')) ?>" placeholder="Optional Auth Token">
+                            </div>
+                            <div class="col-md-6 form-group">
+                                <label for="redis_ttl" class="form-label-custom">Cache TTL Lifetime (Seconds)</label>
+                                <input type="number" name="redis_ttl" id="redis_ttl" class="form-control form-control-modern" value="<?php echo htmlspecialchars($_settings->info('redis_ttl') ?: '3600') ?>" placeholder="3600">
                             </div>
                         </div>
                     </div>
@@ -454,6 +503,60 @@
 			} else {
 				passInput.attr('type', 'password');
 				icon.removeClass('fa-eye-slash').addClass('fa-eye');
+			}
+		});
+
+		// Test Redis Connection
+		$('#btn_test_redis').click(function(){
+			start_loader();
+			$.ajax({
+				url: _base_url_ + "classes/SystemSettings.php?f=test_redis_connection",
+				method: "POST",
+				data: {
+					host: $('#redis_host').val(),
+					port: $('#redis_port').val(),
+					password: $('#redis_password').val(),
+					db: $('#redis_db').val()
+				},
+				dataType: "json",
+				error: err => {
+					console.log(err);
+					alert_toast("An error occurred testing Redis.", 'error');
+					end_loader();
+				},
+				success: function(resp){
+					end_loader();
+					if(resp.status == 'success'){
+						alert_toast(resp.msg, 'success');
+					} else {
+						alert_toast(resp.msg || "Failed to connect to Redis.", 'error');
+					}
+				}
+			});
+		});
+
+		// Flush Redis Cache
+		$('#btn_flush_redis').click(function(){
+			if(confirm("Are you sure you want to flush all Redis cache keys?")){
+				start_loader();
+				$.ajax({
+					url: _base_url_ + "classes/SystemSettings.php?f=flush_redis_cache",
+					method: "POST",
+					dataType: "json",
+					error: err => {
+						console.log(err);
+						alert_toast("An error occurred flushing Redis cache.", 'error');
+						end_loader();
+					},
+					success: function(resp){
+						end_loader();
+						if(resp.status == 'success'){
+							alert_toast(resp.msg, 'success');
+						} else {
+							alert_toast(resp.msg || "Failed to flush Redis cache.", 'error');
+						}
+					}
+				});
 			}
 		});
 

@@ -284,6 +284,27 @@ class SystemSettings extends DBConnection{
 			return json_encode(['status' => 'failed', 'msg' => "Failed to send test email. Please check your email configuration."]);
 		}
 	}
+
+	function test_redis_connection(){
+		require_once(__DIR__ . '/../src/Services/RedisCacheService.php');
+		$redis = new \App\Services\RedisCacheService($this);
+		$ping = $redis->ping();
+		if($ping['success']){
+			return json_encode(['status' => 'success', 'msg' => $ping['message']]);
+		} else {
+			return json_encode(['status' => 'failed', 'msg' => $ping['message']]);
+		}
+	}
+
+	function flush_redis_cache(){
+		require_once(__DIR__ . '/../src/Services/RedisCacheService.php');
+		$redis = new \App\Services\RedisCacheService($this);
+		if($redis->flush()){
+			return json_encode(['status' => 'success', 'msg' => 'Redis cache database successfully flushed.']);
+		} else {
+			return json_encode(['status' => 'failed', 'msg' => 'Failed to flush Redis cache or Redis is disconnected.']);
+		}
+	}
 }
 $_settings = new SystemSettings();
 $_settings->load_system_info();
@@ -295,6 +316,12 @@ switch ($action) {
 		break;
 	case 'send_test_email':
 		echo $sysset->send_test_email();
+		break;
+	case 'test_redis_connection':
+		echo $sysset->test_redis_connection();
+		break;
+	case 'flush_redis_cache':
+		echo $sysset->flush_redis_cache();
 		break;
 	case 'switch_tenant':
 		if(isset($_POST['tenant_id'])){
