@@ -14,10 +14,61 @@
 <!-- Navbar -->
       <nav class="main-header navbar navbar-expand navbar-light text-sm shadow-sm">
         <!-- Left navbar links -->
-        <ul class="navbar-nav">
+        <ul class="navbar-nav align-items-center">
           <li class="nav-item">
-          <a class="nav-link" data-widget="pushmenu" href="#" role="button"><i class="fas fa-bars"></i></a>
+            <a class="nav-link" data-widget="pushmenu" href="#" role="button"><i class="fas fa-bars"></i></a>
           </li>
+
+          <!-- Quick "Create New" (+) Dropdown Menu (Inspired by Xero / Nuvis ERP) -->
+          <li class="nav-item dropdown mr-2">
+            <a class="btn btn-primary btn-sm font-weight-bold dropdown-toggle shadow-sm d-flex align-items-center" href="#" id="createNewDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" style="border-radius: 6px; padding: 5px 12px;">
+              <i class="fas fa-plus"></i> <span class="d-none d-md-inline ml-1">Create new</span>
+            </a>
+            <div class="dropdown-menu dropdown-menu-left shadow-lg border-0 rounded-lg p-2" aria-labelledby="createNewDropdown" style="min-width: 250px;">
+              <div class="text-xs font-weight-bold text-uppercase text-muted px-3 py-1 mb-1">Create new</div>
+
+              <a class="dropdown-item d-flex justify-content-between align-items-center py-2 rounded" href="<?php echo base_url ?>admin/?page=invoices/manage_invoice">
+                <span><i class="fas fa-file-invoice text-primary mr-2" style="width: 16px;"></i> Invoice</span>
+                <kbd class="bg-light text-muted border text-xs px-2 py-0">Alt I</kbd>
+              </a>
+
+              <a class="dropdown-item d-flex justify-content-between align-items-center py-2 rounded" href="<?php echo base_url ?>admin/?page=invoices/manage_invoice&type=bill">
+                <span><i class="fas fa-file-invoice-dollar text-danger mr-2" style="width: 16px;"></i> Bill</span>
+                <kbd class="bg-light text-muted border text-xs px-2 py-0">Alt B</kbd>
+              </a>
+
+              <a class="dropdown-item d-flex justify-content-between align-items-center py-2 rounded" href="<?php echo base_url ?>admin/?page=parties">
+                <span><i class="fas fa-address-book text-info mr-2" style="width: 16px;"></i> Contact</span>
+                <kbd class="bg-light text-muted border text-xs px-2 py-0">Alt C</kbd>
+              </a>
+
+              <a class="dropdown-item d-flex justify-content-between align-items-center py-2 rounded" href="<?php echo base_url ?>admin/?page=sales_orders/manage_order">
+                <span><i class="fas fa-file-signature text-warning mr-2" style="width: 16px;"></i> Quote</span>
+                <kbd class="bg-light text-muted border text-xs px-2 py-0">Alt Q</kbd>
+              </a>
+
+              <a class="dropdown-item d-flex justify-content-between align-items-center py-2 rounded" href="<?php echo base_url ?>admin/?page=sales_orders/manage_order&type=po">
+                <span><i class="fas fa-shopping-bag text-secondary mr-2" style="width: 16px;"></i> Purchase order</span>
+                <kbd class="bg-light text-muted border text-xs px-2 py-0">Alt O</kbd>
+              </a>
+
+              <a class="dropdown-item d-flex justify-content-between align-items-center py-2 rounded" href="<?php echo base_url ?>admin/?page=journals/manage_journal">
+                <span><i class="fas fa-book text-success mr-2" style="width: 16px;"></i> Manual journal</span>
+                <kbd class="bg-light text-muted border text-xs px-2 py-0">Alt J</kbd>
+              </a>
+
+              <a class="dropdown-item d-flex justify-content-between align-items-center py-2 rounded" href="<?php echo base_url ?>admin/?page=payments/manage_payment">
+                <span><i class="fas fa-hand-holding-usd text-indigo mr-2" style="width: 16px;"></i> Spend / Receive money</span>
+                <kbd class="bg-light text-muted border text-xs px-2 py-0">Alt S</kbd>
+              </a>
+
+              <a class="dropdown-item d-flex justify-content-between align-items-center py-2 rounded" href="<?php echo base_url ?>admin/?page=journals/manage_journal">
+                <span><i class="fas fa-exchange-alt text-teal mr-2" style="width: 16px;"></i> Transfer money</span>
+                <kbd class="bg-light text-muted border text-xs px-2 py-0">Alt T</kbd>
+              </a>
+            </div>
+          </li>
+
           <li class="nav-item d-none d-sm-inline-block">
             <a href="<?php echo base_url ?>" class="nav-link"><b><?php echo (!isMobileDevice()) ? $_settings->info('name'):$_settings->info('short_name'); ?> - Admin</b></a>
           </li>
@@ -89,6 +140,49 @@
       <!-- /.navbar -->
       <script>
         $(document).ready(function(){
+          // Global Keyboard Shortcuts (Alt + Key) matching Create New dropdown
+          $(document).on('keydown', function(e){
+            if(e.altKey && !e.ctrlKey && !e.shiftKey){
+              var key = e.key ? e.key.toLowerCase() : '';
+              var baseUrl = _base_url_ + 'admin/?page=';
+              switch(key){
+                case 'i':
+                  e.preventDefault();
+                  window.location.href = baseUrl + 'invoices/manage_invoice';
+                  break;
+                case 'b':
+                  e.preventDefault();
+                  window.location.href = baseUrl + 'invoices/manage_invoice&type=bill';
+                  break;
+                case 'c':
+                  e.preventDefault();
+                  window.location.href = baseUrl + 'parties';
+                  break;
+                case 'q':
+                  e.preventDefault();
+                  window.location.href = baseUrl + 'sales_orders/manage_order';
+                  break;
+                case 'o':
+                  e.preventDefault();
+                  window.location.href = baseUrl + 'sales_orders/manage_order&type=po';
+                  break;
+                case 'j':
+                  e.preventDefault();
+                  window.location.href = baseUrl + 'journals/manage_journal';
+                  break;
+                case 's':
+                case 'r':
+                  e.preventDefault();
+                  window.location.href = baseUrl + 'payments/manage_payment';
+                  break;
+                case 't':
+                  e.preventDefault();
+                  window.location.href = baseUrl + 'journals/manage_journal';
+                  break;
+              }
+            }
+          });
+
           $('#tenant-switcher').change(function(){
             var tenant_id = $(this).val();
             start_loader();
