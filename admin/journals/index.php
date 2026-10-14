@@ -5,6 +5,7 @@ function format_num($number){
 	$decimals = isset($num_ex[1]) ? strlen($num_ex[1]) : 0 ;
 	return number_format($number,$decimals);
 }
+$tenant_id = $_settings->active_tenant_id();
 ?>
 <style>
 	th.p-0, td.p-0{
@@ -45,36 +46,36 @@ function format_num($number){
 				</thead>
 				<tbody>
 					<?php 
-					$swhere = "";
+					$swhere = " WHERE tenant_id = '{$tenant_id}' ";
 					if($_settings->userdata('type') != 1){
-						$swhere = " where user_id = '{$_settings->userdata('id')}' ";
+						$swhere .= " AND user_id = '{$_settings->userdata('id')}' ";
 					}
-					$users = $conn->query("SELECT id,username FROM `users` where id in (SELECT `user_id` FROM `journal_entries` {$swhere})");
-					$user_arr = array_column($users->fetch_all(MYSQLI_ASSOC),'username','id');
-					$journals = $conn->query("SELECT * FROM `journal_entries` {$swhere} order by date(journal_date) asc");
+					$users = $conn->query("SELECT id,username FROM `users` WHERE id IN (SELECT `user_id` FROM `journal_entries` {$swhere})");
+					$user_arr = array_column($users ? $users->fetch_all(MYSQLI_ASSOC) : [],'username','id');
+					$journals = $conn->query("SELECT * FROM `journal_entries` {$swhere} ORDER BY date(journal_date) ASC");
 					while($row = $journals->fetch_assoc()):
 					?>
 					<tr>
 						<td class="text-center"><?= date("M d, Y", strtotime($row['journal_date'])) ?></td>
-						<td class=""><?= $row['code'] ?></td>
+						<td class=""><?= htmlspecialchars($row['code']) ?></td>
 						<td class="p-0">
 							<div class="d-flex w-100">
-								<div class="col-6 border"><?= $row['description'] ?></div>
+								<div class="col-6 border"><?= htmlspecialchars($row['description']) ?></div>
 								<div class="col-3 border"></div>
 								<div class="col-3 border"></div>
 							</div>
 							<?php 
-							$jitems = $conn->query("SELECT j.*,a.name as account, g.type as `type` FROM `journal_items` j inner join account_list a on j.account_id = a.id inner join group_list g on j.group_id = g.id where j.journal_id = '{$row['id']}'");
+							$jitems = $conn->query("SELECT j.*,a.name as account, g.type as `type` FROM `journal_items` j INNER JOIN `account_list` a ON j.account_id = a.id INNER JOIN `group_list` g ON j.group_id = g.id WHERE j.journal_id = '{$row['id']}' AND a.tenant_id = '{$tenant_id}'");
 							while($rowss = $jitems->fetch_assoc()):
 							?>
 							<div class="d-flex w-100">
-								<div class="col-6 border"><span class="pl-4"><?= $rowss['account'] ?></span></div>
+								<div class="col-6 border"><span class="pl-4"><?= htmlspecialchars($rowss['account']) ?></span></div>
 								<div class="col-3 border text-right"><?= $rowss['type'] == 1 ? format_num($rowss['amount']) : '' ?></div>
 								<div class="col-3 border text-right"><?= $rowss['type'] == 2 ? format_num($rowss['amount']) : '' ?></div>
 							</div>
 							<?php endwhile; ?>
 						</td>
-						<td><?= isset($user_arr[$row['user_id']]) ? $user_arr[$row['user_id']] : "N/A" ?></td>
+						<td><?= isset($user_arr[$row['user_id']]) ? htmlspecialchars($user_arr[$row['user_id']]) : "N/A" ?></td>
 						<td class="text-center">
 							<button type="button" class="btn btn-flat btn-default btn-sm dropdown-toggle dropdown-icon" data-toggle="dropdown">
 									Action
@@ -83,7 +84,7 @@ function format_num($number){
 							<div class="dropdown-menu" role="menu">
 								<a class="dropdown-item edit_data" href="javascript:void(0)" data-id ="<?php echo $row['id'] ?>"><span class="fa fa-edit text-primary"></span> Edit</a>
 								<div class="dropdown-divider"></div>
-								<a class="dropdown-item delete_data" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>"  data-code="<?php echo $row['code'] ?>"><span class="fa fa-trash text-danger"></span> Delete</a>
+								<a class="dropdown-item delete_data" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>"  data-code="<?php echo htmlspecialchars($row['code']) ?>"><span class="fa fa-trash text-danger"></span> Delete</a>
 							</div>
 						</td>
 					</tr>

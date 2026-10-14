@@ -1,9 +1,11 @@
 <?php 
 require_once(__DIR__ . '/../../config.php');
+$tenant_id = $_settings->active_tenant_id();
+
 $account_arr = [];
 $group_arr = [];
 if(isset($_GET['id'])){
-    $qry = $conn->query("SELECT * FROM `journal_entries` where id = '{$_GET['id']}'");
+    $qry = $conn->query("SELECT * FROM `journal_entries` where id = '{$_GET['id']}' and tenant_id = '{$tenant_id}'");
     if($qry->num_rows > 0){
         $res = $qry->fetch_array();
         foreach($res as $k => $v){
@@ -33,7 +35,7 @@ function format_num($number){
         <div class="row">
             <div class="col-md-6 form-group">
                 <label for="description" class="control-label">Entry Description</label>
-                <textarea rows="2" id="description" name="description" class="form-control form-control-sm rounded-0" required><?= isset($description) ? $description : "" ?></textarea>
+                <textarea rows="2" id="description" name="description" class="form-control form-control-sm rounded-0" required><?= isset($description) ? htmlspecialchars($description) : "" ?></textarea>
             </div>
         </div>
         <div class="row">
@@ -42,12 +44,12 @@ function format_num($number){
                 <select id="account_id" class="from-control form-control-sm form-control-border select2">
                     <option value="" disabled selected></option>
                     <?php 
-                    $accounts = $conn->query("SELECT * FROM `account_list` where delete_flag = 0 and `status` = 1 order by `name` asc ");
+                    $accounts = $conn->query("SELECT * FROM `account_list` where tenant_id = '{$tenant_id}' and delete_flag = 0 and `status` = 1 order by `name` asc ");
                     while($row = $accounts->fetch_assoc()):
                         unset($row['description']);
                         $account_arr[$row['id']] = $row;
                     ?>
-                    <option value="<?= $row['id'] ?>"><?= $row['name'] ?></option>
+                    <option value="<?= $row['id'] ?>"><?= htmlspecialchars($row['name']) ?></option>
                     <?php endwhile; ?>
                 </select>
             </div>
@@ -61,7 +63,7 @@ function format_num($number){
                         unset($row['description']);
                         $group_arr[$row['id']] = $row;
                     ?>
-                    <option value="<?= $row['id'] ?>"><?= $row['name'] ?></option>
+                    <option value="<?= $row['id'] ?>"><?= htmlspecialchars($row['name']) ?></option>
                     <?php endwhile; ?>
                 </select>
             </div>
@@ -95,7 +97,7 @@ function format_num($number){
             <tbody>
                 <?php 
                 if(isset($id)):
-                $jitems = $conn->query("SELECT j.*,a.name as account, g.name as `group`, g.type FROM `journal_items` j inner join account_list a on j.account_id = a.id inner join group_list g on j.group_id = g.id where journal_id = '{$id}'");
+                $jitems = $conn->query("SELECT j.*,a.name as account, g.name as `group`, g.type FROM `journal_items` j inner join account_list a on j.account_id = a.id inner join group_list g on j.group_id = g.id where journal_id = '{$id}' and a.tenant_id = '{$tenant_id}'");
                 while($row = $jitems->fetch_assoc()):
                 ?>
                 <tr>
@@ -106,9 +108,9 @@ function format_num($number){
                         <input type="hidden" name="account_id[]" value="<?= $row['account_id'] ?>">
                         <input type="hidden" name="group_id[]" value="<?= $row['group_id'] ?>">
                         <input type="hidden" name="amount[]" value="<?= $row['amount'] ?>">
-                        <span class="account"><?= $row['account'] ?></span>
+                        <span class="account"><?= htmlspecialchars($row['account']) ?></span>
                     </td>
-                    <td class="group"><?= $row['group'] ?></td>
+                    <td class="group"><?= htmlspecialchars($row['group']) ?></td>
                     <td class="debit_amount text-right"><?= $row['type'] == 1 ? format_num($row['amount']) : '' ?></td>
                     <td class="credit_amount text-right"><?= $row['type'] == 2 ? format_num($row['amount']) : '' ?></td>
                 </tr>

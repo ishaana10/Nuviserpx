@@ -5,8 +5,9 @@ function format_num($number){
 	$decimals = isset($num_ex[1]) ? strlen($num_ex[1]) : 0 ;
 	return number_format($number,$decimals);
 }
-$from = isset($_GET['from']) ? $_GET['from'] : date("Y-m-d",strtotime(date('Y-m-d')." -1 week"));
-$to = isset($_GET['to']) ? $_GET['to'] : date("Y-m-d");
+$tenant_id = $_settings->active_tenant_id();
+$from = isset($_GET['from']) ? $conn->real_escape_string($_GET['from']) : date("Y-m-d",strtotime(date('Y-m-d')." -1 week"));
+$to = isset($_GET['to']) ? $conn->real_escape_string($_GET['to']) : date("Y-m-d");
 ?>
 <style>
 	th.p-0, td.p-0{
@@ -60,17 +61,17 @@ $to = isset($_GET['to']) ? $_GET['to'] : date("Y-m-d");
                 <tbody>
                     <?php 
                     $balance = 0;
-                    $journal = $conn->query("SELECT * FROM `journal_entries` where date(journal_date) BETWEEN '{$from}' and '{$to}'");
+                    $journal = $conn->query("SELECT * FROM `journal_entries` WHERE tenant_id = '{$tenant_id}' AND date(journal_date) BETWEEN '{$from}' AND '{$to}'");
                     $journal_arr = [];
                     while($row = $journal->fetch_assoc()){
                         $journal_arr[$row['id']] = $row;
                     }
-                    $accounts = $conn->query("SELECT * FROM `account_list`  where id in (SELECT account_id FROM `journal_items` where journal_id in (SELECT id FROM `journal_entries` where date(journal_date) BETWEEN '{$from}' and '{$to}' ))");
+                    $accounts = $conn->query("SELECT * FROM `account_list` WHERE tenant_id = '{$tenant_id}' AND delete_flag = 0 AND id IN (SELECT account_id FROM `journal_items` WHERE journal_id IN (SELECT id FROM `journal_entries` WHERE tenant_id = '{$tenant_id}' AND date(journal_date) BETWEEN '{$from}' AND '{$to}' ))");
                     while($arow = $accounts->fetch_assoc()):
-                        $items = $conn->query("SELECT j.*,g.type FROM `journal_items` j inner join group_list g on j.group_id = g.id where j.account_id = '{$arow['id']}' and j.journal_id in (SELECT id FROM `journal_entries` where date(journal_date) BETWEEN '{$from}' and '{$to}' )");
+                        $items = $conn->query("SELECT j.*, g.type FROM `journal_items` j INNER JOIN `group_list` g ON j.group_id = g.id WHERE j.account_id = '{$arow['id']}' AND j.journal_id IN (SELECT id FROM `journal_entries` WHERE tenant_id = '{$tenant_id}' AND date(journal_date) BETWEEN '{$from}' AND '{$to}' )");
                     ?>
                     <tr>
-                        <th colspan="4"><?= $arow['name'] ?></th>
+                        <th colspan="4"><?= htmlspecialchars($arow['name']) ?></th>
                     </tr>
                     <?php 
                     while($irow = $items->fetch_assoc()): 
@@ -81,8 +82,8 @@ $to = isset($_GET['to']) ? $_GET['to'] : date("Y-m-d");
                     ?>
                         <tr>
                             <td><?= isset($journal_arr[$irow['journal_id']]) ? date("M d, Y",strtotime($journal_arr[$irow['journal_id']]['journal_date'])) : "" ?></td>
-                            <td><?= isset($journal_arr[$irow['journal_id']]) ? $journal_arr[$irow['journal_id']]['description'] : "" ?></td>
-                            <td><?= isset($journal_arr[$irow['journal_id']]) ? $journal_arr[$irow['journal_id']]['code'] : "" ?></td>
+                            <td><?= isset($journal_arr[$irow['journal_id']]) ? htmlspecialchars($journal_arr[$irow['journal_id']]['description']) : "" ?></td>
+                            <td><?= isset($journal_arr[$irow['journal_id']]) ? htmlspecialchars($journal_arr[$irow['journal_id']]['code']) : "" ?></td>
                             <td class="text-right"><?= $irow['type'] == 1 ? format_num($irow['amount']) : '-'.(format_num($irow['amount']))  ?></td>
                         </tr>
                     <?php endwhile; ?>
@@ -125,5 +126,4 @@ $to = isset($_GET['to']) ? $_GET['to'] : date("Y-m-d");
 		
 		$('.table td,.table th').addClass('py-1 px-2 align-middle')
 	})
-	
 </script>
