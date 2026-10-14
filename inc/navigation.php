@@ -30,41 +30,6 @@
                         </p>
                       </a>
                     </li>
-                    <li class="nav-item has-treeview">
-                      <a href="#" class="nav-link nav-vms">
-                        <i class="nav-icon fas fa-microchip text-primary"></i>
-                        <p>
-                          VMS 3.0 Module
-                          <i class="right fas fa-angle-left"></i>
-                        </p>
-                      </a>
-                      <ul class="nav nav-treeview">
-                        <li class="nav-item">
-                          <a href="<?php echo base_url ?>?page=vms" class="nav-link nav-vms_index">
-                            <i class="far fa-circle nav-icon"></i>
-                            <p>Dashboard</p>
-                          </a>
-                        </li>
-                        <li class="nav-item">
-                          <a href="<?php echo base_url ?>?page=vms/queue" class="nav-link nav-vms_queue">
-                            <i class="far fa-circle nav-icon"></i>
-                            <p>Queue Manager</p>
-                          </a>
-                        </li>
-                        <li class="nav-item">
-                          <a href="<?php echo base_url ?>?page=vms/logs" class="nav-link nav-vms_logs">
-                            <i class="far fa-circle nav-icon"></i>
-                            <p>Audit & Fail Logs</p>
-                          </a>
-                        </li>
-                        <li class="nav-item">
-                          <a href="<?php echo base_url ?>?page=vms/config" class="nav-link nav-vms_config">
-                            <i class="far fa-circle nav-icon"></i>
-                            <p>FRCS Settings</p>
-                          </a>
-                        </li>
-                      </ul>
-                    </li>
                     <li class="nav-item">
                       <a href="<?php echo base_url ?>?page=manage_registration" class="nav-link nav-manage_registration">
                         <i class="nav-icon fas fa-plus"></i>
