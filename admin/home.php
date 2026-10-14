@@ -195,6 +195,11 @@ $tenant_name = ($tenant_name_qry && $tenant_name_qry->num_rows > 0) ? $tenant_na
             </div>
         </div>
         <div class="d-flex align-items-center gap-2 mt-2 mt-sm-0">
+            <?php if($_settings->can_access('invoices_manage')): ?>
+            <a href="./?page=invoices/manage_invoice" class="btn btn-sm btn-primary bg-gradient-primary font-weight-bold shadow-sm mr-2">
+                <i class="fas fa-plus-circle mr-1"></i> Add New Invoice
+            </a>
+            <?php endif; ?>
             <div class="input-group input-group-sm" style="width: 220px;">
                 <div class="input-group-prepend">
                     <span class="input-group-text bg-white border-right-0"><i class="far fa-calendar-alt text-primary"></i></span>
