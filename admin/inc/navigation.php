@@ -17,29 +17,29 @@ if($t_qry && $t_qry->num_rows > 0){
 ?>
 
 <style>
-/* Xero-inspired Clean Navigation Sidebar */
+/* Xero-inspired Navigation Sidebar - High Contrast White Text */
 .main-sidebar {
-    background-color: #ffffff !important;
-    border-right: 1px solid #e2e8f0;
+    background-color: #0f172a !important;
+    border-right: 1px solid #1e293b;
 }
 
 .main-sidebar .brand-link {
-    background-color: #ffffff !important;
-    border-bottom: 1px solid #f1f5f9;
-    padding: 12px 16px;
+    background-color: #0f172a !important;
+    border-bottom: 1px solid #1e293b;
+    padding: 14px 16px;
     display: flex;
     align-items: center;
     gap: 10px;
 }
 
 .tenant-avatar-badge {
-    width: 30px;
-    height: 30px;
+    width: 32px;
+    height: 32px;
     border-radius: 6px;
     background-color: #ef4444;
     color: #ffffff;
     font-weight: 700;
-    font-size: 0.9rem;
+    font-size: 0.95rem;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -48,33 +48,33 @@ if($t_qry && $t_qry->num_rows > 0){
 .tenant-title-text {
     font-size: 0.95rem;
     font-weight: 700;
-    color: #0f172a;
+    color: #ffffff;
     line-height: 1.2;
 }
 
 .main-sidebar .nav-sidebar .nav-item > .nav-link {
-    color: #334155 !important;
+    color: #ffffff !important;
     border-radius: 6px;
-    margin: 2px 8px;
+    margin: 3px 8px;
     font-weight: 500;
     font-size: 0.92rem;
-    padding: 8px 12px;
+    padding: 9px 12px;
     transition: all 0.15s ease;
 }
 
 .main-sidebar .nav-sidebar .nav-item > .nav-link:hover {
-    background-color: #f1f5f9 !important;
-    color: #0f172a !important;
+    background-color: rgba(255, 255, 255, 0.12) !important;
+    color: #ffffff !important;
 }
 
 .main-sidebar .nav-sidebar .nav-item > .nav-link.active {
-    background-color: #eff6ff !important;
-    color: #2563eb !important;
+    background-color: #e2e8f0 !important;
+    color: #0f172a !important;
     font-weight: 700;
 }
 
 .main-sidebar .nav-sidebar .nav-icon {
-    color: #64748b !important;
+    color: rgba(255, 255, 255, 0.85) !important;
     width: 20px;
     margin-right: 10px;
     text-align: center;
@@ -84,18 +84,28 @@ if($t_qry && $t_qry->num_rows > 0){
     color: #2563eb !important;
 }
 
+.main-sidebar .nav-sidebar .right {
+    color: rgba(255, 255, 255, 0.7) !important;
+}
+
+.main-sidebar .nav-sidebar .nav-link.active .right {
+    color: #0f172a !important;
+}
+
 .main-sidebar .nav-treeview .nav-link {
     padding-left: 2.2rem !important;
     font-size: 0.88rem;
-    color: #475569 !important;
+    color: rgba(255, 255, 255, 0.8) !important;
 }
 
 .main-sidebar .nav-treeview .nav-link:hover {
-    color: #1e293b !important;
+    color: #ffffff !important;
+    background-color: rgba(255, 255, 255, 0.1) !important;
 }
 
 .main-sidebar .nav-treeview .nav-link.active {
     color: #2563eb !important;
+    background-color: #ffffff !important;
     font-weight: 700;
 }
 </style>
