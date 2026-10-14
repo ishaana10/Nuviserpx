@@ -1,5 +1,5 @@
 <?php
-$sidenav_theme = $_settings->info('sidenav_theme') ? $_settings->info('sidenav_theme') : 'sidebar-dark-navy';
+$sidenav_theme = $_settings->info('sidenav_theme') ? $_settings->info('sidenav_theme') : 'sidebar-light-primary';
 $sidenav_mode = $_settings->info('sidenav_mode') ? $_settings->info('sidenav_mode') : 'accordion';
 $sidenav_compact = $_settings->info('sidenav_compact') !== '0' ? 'nav-compact' : '';
 
@@ -7,295 +7,383 @@ $show_commercial = $_settings->info('sidenav_show_commercial') !== '0';
 $show_payroll = $_settings->info('sidenav_show_payroll') !== '0';
 $show_financial = $_settings->info('sidenav_show_financial') !== '0';
 $show_maintenance = $_settings->info('sidenav_show_maintenance') !== '0';
+
+$active_tenant = $_settings->active_tenant_id();
+$tenant_name = 'Nuvis Enterprise';
+$t_qry = $conn->query("SELECT name FROM tenants WHERE id = '{$active_tenant}'");
+if($t_qry && $t_qry->num_rows > 0){
+    $tenant_name = $t_qry->fetch_assoc()['name'];
+}
 ?>
 
 <style>
+/* Xero-inspired Clean Navigation Sidebar */
+.main-sidebar {
+    background-color: #ffffff !important;
+    border-right: 1px solid #e2e8f0;
+}
+
+.main-sidebar .brand-link {
+    background-color: #ffffff !important;
+    border-bottom: 1px solid #f1f5f9;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.tenant-avatar-badge {
+    width: 30px;
+    height: 30px;
+    border-radius: 6px;
+    background-color: #ef4444;
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.tenant-title-text {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #0f172a;
+    line-height: 1.2;
+}
+
 .main-sidebar .nav-sidebar .nav-item > .nav-link {
+    color: #334155 !important;
     border-radius: 6px;
     margin: 2px 8px;
-    transition: all 0.2s ease-in-out;
+    font-weight: 500;
+    font-size: 0.92rem;
+    padding: 8px 12px;
+    transition: all 0.15s ease;
 }
+
 .main-sidebar .nav-sidebar .nav-item > .nav-link:hover {
-    background-color: rgba(255, 255, 255, 0.08);
+    background-color: #f1f5f9 !important;
+    color: #0f172a !important;
 }
-.main-sidebar .nav-sidebar .nav-item.menu-open > .nav-link {
-    background-color: rgba(255, 255, 255, 0.12);
+
+.main-sidebar .nav-sidebar .nav-item > .nav-link.active {
+    background-color: #eff6ff !important;
+    color: #2563eb !important;
+    font-weight: 700;
 }
+
+.main-sidebar .nav-sidebar .nav-icon {
+    color: #64748b !important;
+    width: 20px;
+    margin-right: 10px;
+    text-align: center;
+}
+
+.main-sidebar .nav-sidebar .nav-link.active .nav-icon {
+    color: #2563eb !important;
+}
+
 .main-sidebar .nav-treeview .nav-link {
-    padding-left: 2rem !important;
+    padding-left: 2.2rem !important;
+    font-size: 0.88rem;
+    color: #475569 !important;
+}
+
+.main-sidebar .nav-treeview .nav-link:hover {
+    color: #1e293b !important;
+}
+
+.main-sidebar .nav-treeview .nav-link.active {
+    color: #2563eb !important;
+    font-weight: 700;
 }
 </style>
 
 <!-- Main Sidebar Container -->
-<aside class="main-sidebar <?= $sidenav_theme ?> elevation-4 sidebar-no-expand">
-    <!-- Brand Logo -->
-    <a href="<?php echo base_url ?>admin" class="brand-link bg-transparent text-sm shadow-sm py-2">
-        <img src="<?php echo validate_image($_settings->info('logo'))?>" alt="Logo" class="brand-image img-circle elevation-3 bg-black" style="width: 1.8rem;height: 1.8rem;max-height: unset;object-fit:scale-down;object-position:center center">
-        <span class="brand-text font-weight-bold text-wrap"><?php echo $_settings->info('short_name') ?></span>
+<aside class="main-sidebar elevation-1 sidebar-no-expand">
+    <!-- Brand / Tenant Active Badge Header -->
+    <a href="<?php echo base_url ?>admin" class="brand-link">
+        <div class="tenant-avatar-badge">
+            <?php echo strtoupper(substr($tenant_name, 0, 1)) ?>
+        </div>
+        <div class="d-flex align-items-center justify-content-between w-100">
+            <span class="tenant-title-text"><?php echo htmlspecialchars($tenant_name) ?></span>
+            <i class="fas fa-chevron-right text-muted text-xs"></i>
+        </div>
     </a>
 
-    <!-- Sidebar -->
+    <!-- Sidebar Scroll Area -->
     <div class="sidebar os-host os-theme-light os-host-overflow os-host-overflow-y">
         <div class="os-padding">
             <div class="os-viewport os-viewport-native-scrollbars-invisible">
-                <div class="os-content" style="padding: 0px 4px; height: 100%; width: 100%;">
+                <div class="os-content" style="padding: 0px; height: 100%; width: 100%;">
 
-                    <!-- Sidebar Menu -->
+                    <!-- Xero-inspired Nav Menu Structure -->
                     <nav class="mt-2">
                         <ul class="nav nav-pills nav-sidebar flex-column text-sm <?= $sidenav_compact ?> nav-flat nav-child-indent" data-widget="treeview" role="menu" data-accordion="<?= $sidenav_mode == 'accordion' ? 'true' : 'false' ?>">
 
-                            <!-- Dashboard -->
+                            <!-- 1. Home -->
                             <li class="nav-item">
-                                <a href="./" class="nav-link text-light nav-home">
-                                    <i class="nav-icon fas fa-tachometer-alt text-info"></i>
-                                    <p>Dashboard</p>
+                                <a href="./" class="nav-link nav-home">
+                                    <i class="nav-icon fas fa-home"></i>
+                                    <p>Home</p>
                                 </a>
                             </li>
 
-                            <!-- Commercial Stock & Sales Group Dropdown -->
-                            <?php if($show_commercial && ($_settings->can_access('products_view') || $_settings->can_access('sales_orders_view') || $_settings->can_access('invoices_view') || $_settings->can_access('payments_view'))): ?>
+                            <!-- 2. Sales -->
                             <li class="nav-item has-treeview">
-                                <a href="#" class="nav-link text-light nav-is-tree">
-                                    <i class="nav-icon fas fa-shopping-cart text-warning"></i>
+                                <a href="#" class="nav-link nav-is-tree">
+                                    <i class="nav-icon fas fa-dollar-sign"></i>
                                     <p>
-                                        Stock & Sales
-                                        <i class="right fas fa-angle-left"></i>
+                                        Sales
+                                        <i class="right fas fa-chevron-right text-xs"></i>
                                     </p>
                                 </a>
                                 <ul class="nav nav-treeview">
-                                    <?php if($_settings->can_access('products_view')): ?>
                                     <li class="nav-item">
-                                        <a href="<?php echo base_url ?>admin/?page=products" class="nav-link text-light nav-products tree-item">
-                                            <i class="nav-icon fas fa-boxes"></i>
-                                            <p>Products & Stock</p>
-                                        </a>
-                                    </li>
-                                    <?php endif; ?>
-
-                                    <?php if($_settings->can_access('sales_orders_view')): ?>
-                                    <li class="nav-item">
-                                        <a href="<?php echo base_url ?>admin/?page=sales_orders" class="nav-link text-light nav-sales_orders tree-item">
-                                            <i class="nav-icon fas fa-mobile-alt"></i>
-                                            <p>Sales Orders & Quotes</p>
-                                        </a>
-                                    </li>
-                                    <?php endif; ?>
-
-                                    <?php if($_settings->can_access('products_view')): ?>
-                                    <li class="nav-item">
-                                        <a href="<?php echo base_url ?>admin/?page=stock_adjustments" class="nav-link text-light nav-stock_adjustments tree-item">
-                                            <i class="nav-icon fas fa-cubes"></i>
-                                            <p>Stock Movements</p>
-                                        </a>
-                                    </li>
-                                    <?php endif; ?>
-
-                                    <?php if($_settings->can_access('invoices_view')): ?>
-                                    <li class="nav-item">
-                                        <a href="<?php echo base_url ?>admin/?page=parties" class="nav-link text-light nav-parties tree-item">
-                                            <i class="nav-icon fas fa-address-book"></i>
-                                            <p>Customers & Vendors</p>
-                                        </a>
-                                    </li>
-                                    <li class="nav-item">
-                                        <a href="<?php echo base_url ?>admin/?page=invoices" class="nav-link text-light nav-invoices tree-item">
+                                        <a href="<?php echo base_url ?>admin/?page=invoices" class="nav-link nav-invoices tree-item">
                                             <i class="nav-icon fas fa-file-invoice"></i>
                                             <p>Sales Invoices</p>
                                         </a>
                                     </li>
-                                    <?php endif; ?>
-
-                                    <?php if($_settings->can_access('payments_view')): ?>
                                     <li class="nav-item">
-                                        <a href="<?php echo base_url ?>admin/?page=payments" class="nav-link text-light nav-payments tree-item">
+                                        <a href="<?php echo base_url ?>admin/?page=sales_orders" class="nav-link nav-sales_orders tree-item">
+                                            <i class="nav-icon fas fa-file-signature"></i>
+                                            <p>Quotes & Orders</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=payments" class="nav-link nav-payments tree-item">
                                             <i class="nav-icon fas fa-receipt"></i>
                                             <p>Payment Receipts</p>
                                         </a>
                                     </li>
-                                    <?php endif; ?>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=products" class="nav-link nav-products tree-item">
+                                            <i class="nav-icon fas fa-boxes"></i>
+                                            <p>Products & Services</p>
+                                        </a>
+                                    </li>
                                 </ul>
                             </li>
-                            <?php endif; ?>
 
-                            <!-- Payroll & HR Group Dropdown -->
-                            <?php if($show_payroll && ($_settings->can_access('employees_view') || $_settings->can_access('payroll_view'))): ?>
+                            <!-- 3. Purchases -->
                             <li class="nav-item has-treeview">
-                                <a href="#" class="nav-link text-light nav-is-tree">
-                                    <i class="nav-icon fas fa-users text-success"></i>
+                                <a href="#" class="nav-link nav-is-tree">
+                                    <i class="nav-icon fas fa-shopping-bag"></i>
                                     <p>
-                                        Payroll & HR
-                                        <i class="right fas fa-angle-left"></i>
+                                        Purchases
+                                        <i class="right fas fa-chevron-right text-xs"></i>
                                     </p>
                                 </a>
                                 <ul class="nav nav-treeview">
-                                    <?php if($_settings->can_access('employees_view')): ?>
                                     <li class="nav-item">
-                                        <a href="<?php echo base_url ?>admin/?page=employees" class="nav-link text-light nav-employees tree-item">
-                                            <i class="nav-icon fas fa-user-tie"></i>
-                                            <p>Employees</p>
-                                        </a>
-                                    </li>
-                                    <li class="nav-item">
-                                        <a href="<?php echo base_url ?>admin/?page=attendance" class="nav-link text-light nav-attendance tree-item">
-                                            <i class="nav-icon fas fa-user-clock"></i>
-                                            <p>Attendance</p>
-                                        </a>
-                                    </li>
-                                    <li class="nav-item">
-                                        <a href="<?php echo base_url ?>admin/?page=leaves" class="nav-link text-light nav-leaves tree-item">
-                                            <i class="nav-icon fas fa-business-time"></i>
-                                            <p>Leave Applications</p>
-                                        </a>
-                                    </li>
-                                    <?php endif; ?>
-
-                                    <?php if($_settings->can_access('payroll_view')): ?>
-                                    <li class="nav-item">
-                                        <a href="<?php echo base_url ?>admin/?page=payroll" class="nav-link text-light nav-payroll tree-item">
+                                        <a href="<?php echo base_url ?>admin/?page=invoices&type=bill" class="nav-link nav-bills tree-item">
                                             <i class="nav-icon fas fa-file-invoice-dollar"></i>
-                                            <p>Payroll & Payslips</p>
+                                            <p>Bills & Expenses</p>
                                         </a>
                                     </li>
-                                    <?php endif; ?>
-                                </ul>
-                            </li>
-                            <?php endif; ?>
-
-                            <!-- Financial Accounting Dropdown -->
-                            <?php if($show_financial && $_settings->can_access('journals_view')): ?>
-                            <li class="nav-item has-treeview">
-                                <a href="#" class="nav-link text-light nav-is-tree">
-                                    <i class="nav-icon fas fa-book text-primary"></i>
-                                    <p>
-                                        Financial Journals
-                                        <i class="right fas fa-angle-left"></i>
-                                    </p>
-                                </a>
-                                <ul class="nav nav-treeview">
                                     <li class="nav-item">
-                                        <a href="<?php echo base_url ?>admin/?page=journals" class="nav-link text-light nav-journals tree-item">
-                                            <i class="nav-icon fas fa-book-open"></i>
-                                            <p>Journal Entries</p>
+                                        <a href="<?php echo base_url ?>admin/?page=sales_orders&type=po" class="nav-link nav-purchase_orders tree-item">
+                                            <i class="nav-icon fas fa-shopping-cart"></i>
+                                            <p>Purchase Orders</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=stock_adjustments" class="nav-link nav-stock_adjustments tree-item">
+                                            <i class="nav-icon fas fa-cubes"></i>
+                                            <p>Stock Movements</p>
                                         </a>
                                     </li>
                                 </ul>
                             </li>
-                            <?php endif; ?>
 
-                            <!-- Independent Reports Tab (Above Settings) -->
-                            <?php if($_settings->can_access('reports_view')): ?>
+                            <!-- 4. Reporting -->
                             <li class="nav-item has-treeview">
-                                <a href="#" class="nav-link text-light nav-is-tree">
-                                    <i class="nav-icon fas fa-chart-pie text-warning"></i>
+                                <a href="#" class="nav-link nav-is-tree">
+                                    <i class="nav-icon fas fa-chart-line"></i>
                                     <p>
-                                        Reports Center
-                                        <i class="right fas fa-angle-left"></i>
+                                        Reporting
+                                        <i class="right fas fa-chevron-right text-xs"></i>
                                     </p>
                                 </a>
                                 <ul class="nav nav-treeview">
                                     <li class="nav-item">
-                                        <a href="<?php echo base_url ?>admin/?page=reports" class="nav-link text-light nav-reports tree-item">
-                                            <i class="nav-icon fas fa-th-large text-info"></i>
+                                        <a href="<?php echo base_url ?>admin/?page=reports" class="nav-link nav-reports tree-item">
+                                            <i class="nav-icon fas fa-th-large"></i>
                                             <p>All Reports Hub</p>
                                         </a>
                                     </li>
                                     <li class="nav-item">
-                                        <a href="<?php echo base_url ?>admin/?page=reports/general_ledger" class="nav-link text-light nav-reports_general_ledger tree-item">
+                                        <a href="<?php echo base_url ?>admin/?page=reports/general_ledger" class="nav-link nav-reports_general_ledger tree-item">
                                             <i class="nav-icon fas fa-book-open"></i>
                                             <p>General Ledger</p>
                                         </a>
                                     </li>
                                     <li class="nav-item">
-                                        <a href="<?php echo base_url ?>admin/?page=reports/balance_sheet" class="nav-link text-light nav-reports_balance_sheet tree-item">
+                                        <a href="<?php echo base_url ?>admin/?page=reports/balance_sheet" class="nav-link nav-reports_balance_sheet tree-item">
                                             <i class="nav-icon fas fa-balance-scale"></i>
                                             <p>Balance Sheet</p>
                                         </a>
                                     </li>
                                     <li class="nav-item">
-                                        <a href="<?php echo base_url ?>admin/?page=reports/income_statement" class="nav-link text-light nav-reports_income_statement tree-item">
-                                            <i class="nav-icon fas fa-chart-line"></i>
+                                        <a href="<?php echo base_url ?>admin/?page=reports/income_statement" class="nav-link nav-reports_income_statement tree-item">
+                                            <i class="nav-icon fas fa-chart-bar"></i>
                                             <p>Income Statement</p>
                                         </a>
                                     </li>
                                     <li class="nav-item">
-                                        <a href="<?php echo base_url ?>admin/?page=reports/ar_aging" class="nav-link text-light nav-reports_ar_aging tree-item">
+                                        <a href="<?php echo base_url ?>admin/?page=reports/ar_aging" class="nav-link nav-reports_ar_aging tree-item">
                                             <i class="nav-icon fas fa-history"></i>
                                             <p>AR Aging</p>
                                         </a>
                                     </li>
                                     <li class="nav-item">
-                                        <a href="<?php echo base_url ?>admin/?page=reports/payroll_accounting" class="nav-link text-light nav-reports_payroll_accounting tree-item">
+                                        <a href="<?php echo base_url ?>admin/?page=reports/payroll_accounting" class="nav-link nav-reports_payroll_accounting tree-item">
                                             <i class="nav-icon fas fa-calculator"></i>
                                             <p>Payroll Accounting</p>
                                         </a>
                                     </li>
+                                </ul>
+                            </li>
+
+                            <!-- 5. Accounting -->
+                            <li class="nav-item has-treeview">
+                                <a href="#" class="nav-link nav-is-tree">
+                                    <i class="nav-icon fas fa-university"></i>
+                                    <p>
+                                        Accounting
+                                        <i class="right fas fa-chevron-right text-xs"></i>
+                                    </p>
+                                </a>
+                                <ul class="nav nav-treeview">
                                     <li class="nav-item">
-                                        <a href="<?php echo base_url ?>admin/?page=reports/working_trial_balance" class="nav-link text-light nav-reports_working_trial_balance tree-item">
-                                            <i class="nav-icon fas fa-file-alt"></i>
-                                            <p>Working Trial Balance</p>
+                                        <a href="<?php echo base_url ?>admin/?page=accounts" class="nav-link nav-accounts tree-item">
+                                            <i class="nav-icon fas fa-table"></i>
+                                            <p>Chart of Accounts</p>
                                         </a>
                                     </li>
                                     <li class="nav-item">
-                                        <a href="<?php echo base_url ?>admin/?page=reports/trial_balance" class="nav-link text-light nav-reports_trial_balance tree-item">
-                                            <i class="nav-icon fas fa-file"></i>
-                                            <p>Trial Balance</p>
+                                        <a href="<?php echo base_url ?>admin/?page=groups" class="nav-link nav-groups tree-item">
+                                            <i class="nav-icon fas fa-th-list"></i>
+                                            <p>Account Groups</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=journals" class="nav-link nav-journals tree-item">
+                                            <i class="nav-icon fas fa-book"></i>
+                                            <p>Manual Journals</p>
+                                        </a>
+                                    </li>
+                                </ul>
+                            </li>
+
+                            <!-- 6. Tax -->
+                            <li class="nav-item has-treeview">
+                                <a href="#" class="nav-link nav-is-tree">
+                                    <i class="nav-icon fas fa-percentage"></i>
+                                    <p>
+                                        Tax
+                                        <i class="right fas fa-chevron-right text-xs"></i>
+                                    </p>
+                                </a>
+                                <ul class="nav nav-treeview">
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=tax/report" class="nav-link nav-tax_report tree-item">
+                                            <i class="nav-icon fas fa-file-invoice-dollar"></i>
+                                            <p>Sales Tax Report</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=tax/rates" class="nav-link nav-tax_rates tree-item">
+                                            <i class="nav-icon fas fa-sliders-h"></i>
+                                            <p>Tax Rates & Settings</p>
+                                        </a>
+                                    </li>
+                                </ul>
+                            </li>
+
+                            <!-- 7. Contacts -->
+                            <li class="nav-item">
+                                <a href="<?php echo base_url ?>admin/?page=parties" class="nav-link nav-parties">
+                                    <i class="nav-icon fas fa-user-friends"></i>
+                                    <p>Contacts</p>
+                                </a>
+                            </li>
+
+                            <!-- 8. Payroll & HR -->
+                            <?php if($show_payroll): ?>
+                            <li class="nav-item has-treeview">
+                                <a href="#" class="nav-link nav-is-tree">
+                                    <i class="nav-icon fas fa-users"></i>
+                                    <p>
+                                        Payroll & HR
+                                        <i class="right fas fa-chevron-right text-xs"></i>
+                                    </p>
+                                </a>
+                                <ul class="nav nav-treeview">
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=employees" class="nav-link nav-employees tree-item">
+                                            <i class="nav-icon fas fa-user-tie"></i>
+                                            <p>Employees</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=attendance" class="nav-link nav-attendance tree-item">
+                                            <i class="nav-icon fas fa-user-clock"></i>
+                                            <p>Attendance</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=leaves" class="nav-link nav-leaves tree-item">
+                                            <i class="nav-icon fas fa-business-time"></i>
+                                            <p>Leave Requests</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=payroll" class="nav-link nav-payroll tree-item">
+                                            <i class="nav-icon fas fa-file-invoice-dollar"></i>
+                                            <p>Payroll Run</p>
                                         </a>
                                     </li>
                                 </ul>
                             </li>
                             <?php endif; ?>
 
-                            <!-- Maintenance & Settings Dropdown (Admin only) -->
-                            <?php if($show_maintenance && $_settings->userdata('type') == 1): ?>
+                            <!-- 9. Settings (Admin only) -->
+                            <?php if($_settings->userdata('type') == 1): ?>
                             <li class="nav-item has-treeview">
-                                <a href="#" class="nav-link text-light nav-is-tree">
-                                    <i class="nav-icon fas fa-cogs text-secondary"></i>
+                                <a href="#" class="nav-link nav-is-tree">
+                                    <i class="nav-icon fas fa-cog"></i>
                                     <p>
-                                        Maintenance & Settings
-                                        <i class="right fas fa-angle-left"></i>
+                                        Settings
+                                        <i class="right fas fa-chevron-right text-xs"></i>
                                     </p>
                                 </a>
                                 <ul class="nav nav-treeview">
                                     <li class="nav-item">
-                                        <a href="<?php echo base_url ?>admin/?page=groups" class="nav-link text-light nav-groups tree-item">
-                                            <i class="nav-icon fas fa-th-list"></i>
-                                            <p>Group List</p>
+                                        <a href="<?php echo base_url ?>admin/?page=system_info" class="nav-link nav-system_info tree-item">
+                                            <i class="nav-icon fas fa-sliders-h"></i>
+                                            <p>System & VMS</p>
                                         </a>
                                     </li>
                                     <li class="nav-item">
-                                        <a href="<?php echo base_url ?>admin/?page=accounts" class="nav-link text-light nav-accounts tree-item">
-                                            <i class="nav-icon fas fa-table"></i>
-                                            <p>Accounts List</p>
-                                        </a>
-                                    </li>
-                                    <li class="nav-item">
-                                        <a href="<?php echo base_url ?>admin/?page=user/list" class="nav-link text-light nav-user_list tree-item">
-                                            <i class="nav-icon fas fa-users-cog"></i>
-                                            <p>User List</p>
-                                        </a>
-                                    </li>
-                                    <li class="nav-item">
-                                        <a href="<?php echo base_url ?>admin/?page=tenants" class="nav-link text-light nav-tenants tree-item">
-                                            <i class="nav-icon fas fa-building"></i>
-                                            <p>Tenants / Companies</p>
-                                        </a>
-                                    </li>
-                                    <li class="nav-item">
-                                        <a href="<?php echo base_url ?>admin/?page=api_keys" class="nav-link text-light nav-api_keys tree-item">
-                                            <i class="nav-icon fas fa-plug"></i>
-                                            <p>API Keys & Webhooks</p>
-                                        </a>
-                                    </li>
-                                    <li class="nav-item">
-                                        <a href="<?php echo base_url ?>admin/?page=roles" class="nav-link text-light nav-roles tree-item">
+                                        <a href="<?php echo base_url ?>admin/?page=roles" class="nav-link nav-roles tree-item">
                                             <i class="nav-icon fas fa-user-shield"></i>
                                             <p>User Roles & Access</p>
                                         </a>
                                     </li>
                                     <li class="nav-item">
-                                        <a href="<?php echo base_url ?>admin/?page=system_info" class="nav-link text-light nav-system_info tree-item">
-                                            <i class="nav-icon fas fa-sliders-h"></i>
-                                            <p>System & VMS Settings</p>
+                                        <a href="<?php echo base_url ?>admin/?page=tenants" class="nav-link nav-tenants tree-item">
+                                            <i class="nav-icon fas fa-building"></i>
+                                            <p>Tenants / Companies</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=api_keys" class="nav-link nav-api_keys tree-item">
+                                            <i class="nav-icon fas fa-plug"></i>
+                                            <p>API Keys & Webhooks</p>
                                         </a>
                                     </li>
                                 </ul>
@@ -317,12 +405,12 @@ $(document).ready(function(){
 
     if($('.nav-link.nav-'+page).length > 0){
         var $activeLink = $('.nav-link.nav-'+page);
-        $activeLink.addClass('active').removeClass('text-light text-dark');
+        $activeLink.addClass('active');
 
         if($activeLink.hasClass('tree-item')){
             var $treeview = $activeLink.closest('.has-treeview');
             $treeview.addClass('menu-open');
-            $treeview.children('a.nav-is-tree').addClass('active').removeClass('text-light text-dark');
+            $treeview.children('a.nav-is-tree').addClass('active');
         }
     }
 });
