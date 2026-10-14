@@ -255,6 +255,18 @@ class DBConnection{
         if ($res && $res->num_rows == 0) {
             @$this->conn->query("ALTER TABLE `users` ADD COLUMN `role_id` int(30) DEFAULT NULL AFTER `type` ");
         }
+
+        // Check employee_id column in users table
+        $res_emp = @$this->conn->query("SHOW COLUMNS FROM `users` LIKE 'employee_id'");
+        if ($res_emp && $res_emp->num_rows == 0) {
+            @$this->conn->query("ALTER TABLE `users` ADD COLUMN `employee_id` int(30) DEFAULT NULL AFTER `role_id` ");
+        }
+
+        // Check tenant_id column in users table
+        $res_t = @$this->conn->query("SHOW COLUMNS FROM `users` LIKE 'tenant_id'");
+        if ($res_t && $res_t->num_rows == 0) {
+            @$this->conn->query("ALTER TABLE `users` ADD COLUMN `tenant_id` int(30) NOT NULL DEFAULT 1 AFTER `id` ");
+        }
     }
 
     public function check_api_migrations(){

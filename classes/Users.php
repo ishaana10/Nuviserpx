@@ -28,10 +28,18 @@ Class Users extends DBConnection {
 			return 3;
 			exit;
 		}
+		if(!isset($_POST['tenant_id']) || empty($_POST['tenant_id'])){
+			$_POST['tenant_id'] = $this->settings->active_tenant_id();
+		}
 		foreach($_POST as $k => $v){
-			if(in_array($k,array('firstname','middlename','lastname','username','type','role_id'))){
+			if(in_array($k,array('firstname','middlename','lastname','username','type','role_id','tenant_id','employee_id'))){
 				if(!empty($data)) $data .=" , ";
-				$data .= " `{$k}` = '{$v}' ";
+				if(($k == 'role_id' || $k == 'employee_id') && (empty($v) || $v == '0')){
+					$data .= " `{$k}` = NULL ";
+				} else {
+					$v_escaped = $this->conn->real_escape_string((string)$v);
+					$data .= " `{$k}` = '{$v_escaped}' ";
+				}
 			}
 		}
 		if(!empty($password)){
