@@ -161,65 +161,44 @@ $show_maintenance = $_settings->info('sidenav_show_maintenance') !== '0';
                             </li>
                             <?php endif; ?>
 
-                            <!-- Financial Statements & Reports Dropdown -->
-                            <?php if($show_financial && ($_settings->can_access('journals_view') || $_settings->can_access('reports_view'))): ?>
+                            <!-- Financial Accounting Dropdown -->
+                            <?php if($show_financial && $_settings->can_access('journals_view')): ?>
                             <li class="nav-item has-treeview">
                                 <a href="#" class="nav-link text-light nav-is-tree">
-                                    <i class="nav-icon fas fa-chart-line text-primary"></i>
+                                    <i class="nav-icon fas fa-book text-primary"></i>
                                     <p>
-                                        Financial Reports
+                                        Financial Journals
                                         <i class="right fas fa-angle-left"></i>
                                     </p>
                                 </a>
                                 <ul class="nav nav-treeview">
-                                    <?php if($_settings->can_access('reports_view')): ?>
-                                    <li class="nav-item has-treeview">
-                                        <a href="<?php echo base_url ?>admin/?page=reports" class="nav-link text-light nav-reports tree-item">
-                                            <i class="nav-icon fas fa-chart-pie"></i>
-                                            <p>
-                                                Reports Center
-                                                <i class="right fas fa-angle-left"></i>
-                                            </p>
-                                        </a>
-                                        <ul class="nav nav-treeview pl-3">
-                                            <li class="nav-item">
-                                                <a href="<?php echo base_url ?>admin/?page=reports&tab=sales" class="nav-link text-light py-1">
-                                                    <i class="fas fa-shopping-cart nav-icon font-size-xs"></i>
-                                                    <p class="small">Sales & AR Reports</p>
-                                                </a>
-                                            </li>
-                                            <li class="nav-item">
-                                                <a href="<?php echo base_url ?>admin/?page=reports&tab=purchases" class="nav-link text-light py-1">
-                                                    <i class="fas fa-wallet nav-icon font-size-xs"></i>
-                                                    <p class="small">Purchases & Expenses</p>
-                                                </a>
-                                            </li>
-                                            <li class="nav-item">
-                                                <a href="<?php echo base_url ?>admin/?page=reports&tab=financial" class="nav-link text-light py-1">
-                                                    <i class="fas fa-chart-line nav-icon font-size-xs"></i>
-                                                    <p class="small">Financials & Taxes</p>
-                                                </a>
-                                            </li>
-                                            <li class="nav-item">
-                                                <a href="<?php echo base_url ?>admin/?page=reports&tab=payroll" class="nav-link text-light py-1">
-                                                    <i class="fas fa-users nav-icon font-size-xs"></i>
-                                                    <p class="small">Payroll & HR Reports</p>
-                                                </a>
-                                            </li>
-                                        </ul>
-                                    </li>
-                                    <?php endif; ?>
-
-                                    <?php if($_settings->can_access('journals_view')): ?>
                                     <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=journals" class="nav-link text-light nav-journals tree-item">
-                                            <i class="nav-icon fas fa-book"></i>
+                                            <i class="nav-icon fas fa-book-open"></i>
                                             <p>Journal Entries</p>
                                         </a>
                                     </li>
-                                    <?php endif; ?>
+                                </ul>
+                            </li>
+                            <?php endif; ?>
 
-                                    <?php if($_settings->can_access('reports_view')): ?>
+                            <!-- Independent Reports Tab (Above Settings) -->
+                            <?php if($_settings->can_access('reports_view')): ?>
+                            <li class="nav-item has-treeview">
+                                <a href="#" class="nav-link text-light nav-is-tree">
+                                    <i class="nav-icon fas fa-chart-pie text-warning"></i>
+                                    <p>
+                                        Reports Center
+                                        <i class="right fas fa-angle-left"></i>
+                                    </p>
+                                </a>
+                                <ul class="nav nav-treeview">
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=reports" class="nav-link text-light nav-reports tree-item">
+                                            <i class="nav-icon fas fa-th-large text-info"></i>
+                                            <p>All Reports Hub</p>
+                                        </a>
+                                    </li>
                                     <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=reports/general_ledger" class="nav-link text-light nav-reports_general_ledger tree-item">
                                             <i class="nav-icon fas fa-book-open"></i>
@@ -252,7 +231,7 @@ $show_maintenance = $_settings->info('sidenav_show_maintenance') !== '0';
                                     </li>
                                     <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=reports/working_trial_balance" class="nav-link text-light nav-reports_working_trial_balance tree-item">
-                                            <i class="nav-icon fas fa-file"></i>
+                                            <i class="nav-icon fas fa-file-alt"></i>
                                             <p>Working Trial Balance</p>
                                         </a>
                                     </li>
@@ -262,7 +241,6 @@ $show_maintenance = $_settings->info('sidenav_show_maintenance') !== '0';
                                             <p>Trial Balance</p>
                                         </a>
                                     </li>
-                                    <?php endif; ?>
                                 </ul>
                             </li>
                             <?php endif; ?>
