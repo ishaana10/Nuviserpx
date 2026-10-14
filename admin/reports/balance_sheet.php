@@ -9,12 +9,11 @@ $as_of = isset($_GET['as_of']) ? $conn->real_escape_string($_GET['as_of']) : dat
 // Fetch accounts categorized by group (Assets, Liabilities, Equity)
 $qry = $conn->query("
     SELECT a.id, a.name AS account_name, g.name AS group_name, g.type AS group_type,
-           SUM(CASE WHEN g2.type = 1 THEN ji.amount ELSE 0 END) AS total_debit,
-           SUM(CASE WHEN g2.type = 2 THEN ji.amount ELSE 0 END) AS total_credit
-    FROM `account_list` a
-    INNER JOIN `group_list` g ON a.group_id = g.id
-    LEFT JOIN `journal_items` ji ON ji.account_id = a.id
-    LEFT JOIN `group_list` g2 ON ji.group_id = g2.id
+           SUM(CASE WHEN g.type = 1 THEN ji.amount ELSE 0 END) AS total_debit,
+           SUM(CASE WHEN g.type = 2 THEN ji.amount ELSE 0 END) AS total_credit
+    FROM `journal_items` ji
+    INNER JOIN `account_list` a ON ji.account_id = a.id
+    INNER JOIN `group_list` g ON ji.group_id = g.id
     INNER JOIN `journal_entries` j ON ji.journal_id = j.id
     WHERE a.tenant_id = '{$tenant_id}' AND j.tenant_id = '{$tenant_id}' AND a.delete_flag = 0 AND date(j.journal_date) <= '{$as_of}' AND g.name IN ('Assets', 'Liabilities', 'Equity')
     GROUP BY a.id, a.name, g.name, g.type
@@ -51,12 +50,11 @@ while($row = $qry->fetch_assoc()){
 // Calculate Net Income (Profit) up to as_of date to include in Retained Earnings/Equity
 $pnl_qry = $conn->query("
     SELECT g.name AS group_name,
-           SUM(CASE WHEN g2.type = 1 THEN ji.amount ELSE 0 END) AS total_debit,
-           SUM(CASE WHEN g2.type = 2 THEN ji.amount ELSE 0 END) AS total_credit
-    FROM `account_list` a
-    INNER JOIN `group_list` g ON a.group_id = g.id
-    LEFT JOIN `journal_items` ji ON ji.account_id = a.id
-    LEFT JOIN `group_list` g2 ON ji.group_id = g2.id
+           SUM(CASE WHEN g.type = 1 THEN ji.amount ELSE 0 END) AS total_debit,
+           SUM(CASE WHEN g.type = 2 THEN ji.amount ELSE 0 END) AS total_credit
+    FROM `journal_items` ji
+    INNER JOIN `account_list` a ON ji.account_id = a.id
+    INNER JOIN `group_list` g ON ji.group_id = g.id
     INNER JOIN `journal_entries` j ON ji.journal_id = j.id
     WHERE a.tenant_id = '{$tenant_id}' AND j.tenant_id = '{$tenant_id}' AND a.delete_flag = 0 AND date(j.journal_date) <= '{$as_of}' AND g.name IN ('Revenue', 'Expenses')
     GROUP BY g.name
