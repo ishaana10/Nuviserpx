@@ -61,9 +61,10 @@ if($account_id != 'all' && is_numeric($account_id)){
             <hr>
 
             <?php
-            $acc_qry = $conn->query("SELECT a.*, g.name as group_name, g.type as group_type
+            $acc_qry = $conn->query("SELECT a.*,
+		(SELECT g.name FROM `journal_items` ji INNER JOIN `group_list` g ON ji.group_id = g.id WHERE ji.account_id = a.id LIMIT 1) as group_name,
+		(SELECT g.type FROM `journal_items` ji INNER JOIN `group_list` g ON ji.group_id = g.id WHERE ji.account_id = a.id LIMIT 1) as group_type
 		FROM `account_list` a
-		LEFT JOIN `group_list` g ON a.group_id = g.id
 		WHERE a.tenant_id = '{$tenant_id}' AND a.delete_flag = 0 {$account_where}
 		ORDER BY a.name ASC");
 

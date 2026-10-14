@@ -5,7 +5,10 @@ $tenant_id = $_settings->active_tenant_id();
 
 if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
     $acc_id_clean = intval($_GET['id']);
-    $qry = $conn->query("SELECT a.*, g.name as group_name, g.type as group_type FROM `account_list` a LEFT JOIN `group_list` g ON a.group_id = g.id WHERE a.id = '{$acc_id_clean}' AND a.tenant_id = '{$tenant_id}'");
+    $qry = $conn->query("SELECT a.*,
+        (SELECT g.name FROM `journal_items` ji INNER JOIN `group_list` g ON ji.group_id = g.id WHERE ji.account_id = a.id LIMIT 1) as group_name,
+        (SELECT g.type FROM `journal_items` ji INNER JOIN `group_list` g ON ji.group_id = g.id WHERE ji.account_id = a.id LIMIT 1) as group_type
+        FROM `account_list` a WHERE a.id = '{$acc_id_clean}' AND a.tenant_id = '{$tenant_id}'");
     if($qry->num_rows > 0){
         foreach($qry->fetch_assoc() as $k => $v){
             $$k=$v;

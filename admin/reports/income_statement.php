@@ -10,12 +10,11 @@ $to = isset($_GET['to']) ? $conn->real_escape_string($_GET['to']) : date("Y-m-d"
 // Query Revenue & Expense accounts
 $qry = $conn->query("
     SELECT a.id, a.name AS account_name, g.name AS group_name,
-           SUM(CASE WHEN g2.type = 1 THEN ji.amount ELSE 0 END) AS total_debit,
-           SUM(CASE WHEN g2.type = 2 THEN ji.amount ELSE 0 END) AS total_credit
-    FROM `account_list` a
-    INNER JOIN `group_list` g ON a.group_id = g.id
-    LEFT JOIN `journal_items` ji ON ji.account_id = a.id
-    LEFT JOIN `group_list` g2 ON ji.group_id = g2.id
+           SUM(CASE WHEN g.type = 1 THEN ji.amount ELSE 0 END) AS total_debit,
+           SUM(CASE WHEN g.type = 2 THEN ji.amount ELSE 0 END) AS total_credit
+    FROM `journal_items` ji
+    INNER JOIN `account_list` a ON ji.account_id = a.id
+    INNER JOIN `group_list` g ON ji.group_id = g.id
     INNER JOIN `journal_entries` j ON ji.journal_id = j.id
     WHERE a.tenant_id = '{$tenant_id}' AND j.tenant_id = '{$tenant_id}' AND a.delete_flag = 0
     AND date(j.journal_date) BETWEEN '{$from}' AND '{$to}' AND g.name IN ('Revenue', 'Expenses')
