@@ -108,16 +108,16 @@ class RedisCacheService
                 $usedMemory = $info['used_memory_human'] ?? 'Unknown';
                 $connectedClients = (int)($info['connected_clients'] ?? 1);
 
-                $allKeys = $this->redis->keys($this->prefix . '*');
+                $allKeys = $this->redis->keys('*');
 
                 if (is_array($allKeys)) {
                     $cachedKeysCount = count($allKeys);
-                    $sessionKeys = array_filter($allKeys, fn($k) => str_contains($k, 'sess:'));
+                    $sessionKeys = array_filter($allKeys, fn($k) => str_contains(strtolower($k), 'sess'));
                     $activeSessionsCount = count($sessionKeys);
 
-                    foreach (array_slice($allKeys, 0, 15) as $k) {
+                    foreach (array_slice($allKeys, 0, 20) as $k) {
                         $ttl = $this->redis->ttl($k);
-                        $shortKey = str_replace($this->prefix, '', $k);
+                        $shortKey = preg_replace('/^(nuviserpxssid:|nuvis:)/i', '', $k);
                         $keysList[] = [
                             'key' => $shortKey,
                             'full_key' => $k,
