@@ -391,6 +391,12 @@ if($t_qry && $t_qry->num_rows > 0){
                                         </a>
                                     </li>
                                     <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=user/list" class="nav-link nav-user_list tree-item">
+                                            <i class="nav-icon fas fa-users-cog"></i>
+                                            <p>Users & Staff</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=api_keys" class="nav-link nav-api_keys tree-item">
                                             <i class="nav-icon fas fa-plug"></i>
                                             <p>API Keys & Webhooks</p>
