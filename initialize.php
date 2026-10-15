@@ -24,8 +24,8 @@ if (file_exists(__DIR__ . '/.env')) {
 $db_server   = getenv('DB_SERVER')   ?: (isset($_ENV['DB_SERVER'])   ? $_ENV['DB_SERVER']   : "localhost");
 $db_username = getenv('DB_USERNAME') ?: (isset($_ENV['DB_USERNAME']) ? $_ENV['DB_USERNAME'] : "root");
 $db_password = getenv('DB_PASSWORD') ?: (isset($_ENV['DB_PASSWORD']) ? $_ENV['DB_PASSWORD'] : "");
-$db_name     = getenv('DB_NAME')     ?: (isset($_ENV['DB_NAME'])     ? $_ENV['DB_NAME']     : "ajms_db");
-$env_base_url= getenv('APP_URL')     ?: (getenv('BASE_URL') ?: (isset($_ENV['APP_URL']) ? $_ENV['APP_URL'] : (isset($_ENV['BASE_URL']) ? $_ENV['BASE_URL'] : 'http://localhost/ajms/')));
+$db_name     = getenv('DB_NAME')     ?: (isset($_ENV['DB_NAME'])     ? $_ENV['DB_NAME']     : "nuviserpx");
+$env_base_url= getenv('APP_URL')     ?: (getenv('BASE_URL') ?: (isset($_ENV['APP_URL']) ? $_ENV['APP_URL'] : (isset($_ENV['BASE_URL']) ? $_ENV['BASE_URL'] : 'http://localhost/nuviserpx/')));
 
 // Ensure trailing slash on base_url
 if (substr($env_base_url, -1) !== '/') {
