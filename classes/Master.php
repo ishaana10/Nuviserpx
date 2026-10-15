@@ -496,6 +496,27 @@ class Master extends DBConnection
         $output = shell_exec("git fetch 2>&1 && git status 2>&1");
         return json_encode(['status' => 'success', 'msg' => 'Git fetch executed.', 'output' => $output]);
     }
+
+    public function get_redis_status()
+    {
+        require_once(__DIR__ . '/../src/Services/RedisCacheService.php');
+        $redis = new \App\Services\RedisCacheService($this->settings);
+        return json_encode($redis->getStatus());
+    }
+
+    public function test_redis_ping()
+    {
+        require_once(__DIR__ . '/../src/Services/RedisCacheService.php');
+        $redis = new \App\Services\RedisCacheService($this->settings);
+        return json_encode($redis->benchmark());
+    }
+
+    public function start_redis_daemon()
+    {
+        require_once(__DIR__ . '/../src/Services/RedisCacheService.php');
+        $redis = new \App\Services\RedisCacheService($this->settings);
+        return json_encode($redis->startDaemon());
+    }
 }
 
 $Master = new Master();
@@ -620,6 +641,15 @@ switch ($action) {
         break;
     case 'git_fetch':
         echo $Master->git_fetch();
+        break;
+    case 'get_redis_status':
+        echo $Master->get_redis_status();
+        break;
+    case 'test_redis_ping':
+        echo $Master->test_redis_ping();
+        break;
+    case 'start_redis_daemon':
+        echo $Master->start_redis_daemon();
         break;
     default:
         break;
