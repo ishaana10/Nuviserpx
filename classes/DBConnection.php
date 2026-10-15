@@ -400,7 +400,7 @@ class DBConnection{
     }
 
     public function auto_install_schema(){
-        $sql_file = base_app . 'database/ajms_db.sql';
+        $sql_file = base_app . 'database/nuviserpx.sql';
         if (file_exists($sql_file)) {
             $sql_content = file_get_contents($sql_file);
             if (!empty($sql_content)) {

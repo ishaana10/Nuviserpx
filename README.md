@@ -47,9 +47,9 @@ cd nuvis-erpx
    ```sql
    CREATE DATABASE ajms_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
    ```
-3. Import the SQL file located at `database/ajms_db.sql`:
+3. Import the SQL file located at `database/nuviserpx.sql`:
    ```bash
-   mysql -u root -p ajms_db < database/ajms_db.sql
+   mysql -u root -p nuviserpx < database/nuviserpx.sql
    ```
 
 ---
