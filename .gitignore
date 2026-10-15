@@ -1,0 +1,6 @@
+# Local environment file
+# .env
+
+# Uploads and temporary files
+uploads/temp/
+*.log
