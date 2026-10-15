@@ -219,7 +219,7 @@ $working_status = trim((string)shell_exec('git status --short 2>&1'));
                     <div class="redis-kpi-card">
                         <div class="redis-kpi-label">CACHED APP OBJECTS</div>
                         <div id="redis-card-keys" class="redis-kpi-val text-primary mt-1">0</div>
-                        <div class="text-xs text-muted font-monospace mt-1">Prefix: nuvis:*</div>
+                        <div class="text-xs text-muted font-monospace mt-1">Prefix: nuviserpxssid:*</div>
                     </div>
                 </div>
 
@@ -228,7 +228,7 @@ $working_status = trim((string)shell_exec('git status --short 2>&1'));
                     <div class="redis-kpi-card">
                         <div class="redis-kpi-label">REDIS ACTIVE SESSIONS</div>
                         <div id="redis-card-sessions" class="redis-kpi-val text-success mt-1">0</div>
-                        <div class="text-xs text-muted font-monospace mt-1">Prefix: nuvis:sess:*</div>
+                        <div class="text-xs text-muted font-monospace mt-1">Prefix: nuviserpxssid:sess:*</div>
                     </div>
                 </div>
             </div>

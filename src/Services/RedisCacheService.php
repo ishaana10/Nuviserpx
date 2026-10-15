@@ -10,7 +10,7 @@ class RedisCacheService
     protected mixed $redis = null;
     protected bool $connected = false;
     protected string $socketPath = '/home/ictfjcom/.redis/redis.sock';
-    protected string $prefix = 'nuvis:';
+    protected string $prefix = 'nuviserpxssid:';
 
     public function __construct(SystemSettings $settings)
     {
