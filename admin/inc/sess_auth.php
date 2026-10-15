@@ -1,5 +1,6 @@
 <?php 
 if (session_status() == PHP_SESSION_NONE) {
+    session_name('NUVISERPXSESSID');
     session_start();
 }
 if(isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') 
