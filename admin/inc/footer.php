@@ -59,7 +59,7 @@
         <strong>Copyright © <?php echo date('Y') ?>. A property of <a href="https://nuvistechnologies.com.fj" target="_blank">Nuvis Technologies</a>.</strong>
         All rights reserved.
         <div class="float-right d-none d-sm-inline-block">
-          <b><?php echo $_settings->info('short_name') ?></b> v1.0
+          <b><?php echo $_settings->info('short_name') ?></b> <?php echo class_exists('AppVersion') ? AppVersion::get('full') : 'v1.0' ?>
         </div>
       </footer>
     </div>
@@ -98,7 +98,7 @@
     <!-- overlayScrollbars -->
     <!-- <script src="<?php echo base_url ?>plugins/overlayScrollbars/js/jquery.overlayScrollbars.min.js"></script> -->
     <!-- AdminLTE App -->
-    <script src="<?php echo base_url ?>dist/js/adminlte.js"></script>
+    <script src="<?php echo base_url ?>dist/js/adminlte.js?v=<?php echo class_exists('AppVersion') ? urlencode(AppVersion::get('commit')) : '1.0' ?>"></script>
   </div>   
     <div class="daterangepicker ltr show-ranges opensright">
       <div class="ranges">
