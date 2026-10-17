@@ -57,6 +57,7 @@ class DBConnection{
                 $this->check_stock_migrations();
                 $this->check_api_migrations();
                 $this->check_rbac_migrations();
+                $this->check_invoice_template_migrations();
             }
 
             // Run versioned migrations
@@ -228,6 +229,27 @@ class DBConnection{
         foreach ($queries as $sql) {
             @$this->conn->query($sql);
         }
+    }
+
+    public function check_invoice_template_migrations(){
+        if (!$this->conn) return;
+
+        $sql = "CREATE TABLE IF NOT EXISTS `invoice_templates` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `tenant_id` int(30) NOT NULL DEFAULT 1,
+          `template_name` varchar(50) NOT NULL DEFAULT 'standard',
+          `logo_path` varchar(255) DEFAULT NULL,
+          `bg_color` varchar(20) NOT NULL DEFAULT '#ffffff',
+          `label_color` varchar(20) NOT NULL DEFAULT '#0f172a',
+          `font_color` varchar(20) NOT NULL DEFAULT '#334155',
+          `font_family` varchar(50) NOT NULL DEFAULT 'sans-serif',
+          `footer_notes` text DEFAULT NULL,
+          `date_updated` datetime DEFAULT NULL ON UPDATE current_timestamp(),
+          PRIMARY KEY (`id`),
+          UNIQUE KEY `template_tenant` (`tenant_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+
+        @$this->conn->query($sql);
     }
 
     public function check_rbac_migrations(){

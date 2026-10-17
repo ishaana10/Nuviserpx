@@ -517,6 +517,42 @@ class Master extends DBConnection
         $redis = new \App\Services\RedisCacheService($this->settings);
         return json_encode($redis->startDaemon());
     }
+
+    public function save_invoice_template()
+    {
+        $tenant_id     = $this->settings->active_tenant_id();
+        $template_name = $this->conn->real_escape_string($_POST['template_name'] ?? 'standard');
+        $bg_color      = $this->conn->real_escape_string($_POST['bg_color'] ?? '#ffffff');
+        $label_color   = $this->conn->real_escape_string($_POST['label_color'] ?? '#0f172a');
+        $font_color    = $this->conn->real_escape_string($_POST['font_color'] ?? '#334155');
+        $font_family   = $this->conn->real_escape_string($_POST['font_family'] ?? 'sans-serif');
+
+        $logo_path = null;
+        if (isset($_FILES['logo']) && $_FILES['logo']['tmp_name'] != '') {
+            $fname = 'uploads/tenant_logo_' . $tenant_id . '_' . time() . '.png';
+            $dir_path = base_app . $fname;
+            if (move_uploaded_file($_FILES['logo']['tmp_name'], $dir_path)) {
+                $logo_path = $fname;
+            }
+        }
+
+        $logo_sql = $logo_path ? ", `logo_path` = '{$logo_path}'" : "";
+
+        $check = $this->conn->query("SELECT id FROM `invoice_templates` WHERE tenant_id = '{$tenant_id}'");
+        if ($check && $check->num_rows > 0) {
+            $sql = "UPDATE `invoice_templates` SET `template_name` = '{$template_name}', `bg_color` = '{$bg_color}', `label_color` = '{$label_color}', `font_color` = '{$font_color}', `font_family` = '{$font_family}' {$logo_sql} WHERE tenant_id = '{$tenant_id}'";
+        } else {
+            $sql = "INSERT INTO `invoice_templates` (`tenant_id`, `template_name`, `bg_color`, `label_color`, `font_color`, `font_family`, `logo_path`) VALUES ('{$tenant_id}', '{$template_name}', '{$bg_color}', '{$label_color}', '{$font_color}', '{$font_family}', " . ($logo_path ? "'{$logo_path}'" : "NULL") . ")";
+        }
+
+        $save = $this->conn->query($sql);
+        if ($save) {
+            $this->log_audit("save_invoice_template", "Invoice Templates", "Saved template {$template_name} for tenant {$tenant_id}");
+            return json_encode(['status' => 'success', 'msg' => 'Invoice template customization saved successfully!']);
+        }
+
+        return json_encode(['status' => 'failed', 'msg' => 'Failed to save template settings: ' . $this->conn->error]);
+    }
 }
 
 $Master = new Master();
@@ -650,6 +686,9 @@ switch ($action) {
         break;
     case 'start_redis_daemon':
         echo $Master->start_redis_daemon();
+        break;
+    case 'save_invoice_template':
+        echo $Master->save_invoice_template();
         break;
     default:
         break;

@@ -373,6 +373,12 @@ if($t_qry && $t_qry->num_rows > 0){
                                 </a>
                                 <ul class="nav nav-treeview">
                                     <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=templates/manage_template" class="nav-link nav-templates_manage_template tree-item">
+                                            <i class="fas fa-file-invoice nav-icon"></i>
+                                            <p>Invoice Templates</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=system_info" class="nav-link nav-system_info tree-item">
                                             <i class="nav-icon fas fa-sliders-h"></i>
                                             <p>System & VMS</p>
