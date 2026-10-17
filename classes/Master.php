@@ -56,6 +56,62 @@ class Master extends DBConnection
         return $this->container->make(AccountService::class)->deleteAccount(intval($_POST['id'] ?? 0));
     }
 
+    public function delete_accounts_bulk()
+    {
+        $tenant_id = $this->settings->active_tenant_id();
+        $ids = $_POST['account_ids'] ?? [];
+        if (!is_array($ids) || empty($ids)) {
+            return json_encode(['status' => 'failed', 'msg' => 'No accounts selected.']);
+        }
+
+        $sanitized_ids = array_map('intval', $ids);
+        $id_list = implode(',', $sanitized_ids);
+
+        $del = $this->conn->query("UPDATE `account_list` SET delete_flag = 1 WHERE tenant_id = '{$tenant_id}' AND id IN ({$id_list})");
+        if ($del) {
+            return json_encode(['status' => 'success', 'msg' => 'Selected accounts successfully deleted.']);
+        }
+        return json_encode(['status' => 'failed', 'msg' => 'Failed to delete selected accounts.']);
+    }
+
+    public function archive_accounts_bulk()
+    {
+        $tenant_id = $this->settings->active_tenant_id();
+        $ids = $_POST['account_ids'] ?? [];
+        if (!is_array($ids) || empty($ids)) {
+            return json_encode(['status' => 'failed', 'msg' => 'No accounts selected.']);
+        }
+
+        $sanitized_ids = array_map('intval', $ids);
+        $id_list = implode(',', $sanitized_ids);
+
+        $upd = $this->conn->query("UPDATE `account_list` SET is_archived = 1 WHERE tenant_id = '{$tenant_id}' AND id IN ({$id_list})");
+        if ($upd) {
+            return json_encode(['status' => 'success', 'msg' => 'Selected accounts successfully archived.']);
+        }
+        return json_encode(['status' => 'failed', 'msg' => 'Failed to archive selected accounts.']);
+    }
+
+    public function change_tax_rate_bulk()
+    {
+        $tenant_id = $this->settings->active_tenant_id();
+        $ids = $_POST['account_ids'] ?? [];
+        $tax_rate = $this->conn->real_escape_string($_POST['tax_rate'] ?? 'Tax Exempt (0%)');
+
+        if (!is_array($ids) || empty($ids)) {
+            return json_encode(['status' => 'failed', 'msg' => 'No accounts selected.']);
+        }
+
+        $sanitized_ids = array_map('intval', $ids);
+        $id_list = implode(',', $sanitized_ids);
+
+        $upd = $this->conn->query("UPDATE `account_list` SET tax_rate = '{$tax_rate}' WHERE tenant_id = '{$tenant_id}' AND id IN ({$id_list})");
+        if ($upd) {
+            return json_encode(['status' => 'success', 'msg' => 'Tax rates updated successfully for selected accounts.']);
+        }
+        return json_encode(['status' => 'failed', 'msg' => 'Failed to update tax rates.']);
+    }
+
     /* Journal Actions */
     public function save_journal()
     {
@@ -689,6 +745,15 @@ switch ($action) {
         break;
     case 'save_invoice_template':
         echo $Master->save_invoice_template();
+        break;
+    case 'delete_accounts_bulk':
+        echo $Master->delete_accounts_bulk();
+        break;
+    case 'archive_accounts_bulk':
+        echo $Master->archive_accounts_bulk();
+        break;
+    case 'change_tax_rate_bulk':
+        echo $Master->change_tax_rate_bulk();
         break;
     default:
         break;

@@ -58,6 +58,7 @@ class DBConnection{
                 $this->check_api_migrations();
                 $this->check_rbac_migrations();
                 $this->check_invoice_template_migrations();
+                $this->check_account_list_migrations();
             }
 
             // Run versioned migrations
@@ -228,6 +229,24 @@ class DBConnection{
 
         foreach ($queries as $sql) {
             @$this->conn->query($sql);
+        }
+    }
+
+    public function check_account_list_migrations(){
+        if (!$this->conn) return;
+
+        $acc_cols = array(
+            'code' => "ALTER TABLE `account_list` ADD COLUMN `code` varchar(50) DEFAULT NULL AFTER `tenant_id`",
+            'type' => "ALTER TABLE `account_list` ADD COLUMN `type` varchar(50) DEFAULT 'Expense' AFTER `name`",
+            'tax_rate' => "ALTER TABLE `account_list` ADD COLUMN `tax_rate` varchar(100) DEFAULT 'Tax Exempt (0%)' AFTER `type`",
+            'is_archived' => "ALTER TABLE `account_list` ADD COLUMN `is_archived` tinyint(1) NOT NULL DEFAULT 0 AFTER `status`"
+        );
+
+        foreach ($acc_cols as $col => $sql) {
+            $res = @$this->conn->query("SHOW COLUMNS FROM `account_list` LIKE '{$col}'");
+            if ($res && $res->num_rows == 0) {
+                @$this->conn->query($sql);
+            }
         }
     }
 
