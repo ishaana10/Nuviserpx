@@ -44,6 +44,33 @@ while($row = $sys_qry->fetch_assoc()){
     $sys[$row['meta_field']] = $row['meta_value'];
 }
 
+// Fetch active tenant customized invoice template
+$tmpl = [
+    'template_name' => 'standard',
+    'bg_color'      => '#ffffff',
+    'label_color'   => '#0f172a',
+    'font_color'    => '#334155',
+    'font_family'   => 'sans-serif',
+    'logo_path'     => $_settings->info('logo') ?: ''
+];
+
+$tmpl_qry = $conn->query("SELECT * FROM `invoice_templates` WHERE tenant_id = '{$tenant_id}' LIMIT 1");
+if ($tmpl_qry && $tmpl_qry->num_rows > 0) {
+    $trow = $tmpl_qry->fetch_assoc();
+    $tmpl['template_name'] = $trow['template_name'] ?: 'standard';
+    $tmpl['bg_color']      = $trow['bg_color'] ?: '#ffffff';
+    $tmpl['label_color']   = $trow['label_color'] ?: '#0f172a';
+    $tmpl['font_color']    = $trow['font_color'] ?: '#334155';
+    $tmpl['font_family']   = $trow['font_family'] ?: 'sans-serif';
+    if (!empty($trow['logo_path'])) {
+        $tmpl['logo_path'] = $trow['logo_path'];
+    }
+}
+
+// Overrides via GET parameters
+if (isset($_GET['view'])) $tmpl['template_name'] = $_GET['view'];
+if (isset($_GET['color'])) $tmpl['label_color'] = $_GET['color'];
+
 $status_class = [
     'draft'          => 'secondary',
     'unpaid'         => 'danger',
@@ -51,14 +78,14 @@ $status_class = [
     'paid'           => 'success',
     'cancelled'      => 'dark'
 ][$invoice['status']] ?? 'secondary';
-
-$inv_view = isset($_GET['view']) ? $_GET['view'] : ($_settings->info('invoice_default_view') ?: 'modern');
-$inv_color = isset($_GET['color']) ? $_GET['color'] : ($_settings->info('invoice_theme_color') ?: '#1e3a8a');
 ?>
 
 <style>
     :root {
-        --inv-primary: <?= htmlspecialchars($inv_color) ?>;
+        --inv-bg: <?= htmlspecialchars($tmpl['bg_color']) ?>;
+        --inv-label: <?= htmlspecialchars($tmpl['label_color']) ?>;
+        --inv-font-color: <?= htmlspecialchars($tmpl['font_color']) ?>;
+        --inv-font-family: <?= htmlspecialchars($tmpl['font_family']) ?>;
     }
     @media print {
         .no-print { display: none !important; }
@@ -66,15 +93,30 @@ $inv_color = isset($_GET['color']) ? $_GET['color'] : ($_settings->info('invoice
         .card-header, .card-footer { display: none !important; }
         body { background: #fff !important; }
     }
-    .invoice-title { font-size: 1.8rem; font-weight: 700; color: var(--inv-primary); }
-    .bg-inv-primary { background-color: var(--inv-primary) !important; color: #ffffff !important; }
-    .text-inv-primary { color: var(--inv-primary) !important; }
-    .border-inv-primary { border-color: var(--inv-primary) !important; }
+    #print-area {
+        background-color: var(--inv-bg) !important;
+        color: var(--inv-font-color) !important;
+        font-family: var(--inv-font-family) !important;
+    }
+    .invoice-title { font-size: 1.8rem; font-weight: 700; color: var(--inv-label); }
+    .text-inv-label { color: var(--inv-label) !important; }
+    .bg-inv-label { background-color: var(--inv-label) !important; color: #ffffff !important; }
 
-    /* Classic View Specific Styling */
-    .invoice-classic-table { border: 2px solid #000 !important; }
-    .invoice-classic-table th, .invoice-classic-table td { border: 1px solid #000 !important; }
-    .invoice-classic-header { border-bottom: 3px double #000 !important; }
+    /* Template Specific Styling */
+    <?php if ($tmpl['template_name'] == 'spreadsheet'): ?>
+        .inv-table { border: 1px solid #cbd5e1 !important; }
+        .inv-table th { background: #f1f5f9 !important; color: var(--inv-font-color) !important; border: 1px solid #cbd5e1 !important; }
+        .inv-table td { border: 1px solid #cbd5e1 !important; }
+    <?php elseif ($tmpl['template_name'] == 'continental'): ?>
+        .inv-header-banner { background: var(--inv-label) !important; color: #ffffff !important; padding: 1.5rem; border-radius: 8px; }
+        .inv-header-banner h3, .inv-header-banner h4, .inv-header-banner p { color: #ffffff !important; }
+        .inv-table th { background: #1e293b !important; color: #ffffff !important; }
+    <?php elseif ($tmpl['template_name'] == 'compact'): ?>
+        #print-area { padding: 1.25rem !important; }
+        .inv-table th, .inv-table td { padding: 0.3rem 0.5rem !important; }
+    <?php else: ?>
+        .inv-table th { background: var(--inv-label) !important; color: #ffffff !important; }
+    <?php endif; ?>
 </style>
 
 <div class="card card-outline card-primary">
@@ -86,19 +128,15 @@ $inv_color = isset($_GET['color']) ? $_GET['color'] : ($_settings->info('invoice
             <!-- View Selector Dropdown -->
             <div class="btn-group mr-2">
                 <button type="button" class="btn btn-sm btn-outline-navy dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                    <i class="fas fa-palette mr-1"></i> View Style: <?= ucfirst($inv_view) ?>
+                    <i class="fas fa-palette mr-1"></i> Template: <?= ucfirst($tmpl['template_name']) ?>
                 </button>
                 <div class="dropdown-menu dropdown-menu-right">
-                    <a class="dropdown-menu-item dropdown-item <?= $inv_view == 'modern' ? 'active' : '' ?>" href="./?page=invoices/view&id=<?= $id ?>&view=modern&color=<?= urlencode($inv_color) ?>">Modern View</a>
-                    <a class="dropdown-menu-item dropdown-item <?= $inv_view == 'classic' ? 'active' : '' ?>" href="./?page=invoices/view&id=<?= $id ?>&view=classic&color=<?= urlencode($inv_color) ?>">Classic View</a>
-                    <a class="dropdown-menu-item dropdown-item <?= $inv_view == 'minimalist' ? 'active' : '' ?>" href="./?page=invoices/view&id=<?= $id ?>&view=minimalist&color=<?= urlencode($inv_color) ?>">Minimalist View</a>
+                    <a class="dropdown-item" href="./?page=templates/manage_template"><i class="fas fa-sliders-h mr-1 text-primary"></i> Customize Layout & Colors</a>
                     <div class="dropdown-divider"></div>
-                    <div class="dropdown-header">Accent Color Theme</div>
-                    <a class="dropdown-item" href="./?page=invoices/view&id=<?= $id ?>&view=<?= $inv_view ?>&color=%231e3a8a"><span class="badge badge-primary mr-1">&nbsp;</span> Navy Blue</a>
-                    <a class="dropdown-item" href="./?page=invoices/view&id=<?= $id ?>&view=<?= $inv_view ?>&color=%23059669"><span class="badge badge-success mr-1">&nbsp;</span> Emerald Green</a>
-                    <a class="dropdown-item" href="./?page=invoices/view&id=<?= $id ?>&view=<?= $inv_view ?>&color=%237c3aed"><span class="badge badge-purple mr-1" style="background:#7c3aed;color:#fff;">&nbsp;</span> Royal Purple</a>
-                    <a class="dropdown-item" href="./?page=invoices/view&id=<?= $id ?>&view=<?= $inv_view ?>&color=%23dc2626"><span class="badge badge-danger mr-1">&nbsp;</span> Crimson Red</a>
-                    <a class="dropdown-item" href="./?page=invoices/view&id=<?= $id ?>&view=<?= $inv_view ?>&color=%23111827"><span class="badge badge-dark mr-1">&nbsp;</span> Charcoal Black</a>
+                    <a class="dropdown-item <?= $tmpl['template_name'] == 'standard' ? 'active' : '' ?>" href="./?page=invoices/view&id=<?= $id ?>&view=standard">Standard Layout</a>
+                    <a class="dropdown-item <?= $tmpl['template_name'] == 'spreadsheet' ? 'active' : '' ?>" href="./?page=invoices/view&id=<?= $id ?>&view=spreadsheet">Spreadsheet Layout</a>
+                    <a class="dropdown-item <?= $tmpl['template_name'] == 'continental' ? 'active' : '' ?>" href="./?page=invoices/view&id=<?= $id ?>&view=continental">Continental Layout</a>
+                    <a class="dropdown-item <?= $tmpl['template_name'] == 'compact' ? 'active' : '' ?>" href="./?page=invoices/view&id=<?= $id ?>&view=compact">Compact Layout</a>
                 </div>
             </div>
 
@@ -120,14 +158,14 @@ $inv_color = isset($_GET['color']) ? $_GET['color'] : ($_settings->info('invoice
     </div>
 
     <div class="card-body p-4" id="print-area">
-        <!-- Header -->
-        <div class="row border-bottom pb-3 mb-4 align-items-center">
+        <!-- Header Banner -->
+        <div class="row border-bottom pb-3 mb-4 align-items-center <?= $tmpl['template_name'] == 'continental' ? 'inv-header-banner' : '' ?>">
             <div class="col-md-6 d-flex align-items-center">
-                <?php if(!empty($_settings->info('logo'))): ?>
-                    <img src="<?= validate_image($_settings->info('logo')) ?>" alt="Logo" class="mr-3 rounded" style="max-height: 75px; width: auto; object-fit: contain;">
+                <?php if(!empty($tmpl['logo_path'])): ?>
+                    <img src="<?= validate_image($tmpl['logo_path']) ?>" alt="Logo" class="mr-3 rounded" style="max-height: 75px; width: auto; object-fit: contain;">
                 <?php endif; ?>
                 <div>
-                    <h3 class="font-weight-bold text-navy mb-1"><?= htmlspecialchars($sys['name'] ?? 'Nuvis ERPX') ?></h3>
+                    <h3 class="font-weight-bold text-inv-label mb-1"><?= htmlspecialchars($sys['name'] ?? 'Nuvis ERPX') ?></h3>
                     <p class="mb-0 text-muted small"><?= htmlspecialchars($sys['address'] ?? 'Fiji Islands') ?></p>
                     <p class="mb-0 text-muted small">
                         <b>Email:</b> <?= htmlspecialchars($sys['email'] ?? '') ?> | <b>Phone:</b> <?= htmlspecialchars($sys['contact'] ?? '') ?>
@@ -146,9 +184,9 @@ $inv_color = isset($_GET['color']) ? $_GET['color'] : ($_settings->info('invoice
         </div>
 
         <!-- Customer / Billed To Info -->
-        <div class="row mb-4 bg-light p-3 rounded">
+        <div class="row mb-4 p-3 rounded" style="background-color: rgba(15, 23, 42, 0.03); border: 1px solid rgba(15, 23, 42, 0.08);">
             <div class="col-md-6">
-                <h6 class="text-uppercase font-weight-bold text-navy mb-2">Billed To:</h6>
+                <h6 class="text-uppercase font-weight-bold text-inv-label mb-2">Billed To:</h6>
                 <h5 class="font-weight-bold mb-1"><?= htmlspecialchars($invoice['party_name']) ?></h5>
                 <p class="mb-1 text-muted small"><b>Code:</b> <?= htmlspecialchars($invoice['party_code']) ?></p>
                 <?php if($invoice['party_tin']): ?>
@@ -162,15 +200,15 @@ $inv_color = isset($_GET['color']) ? $_GET['color'] : ($_settings->info('invoice
                 <?php endif; ?>
             </div>
             <div class="col-md-6 text-right">
-                <h6 class="text-uppercase font-weight-bold text-navy mb-2">Billing Address:</h6>
+                <h6 class="text-uppercase font-weight-bold text-inv-label mb-2">Billing Address:</h6>
                 <p class="mb-0 text-muted small"><?= nl2br(htmlspecialchars($invoice['party_address'] ?? 'N/A')) ?></p>
             </div>
         </div>
 
         <!-- Line Items Table -->
         <div class="table-responsive mb-4">
-            <table class="table table-bordered table-striped table-sm">
-                <thead class="bg-navy text-white">
+            <table class="table inv-table table-striped table-sm">
+                <thead>
                     <tr>
                         <th>#</th>
                         <th>Item & Description</th>
@@ -208,7 +246,7 @@ $inv_color = isset($_GET['color']) ? $_GET['color'] : ($_settings->info('invoice
             <div class="col-md-7">
                 <?php if(!empty($invoice['notes'])): ?>
                 <div class="border p-3 rounded mb-3 bg-light">
-                    <h6 class="font-weight-bold text-navy mb-1"><i class="fas fa-sticky-note"></i> Notes & Terms:</h6>
+                    <h6 class="font-weight-bold text-inv-label mb-1"><i class="fas fa-sticky-note"></i> Notes & Terms:</h6>
                     <p class="mb-0 small text-muted"><?= nl2br(htmlspecialchars($invoice['notes'])) ?></p>
                 </div>
                 <?php endif; ?>
@@ -259,7 +297,7 @@ $inv_color = isset($_GET['color']) ? $_GET['color'] : ($_settings->info('invoice
                     <hr class="my-2">
                     <div class="d-flex justify-content-between mb-2">
                         <span class="font-weight-bold h6">Grand Total:</span>
-                        <strong class="font-weight-bold h5 text-primary">$<?= number_format($invoice['total'], 2) ?></strong>
+                        <strong class="font-weight-bold h5 text-inv-label">$<?= number_format($invoice['total'], 2) ?></strong>
                     </div>
                     <div class="d-flex justify-content-between mb-2">
                         <span class="text-muted">Amount Paid:</span>
