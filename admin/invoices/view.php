@@ -109,11 +109,12 @@ $status_class = [
         .inv-table td { border: 1px solid #cbd5e1 !important; }
     <?php elseif ($tmpl['template_name'] == 'continental'): ?>
         .inv-header-banner { background: var(--inv-label) !important; color: #ffffff !important; padding: 1.5rem; border-radius: 8px; }
-        .inv-header-banner h3, .inv-header-banner h4, .inv-header-banner p { color: #ffffff !important; }
+        .inv-header-banner h3, .inv-header-banner h4, .inv-header-banner p, .inv-header-banner .invoice-title { color: #ffffff !important; }
         .inv-table th { background: #1e293b !important; color: #ffffff !important; }
     <?php elseif ($tmpl['template_name'] == 'compact'): ?>
         #print-area { padding: 1.25rem !important; }
         .inv-table th, .inv-table td { padding: 0.3rem 0.5rem !important; }
+        .inv-table th { background: #0f172a !important; color: #ffffff !important; }
     <?php else: ?>
         .inv-table th { background: var(--inv-label) !important; color: #ffffff !important; }
     <?php endif; ?>
