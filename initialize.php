@@ -1,7 +1,19 @@
 <?php
-$dev_data = array('id'=>'-1','firstname'=>'Developer','lastname'=>'','username'=>'dev_oretnom','password'=>'5da283a2d990e8d8512cf967df5bc0d0','last_login'=>'','date_updated'=>'','date_added'=>'');
 if(!defined('base_app')) define('base_app', str_replace('\\','/',__DIR__).'/' );
-if(!defined('dev_data')) define('dev_data',$dev_data);
+
+// Redirect to installer if system is not installed and user is not accessing /install/
+$lock_file = __DIR__ . '/install/installed.lock';
+$env_file = __DIR__ . '/.env';
+$uri = $_SERVER['REQUEST_URI'] ?? '';
+
+if ((!file_exists($lock_file) || !file_exists($env_file)) && strpos($uri, '/install/') === false && php_sapi_name() !== 'cli') {
+    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? "https://" : "http://";
+    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+    $base = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/\\');
+    header("Location: " . $protocol . $host . $base . "/install/index.php");
+    exit;
+}
+
 // Load environment variables from .env if present
 if (file_exists(__DIR__ . '/.env')) {
     $env_lines = file(__DIR__ . '/.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);

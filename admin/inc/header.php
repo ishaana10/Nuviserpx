@@ -1,6 +1,7 @@
 <?php
+  require_once(__DIR__ . '/../../classes/AppVersion.php');
   require_once('sess_auth.php');
-  
+  $assetVer = class_exists('AppVersion') ? urlencode(AppVersion::get('commit')) : '1.0';
 ?>
 <head>
   <style>
@@ -34,8 +35,8 @@
     <!-- fullCalendar -->
     <link rel="stylesheet" href="<?php echo base_url ?>plugins/fullcalendar/main.css">
     <!-- Theme style -->
-    <link rel="stylesheet" href="<?php echo base_url ?>dist/css/adminlte.css">
-    <link rel="stylesheet" href="<?php echo base_url ?>dist/css/custom.css">
+    <link rel="stylesheet" href="<?php echo base_url ?>dist/css/adminlte.css?v=<?php echo $assetVer ?>">
+    <link rel="stylesheet" href="<?php echo base_url ?>dist/css/custom.css?v=<?php echo $assetVer ?>">
     <!-- overlayScrollbars -->
     <link rel="stylesheet" href="<?php echo base_url ?>plugins/overlayScrollbars/css/OverlayScrollbars.min.css">
     <!-- Daterange picker -->
@@ -61,6 +62,7 @@
     <meta name="csrf-token" content="<?php echo $_settings->csrf_token() ?>">
     <script>
         var _base_url_ = '<?php echo base_url ?>';
+        window.NUVIS_VERSION = '<?php echo addslashes(class_exists("AppVersion") ? AppVersion::get("full") : "1.0") ?>';
         $(document).ready(function(){
             $.ajaxSetup({
                 headers: {
@@ -69,6 +71,6 @@
             });
         });
     </script>
-    <script src="<?php echo base_url ?>dist/js/script.js"></script>
+    <script src="<?php echo base_url ?>dist/js/script.js?v=<?php echo $assetVer ?>"></script>
 
   </head>
