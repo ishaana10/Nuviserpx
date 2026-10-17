@@ -82,6 +82,39 @@ if ($qry && $qry->num_rows > 0) {
         min-height: 520px;
         transition: all 0.3s ease;
     }
+
+    /* Template Specific Live Layout Variations */
+    .preview-card.tmpl-continental #prev_header_row {
+        background-color: var(--label-color, #0f172a) !important;
+        color: #ffffff !important;
+        padding: 1.5rem !important;
+        border-radius: 8px !important;
+        border-bottom: none !important;
+    }
+    .preview-card.tmpl-continental #prev_header_row h5,
+    .preview-card.tmpl-continental #prev_header_row h4,
+    .preview-card.tmpl-continental #prev_header_row small,
+    .preview-card.tmpl-continental #prev_header_row span {
+        color: #ffffff !important;
+    }
+
+    .preview-card.tmpl-spreadsheet #prev_table {
+        border: 1px solid #cbd5e1 !important;
+    }
+    .preview-card.tmpl-spreadsheet #prev_table th,
+    .preview-card.tmpl-spreadsheet #prev_table td {
+        border: 1px solid #cbd5e1 !important;
+        padding: 0.5rem !important;
+    }
+
+    .preview-card.tmpl-compact {
+        padding: 1.25rem !important;
+    }
+    .preview-card.tmpl-compact #prev_table th,
+    .preview-card.tmpl-compact #prev_table td {
+        padding: 0.25rem 0.4rem !important;
+        font-size: 0.85rem !important;
+    }
 </style>
 
 <div class="card card-outline card-primary shadow-sm">
@@ -198,13 +231,13 @@ if ($qry && $qry->num_rows > 0) {
                         <span class="badge badge-light border font-weight-normal text-xs text-uppercase" id="preview_tmpl_badge">TEMPLATE: Standard</span>
                     </h5>
 
-                    <div class="preview-card" id="invoice_live_preview">
+                    <div class="preview-card tmpl-standard" id="invoice_live_preview">
                         <!-- Preview Header -->
                         <div class="d-flex justify-content-between align-items-start border-bottom pb-3 mb-4" id="prev_header_row">
                             <div class="d-flex align-items-center">
                                 <img src="<?= !empty($tmpl['logo_path']) ? validate_image($tmpl['logo_path']) : validate_image($_settings->info('logo')) ?>" id="prev_logo_img" alt="Logo" style="max-height: 55px; width: auto; margin-right: 15px; object-fit: contain;">
                                 <div>
-                                    <h5 class="font-weight-bold mb-0" id="prev_company_name"><?= htmlspecialchars($_settings->info('name') ?: 'Nuvis Technologies') ?></h5>
+                                    <h5 class="font-weight-bold mb-0" id="prev_company_name"><?= htmlspecialchars($_settings->info('name') ?: 'Nuvis ERPX') ?></h5>
                                     <small class="text-muted">Fiji Islands</small>
                                 </div>
                             </div>
@@ -231,10 +264,10 @@ if ($qry && $qry->num_rows > 0) {
                             <table class="table table-sm border-0" id="prev_table">
                                 <thead id="prev_thead">
                                     <tr>
-                                        <th>Item & Description</th>
-                                        <th class="text-center">Qty</th>
-                                        <th class="text-right">Rate</th>
-                                        <th class="text-right">Amount</th>
+                                        <th>ITEM & DESCRIPTION</th>
+                                        <th class="text-center">QTY</th>
+                                        <th class="text-right">RATE</th>
+                                        <th class="text-right">AMOUNT</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -264,7 +297,7 @@ if ($qry && $qry->num_rows > 0) {
                         <div class="row pt-3 border-top" id="prev_footer_row">
                             <div class="col-6">
                                 <small class="text-muted">Notes:</small>
-                                <p class="small mb-0">Thank you for your business!</p>
+                                <p class="small mb-0" id="prev_notes_val">Thank you for your business!</p>
                             </div>
                             <div class="col-6 text-right">
                                 <div class="d-flex justify-content-between">
@@ -292,19 +325,32 @@ $(document).ready(function(){
         $('#preview_tmpl_badge').text('TEMPLATE: ' + tmpl.toUpperCase());
 
         var card = $('#invoice_live_preview');
+        card.removeClass('tmpl-standard tmpl-spreadsheet tmpl-continental tmpl-compact').addClass('tmpl-' + tmpl);
+
+        card.get(0).style.setProperty('--label-color', labelColor);
         card.css('background-color', bgColor);
         card.css('color', fontColor);
         card.css('font-family', fontFamily);
 
-        $('#prev_company_name, #prev_inv_label, #prev_total_val').css('color', labelColor);
+        if (tmpl !== 'continental') {
+            $('#prev_company_name, #prev_inv_label').css('color', labelColor);
+            $('#prev_header_row').css('background-color', 'transparent');
+        }
+        $('#prev_total_val, #prev_date_val, #prev_due_val, #prev_notes_val').css('color', fontColor);
 
         var thead = $('#prev_thead');
         if (tmpl === 'continental') {
             thead.css({'background-color': labelColor, 'color': '#ffffff'});
+            thead.find('th').css('color', '#ffffff');
         } else if (tmpl === 'spreadsheet') {
-            thead.css({'background-color': '#f1f5f9', 'color': fontColor, 'border': '1px solid #cbd5e1'});
+            thead.css({'background-color': '#f1f5f9', 'color': fontColor});
+            thead.find('th').css('color', fontColor);
+        } else if (tmpl === 'compact') {
+            thead.css({'background-color': '#0f172a', 'color': '#ffffff'});
+            thead.find('th').css('color', '#ffffff');
         } else {
-            thead.css({'background-color': 'transparent', 'color': fontColor, 'border-bottom': '2px solid ' + labelColor});
+            thead.css({'background-color': 'transparent', 'color': fontColor});
+            thead.find('th').css('color', fontColor);
         }
     }
 
