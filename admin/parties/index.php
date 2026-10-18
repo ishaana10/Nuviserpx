@@ -15,12 +15,13 @@
 			<table class="table table-hover table-striped table-bordered" id="list">
 				<colgroup>
 					<col width="5%">
-					<col width="12%">
-					<col width="23%">
-					<col width="12%">
-					<col width="23%">
 					<col width="10%">
-					<col width="15%">
+					<col width="20%">
+					<col width="10%">
+					<col width="20%">
+					<col width="12%">
+					<col width="10%">
+					<col width="13%">
 				</colgroup>
 				<thead>
 					<tr>
@@ -29,6 +30,7 @@
 						<th>Name / Company</th>
 						<th>Type</th>
 						<th>Contact Details</th>
+						<th>Portal Status</th>
 						<th>Status</th>
 						<th>Action</th>
 					</tr>
@@ -37,8 +39,30 @@
 					<?php
 					$i = 1;
 						$tenant_id = $_settings->active_tenant_id();
+						// Build lookup for customer portal users
+						$portal_users = [];
+						$p_qry = $conn->query("SELECT * FROM `customer_portal_users` WHERE tenant_id = '{$tenant_id}'");
+						if($p_qry){
+							while($pr = $p_qry->fetch_assoc()){
+								$portal_users[$pr['party_id']] = $pr;
+							}
+						}
+
 						$qry = $conn->query("SELECT * from `party_list` where tenant_id = '{$tenant_id}' and delete_flag = 0 order by id desc ");
 						while($row = $qry->fetch_assoc()):
+							$p_status_badge = '<span class="badge badge-secondary px-2">N/A</span>';
+							if($row['type'] == 'customer'){
+								if(isset($portal_users[$row['id']])){
+									$pu = $portal_users[$row['id']];
+									if($pu['status'] == 1){
+										$p_status_badge = '<span class="badge badge-success px-2 py-1"><i class="fas fa-check-circle mr-1"></i> Active</span>';
+									} else {
+										$p_status_badge = '<span class="badge badge-warning px-2 py-1"><i class="fas fa-clock mr-1"></i> Pending Invite</span>';
+									}
+								} else {
+									$p_status_badge = '<span class="badge badge-light border text-muted px-2 py-1">Not Invited</span>';
+								}
+							}
 					?>
 						<tr>
 							<td class="text-center"><?php echo $i++; ?></td>
@@ -56,6 +80,7 @@
 								<small class="d-block"><b>Email:</b> <?php echo !empty($row['email']) ? $row['email'] : 'N/A' ?></small>
 								<small class="d-block text-muted"><b>Phone:</b> <?php echo !empty($row['phone']) ? $row['phone'] : 'N/A' ?></small>
 							</td>
+							<td class="text-center"><?php echo $p_status_badge ?></td>
 							<td class="text-center">
                                 <?php if($row['status'] == 1): ?>
                                     <span class="badge badge-success px-3 rounded-pill">Active</span>
@@ -72,7 +97,8 @@
 				                    <a class="dropdown-item edit_data" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>"><span class="fa fa-edit text-primary"></span> Edit</a>
 				                    <?php if($row['type'] == 'customer'): ?>
 				                    <div class="dropdown-divider"></div>
-				                    <a class="dropdown-item invite_portal" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>" data-name="<?php echo htmlspecialchars($row['name']) ?>"><span class="fa fa-paper-plane text-info"></span> Invite to Portal</a>
+				                    <a class="dropdown-item invite_portal" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>" data-name="<?php echo htmlspecialchars($row['name']) ?>"><span class="fa fa-paper-plane text-info"></span> Invite / Resend Invitation</a>
+				                    <a class="dropdown-item view_portal_logs" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>" data-name="<?php echo htmlspecialchars($row['name']) ?>"><span class="fa fa-history text-secondary"></span> Portal Activity Logs</a>
 				                    <?php endif; ?>
 				                    <div class="dropdown-divider"></div>
 				                    <a class="dropdown-item delete_data" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>"><span class="fa fa-trash text-danger"></span> Delete</a>
@@ -122,9 +148,52 @@
 				});
 			}
 		});
+		$('.view_portal_logs').click(function(){
+			var party_id = $(this).attr('data-id');
+			var party_name = $(this).attr('data-name');
+			start_loader();
+			$.ajax({
+				url: _base_url_ + "classes/Master.php?f=get_portal_logs",
+				method: "POST",
+				data: { party_id: party_id },
+				dataType: "json",
+				error: err => {
+					console.log(err);
+					alert_toast("An error occurred.", 'error');
+					end_loader();
+				},
+				success: function(resp){
+					end_loader();
+					if(resp.status == 'success'){
+						var html = '<div class="table-responsive"><table class="table table-bordered table-striped table-sm">';
+						html += '<thead><tr><th>Date & Time</th><th>Action</th><th>Details</th><th>IP Address</th></tr></thead><tbody>';
+						if(resp.data.length > 0){
+							$.each(resp.data, function(i, log){
+								html += '<tr>';
+								html += '<td><small>' + log.date_created + '</small></td>';
+								html += '<td><span class="badge badge-info">' + log.action + '</span></td>';
+								html += '<td>' + (log.details || '') + '</td>';
+								html += '<td><small>' + (log.ip_address || 'N/A') + '</small></td>';
+								html += '</tr>';
+							});
+						} else {
+							html += '<tr><td colspan="4" class="text-center text-muted">No portal activity logged yet.</td></tr>';
+						}
+						html += '</tbody></table></div>';
+
+						$('#uni_modal .modal-title').html('<i class="fas fa-history text-primary"></i> Portal Activity Log - ' + party_name);
+						$('#uni_modal .modal-body').html(html);
+						$('#uni_modal .modal-footer').html('<button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Close</button>');
+						$('#uni_modal').modal('show');
+					} else {
+						alert_toast("Failed to load logs.", 'error');
+					}
+				}
+			});
+		});
 		$('#list').dataTable({
 			columnDefs: [
-					{ orderable: false, targets: [6] }
+					{ orderable: false, targets: [7] }
 			],
 			order: [0, 'asc']
 		});

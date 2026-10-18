@@ -236,7 +236,7 @@ class DBConnection{
     public function check_customer_portal_migrations(){
         if (!$this->conn) return;
 
-        $sql = "CREATE TABLE IF NOT EXISTS `customer_portal_users` (
+        $sql1 = "CREATE TABLE IF NOT EXISTS `customer_portal_users` (
           `id` int(30) NOT NULL AUTO_INCREMENT,
           `tenant_id` int(30) NOT NULL DEFAULT 1,
           `party_id` int(30) NOT NULL,
@@ -254,7 +254,23 @@ class DBConnection{
           UNIQUE KEY `portal_email_tenant` (`tenant_id`, `email`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
 
-        @$this->conn->query($sql);
+        $sql2 = "CREATE TABLE IF NOT EXISTS `customer_portal_logs` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `tenant_id` int(30) NOT NULL DEFAULT 1,
+          `portal_user_id` int(30) DEFAULT NULL,
+          `party_id` int(30) NOT NULL,
+          `action` varchar(100) NOT NULL,
+          `details` text DEFAULT NULL,
+          `ip_address` varchar(50) DEFAULT NULL,
+          `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+          PRIMARY KEY (`id`),
+          KEY `tenant_id` (`tenant_id`),
+          KEY `party_id` (`party_id`),
+          KEY `portal_user_id` (`portal_user_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+
+        @$this->conn->query($sql1);
+        @$this->conn->query($sql2);
     }
 
     public function check_account_list_migrations(){
