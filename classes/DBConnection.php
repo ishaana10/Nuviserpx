@@ -59,6 +59,7 @@ class DBConnection{
                 $this->check_rbac_migrations();
                 $this->check_invoice_template_migrations();
                 $this->check_account_list_migrations();
+                $this->check_customer_portal_migrations();
             }
 
             // Run versioned migrations
@@ -230,6 +231,30 @@ class DBConnection{
         foreach ($queries as $sql) {
             @$this->conn->query($sql);
         }
+    }
+
+    public function check_customer_portal_migrations(){
+        if (!$this->conn) return;
+
+        $sql = "CREATE TABLE IF NOT EXISTS `customer_portal_users` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `tenant_id` int(30) NOT NULL DEFAULT 1,
+          `party_id` int(30) NOT NULL,
+          `email` varchar(150) NOT NULL,
+          `password` varchar(255) DEFAULT NULL,
+          `invite_token` varchar(100) DEFAULT NULL,
+          `invite_expires_at` datetime DEFAULT NULL,
+          `status` tinyint(1) NOT NULL DEFAULT 0,
+          `last_login` datetime DEFAULT NULL,
+          `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+          `date_updated` datetime DEFAULT NULL ON UPDATE current_timestamp(),
+          PRIMARY KEY (`id`),
+          KEY `tenant_id` (`tenant_id`),
+          KEY `party_id` (`party_id`),
+          UNIQUE KEY `portal_email_tenant` (`tenant_id`, `email`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+
+        @$this->conn->query($sql);
     }
 
     public function check_account_list_migrations(){

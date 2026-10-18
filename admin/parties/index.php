@@ -70,6 +70,10 @@
 				                  </button>
 				                  <div class="dropdown-menu" role="menu">
 				                    <a class="dropdown-item edit_data" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>"><span class="fa fa-edit text-primary"></span> Edit</a>
+				                    <?php if($row['type'] == 'customer'): ?>
+				                    <div class="dropdown-divider"></div>
+				                    <a class="dropdown-item invite_portal" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>" data-name="<?php echo htmlspecialchars($row['name']) ?>"><span class="fa fa-paper-plane text-info"></span> Invite to Portal</a>
+				                    <?php endif; ?>
 				                    <div class="dropdown-divider"></div>
 				                    <a class="dropdown-item delete_data" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>"><span class="fa fa-trash text-danger"></span> Delete</a>
 				                  </div>
@@ -92,6 +96,32 @@
 		$('.edit_data').click(function(){
 			uni_modal("<i class='fa fa-edit'></i> Edit Party Details","parties/manage_party.php?id="+$(this).attr('data-id'), 'large')
 		})
+		$('.invite_portal').click(function(){
+			var party_id = $(this).attr('data-id');
+			var party_name = $(this).attr('data-name');
+			if(confirm("Send Customer Portal access invitation email to " + party_name + "?")){
+				start_loader();
+				$.ajax({
+					url: _base_url_ + "classes/Master.php?f=send_customer_invitation",
+					method: "POST",
+					data: { party_id: party_id },
+					dataType: "json",
+					error: err => {
+						console.log(err);
+						alert_toast("An error occurred.", 'error');
+						end_loader();
+					},
+					success: function(resp){
+						end_loader();
+						if(resp.status == 'success'){
+							alert_toast(resp.msg, 'success');
+						} else {
+							alert_toast(resp.msg || "Failed to send invitation.", 'error');
+						}
+					}
+				});
+			}
+		});
 		$('#list').dataTable({
 			columnDefs: [
 					{ orderable: false, targets: [6] }
