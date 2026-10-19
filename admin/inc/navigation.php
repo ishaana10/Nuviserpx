@@ -424,6 +424,12 @@ if($t_qry && $t_qry->num_rows > 0){
                                 </a>
                                 <ul class="nav nav-treeview">
                                     <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=developer/portal_preview" class="nav-link nav-developer_portal_preview tree-item">
+                                            <i class="nav-icon fas fa-desktop text-success"></i>
+                                            <p>Customer Portal Inspector</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=developer/git_update" class="nav-link nav-developer_git_update tree-item">
                                             <i class="nav-icon fas fa-code-branch text-info"></i>
                                             <p>Git Update Module</p>
