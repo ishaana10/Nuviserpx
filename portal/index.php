@@ -89,6 +89,15 @@ $view_invoice_id = $_GET['invoice_id'] ?? null;
         else:
           $inv = $inv_qry->fetch_assoc();
           $items = $conn->query("SELECT * FROM `invoice_items` WHERE invoice_id = '{$inv['id']}'");
+
+          // Log invoice view action
+          $ip = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
+          $ip_esc = $conn->real_escape_string($ip);
+          $tenant_id = $_SESSION['customer_portal']['tenant_id'] ?? 1;
+          $portal_user_id = $_SESSION['customer_portal']['id'] ?? NULL;
+          $inv_code = $conn->real_escape_string($inv['invoice_code']);
+          $conn->query("INSERT INTO `customer_portal_logs` (`tenant_id`, `party_id`, `portal_user_id`, `action`, `details`, `ip_address`)
+                        VALUES ('{$tenant_id}', '{$client_id}', '{$portal_user_id}', 'view_invoice', 'Viewed Invoice #{$inv_code}', '{$ip_esc}')");
       ?>
         <div class="card card-outline card-primary shadow-sm">
           <div class="card-header border-bottom-0">

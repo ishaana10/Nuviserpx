@@ -574,6 +574,19 @@ class Master extends DBConnection
         return json_encode($redis->startDaemon());
     }
 
+    public function log_portal_activity($tenant_id, $party_id, $portal_user_id, $action, $details = '')
+    {
+        $ip = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
+        $ip_esc = $this->conn->real_escape_string($ip);
+        $action_esc = $this->conn->real_escape_string($action);
+        $details_esc = $this->conn->real_escape_string($details);
+        $user_id_sql = $portal_user_id ? "'{$portal_user_id}'" : "NULL";
+
+        $sql = "INSERT INTO `customer_portal_logs` (`tenant_id`, `party_id`, `portal_user_id`, `action`, `details`, `ip_address`)
+                VALUES ('{$tenant_id}', '{$party_id}', {$user_id_sql}, '{$action_esc}', '{$details_esc}', '{$ip_esc}')";
+        @$this->conn->query($sql);
+    }
+
     public function send_customer_invitation()
     {
         $tenant_id = $this->settings->active_tenant_id();
@@ -596,19 +609,27 @@ class Master extends DBConnection
 
         $chk = $this->conn->query("SELECT id FROM `customer_portal_users` WHERE tenant_id = '{$tenant_id}' AND party_id = '{$party_id}'");
         if ($chk && $chk->num_rows > 0) {
-            $sql = "UPDATE `customer_portal_users` SET `email` = '{$email}', `invite_token` = '{$token}', `invite_expires_at` = '{$expires}' WHERE tenant_id = '{$tenant_id}' AND party_id = '{$party_id}'";
+            $portal_user = $chk->fetch_assoc();
+            $portal_user_id = $portal_user['id'];
+            $sql = "UPDATE `customer_portal_users` SET `email` = '{$email}', `invite_token` = '{$token}', `invite_expires_at` = '{$expires}', `status` = 0 WHERE id = '{$portal_user_id}'";
         } else {
             $sql = "INSERT INTO `customer_portal_users` (`tenant_id`, `party_id`, `email`, `invite_token`, `invite_expires_at`, `status`) VALUES ('{$tenant_id}', '{$party_id}', '{$email}', '{$token}', '{$expires}', 0)";
         }
 
         if ($this->conn->query($sql)) {
+            if (empty($portal_user_id)) {
+                $portal_user_id = $this->conn->insert_id;
+            }
+
             $invite_url = base_url . "portal/login.php?token=" . $token;
             require_once(__DIR__ . '/Emailer.php');
             $sys = [];
             $sys_qry = $this->conn->query("SELECT meta_field, meta_value FROM `system_info`");
             while ($r = $sys_qry->fetch_assoc()) $sys[$r['meta_field']] = $r['meta_value'];
 
-            $sent = \Emailer::send_portal_invitation($email, $party['name'], $invite_url, $sys);
+            \Emailer::send_portal_invitation($email, $party['name'], $invite_url, $sys);
+
+            $this->log_portal_activity($tenant_id, $party_id, $portal_user_id, 'invitation_sent', "Portal invitation sent to {$email}");
 
             return json_encode([
                 'status' => 'success',
@@ -653,6 +674,8 @@ class Master extends DBConnection
                 'email' => $user['email']
             ];
 
+            $this->log_portal_activity($user['tenant_id'], $user['party_id'], $user['id'], 'account_activated', "Customer registered password and activated portal account");
+
             return json_encode(['status' => 'success', 'msg' => 'Account successfully created and activated! Redirecting to dashboard...']);
         }
 
@@ -682,12 +705,28 @@ class Master extends DBConnection
                 ];
 
                 $this->conn->query("UPDATE `customer_portal_users` SET `last_login` = NOW() WHERE id = '{$user['id']}'");
+                $this->log_portal_activity($user['tenant_id'], $user['party_id'], $user['id'], 'customer_login', "Customer logged into portal");
 
                 return json_encode(['status' => 'success', 'msg' => 'Login successful!']);
             }
         }
 
         return json_encode(['status' => 'failed', 'msg' => 'Invalid email address or password.']);
+    }
+
+    public function get_portal_logs()
+    {
+        $tenant_id = $this->settings->active_tenant_id();
+        $party_id  = intval($_POST['party_id'] ?? 0);
+
+        $qry = $this->conn->query("SELECT * FROM `customer_portal_logs` WHERE tenant_id = '{$tenant_id}' AND party_id = '{$party_id}' ORDER BY date_created DESC LIMIT 50");
+        $logs = [];
+        if ($qry) {
+            while ($row = $qry->fetch_assoc()) {
+                $logs[] = $row;
+            }
+        }
+        return json_encode(['status' => 'success', 'data' => $logs]);
     }
 
     public function save_invoice_template()
@@ -867,6 +906,9 @@ switch ($action) {
         break;
     case 'customer_login':
         echo $Master->customer_login();
+        break;
+    case 'get_portal_logs':
+        echo $Master->get_portal_logs();
         break;
     case 'save_invoice_template':
         echo $Master->save_invoice_template();
