@@ -4,8 +4,9 @@ $token = $_GET['token'] ?? '';
 $user = null;
 
 if (!empty($token)) {
-    $qry = $conn->query("SELECT u.*, p.name as party_name, p.email as party_email FROM `customer_portal_users` u JOIN `client_list` p ON u.client_id = p.id WHERE u.invitation_token = '{$conn->real_escape_string($token)}'");
-    if ($qry->num_rows > 0) {
+    $token_esc = $conn->real_escape_string($token);
+    $qry = $conn->query("SELECT u.*, p.name as party_name, p.email as party_email FROM `customer_portal_users` u JOIN `party_list` p ON u.party_id = p.id WHERE u.invite_token = '{$token_esc}'");
+    if ($qry && $qry->num_rows > 0) {
         $user = $qry->fetch_assoc();
     }
 }
