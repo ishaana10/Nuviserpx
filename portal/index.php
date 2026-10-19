@@ -16,24 +16,39 @@ if (!isset($_SESSION['customer_id'])) {
 $client_id = $_SESSION['customer_client_id'];
 $customer_name = $_SESSION['customer_name'];
 
+// Read portal customization settings
+$portal_show_invoices = $_settings->info('portal_show_invoices') !== '0';
+$portal_show_payments = $_settings->info('portal_show_payments') !== '0';
+$portal_show_orders   = $_settings->info('portal_show_orders') !== '0';
+$portal_show_kpi      = $_settings->info('portal_show_kpi_cards') !== '0';
+$portal_welcome_msg   = $_settings->info('portal_welcome_msg') ?: 'Welcome to your customer portal. View your account statement and invoices below.';
+$portal_announcement  = $_settings->info('portal_announcement');
+$portal_theme_color   = $_settings->info('portal_primary_color') ?: '#0284c7';
+
 // Fetch party info
 $party = $conn->query("SELECT * FROM `client_list` WHERE id = '{$client_id}'")->fetch_assoc();
 
 // Handle viewing a specific invoice
 $view_invoice_id = $_GET['invoice_id'] ?? null;
+$view_order_id   = $_GET['order_id'] ?? null;
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <?php require_once('../admin/inc/header.php') ?>
+<style>
+  .portal-header {
+    background-color: <?php echo htmlspecialchars($portal_theme_color) ?> !important;
+  }
+</style>
 <body class="hold-transition layout-top-nav">
 <div class="wrapper">
 
   <!-- Navbar -->
-  <nav class="main-header navbar navbar-expand-md navbar-light navbar-white shadow-sm">
+  <nav class="main-header navbar navbar-expand-md navbar-dark portal-header shadow-sm">
     <div class="container">
       <a href="<?php echo base_url ?>portal/" class="navbar-brand">
-        <span class="brand-text font-weight-bold text-primary"><?php echo $_settings->info('name') ?></span>
-        <span class="badge badge-secondary ml-2">Customer Portal</span>
+        <span class="brand-text font-weight-bold text-white"><?php echo $_settings->info('name') ?></span>
+        <span class="badge badge-light ml-2">Customer Portal (Read-Only)</span>
       </a>
 
       <button class="navbar-toggler order-1" type="button" data-toggle="collapse" data-target="#navbarCollapse">
@@ -61,14 +76,20 @@ $view_invoice_id = $_GET['invoice_id'] ?? null;
     <!-- Content Header (Page header) -->
     <div class="content-header">
       <div class="container">
-        <div class="row mb-2">
-          <div class="col-sm-6">
-            <h1 class="m-0 text-dark"> Welcome, <?php echo htmlspecialchars($customer_name) ?></h1>
-            <p class="text-muted text-sm"><?php echo htmlspecialchars($party['email'] ?? '') ?></p>
+        <?php if (!empty($portal_announcement)): ?>
+          <div class="alert alert-info border-left border-info shadow-sm mb-3">
+            <i class="fas fa-bullhorn mr-2"></i> <?php echo nl2br(htmlspecialchars($portal_announcement)) ?>
           </div>
-          <div class="col-sm-6 text-right">
-            <?php if ($view_invoice_id): ?>
-              <a href="index.php" class="btn btn-secondary btn-sm"><i class="fas fa-arrow-left mr-1"></i> Back to Statement</a>
+        <?php endif; ?>
+
+        <div class="row mb-2">
+          <div class="col-sm-8">
+            <h1 class="m-0 text-dark font-weight-bold"> Welcome, <?php echo htmlspecialchars($customer_name) ?></h1>
+            <p class="text-muted text-sm mb-0"><?php echo htmlspecialchars($portal_welcome_msg) ?></p>
+          </div>
+          <div class="col-sm-4 text-right">
+            <?php if ($view_invoice_id || $view_order_id): ?>
+              <a href="index.php" class="btn btn-secondary btn-sm"><i class="fas fa-arrow-left mr-1"></i> Back to Dashboard</a>
             <?php endif; ?>
           </div>
         </div>
@@ -175,7 +196,7 @@ $view_invoice_id = $_GET['invoice_id'] ?? null;
 
       <?php else: ?>
         <!-- Customer Account Dashboard Summary -->
-        <?php
+        <?php if ($portal_show_kpi):
           $tot_inv_qry = $conn->query("SELECT COUNT(*) as count, SUM(total_amount) as total FROM `invoice_list` WHERE client_id = '{$client_id}'");
           $tot_inv = $tot_inv_qry->fetch_assoc();
 
@@ -185,7 +206,7 @@ $view_invoice_id = $_GET['invoice_id'] ?? null;
           $total_invoiced = $tot_inv['total'] ?? 0;
           $balance_due = max(0, $total_invoiced - $total_paid);
         ?>
-        <div class="row">
+        <div class="row mb-4">
           <div class="col-lg-4 col-6">
             <div class="small-box bg-info shadow-sm">
               <div class="inner">
@@ -214,11 +235,13 @@ $view_invoice_id = $_GET['invoice_id'] ?? null;
             </div>
           </div>
         </div>
+        <?php endif; ?>
 
+        <?php if ($portal_show_invoices): ?>
         <!-- Invoices List -->
         <div class="card card-outline card-primary shadow-sm mb-4">
           <div class="card-header">
-            <h3 class="card-title font-weight-bold"><i class="fas fa-file-alt mr-1"></i> Your Invoices</h3>
+            <h3 class="card-title font-weight-bold"><i class="fas fa-file-alt mr-1"></i> Your Invoices (Read-Only)</h3>
           </div>
           <div class="card-body p-0">
             <div class="table-responsive">
@@ -268,6 +291,52 @@ $view_invoice_id = $_GET['invoice_id'] ?? null;
             </div>
           </div>
         </div>
+        <?php endif; ?>
+
+        <?php if ($portal_show_payments): ?>
+        <!-- Payments & Receipts List -->
+        <div class="card card-outline card-success shadow-sm mb-4">
+          <div class="card-header">
+            <h3 class="card-title font-weight-bold"><i class="fas fa-receipt mr-1"></i> Payment History (Read-Only)</h3>
+          </div>
+          <div class="card-body p-0">
+            <div class="table-responsive">
+              <table class="table table-striped table-hover mb-0">
+                <thead>
+                  <tr>
+                    <th>Payment Date</th>
+                    <th>Receipt / Ref #</th>
+                    <th>Payment Method</th>
+                    <th>Amount Paid</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <?php
+                    $payments = $conn->query("SELECT * FROM `payment_list` WHERE client_id = '{$client_id}' ORDER BY payment_date DESC");
+                    if ($payments && $payments->num_rows > 0):
+                      while($p_row = $payments->fetch_assoc()):
+                  ?>
+                  <tr>
+                    <td><?php echo date("Y-m-d", strtotime($p_row['payment_date'])) ?></td>
+                    <td class="font-weight-bold"><?php echo htmlspecialchars($p_row['payment_no'] ?? $p_row['reference'] ?? 'N/A') ?></td>
+                    <td><span class="badge badge-light border"><?php echo ucfirst(htmlspecialchars($p_row['method'] ?? 'cash')) ?></span></td>
+                    <td class="text-success font-weight-bold">$<?php echo number_format($p_row['amount'], 2) ?></td>
+                  </tr>
+                  <?php
+                      endwhile;
+                    else:
+                  ?>
+                  <tr>
+                    <td colspan="4" class="text-center text-muted py-4">No payment receipts recorded yet.</td>
+                  </tr>
+                  <?php endif; ?>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <?php endif; ?>
+
       <?php endif; ?>
 
       </div><!-- /.container-fluid -->

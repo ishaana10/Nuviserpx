@@ -193,6 +193,7 @@
                 <div class="card border shadow-sm rounded-lg settings-anchor-nav p-2">
                     <div class="text-xs font-weight-bold text-uppercase text-muted px-3 py-2">System Sections</div>
                     <a href="#section-branding" class="nav-link active"><i class="fas fa-building text-primary"></i> Branding & Identification</a>
+                    <a href="#section-portal" class="nav-link"><i class="fas fa-user-shield text-success"></i> Customer Portal Controls</a>
                     <a href="#section-smtp" class="nav-link"><i class="fas fa-envelope-open-text text-info"></i> Email & SMTP Settings</a>
                     <a href="#section-vms" class="nav-link"><i class="fas fa-microchip text-warning"></i> FRCS VMS Integration</a>
                     <a href="#section-redis" class="nav-link"><i class="fas fa-database text-danger"></i> Redis Cache Store</a>
@@ -250,6 +251,73 @@
                                 </div>
                                 <input type="file" id="coverInput" name="cover" class="d-none" onchange="displayImg2(this)">
                                 <span class="text-muted text-xs mt-1 d-block">Recommended ratio 4:1 (e.g., 1200x300px)</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CARD: CUSTOMER PORTAL CONTROLS & DASHBOARD CUSTOMIZATION -->
+                <div class="settings-card" id="section-portal">
+                    <div class="settings-card-header">
+                        <h2 class="settings-card-title"><i class="fas fa-user-shield text-success"></i> Customer Portal Controls & Customization</h2>
+                    </div>
+                    <div class="settings-card-body">
+                        <label class="form-label-custom d-block mb-3">Customer View Permissions (Read-Only Enforcement)</label>
+                        <div class="row mb-4">
+                            <div class="col-md-6 mb-3">
+                                <div class="custom-switch-card">
+                                    <span class="font-weight-medium text-dark"><i class="fas fa-file-invoice text-primary mr-2"></i> Allow View Invoices</span>
+                                    <div class="custom-control custom-switch">
+                                        <input type="checkbox" class="custom-control-input" id="switch_portal_invoices" name="portal_show_invoices_check" value="1" <?php echo $_settings->info('portal_show_invoices') !== '0' ? 'checked' : '' ?> onchange="$('#portal_show_invoices').val(this.checked ? '1' : '0')">
+                                        <input type="hidden" name="portal_show_invoices" id="portal_show_invoices" value="<?php echo $_settings->info('portal_show_invoices') !== '0' ? '1' : '0' ?>">
+                                        <label class="custom-control-label" for="switch_portal_invoices"></label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="custom-switch-card">
+                                    <span class="font-weight-medium text-dark"><i class="fas fa-receipt text-success mr-2"></i> Allow View Payments & Receipts</span>
+                                    <div class="custom-control custom-switch">
+                                        <input type="checkbox" class="custom-control-input" id="switch_portal_payments" name="portal_show_payments_check" value="1" <?php echo $_settings->info('portal_show_payments') !== '0' ? 'checked' : '' ?> onchange="$('#portal_show_payments').val(this.checked ? '1' : '0')">
+                                        <input type="hidden" name="portal_show_payments" id="portal_show_payments" value="<?php echo $_settings->info('portal_show_payments') !== '0' ? '1' : '0' ?>">
+                                        <label class="custom-control-label" for="switch_portal_payments"></label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="custom-switch-card">
+                                    <span class="font-weight-medium text-dark"><i class="fas fa-shopping-bag text-info mr-2"></i> Allow View Sales Orders / Quotes</span>
+                                    <div class="custom-control custom-switch">
+                                        <input type="checkbox" class="custom-control-input" id="switch_portal_orders" name="portal_show_orders_check" value="1" <?php echo $_settings->info('portal_show_orders') !== '0' ? 'checked' : '' ?> onchange="$('#portal_show_orders').val(this.checked ? '1' : '0')">
+                                        <input type="hidden" name="portal_show_orders" id="portal_show_orders" value="<?php echo $_settings->info('portal_show_orders') !== '0' ? '1' : '0' ?>">
+                                        <label class="custom-control-label" for="switch_portal_orders"></label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="custom-switch-card">
+                                    <span class="font-weight-medium text-dark"><i class="fas fa-tachometer-alt text-warning mr-2"></i> Show Dashboard KPI Summary Cards</span>
+                                    <div class="custom-control custom-switch">
+                                        <input type="checkbox" class="custom-control-input" id="switch_portal_kpi" name="portal_show_kpi_cards_check" value="1" <?php echo $_settings->info('portal_show_kpi_cards') !== '0' ? 'checked' : '' ?> onchange="$('#portal_show_kpi_cards').val(this.checked ? '1' : '0')">
+                                        <input type="hidden" name="portal_show_kpi_cards" id="portal_show_kpi_cards" value="<?php echo $_settings->info('portal_show_kpi_cards') !== '0' ? '1' : '0' ?>">
+                                        <label class="custom-control-label" for="switch_portal_kpi"></label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row pt-3 border-top">
+                            <div class="col-md-6 form-group">
+                                <label for="portal_welcome_msg" class="form-label-custom">Custom Welcome Message</label>
+                                <input type="text" class="form-control form-control-modern" name="portal_welcome_msg" id="portal_welcome_msg" value="<?php echo htmlspecialchars($_settings->info('portal_welcome_msg') ?: 'Welcome to your customer portal. View your account statement and invoices below.') ?>" placeholder="Custom greeting message">
+                            </div>
+                            <div class="col-md-6 form-group">
+                                <label for="portal_primary_color" class="form-label-custom">Portal Header Theme Color</label>
+                                <input type="color" class="form-control form-control-modern" style="height: 38px;" name="portal_primary_color" id="portal_primary_color" value="<?php echo htmlspecialchars($_settings->info('portal_primary_color') ?: '#0284c7') ?>">
+                            </div>
+                            <div class="col-md-12 form-group mb-0">
+                                <label for="portal_announcement" class="form-label-custom">Portal Notice / Announcement Banner</label>
+                                <textarea name="portal_announcement" id="portal_announcement" rows="2" class="form-control form-control-modern" placeholder="Optional notice or message displayed at the top of the portal dashboard"><?php echo htmlspecialchars($_settings->info('portal_announcement')) ?></textarea>
                             </div>
                         </div>
                     </div>
