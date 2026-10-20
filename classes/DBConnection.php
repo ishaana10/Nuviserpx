@@ -60,6 +60,8 @@ class DBConnection{
                 $this->check_invoice_template_migrations();
                 $this->check_account_list_migrations();
                 $this->check_customer_portal_migrations();
+                $this->check_fixed_assets_migrations();
+                $this->check_journal_options_migrations();
             }
 
             // Run versioned migrations
@@ -280,11 +282,80 @@ class DBConnection{
             'code' => "ALTER TABLE `account_list` ADD COLUMN `code` varchar(50) DEFAULT NULL AFTER `tenant_id`",
             'type' => "ALTER TABLE `account_list` ADD COLUMN `type` varchar(50) DEFAULT 'Expense' AFTER `name`",
             'tax_rate' => "ALTER TABLE `account_list` ADD COLUMN `tax_rate` varchar(100) DEFAULT 'Tax Exempt (0%)' AFTER `type`",
-            'is_archived' => "ALTER TABLE `account_list` ADD COLUMN `is_archived` tinyint(1) NOT NULL DEFAULT 0 AFTER `status`"
+            'is_archived' => "ALTER TABLE `account_list` ADD COLUMN `is_archived` tinyint(1) NOT NULL DEFAULT 0 AFTER `status`",
+            'bank_name' => "ALTER TABLE `account_list` ADD COLUMN `bank_name` varchar(150) DEFAULT NULL AFTER `tax_rate`",
+            'account_number' => "ALTER TABLE `account_list` ADD COLUMN `account_number` varchar(100) DEFAULT NULL AFTER `bank_name`",
+            'currency' => "ALTER TABLE `account_list` ADD COLUMN `currency` varchar(10) NOT NULL DEFAULT 'FJD' AFTER `account_number`"
         );
 
         foreach ($acc_cols as $col => $sql) {
             $res = @$this->conn->query("SHOW COLUMNS FROM `account_list` LIKE '{$col}'");
+            if ($res && $res->num_rows == 0) {
+                @$this->conn->query($sql);
+            }
+        }
+    }
+
+    public function check_fixed_assets_migrations(){
+        if (!$this->conn) return;
+
+        $sql = "CREATE TABLE IF NOT EXISTS `fixed_assets` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `tenant_id` int(30) NOT NULL DEFAULT 1,
+          `asset_number` varchar(50) NOT NULL,
+          `asset_name` varchar(250) NOT NULL,
+          `purchase_date` date DEFAULT NULL,
+          `purchase_price` decimal(12,2) NOT NULL DEFAULT 0.00,
+          `asset_type` varchar(100) DEFAULT NULL,
+          `warranty_expiry` date DEFAULT NULL,
+          `serial_number` varchar(100) DEFAULT NULL,
+          `description` text DEFAULT NULL,
+          `attachment_path` varchar(255) DEFAULT NULL,
+          `dep_start_date` date DEFAULT NULL,
+          `dep_method` varchar(100) DEFAULT NULL,
+          `averaging_method` varchar(100) DEFAULT NULL,
+          `dep_calc_by` enum('rate','effective_life') DEFAULT 'rate',
+          `dep_rate` decimal(5,2) NOT NULL DEFAULT 0.00,
+          `effective_life_years` decimal(5,2) NOT NULL DEFAULT 0.00,
+          `cost_limit` decimal(12,2) NOT NULL DEFAULT 0.00,
+          `residual_value` decimal(12,2) NOT NULL DEFAULT 0.00,
+          `status` enum('draft','registered','disposed') NOT NULL DEFAULT 'draft',
+          `created_by` int(30) DEFAULT NULL,
+          `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+          `date_updated` datetime DEFAULT NULL ON UPDATE current_timestamp(),
+          PRIMARY KEY (`id`),
+          KEY `tenant_id` (`tenant_id`),
+          UNIQUE KEY `asset_tenant_num` (`tenant_id`, `asset_number`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+
+        @$this->conn->query($sql);
+    }
+
+    public function check_journal_options_migrations(){
+        if (!$this->conn) return;
+
+        $j_cols = array(
+            'auto_reversing_date' => "ALTER TABLE `journal_entries` ADD COLUMN `auto_reversing_date` date DEFAULT NULL AFTER `journal_date`",
+            'default_narration' => "ALTER TABLE `journal_entries` ADD COLUMN `default_narration` tinyint(1) NOT NULL DEFAULT 1 AFTER `description`",
+            'show_cash_basis' => "ALTER TABLE `journal_entries` ADD COLUMN `show_cash_basis` tinyint(1) NOT NULL DEFAULT 1 AFTER `default_narration`",
+            'tax_mode' => "ALTER TABLE `journal_entries` ADD COLUMN `tax_mode` varchar(50) NOT NULL DEFAULT 'No Tax' AFTER `show_cash_basis`",
+            'status' => "ALTER TABLE `journal_entries` ADD COLUMN `status` varchar(20) NOT NULL DEFAULT 'posted' AFTER `tax_mode`"
+        );
+
+        foreach ($j_cols as $col => $sql) {
+            $res = @$this->conn->query("SHOW COLUMNS FROM `journal_entries` LIKE '{$col}'");
+            if ($res && $res->num_rows == 0) {
+                @$this->conn->query($sql);
+            }
+        }
+
+        $item_cols = array(
+            'description' => "ALTER TABLE `journal_items` ADD COLUMN `description` text DEFAULT NULL AFTER `journal_id`",
+            'tax_rate' => "ALTER TABLE `journal_items` ADD COLUMN `tax_rate` varchar(100) DEFAULT 'No Tax (0%)' AFTER `amount`"
+        );
+
+        foreach ($item_cols as $col => $sql) {
+            $res = @$this->conn->query("SHOW COLUMNS FROM `journal_items` LIKE '{$col}'");
             if ($res && $res->num_rows == 0) {
                 @$this->conn->query($sql);
             }

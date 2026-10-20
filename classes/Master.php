@@ -112,6 +112,124 @@ class Master extends DBConnection
         return json_encode(['status' => 'failed', 'msg' => 'Failed to update tax rates.']);
     }
 
+    public function save_asset()
+    {
+        $tenant_id = $this->settings->active_tenant_id();
+        $user_id = $this->settings->userdata('id');
+        extract($_POST);
+
+        if (empty($asset_name) || empty($asset_number)) {
+            return json_encode(['status' => 'failed', 'msg' => 'Asset Name and Asset Number are required.']);
+        }
+
+        // Check unique asset number within tenant
+        $chk_sql = "SELECT id FROM `fixed_assets` WHERE `tenant_id` = '{$tenant_id}' AND `asset_number` = '{$this->conn->real_escape_string($asset_number)}' ";
+        if (!empty($id)) {
+            $chk_sql .= " AND id != '{$id}' ";
+        }
+        $check = $this->conn->query($chk_sql);
+        if ($check && $check->num_rows > 0) {
+            return json_encode(['status' => 'failed', 'msg' => 'Asset Number already exists for this tenant.']);
+        }
+
+        $data = " `tenant_id` = '{$tenant_id}' ";
+        $data .= ", `asset_number` = '{$this->conn->real_escape_string($asset_number)}' ";
+        $data .= ", `asset_name` = '{$this->conn->real_escape_string($asset_name)}' ";
+        $data .= ", `purchase_date` = " . (!empty($purchase_date) ? "'{$this->conn->real_escape_string($purchase_date)}'" : "NULL") . " ";
+        $data .= ", `purchase_price` = '" . (!empty($purchase_price) ? floatval($purchase_price) : 0.00) . "' ";
+        $data .= ", `asset_type` = '{$this->conn->real_escape_string($asset_type ?? '')}' ";
+        $data .= ", `warranty_expiry` = " . (!empty($warranty_expiry) ? "'{$this->conn->real_escape_string($warranty_expiry)}'" : "NULL") . " ";
+        $data .= ", `serial_number` = '{$this->conn->real_escape_string($serial_number ?? '')}' ";
+        $data .= ", `description` = '{$this->conn->real_escape_string($description ?? '')}' ";
+        $data .= ", `dep_start_date` = " . (!empty($dep_start_date) ? "'{$this->conn->real_escape_string($dep_start_date)}'" : "NULL") . " ";
+        $data .= ", `dep_method` = '{$this->conn->real_escape_string($dep_method ?? '')}' ";
+        $data .= ", `averaging_method` = '{$this->conn->real_escape_string($averaging_method ?? '')}' ";
+        $data .= ", `dep_calc_by` = '{$this->conn->real_escape_string($dep_calc_by ?? 'rate')}' ";
+        $data .= ", `dep_rate` = '" . (!empty($dep_rate) ? floatval($dep_rate) : 0.00) . "' ";
+        $data .= ", `effective_life_years` = '" . (!empty($effective_life_years) ? floatval($effective_life_years) : 0.00) . "' ";
+        $data .= ", `cost_limit` = '" . (!empty($cost_limit) ? floatval($cost_limit) : 0.00) . "' ";
+        $data .= ", `residual_value` = '" . (!empty($residual_value) ? floatval($residual_value) : 0.00) . "' ";
+        $data .= ", `status` = '{$this->conn->real_escape_string($status ?? 'draft')}' ";
+        $data .= ", `created_by` = '{$user_id}' ";
+
+        if (isset($_FILES['attachment']) && $_FILES['attachment']['tmp_name'] != '') {
+            $fname = 'uploads/assets/asset_' . $tenant_id . '_' . time() . '.' . pathinfo($_FILES['attachment']['name'], PATHINFO_EXTENSION);
+            $dir_path = base_app . 'uploads/assets';
+            if (!is_dir($dir_path)) {
+                mkdir($dir_path, 0777, true);
+            }
+            if (move_uploaded_file($_FILES['attachment']['tmp_name'], base_app . $fname)) {
+                $data .= ", `attachment_path` = '{$fname}' ";
+            }
+        }
+
+        if (empty($id)) {
+            $save = $this->conn->query("INSERT INTO `fixed_assets` SET {$data}");
+            $asset_id = $this->conn->insert_id;
+        } else {
+            $save = $this->conn->query("UPDATE `fixed_assets` SET {$data} WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'");
+            $asset_id = $id;
+        }
+
+        if ($save) {
+            $this->settings->log_audit(empty($id) ? "Created Asset" : "Updated Asset", "Fixed Assets", "Asset #{$asset_number}: {$asset_name}");
+            return json_encode(['status' => 'success', 'id' => $asset_id, 'msg' => 'Fixed asset saved successfully.']);
+        }
+        return json_encode(['status' => 'failed', 'msg' => 'Failed to save fixed asset. ' . $this->conn->error]);
+    }
+
+    public function delete_asset()
+    {
+        $tenant_id = $this->settings->active_tenant_id();
+        $id = intval($_POST['id'] ?? 0);
+
+        $del = $this->conn->query("DELETE FROM `fixed_assets` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'");
+        if ($del) {
+            $this->settings->log_audit("Deleted Asset", "Fixed Assets", "Asset ID #{$id}");
+            return json_encode(['status' => 'success', 'msg' => 'Fixed asset deleted successfully.']);
+        }
+        return json_encode(['status' => 'failed', 'msg' => 'Failed to delete fixed asset.']);
+    }
+
+    public function save_bank_account()
+    {
+        $tenant_id = $this->settings->active_tenant_id();
+        extract($_POST);
+
+        if (empty($bank_name) || empty($account_name)) {
+            return json_encode(['status' => 'failed', 'msg' => 'Bank Name and Account Name are required.']);
+        }
+
+        // Auto-generate code if missing
+        $code_q = $this->conn->query("SELECT MAX(CAST(code AS UNSIGNED)) as max_code FROM `account_list` WHERE tenant_id = '{$tenant_id}' AND code REGEXP '^[0-9]+$'");
+        $max_code = ($code_q && $code_q->num_rows > 0) ? intval($code_q->fetch_assoc()['max_code']) : 1000;
+        $code = ($max_code > 0) ? strval($max_code + 10) : '1010';
+
+        $full_name = $this->conn->real_escape_string($account_name . ' (' . $bank_name . ')');
+        $b_name = $this->conn->real_escape_string($bank_name);
+        $acc_num = $this->conn->real_escape_string($account_number ?? '');
+        $curr = $this->conn->real_escape_string($currency ?? 'FJD');
+        $a_type = 'Bank';
+
+        $data = " `tenant_id` = '{$tenant_id}' ";
+        $data .= ", `code` = '{$code}' ";
+        $data .= ", `name` = '{$full_name}' ";
+        $data .= ", `type` = '{$a_type}' ";
+        $data .= ", `tax_rate` = 'Tax Exempt (0%)' ";
+        $data .= ", `bank_name` = '{$b_name}' ";
+        $data .= ", `account_number` = '{$acc_num}' ";
+        $data .= ", `currency` = '{$curr}' ";
+        $data .= ", `status` = 1 ";
+
+        $save = $this->conn->query("INSERT INTO `account_list` SET {$data}");
+        if ($save) {
+            $acc_id = $this->conn->insert_id;
+            $this->settings->log_audit("Added Bank Account", "Chart of Accounts", "Bank: {$bank_name}, Account: {$account_name}");
+            return json_encode(['status' => 'success', 'id' => $acc_id, 'msg' => 'Bank account added successfully.']);
+        }
+        return json_encode(['status' => 'failed', 'msg' => 'Failed to add bank account. ' . $this->conn->error]);
+    }
+
     /* Journal Actions */
     public function save_journal()
     {
@@ -912,6 +1030,15 @@ switch ($action) {
         break;
     case 'save_invoice_template':
         echo $Master->save_invoice_template();
+        break;
+    case 'save_asset':
+        echo $Master->save_asset();
+        break;
+    case 'delete_asset':
+        echo $Master->delete_asset();
+        break;
+    case 'save_bank_account':
+        echo $Master->save_bank_account();
         break;
     case 'delete_accounts_bulk':
         echo $Master->delete_accounts_bulk();
