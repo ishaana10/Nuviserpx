@@ -4,6 +4,15 @@ function format_num($number){
 }
 
 $tenant_id = $_settings->active_tenant_id();
+$tenant_name = $_settings->info('name');
+$t_qry = $conn->query("SELECT name FROM `tenants` WHERE id = '{$tenant_id}'");
+if($t_qry && $t_qry->num_rows > 0){
+    $t_row = $t_qry->fetch_assoc();
+    if(!empty($t_row['name'])){
+        $tenant_name = $t_row['name'];
+    }
+}
+
 $as_of = isset($_GET['as_of']) ? $conn->real_escape_string($_GET['as_of']) : date("Y-m-d");
 
 // Fetch accounts categorized by group (Assets, Liabilities, Equity)
@@ -96,7 +105,7 @@ $tot_liab_equity = $tot_liabilities + $tot_equity;
 
         <div class="container-fluid" id="outprint">
             <div class="text-center mb-4">
-		<h3 class="font-weight-bold m-0"><?= $_settings->info('name') ?></h3>
+		<h3 class="font-weight-bold m-0"><?= htmlspecialchars($tenant_name) ?></h3>
 		<h4 class="font-weight-bold text-success">BALANCE SHEET STATEMENT</h4>
 		<p class="m-0 text-muted small">As of <?= date("d F Y" , strtotime($as_of)) ?></p>
             </div>
