@@ -164,6 +164,12 @@ if($t_qry && $t_qry->num_rows > 0){
                                         </a>
                                     </li>
                                     <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=crm" class="nav-link nav-crm tree-item">
+                                            <i class="nav-icon fas fa-handshake"></i>
+                                            <p>CRM Opportunities</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=payments" class="nav-link nav-payments tree-item">
                                             <i class="nav-icon fas fa-receipt"></i>
                                             <p>Payment Receipts</p>

@@ -62,6 +62,7 @@ class DBConnection{
                 $this->check_customer_portal_migrations();
                 $this->check_fixed_assets_migrations();
                 $this->check_journal_options_migrations();
+                $this->check_dolibarr_crm_migrations();
             }
 
             // Run versioned migrations
@@ -329,6 +330,46 @@ class DBConnection{
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
 
         @$this->conn->query($sql);
+    }
+
+    public function check_dolibarr_crm_migrations(){
+        if (!$this->conn) return;
+
+        $sql1 = "CREATE TABLE IF NOT EXISTS `crm_opportunities` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `tenant_id` int(30) NOT NULL DEFAULT 1,
+          `title` varchar(250) NOT NULL,
+          `party_id` int(30) DEFAULT NULL,
+          `stage` enum('qualification','proposal','negotiation','won','lost') NOT NULL DEFAULT 'qualification',
+          `amount` decimal(12,2) NOT NULL DEFAULT 0.00,
+          `probability` int(3) NOT NULL DEFAULT 20,
+          `expected_close_date` date DEFAULT NULL,
+          `notes` text DEFAULT NULL,
+          `created_by` int(30) DEFAULT NULL,
+          `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+          `date_updated` datetime DEFAULT NULL ON UPDATE current_timestamp(),
+          PRIMARY KEY (`id`),
+          KEY `tenant_id` (`tenant_id`),
+          KEY `party_id` (`party_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+
+        $sql2 = "CREATE TABLE IF NOT EXISTS `proposal_signatures` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `tenant_id` int(30) NOT NULL DEFAULT 1,
+          `sales_order_id` int(30) NOT NULL,
+          `signer_name` varchar(150) NOT NULL,
+          `signer_email` varchar(150) NOT NULL,
+          `signature_data` longtext NOT NULL,
+          `signed_at` datetime NOT NULL DEFAULT current_timestamp(),
+          `ip_address` varchar(50) DEFAULT NULL,
+          `status` varchar(50) NOT NULL DEFAULT 'accepted',
+          PRIMARY KEY (`id`),
+          KEY `tenant_id` (`tenant_id`),
+          KEY `sales_order_id` (`sales_order_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+
+        @$this->conn->query($sql1);
+        @$this->conn->query($sql2);
     }
 
     public function check_journal_options_migrations(){

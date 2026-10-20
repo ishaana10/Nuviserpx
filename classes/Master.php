@@ -153,7 +153,12 @@ class Master extends DBConnection
         $data .= ", `created_by` = '{$user_id}' ";
 
         if (isset($_FILES['attachment']) && $_FILES['attachment']['tmp_name'] != '') {
-            $fname = 'uploads/assets/asset_' . $tenant_id . '_' . time() . '.' . pathinfo($_FILES['attachment']['name'], PATHINFO_EXTENSION);
+            $ext = strtolower(pathinfo($_FILES['attachment']['name'], PATHINFO_EXTENSION));
+            $allowed_exts = ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'zip', 'txt'];
+            if (!in_array($ext, $allowed_exts)) {
+                return json_encode(['status' => 'failed', 'msg' => 'Invalid file attachment format. Allowed types: PDF, Images, Documents, Spreadsheets.']);
+            }
+            $fname = 'uploads/assets/asset_' . $tenant_id . '_' . time() . '.' . $ext;
             $dir_path = base_app . 'uploads/assets';
             if (!is_dir($dir_path)) {
                 mkdir($dir_path, 0777, true);
@@ -228,6 +233,85 @@ class Master extends DBConnection
             return json_encode(['status' => 'success', 'id' => $acc_id, 'msg' => 'Bank account added successfully.']);
         }
         return json_encode(['status' => 'failed', 'msg' => 'Failed to add bank account. ' . $this->conn->error]);
+    }
+
+    /* Dolibarr Inspired CRM Opportunity Methods */
+    public function save_opportunity()
+    {
+        $tenant_id = $this->settings->active_tenant_id();
+        $user_id = $this->settings->userdata('id');
+        extract($_POST);
+
+        if (empty($title)) {
+            return json_encode(['status' => 'failed', 'msg' => 'Opportunity Title is required.']);
+        }
+
+        $data = " `tenant_id` = '{$tenant_id}' ";
+        $data .= ", `title` = '{$this->conn->real_escape_string($title)}' ";
+        $data .= ", `party_id` = " . (!empty($party_id) ? intval($party_id) : "NULL") . " ";
+        $data .= ", `stage` = '{$this->conn->real_escape_string($stage ?? 'qualification')}' ";
+        $data .= ", `amount` = '" . (!empty($amount) ? floatval($amount) : 0.00) . "' ";
+        $data .= ", `probability` = '" . (!empty($probability) ? intval($probability) : 20) . "' ";
+        $data .= ", `expected_close_date` = " . (!empty($expected_close_date) ? "'{$this->conn->real_escape_string($expected_close_date)}'" : "NULL") . " ";
+        $data .= ", `notes` = '{$this->conn->real_escape_string($notes ?? '')}' ";
+        $data .= ", `created_by` = '{$user_id}' ";
+
+        if (empty($id)) {
+            $save = $this->conn->query("INSERT INTO `crm_opportunities` SET {$data}");
+            $opp_id = $this->conn->insert_id;
+        } else {
+            $save = $this->conn->query("UPDATE `crm_opportunities` SET {$data} WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'");
+            $opp_id = $id;
+        }
+
+        if ($save) {
+            $this->settings->log_audit(empty($id) ? "Created CRM Deal" : "Updated CRM Deal", "CRM Opportunities", "Title: {$title}");
+            return json_encode(['status' => 'success', 'id' => $opp_id, 'msg' => 'CRM Opportunity saved successfully.']);
+        }
+        return json_encode(['status' => 'failed', 'msg' => 'Failed to save opportunity. ' . $this->conn->error]);
+    }
+
+    public function delete_opportunity()
+    {
+        $tenant_id = $this->settings->active_tenant_id();
+        $id = intval($_POST['id'] ?? 0);
+
+        $del = $this->conn->query("DELETE FROM `crm_opportunities` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'");
+        if ($del) {
+            $this->settings->log_audit("Deleted CRM Deal", "CRM Opportunities", "ID #{$id}");
+            return json_encode(['status' => 'success', 'msg' => 'CRM opportunity deleted successfully.']);
+        }
+        return json_encode(['status' => 'failed', 'msg' => 'Failed to delete opportunity.']);
+    }
+
+    public function save_proposal_signature()
+    {
+        extract($_POST);
+        $t_id = !empty($tenant_id) ? intval($tenant_id) : $this->settings->active_tenant_id();
+        $so_id = intval($sales_order_id ?? 0);
+
+        if ($so_id <= 0 || empty($signer_name) || empty($signer_email) || empty($signature_data)) {
+            return json_encode(['status' => 'failed', 'msg' => 'Signer Name, Email, and Signature drawing are required.']);
+        }
+
+        $ip = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
+        $s_name = $this->conn->real_escape_string($signer_name);
+        $s_email = $this->conn->real_escape_string($signer_email);
+        $sig_data = $this->conn->real_escape_string($signature_data);
+
+        $save = $this->conn->query("
+            INSERT INTO `proposal_signatures`
+            (`tenant_id`, `sales_order_id`, `signer_name`, `signer_email`, `signature_data`, `ip_address`, `status`)
+            VALUES ('{$t_id}', '{$so_id}', '{$s_name}', '{$s_email}', '{$sig_data}', '{$ip}', 'accepted')
+        ");
+
+        if ($save) {
+            // Update sales order status to confirmed
+            $this->conn->query("UPDATE `sales_order_list` SET `status` = 'confirmed' WHERE id = '{$so_id}'");
+            $this->settings->log_audit("Signed Commercial Proposal", "Customer Portal", "Quote ID #{$so_id} signed by {$signer_name}");
+            return json_encode(['status' => 'success', 'msg' => 'Proposal signed and confirmed successfully.']);
+        }
+        return json_encode(['status' => 'failed', 'msg' => 'Failed to save digital signature. ' . $this->conn->error]);
     }
 
     /* Journal Actions */
@@ -1039,6 +1123,15 @@ switch ($action) {
         break;
     case 'save_bank_account':
         echo $Master->save_bank_account();
+        break;
+    case 'save_opportunity':
+        echo $Master->save_opportunity();
+        break;
+    case 'delete_opportunity':
+        echo $Master->delete_opportunity();
+        break;
+    case 'save_proposal_signature':
+        echo $Master->save_proposal_signature();
         break;
     case 'delete_accounts_bulk':
         echo $Master->delete_accounts_bulk();
