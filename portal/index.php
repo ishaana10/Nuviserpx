@@ -25,6 +25,15 @@ if ($party) {
     }
 }
 
+// System info for invoice header branding
+$sys = [];
+$sys_qry = $conn->query("SELECT meta_field, meta_value FROM `system_info`");
+if ($sys_qry) {
+    while ($r = $sys_qry->fetch_assoc()) {
+        $sys[$r['meta_field']] = $r['meta_value'];
+    }
+}
+
 // Read portal customization settings
 $portal_show_invoices = $_settings->info('portal_show_invoices') !== '0';
 $portal_show_payments = $_settings->info('portal_show_payments') !== '0';
@@ -45,12 +54,18 @@ $view_order_id   = $_GET['order_id'] ?? null;
   .portal-header {
     background-color: <?php echo htmlspecialchars($portal_theme_color) ?> !important;
   }
+  @media print {
+    .no-print { display: none !important; }
+    .main-header, .main-footer, .content-header { display: none !important; }
+    .content-wrapper { background: #fff !important; padding: 0 !important; }
+    .card { border: none !important; box-shadow: none !important; }
+  }
 </style>
 <body class="hold-transition layout-top-nav">
 <div class="wrapper">
 
   <!-- Navbar -->
-  <nav class="main-header navbar navbar-expand-md navbar-dark portal-header shadow-sm">
+  <nav class="main-header navbar navbar-expand-md navbar-dark portal-header shadow-sm no-print">
     <div class="container">
       <a href="<?php echo base_url ?>portal/" class="navbar-brand">
         <span class="brand-text font-weight-bold text-white"><?php echo $_settings->info('name') ?></span>
@@ -80,7 +95,7 @@ $view_order_id   = $_GET['order_id'] ?? null;
   <!-- Content Wrapper. Contains page content -->
   <div class="content-wrapper bg-light">
     <!-- Content Header (Page header) -->
-    <div class="content-header">
+    <div class="content-header no-print">
       <div class="container">
         <?php if (!empty($portal_announcement)): ?>
           <div class="alert alert-info border-left border-info shadow-sm mb-3">
@@ -108,14 +123,15 @@ $view_order_id   = $_GET['order_id'] ?? null;
 
       <?php if ($view_invoice_id):
         // Fetch invoice details
-        $inv_qry = $conn->query("SELECT i.*, p.name as customer_name, p.email as customer_email, p.address as customer_address FROM `invoice_list` i LEFT JOIN `party_list` p ON i.party_id = p.id WHERE i.id = '{$conn->real_escape_string($view_invoice_id)}' AND i.party_id = '{$party_id}'");
+        $inv_qry = $conn->query("SELECT i.*, p.party_code, p.name as customer_name, p.email as customer_email, p.phone as customer_phone, p.tin as customer_tin, p.address as customer_address FROM `invoice_list` i LEFT JOIN `party_list` p ON i.party_id = p.id WHERE i.id = '{$conn->real_escape_string($view_invoice_id)}' AND i.party_id = '{$party_id}'");
         if (!$inv_qry || $inv_qry->num_rows == 0):
       ?>
         <div class="alert alert-danger">Invoice not found or access denied.</div>
       <?php
         else:
           $inv = $inv_qry->fetch_assoc();
-          $items = $conn->query("SELECT * FROM `invoice_items` WHERE invoice_id = '{$inv['id']}'");
+          $items = $conn->query("SELECT * FROM `invoice_items` WHERE invoice_id = '{$inv['id']}' ORDER BY id ASC");
+          $payments = $conn->query("SELECT pa.amount as allocated_amount, p.payment_no, p.payment_date, p.method FROM `payment_allocations` pa INNER JOIN `payment_list` p ON p.id = pa.payment_id WHERE pa.invoice_id = '{$inv['id']}' ORDER BY p.payment_date DESC");
 
           // Log invoice view action
           $ip = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
@@ -125,77 +141,197 @@ $view_order_id   = $_GET['order_id'] ?? null;
           $inv_code = $conn->real_escape_string($inv['invoice_no']);
           $conn->query("INSERT INTO `customer_portal_logs` (`tenant_id`, `party_id`, `portal_user_id`, `action`, `details`, `ip_address`)
                         VALUES ('{$tenant_id}', '{$party_id}', " . ($portal_user_id ? "'{$portal_user_id}'" : "NULL") . ", 'view_invoice', 'Viewed Invoice #{$inv_code}', '{$ip_esc}')");
+
+          $status_class = [
+            'draft' => 'secondary',
+            'unpaid' => 'danger',
+            'partially_paid' => 'warning',
+            'paid' => 'success',
+            'cancelled' => 'dark'
+          ][$inv['status']] ?? 'secondary';
       ?>
-        <div class="card card-outline card-primary shadow-sm">
-          <div class="card-header border-bottom-0">
-            <h3 class="card-title">Invoice #<?php echo htmlspecialchars($inv['invoice_no']) ?></h3>
+        <div class="card card-outline card-primary shadow-sm mb-4">
+          <div class="card-header no-print d-flex justify-content-between align-items-center">
+            <h3 class="card-title font-weight-bold m-0"><i class="fas fa-file-invoice text-primary mr-2"></i> Tax Invoice #<?php echo htmlspecialchars($inv['invoice_no']) ?></h3>
             <div class="card-tools">
-              <button class="btn btn-default btn-sm" onclick="window.print()"><i class="fas fa-print mr-1"></i> Print</button>
+              <a href="view_invoice.php?id=<?php echo $inv['id'] ?>&print=1" target="_blank" class="btn btn-sm btn-primary font-weight-bold mr-1">
+                <i class="fas fa-file-pdf mr-1"></i> Download PDF / Print
+              </a>
+              <button onclick="window.print()" class="btn btn-sm btn-outline-secondary font-weight-bold">
+                <i class="fas fa-print mr-1"></i> Print View
+              </button>
             </div>
           </div>
-          <div class="card-body">
-            <div class="row mb-4">
+          <div class="card-body p-4 bg-white" id="invoice-print-area">
+            <!-- Header Banner Matching Attachment Image -->
+            <div class="row border-bottom pb-3 mb-4 align-items-center">
+              <div class="col-sm-7 d-flex align-items-center">
+                <?php if(!empty($_settings->info('logo'))): ?>
+                  <img src="<?php echo validate_image($_settings->info('logo')) ?>" alt="Logo" class="mr-3 rounded" style="max-height: 70px; width: auto; object-fit: contain;">
+                <?php endif; ?>
+                <div>
+                  <h3 class="font-weight-bold text-navy mb-1"><?php echo htmlspecialchars($sys['name'] ?? 'Nuvis ERPX') ?></h3>
+                  <p class="mb-0 text-muted small"><?php echo htmlspecialchars($sys['address'] ?? 'Fiji Islands') ?></p>
+                  <p class="mb-0 text-muted small">
+                    <b>Email:</b> <?php echo htmlspecialchars($sys['email'] ?? '') ?> | <b>Phone:</b> <?php echo htmlspecialchars($sys['contact'] ?? '') ?>
+                  </p>
+                </div>
+              </div>
+              <div class="col-sm-5 text-right">
+                <h2 class="font-weight-bold text-dark mb-0">TAX INVOICE</h2>
+                <h4 class="font-weight-bold text-primary mb-1">#<?php echo htmlspecialchars($inv['invoice_no']) ?></h4>
+                <p class="mb-1 text-muted small"><b>Invoice Date:</b> <?php echo date('d M Y', strtotime($inv['invoice_date'] ?? $inv['date_created'])) ?></p>
+                <p class="mb-1 text-muted small"><b>Due Date:</b> <?php echo !empty($inv['due_date']) ? date('d M Y', strtotime($inv['due_date'])) : '—' ?></p>
+                <span class="badge badge-<?php echo $status_class ?> px-3 py-1 font-weight-bold text-uppercase mt-1">
+                  <?php echo strtoupper(str_replace('_', ' ', $inv['status'])) ?>
+                </span>
+              </div>
+            </div>
+
+            <!-- Billed To Section -->
+            <div class="row mb-4 p-3 rounded bg-light border">
               <div class="col-sm-6">
-                <h6 class="text-muted">Billed From:</h6>
-                <p class="font-weight-bold mb-1"><?php echo $_settings->info('name') ?></p>
-                <p class="text-sm text-muted mb-0"><?php echo $_settings->info('address') ?? '' ?></p>
+                <h6 class="text-uppercase font-weight-bold text-navy mb-2">BILLED TO:</h6>
+                <h5 class="font-weight-bold mb-1"><?php echo htmlspecialchars($inv['customer_name']) ?></h5>
+                <p class="mb-1 text-muted small"><b>Code:</b> <?php echo htmlspecialchars($inv['party_code'] ?? 'CUST-' . $inv['party_id']) ?></p>
+                <?php if (!empty($inv['customer_email'])): ?>
+                  <p class="mb-1 text-muted small"><b>Email:</b> <?php echo htmlspecialchars($inv['customer_email']) ?></p>
+                <?php endif; ?>
+                <?php if (!empty($inv['customer_phone'])): ?>
+                  <p class="mb-1 text-muted small"><b>Phone:</b> <?php echo htmlspecialchars($inv['customer_phone']) ?></p>
+                <?php endif; ?>
               </div>
               <div class="col-sm-6 text-right">
-                <h6 class="text-muted">Billed To:</h6>
-                <p class="font-weight-bold mb-1"><?php echo htmlspecialchars($inv['customer_name']) ?></p>
-                <p class="text-sm text-muted mb-0"><?php echo htmlspecialchars($inv['customer_email']) ?></p>
+                <h6 class="text-uppercase font-weight-bold text-navy mb-2">BILLING ADDRESS:</h6>
+                <p class="mb-0 text-muted small"><?php echo nl2br(htmlspecialchars($inv['customer_address'] ?: 'N/A')) ?></p>
               </div>
             </div>
 
-            <div class="row mb-4">
-              <div class="col-sm-4">
-                <span class="text-muted text-xs">Date Issued:</span>
-                <p class="font-weight-bold mb-0"><?php echo date("d M Y", strtotime($inv['invoice_date'] ?? $inv['date_created'])) ?></p>
+            <!-- Line Items Breakdown Table -->
+            <div class="table-responsive mb-4">
+              <table class="table table-bordered table-striped table-sm">
+                <thead class="bg-navy text-white">
+                  <tr>
+                    <th class="text-center" style="width: 50px;">#</th>
+                    <th>ITEM & DESCRIPTION</th>
+                    <th class="text-center" style="width: 90px;">QTY</th>
+                    <th class="text-right" style="width: 130px;">UNIT PRICE</th>
+                    <th class="text-center" style="width: 100px;">TAX RATE</th>
+                    <th class="text-right" style="width: 140px;">TOTAL (FJD)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <?php
+                  $i = 1;
+                  while($row = $items->fetch_assoc()):
+                  ?>
+                  <tr>
+                    <td class="text-center"><?php echo $i++ ?></td>
+                    <td>
+                      <strong><?php echo htmlspecialchars($row['item_name']) ?></strong>
+                      <?php if($row['description']): ?>
+                        <br><small class="text-muted"><?php echo htmlspecialchars($row['description']) ?></small>
+                      <?php endif; ?>
+                    </td>
+                    <td class="text-center"><?php echo number_format($row['qty'], 2) ?></td>
+                    <td class="text-right"><?php echo number_format($row['unit_price'], 2) ?></td>
+                    <td class="text-center"><?php echo number_format($row['tax_rate'], 1) ?>%</td>
+                    <td class="text-right font-weight-bold"><?php echo number_format($row['amount'], 2) ?></td>
+                  </tr>
+                  <?php endwhile; ?>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Notes & Terms + Summary Totals -->
+            <div class="row">
+              <div class="col-sm-7">
+                <?php if(!empty($inv['notes'])): ?>
+                <div class="border p-3 rounded mb-3 bg-light">
+                  <h6 class="font-weight-bold text-navy mb-1"><i class="fas fa-sticky-note mr-1"></i> Notes & Terms:</h6>
+                  <p class="mb-0 small text-muted"><?php echo nl2br(htmlspecialchars($inv['notes'])) ?></p>
+                </div>
+                <?php endif; ?>
+
+                <?php if($payments && $payments->num_rows > 0): ?>
+                <div class="border p-3 rounded bg-light">
+                  <h6 class="font-weight-bold text-success mb-2"><i class="fas fa-history mr-1"></i> Payment History:</h6>
+                  <table class="table table-sm table-borderless m-0 small">
+                    <thead>
+                      <tr class="border-bottom">
+                        <th>Receipt No</th>
+                        <th>Date</th>
+                        <th>Method</th>
+                        <th class="text-right">Amount Paid</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <?php while($pay = $payments->fetch_assoc()): ?>
+                      <tr>
+                        <td><b><?php echo htmlspecialchars($pay['payment_no']) ?></b></td>
+                        <td><?php echo date('d M Y', strtotime($pay['payment_date'])) ?></td>
+                        <td><?php echo ucfirst($pay['method']) ?></td>
+                        <td class="text-right font-weight-bold text-success">$<?php echo number_format($pay['allocated_amount'], 2) ?></td>
+                      </tr>
+                      <?php endwhile; ?>
+                    </tbody>
+                  </table>
+                </div>
+                <?php endif; ?>
               </div>
-              <div class="col-sm-4">
-                <span class="text-muted text-xs">Due Date:</span>
-                <p class="font-weight-bold mb-0"><?php echo !empty($inv['due_date']) ? date("d M Y", strtotime($inv['due_date'])) : 'N/A' ?></p>
-              </div>
-              <div class="col-sm-4 text-right">
-                <span class="text-muted text-xs">Status:</span>
-                <p class="mb-0">
-                  <?php if($inv['status'] == 'paid' || $inv['status'] == 1): ?>
-                    <span class="badge badge-success px-3 py-1">Paid</span>
-                  <?php elseif($inv['status'] == 'partially_paid' || $inv['status'] == 2): ?>
-                    <span class="badge badge-warning px-3 py-1">Partially Paid</span>
-                  <?php else: ?>
-                    <span class="badge badge-danger px-3 py-1">Unpaid</span>
+
+              <div class="col-sm-5">
+                <div class="card border shadow-none bg-light p-3">
+                  <div class="d-flex justify-content-between mb-2">
+                    <span class="text-muted">Subtotal:</span>
+                    <strong class="text-dark">$<?php echo number_format($inv['subtotal'], 2) ?></strong>
+                  </div>
+                  <div class="d-flex justify-content-between mb-2">
+                    <span class="text-muted">Tax / VAT Amount:</span>
+                    <strong class="text-dark">$<?php echo number_format($inv['tax_amount'], 2) ?></strong>
+                  </div>
+                  <?php if($inv['discount'] > 0): ?>
+                  <div class="d-flex justify-content-between mb-2">
+                    <span class="text-muted">Discount:</span>
+                    <strong class="text-danger">-$<?php echo number_format($inv['discount'], 2) ?></strong>
+                  </div>
                   <?php endif; ?>
-                </p>
+                  <hr class="my-2">
+                  <div class="d-flex justify-content-between mb-2">
+                    <span class="font-weight-bold h6">Grand Total:</span>
+                    <strong class="font-weight-bold h5 text-navy">$<?php echo number_format($inv['total'], 2) ?></strong>
+                  </div>
+                  <div class="d-flex justify-content-between mb-2">
+                    <span class="text-muted">Amount Paid:</span>
+                    <strong class="text-success">$<?php echo number_format($inv['paid_amount'], 2) ?></strong>
+                  </div>
+                  <div class="d-flex justify-content-between pt-2 border-top">
+                    <span class="font-weight-bold h6 text-danger">Balance Due:</span>
+                    <strong class="font-weight-bold h5 text-danger">$<?php echo number_format($inv['balance'], 2) ?></strong>
+                  </div>
+                </div>
               </div>
             </div>
 
-            <table class="table table-bordered table-striped">
-              <thead>
-                <tr>
-                  <th>Description</th>
-                  <th class="text-center" style="width: 100px;">QTY</th>
-                  <th class="text-right" style="width: 150px;">Unit Price</th>
-                  <th class="text-right" style="width: 150px;">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                <?php while($row = $items->fetch_assoc()): ?>
-                <tr>
-                  <td><?php echo htmlspecialchars($row['item_name'] ?? $row['description'] ?? 'Line Item') ?></td>
-                  <td class="text-center"><?php echo number_format($row['qty'], 2) ?></td>
-                  <td class="text-right"><?php echo number_format($row['unit_price'], 2) ?></td>
-                  <td class="text-right"><?php echo number_format($row['amount'], 2) ?></td>
-                </tr>
-                <?php endwhile; ?>
-              </tbody>
-              <tfoot>
-                <tr>
-                  <th colspan="3" class="text-right">Total Amount:</th>
-                  <th class="text-right"><?php echo number_format($inv['total'], 2) ?></th>
-                </tr>
-              </tfoot>
-            </table>
+            <!-- Signatures Row -->
+            <div class="row mt-5 pt-4">
+              <div class="col-6 text-center">
+                <p class="border-top pt-2 mb-0 font-weight-bold">Customer Signature</p>
+              </div>
+              <div class="col-6 text-center">
+                <p class="border-top pt-2 mb-0 font-weight-bold">Authorized Signature</p>
+              </div>
+            </div>
+
+            <!-- Footer Branding Bar -->
+            <div class="row mt-4 pt-3 border-top text-muted text-xs">
+              <div class="col-6">
+                Copyright &copy; <?php echo date('Y') ?>. A property of <a href="#" class="text-primary font-weight-bold"><?php echo htmlspecialchars($sys['name'] ?? 'Nuvis ERPX') ?></a>. All rights reserved.
+              </div>
+              <div class="col-6 text-right font-weight-bold">
+                <?php echo htmlspecialchars($sys['name'] ?? 'Nuvis ERPX') ?> v1.0.11
+              </div>
+            </div>
           </div>
         </div>
       <?php endif; ?>
@@ -281,7 +417,8 @@ $view_order_id   = $_GET['order_id'] ?? null;
                       <?php endif; ?>
                     </td>
                     <td class="text-center">
-                      <a href="index.php?invoice_id=<?php echo $row['id'] ?>" class="btn btn-sm btn-outline-primary"><i class="fas fa-eye mr-1"></i> View</a>
+                      <a href="index.php?invoice_id=<?php echo $row['id'] ?>" class="btn btn-sm btn-outline-primary"><i class="fas fa-eye mr-1"></i> View Invoice</a>
+                      <a href="view_invoice.php?id=<?php echo $row['id'] ?>&print=1" target="_blank" class="btn btn-sm btn-outline-secondary ml-1"><i class="fas fa-file-pdf mr-1"></i> PDF</a>
                     </td>
                   </tr>
                   <?php
@@ -352,7 +489,7 @@ $view_order_id   = $_GET['order_id'] ?? null;
   <!-- /.content-wrapper -->
 
   <!-- Main Footer -->
-  <footer class="main-footer">
+  <footer class="main-footer no-print">
     <div class="container text-center text-muted text-sm">
       &copy; <?php echo date("Y") ?> <strong><?php echo $_settings->info('name') ?></strong>. All rights reserved.
     </div>
