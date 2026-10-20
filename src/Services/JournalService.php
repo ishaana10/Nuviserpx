@@ -34,17 +34,25 @@ class JournalService
 
         extract($post);
         $id = isset($id) ? intval($id) : 0;
+
+        // Ensure optional/boolean fields are sanitized
+        $post['auto_reversing_date'] = !empty($post['auto_reversing_date']) ? $post['auto_reversing_date'] : null;
+        $post['default_narration'] = isset($post['default_narration']) ? intval($post['default_narration']) : 0;
+        $post['show_cash_basis'] = isset($post['show_cash_basis']) ? intval($post['show_cash_basis']) : 0;
+        $post['tax_mode'] = !empty($post['tax_mode']) ? $post['tax_mode'] : 'No Tax';
+        $post['status'] = !empty($post['status']) ? $post['status'] : 'posted';
+
         $dataStr = "";
+        $allowed_fields = ['code', 'journal_date', 'description', 'user_id', 'auto_reversing_date', 'default_narration', 'show_cash_basis', 'tax_mode', 'status'];
+
         foreach ($post as $k => $v) {
-            if (!in_array($k, ['id']) && !is_array($post[$k])) {
-                if (!is_numeric($v) && !is_null($v)) {
-                    $v = $this->conn->real_escape_string((string)$v);
-                }
+            if (in_array($k, $allowed_fields)) {
                 if (!empty($dataStr)) $dataStr .= ",";
-                if (!is_null($v)) {
-                    $dataStr .= " `{$k}`='{$v}' ";
+                if (is_null($v) || $v === '') {
+                    $dataStr .= " `{$k}` = NULL ";
                 } else {
-                    $dataStr .= " `{$k}`= NULL ";
+                    $escaped_v = $this->conn->real_escape_string((string)$v);
+                    $dataStr .= " `{$k}` = '{$escaped_v}' ";
                 }
             }
         }
@@ -63,15 +71,33 @@ class JournalService
 
             if (isset($account_id) && is_array($account_id)) {
                 foreach ($account_id as $k => $v) {
+                    if (empty($v)) continue;
                     if (!empty($dataStr)) $dataStr .= ", ";
-                    $group = $group_id[$k] ?? 1;
-                    $amt = $amount[$k] ?? 0;
-                    $dataStr .= "('{$jid}','{$v}','{$group}','{$amt}')";
+
+                    $d_val = isset($debit[$k]) && $debit[$k] !== '' ? floatval($debit[$k]) : 0;
+                    $c_val = isset($credit[$k]) && $credit[$k] !== '' ? floatval($credit[$k]) : 0;
+
+                    // Group 1 = Debit, Group 2 = Credit
+                    if ($d_val > 0) {
+                        $group = 1;
+                        $amt = $d_val;
+                    } elseif ($c_val > 0) {
+                        $group = 2;
+                        $amt = $c_val;
+                    } else {
+                        $group = $group_id[$k] ?? 1;
+                        $amt = $amount[$k] ?? 0;
+                    }
+
+                    $line_desc = isset($line_description[$k]) ? $this->conn->real_escape_string((string)$line_description[$k]) : '';
+                    $line_tax = isset($tax_rate[$k]) ? $this->conn->real_escape_string((string)$tax_rate[$k]) : 'No Tax (0%)';
+
+                    $dataStr .= "('{$jid}','{$v}','{$group}','{$amt}','{$line_desc}','{$line_tax}')";
                 }
             }
 
             if (!empty($dataStr)) {
-                $sql = "INSERT INTO `journal_items` (`journal_id`,`account_id`,`group_id`,`amount`) VALUES {$dataStr}";
+                $sql = "INSERT INTO `journal_items` (`journal_id`,`account_id`,`group_id`,`amount`,`description`,`tax_rate`) VALUES {$dataStr}";
                 $save2 = $this->conn->query($sql);
                 if ($save2) {
                     $resp['status'] = 'success';

@@ -275,6 +275,12 @@ if($t_qry && $t_qry->num_rows > 0){
                                         </a>
                                     </li>
                                     <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=assets" class="nav-link nav-assets tree-item">
+                                            <i class="nav-icon fas fa-boxes"></i>
+                                            <p>Fixed Assets</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=groups" class="nav-link nav-groups tree-item">
                                             <i class="nav-icon fas fa-th-list"></i>
                                             <p>Account Groups</p>

@@ -302,8 +302,12 @@ $qry = $conn->query("
 
 <script>
 $(document).ready(function(){
-    $('#btn_add_account, #btn_add_bank').click(function(){
+    $('#btn_add_account').click(function(){
         uni_modal("Add Account", "accounts/manage_account.php", "mid-large");
+    });
+
+    $('#btn_add_bank').click(function(){
+        uni_modal("Add Bank Account", "accounts/add_bank_account.php", "mid-large");
     });
 
     $('.edit_account').click(function(){
