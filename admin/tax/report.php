@@ -2,6 +2,15 @@
 require_once(__DIR__ . '/../../config.php');
 
 $tenant_id = $_settings->active_tenant_id();
+$tenant_name = $_settings->info('name');
+$t_qry = $conn->query("SELECT name FROM `tenants` WHERE id = '{$tenant_id}'");
+if($t_qry && $t_qry->num_rows > 0){
+    $t_row = $t_qry->fetch_assoc();
+    if(!empty($t_row['name'])){
+        $tenant_name = $t_row['name'];
+    }
+}
+
 $from = isset($_GET['from']) ? $_GET['from'] : date("Y-m-01");
 $to = isset($_GET['to']) ? $_GET['to'] : date("Y-m-t");
 
@@ -94,7 +103,10 @@ $net_tax_payable = $total_output_tax - $total_input_tax;
     </div>
 
     <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
-        <h4 class="font-weight-bold text-navy m-0"><i class="fas fa-file-invoice-dollar text-primary mr-2"></i> Sales Tax (VAT) Report</h4>
+        <div>
+            <h4 class="font-weight-bold text-navy m-0"><i class="fas fa-file-invoice-dollar text-primary mr-2"></i> Sales Tax (VAT) Report</h4>
+            <small class="text-muted font-weight-bold"><?= htmlspecialchars($tenant_name) ?></small>
+        </div>
         <div class="dropdown">
             <button class="btn btn-sm btn-outline-secondary dropdown-toggle font-weight-bold" type="button" data-toggle="dropdown">
                 <i class="fas fa-cog mr-1"></i> Tax settings

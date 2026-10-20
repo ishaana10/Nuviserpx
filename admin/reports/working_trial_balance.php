@@ -6,6 +6,15 @@ function format_num($number){
 	return number_format($number,$decimals);
 }
 $tenant_id = $_settings->active_tenant_id();
+$tenant_name = $_settings->info('name');
+$t_qry = $conn->query("SELECT name FROM `tenants` WHERE id = '{$tenant_id}'");
+if($t_qry && $t_qry->num_rows > 0){
+    $t_row = $t_qry->fetch_assoc();
+    if(!empty($t_row['name'])){
+        $tenant_name = $t_row['name'];
+    }
+}
+
 $from = isset($_GET['from']) ? $conn->real_escape_string($_GET['from']) : date("Y-m-d",strtotime(date('Y-m-d')." -1 week"));
 $to = isset($_GET['to']) ? $conn->real_escape_string($_GET['to']) : date("Y-m-d");
 ?>
@@ -41,7 +50,7 @@ $to = isset($_GET['to']) ? $conn->real_escape_string($_GET['to']) : date("Y-m-d"
             </form>
         </div>
         <div class="container-fluid" id="outprint">
-            <h3 class="text-center"><b><?= $_settings->info('name') ?></b></h3>
+            <h3 class="text-center"><b><?= htmlspecialchars($tenant_name) ?></b></h3>
             <h4 class="text-center"><b>Working Trial Balance</b></h4>
             <?php if($from == $to): ?>
             <p class="m-0 text-center"><?= date("M d, Y" , strtotime($from)) ?></p>

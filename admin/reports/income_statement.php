@@ -4,6 +4,15 @@ function format_num($number){
 }
 
 $tenant_id = $_settings->active_tenant_id();
+$tenant_name = $_settings->info('name');
+$t_qry = $conn->query("SELECT name FROM `tenants` WHERE id = '{$tenant_id}'");
+if($t_qry && $t_qry->num_rows > 0){
+    $t_row = $t_qry->fetch_assoc();
+    if(!empty($t_row['name'])){
+        $tenant_name = $t_row['name'];
+    }
+}
+
 $from = isset($_GET['from']) ? $conn->real_escape_string($_GET['from']) : date("Y-01-01");
 $to = isset($_GET['to']) ? $conn->real_escape_string($_GET['to']) : date("Y-m-d");
 
@@ -75,7 +84,7 @@ $net_profit = $tot_revenue - $tot_expense;
 
         <div class="container-fluid" id="outprint">
             <div class="text-center mb-4">
-		<h3 class="font-weight-bold m-0"><?= $_settings->info('name') ?></h3>
+		<h3 class="font-weight-bold m-0"><?= htmlspecialchars($tenant_name) ?></h3>
 		<h4 class="font-weight-bold text-info">INCOME STATEMENT (PROFIT & LOSS)</h4>
 		<p class="m-0 text-muted small"><?= date("d M Y" , strtotime($from)) . ' to ' . date("d M Y" , strtotime($to)) ?></p>
             </div>
