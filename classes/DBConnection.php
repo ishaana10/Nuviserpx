@@ -63,6 +63,7 @@ class DBConnection{
                 $this->check_fixed_assets_migrations();
                 $this->check_journal_options_migrations();
                 $this->check_dolibarr_crm_migrations();
+                $this->check_dolibarr_extended_migrations();
             }
 
             // Run versioned migrations
@@ -330,6 +331,109 @@ class DBConnection{
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
 
         @$this->conn->query($sql);
+    }
+
+    public function check_dolibarr_extended_migrations(){
+        if (!$this->conn) return;
+
+        // 1. Support Tickets
+        $sql_tickets = "CREATE TABLE IF NOT EXISTS `tickets` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `tenant_id` int(30) NOT NULL DEFAULT 1,
+          `ticket_code` varchar(50) NOT NULL,
+          `subject` varchar(250) NOT NULL,
+          `party_id` int(30) DEFAULT NULL,
+          `priority` enum('low','medium','high','urgent') NOT NULL DEFAULT 'medium',
+          `status` enum('new','in_progress','waiting_client','resolved','closed') NOT NULL DEFAULT 'new',
+          `assigned_to` int(30) DEFAULT NULL,
+          `created_by` int(30) DEFAULT NULL,
+          `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+          `date_updated` datetime DEFAULT NULL ON UPDATE current_timestamp(),
+          PRIMARY KEY (`id`),
+          KEY `tenant_id` (`tenant_id`),
+          KEY `party_id` (`party_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+
+        $sql_ticket_messages = "CREATE TABLE IF NOT EXISTS `ticket_messages` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `ticket_id` int(30) NOT NULL,
+          `user_id` int(30) DEFAULT NULL,
+          `message` text NOT NULL,
+          `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+          PRIMARY KEY (`id`),
+          KEY `ticket_id` (`ticket_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+
+        // 2. Contracts & Subscriptions
+        $sql_contracts = "CREATE TABLE IF NOT EXISTS `contracts` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `tenant_id` int(30) NOT NULL DEFAULT 1,
+          `contract_no` varchar(100) NOT NULL,
+          `title` varchar(250) NOT NULL,
+          `party_id` int(30) NOT NULL,
+          `billing_frequency` enum('monthly','quarterly','annual') NOT NULL DEFAULT 'monthly',
+          `amount` decimal(12,2) NOT NULL DEFAULT 0.00,
+          `start_date` date NOT NULL,
+          `end_date` date DEFAULT NULL,
+          `status` enum('draft','active','expired','cancelled') NOT NULL DEFAULT 'active',
+          `notes` text DEFAULT NULL,
+          `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+          PRIMARY KEY (`id`),
+          KEY `tenant_id` (`tenant_id`),
+          KEY `party_id` (`party_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+
+        // 3. Multi-Warehouses
+        $sql_warehouses = "CREATE TABLE IF NOT EXISTS `warehouses` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `tenant_id` int(30) NOT NULL DEFAULT 1,
+          `name` varchar(150) NOT NULL,
+          `location` text DEFAULT NULL,
+          `status` tinyint(1) NOT NULL DEFAULT 1,
+          `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+          PRIMARY KEY (`id`),
+          KEY `tenant_id` (`tenant_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+
+        $sql_warehouse_transfers = "CREATE TABLE IF NOT EXISTS `warehouse_transfers` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `tenant_id` int(30) NOT NULL DEFAULT 1,
+          `from_warehouse_id` int(30) NOT NULL,
+          `to_warehouse_id` int(30) NOT NULL,
+          `product_id` int(30) NOT NULL,
+          `qty` decimal(12,2) NOT NULL DEFAULT 0.00,
+          `notes` text DEFAULT NULL,
+          `created_by` int(30) DEFAULT NULL,
+          `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+          PRIMARY KEY (`id`),
+          KEY `tenant_id` (`tenant_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+
+        // 4. Employee Expense Claims
+        $sql_expenses = "CREATE TABLE IF NOT EXISTS `expense_reports` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `tenant_id` int(30) NOT NULL DEFAULT 1,
+          `claim_no` varchar(50) NOT NULL,
+          `employee_id` int(30) NOT NULL,
+          `claim_date` date NOT NULL,
+          `category` varchar(100) DEFAULT 'Travel & Meals',
+          `amount` decimal(12,2) NOT NULL DEFAULT 0.00,
+          `description` text DEFAULT NULL,
+          `attachment_path` varchar(255) DEFAULT NULL,
+          `status` enum('pending','approved','reimbursed','rejected') NOT NULL DEFAULT 'pending',
+          `approved_by` int(30) DEFAULT NULL,
+          `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+          PRIMARY KEY (`id`),
+          KEY `tenant_id` (`tenant_id`),
+          KEY `employee_id` (`employee_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+
+        @$this->conn->query($sql_tickets);
+        @$this->conn->query($sql_ticket_messages);
+        @$this->conn->query($sql_contracts);
+        @$this->conn->query($sql_warehouses);
+        @$this->conn->query($sql_warehouse_transfers);
+        @$this->conn->query($sql_expenses);
     }
 
     public function check_dolibarr_crm_migrations(){

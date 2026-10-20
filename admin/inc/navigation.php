@@ -212,6 +212,12 @@ if($t_qry && $t_qry->num_rows > 0){
                                             <p>Stock Movements</p>
                                         </a>
                                     </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=warehouses" class="nav-link nav-warehouses tree-item">
+                                            <i class="nav-icon fas fa-warehouse"></i>
+                                            <p>Warehouses & Locations</p>
+                                        </a>
+                                    </li>
                                 </ul>
                             </li>
 
@@ -367,6 +373,24 @@ if($t_qry && $t_qry->num_rows > 0){
                                         <a href="<?php echo base_url ?>admin/?page=payroll" class="nav-link nav-payroll tree-item">
                                             <i class="nav-icon fas fa-file-invoice-dollar"></i>
                                             <p>Payroll Run</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=expense_reports" class="nav-link nav-expense_reports tree-item">
+                                            <i class="nav-icon fas fa-receipt"></i>
+                                            <p>Expense Claims</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=contracts" class="nav-link nav-contracts tree-item">
+                                            <i class="nav-icon fas fa-file-contract"></i>
+                                            <p>Contracts & Subscriptions</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=tickets" class="nav-link nav-tickets tree-item">
+                                            <i class="nav-icon fas fa-headset"></i>
+                                            <p>Support Tickets</p>
                                         </a>
                                     </li>
                                 </ul>
