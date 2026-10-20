@@ -100,7 +100,12 @@ while($p = $products_qry->fetch_assoc()){
 			<hr class="my-2">
 			<div class="d-flex justify-content-between align-items-center mb-2">
 				<h6 class="font-weight-bold text-navy m-0"><i class="fas fa-boxes"></i> Select Products / Items</h6>
-				<button type="button" class="btn btn-xs btn-success" id="add_item_row"><i class="fas fa-plus"></i> Add Item Line</button>
+				<div>
+					<button type="button" class="btn btn-xs btn-outline-primary font-weight-bold mr-1" id="btn_open_manage_items">
+						<i class="fas fa-edit mr-1"></i> Option to Edit Item List
+					</button>
+					<button type="button" class="btn btn-xs btn-success" id="add_item_row"><i class="fas fa-plus"></i> Add Item Line</button>
+				</div>
 			</div>
 
 			<div class="table-responsive mb-3">
@@ -125,11 +130,13 @@ while($p = $products_qry->fetch_assoc()){
 							<td>
 								<select name="product_id[]" class="form-control form-control-sm rounded-0 product-select select2-item">
 									<option value="">Custom Item</option>
+									<option value="__new_item__" class="font-weight-bold text-primary">+ Create new item...</option>
 									<?php foreach($products_data as $pid => $prod): ?>
 									<option value="<?= $pid ?>"
 										data-price="<?= $is_po ? ($prod['buying_price'] ?? $prod['selling_price']) : $prod['selling_price'] ?>"
 										data-name="<?= htmlspecialchars($prod['name']) ?>"
 										data-stock="<?= $prod['stock_quantity'] ?>"
+										data-desc="<?= htmlspecialchars($prod['description'] ?? '') ?>"
 										<?= $item['product_id'] == $pid ? 'selected' : '' ?>>
 										<?= $prod['product_code'] ?> - <?= $prod['name'] ?> (Stock: <?= $prod['stock_quantity'] ?>)
 									</option>
@@ -152,11 +159,13 @@ while($p = $products_qry->fetch_assoc()){
 							<td>
 								<select name="product_id[]" class="form-control form-control-sm rounded-0 product-select select2-item">
 									<option value="">Select from Catalog or Custom</option>
+									<option value="__new_item__" class="font-weight-bold text-primary">+ Create new item...</option>
 									<?php foreach($products_data as $pid => $prod): ?>
 									<option value="<?= $pid ?>"
 										data-price="<?= $is_po ? ($prod['buying_price'] ?? $prod['selling_price']) : $prod['selling_price'] ?>"
 										data-name="<?= htmlspecialchars($prod['name']) ?>"
-										data-stock="<?= $prod['stock_quantity'] ?>">
+										data-stock="<?= $prod['stock_quantity'] ?>"
+										data-desc="<?= htmlspecialchars($prod['description'] ?? '') ?>">
 										<?= $prod['product_code'] ?> - <?= $prod['name'] ?> (Stock: <?= $prod['stock_quantity'] ?>)
 									</option>
 									<?php endforeach; ?>
@@ -217,6 +226,132 @@ while($p = $products_qry->fetch_assoc()){
 	</div>
 </div>
 
+<!-- MODAL 2: NEW ITEM MODAL (Matching User Attachment Screenshot 2) -->
+<div class="modal fade" id="modal_quick_product" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+        <div class="modal-content border-0 shadow-lg rounded-lg">
+            <div class="modal-header border-bottom py-3">
+                <h5 class="modal-title font-weight-bold text-dark m-0">New item</h5>
+                <button type="button" class="close text-muted" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="form_quick_product">
+                <input type="hidden" name="id" id="item_modal_id" value="">
+                <div class="modal-body p-4">
+                    <div class="row mb-3">
+                        <div class="col-md-5 form-group">
+                            <label class="control-label font-weight-bold text-xs">Code <span class="text-muted">(required)</span></label>
+                            <input type="text" name="product_code" id="item_modal_code" class="form-control form-control-sm rounded-0" value="ITEM-<?php echo rand(100,999) ?>" required>
+                        </div>
+                        <div class="col-md-7 form-group">
+                            <label class="control-label font-weight-bold text-xs">Name</label>
+                            <input type="text" name="name" id="item_modal_name" class="form-control form-control-sm rounded-0" placeholder="e.g. Consulting Fee / Product A" required>
+                        </div>
+                    </div>
+
+                    <!-- Checkboxes -->
+                    <div class="form-group mb-3">
+                        <div class="custom-control custom-checkbox mb-2">
+                            <input type="checkbox" class="custom-control-input" id="item_is_tracked" name="is_tracked" value="1">
+                            <label class="custom-control-label font-weight-bold text-dark" for="item_is_tracked">Track inventory item</label>
+                        </div>
+                        <small class="text-muted d-block ml-4">
+                            Track the quantity and value of stock on hand. This option is suitable for organisations with less than 4,000 products or services.
+                        </small>
+                    </div>
+
+                    <div class="form-group mb-3">
+                        <div class="custom-control custom-checkbox mb-2">
+                            <input type="checkbox" class="custom-control-input" id="item_is_purchased" name="is_purchased" value="1" checked>
+                            <label class="custom-control-label font-weight-bold text-dark" for="item_is_purchased">Purchase</label>
+                        </div>
+                        <small class="text-muted d-block ml-4">Add item to bills, purchase orders, and other purchase transactions</small>
+                    </div>
+
+                    <div class="form-group mb-3">
+                        <div class="custom-control custom-checkbox mb-2">
+                            <input type="checkbox" class="custom-control-input" id="item_is_sold" name="is_sold" value="1" checked>
+                            <label class="custom-control-label font-weight-bold text-dark" for="item_is_sold">Sell</label>
+                        </div>
+                        <small class="text-muted d-block ml-4 mb-2">Add item to invoices, quotes, and other sales transactions</small>
+
+                        <div class="row ml-3 pt-2" id="sell_options_container">
+                            <div class="col-md-6 form-group">
+                                <label class="control-label font-weight-bold text-xs">Sale price (FJD)</label>
+                                <input type="number" step="any" name="selling_price" id="item_modal_price" class="form-control form-control-sm rounded-0" value="0.00" required>
+                            </div>
+                            <div class="col-md-6 form-group">
+                                <label class="control-label font-weight-bold text-xs">Tax rate</label>
+                                <select name="tax_rate_value" id="item_modal_tax" class="form-control form-control-sm rounded-0">
+                                    <option value="15.00" selected>15% VAT on Income</option>
+                                    <option value="0.00">0% VAT Exempt</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group mb-0">
+                        <label class="control-label font-weight-bold text-xs">Description</label>
+                        <textarea name="description" id="item_modal_desc" rows="2" class="form-control form-control-sm rounded-0" placeholder="Item description..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-top bg-light py-2 justify-content-between">
+                    <button type="button" class="btn btn-sm btn-outline-secondary font-weight-bold" data-dismiss="modal">Cancel</button>
+                    <div>
+                        <button type="submit" class="btn btn-primary bg-gradient-primary font-weight-bold px-4 shadow-sm">Save</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL 3: MANAGE / EDIT ITEM LIST MODAL -->
+<div class="modal fade" id="modal_manage_items" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+        <div class="modal-content border-0 shadow-lg rounded-lg">
+            <div class="modal-header border-bottom py-3 bg-light">
+                <h5 class="modal-title font-weight-bold text-navy m-0"><i class="fas fa-boxes text-primary mr-2"></i> Manage / Edit Item List</h5>
+                <button type="button" class="close text-muted" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body p-3" style="max-height: 450px; overflow-y: auto;">
+                <table class="table table-hover table-striped table-bordered table-sm" id="manage_items_table">
+                    <thead>
+                        <tr>
+                            <th>Code</th>
+                            <th>Item Name</th>
+                            <th class="text-right">Sale Price</th>
+                            <th>Description</th>
+                            <th class="text-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="manage_items_tbody">
+                        <?php foreach($products_data as $pid => $pr): ?>
+                        <tr id="item_row_<?php echo $pid ?>">
+                            <td><b><?php echo htmlspecialchars($pr['product_code']) ?></b></td>
+                            <td class="font-weight-bold text-navy"><?php echo htmlspecialchars($pr['name']) ?></td>
+                            <td class="text-right text-success font-weight-bold">$<?php echo number_format($pr['selling_price'], 2) ?></td>
+                            <td><small class="text-muted"><?php echo htmlspecialchars($pr['description'] ?: 'N/A') ?></small></td>
+                            <td class="text-center">
+                                <button type="button" class="btn btn-xs btn-primary edit_item_btn" data-id="<?php echo $pid ?>" data-code="<?php echo htmlspecialchars($pr['product_code']) ?>" data-name="<?php echo htmlspecialchars($pr['name']) ?>" data-price="<?php echo $pr['selling_price'] ?>" data-desc="<?php echo htmlspecialchars($pr['description']) ?>">
+                                    <i class="fas fa-edit"></i> Edit
+                                </button>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <div class="modal-footer border-top bg-light py-2">
+                <button type="button" class="btn btn-sm btn-secondary" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 	function calculate_order_totals(){
 		var subtotal = 0;
@@ -248,19 +383,106 @@ while($p = $products_qry->fetch_assoc()){
 	$(document).ready(function(){
 		$('.select2').select2({ placeholder:"Select party", width:'100%' });
 
+		var active_row_for_new_item = null;
+
 		$(document).on('change', '.product-select', function(){
 			var option = $(this).find(':selected');
-			var price = option.attr('data-price');
-			var name = option.attr('data-name');
 			var row = $(this).closest('tr');
 
-			if(price){
-				row.find('.price').val(parseFloat(price).toFixed(2));
+			if(option.val() === "__new_item__"){
+				active_row_for_new_item = row;
+				$('#form_quick_product')[0].reset();
+				$('#item_modal_id').val('');
+				$('#item_modal_code').val('ITEM-' + Math.floor(100 + Math.random() * 900));
+				$('#modal_quick_product').modal('show');
+			} else {
+				var price = option.attr('data-price');
+				var name = option.attr('data-name');
+				var desc = option.attr('data-desc');
+
+				if(price){
+					row.find('.price').val(parseFloat(price).toFixed(2));
+				}
+				if(name){
+					row.find('.item-name').val(name);
+				}
+				if(desc){
+					row.find('.item-desc').val(desc);
+				}
+				calculate_order_totals();
 			}
-			if(name){
-				row.find('.item-name').val(name);
-			}
-			calculate_order_totals();
+		});
+
+		$('#btn_open_manage_items').click(function(){
+			$('#modal_manage_items').modal('show');
+		});
+
+		$(document).on('click', '.edit_item_btn', function(){
+			var id = $(this).data('id');
+			var code = $(this).data('code');
+			var name = $(this).data('name');
+			var price = $(this).data('price');
+			var desc = $(this).data('desc');
+
+			$('#item_modal_id').val(id);
+			$('#item_modal_code').val(code);
+			$('#item_modal_name').val(name);
+			$('#item_modal_price').val(price);
+			$('#item_modal_desc').val(desc);
+
+			$('#modal_manage_items').modal('hide');
+			$('#modal_quick_product').modal('show');
+		});
+
+		$('#form_quick_product').submit(function(e){
+			e.preventDefault();
+			start_loader();
+			$.ajax({
+				url: _base_url_ + "classes/Master.php?f=save_product",
+				method: "POST",
+				data: $(this).serialize(),
+				dataType: "json",
+				error: err => {
+					console.log(err);
+					alert_toast("An error occurred.", 'error');
+					end_loader();
+				},
+				success: function(resp){
+					end_loader();
+					if(resp.status == 'success'){
+						alert_toast(resp.msg || "Item saved successfully.", 'success');
+						$('#modal_quick_product').modal('hide');
+
+						var new_id = resp.id || '';
+						var new_name = $('#item_modal_name').val();
+						var new_price = parseFloat($('#item_modal_price').val() || 0).toFixed(2);
+						var new_desc = $('#item_modal_desc').val();
+
+						if (new_id) {
+							$('.product-select').each(function(){
+								var sel = $(this);
+								if (sel.find('option[value="' + new_id + '"]').length > 0) {
+									var opt = sel.find('option[value="' + new_id + '"]');
+									opt.text(new_name).attr('data-price', new_price).attr('data-name', new_name).attr('data-desc', new_desc);
+								} else {
+									sel.append('<option value="' + new_id + '" data-price="' + new_price + '" data-name="' + new_name + '" data-desc="' + new_desc + '">' + new_name + '</option>');
+								}
+							});
+
+							if (active_row_for_new_item) {
+								var sel = active_row_for_new_item.find('.product-select');
+								sel.val(new_id);
+								active_row_for_new_item.find('.item-name').val(new_name);
+								active_row_for_new_item.find('.price').val(new_price);
+								active_row_for_new_item.find('.item-desc').val(new_desc);
+								calculate_order_totals();
+							}
+						}
+					} else {
+						alert_toast(resp.msg || "Failed to save product.", 'error');
+					}
+				}
+			});
 		});
 
 		$('#add_item_row').click(function(){
