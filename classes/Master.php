@@ -153,7 +153,12 @@ class Master extends DBConnection
         $data .= ", `created_by` = '{$user_id}' ";
 
         if (isset($_FILES['attachment']) && $_FILES['attachment']['tmp_name'] != '') {
-            $fname = 'uploads/assets/asset_' . $tenant_id . '_' . time() . '.' . pathinfo($_FILES['attachment']['name'], PATHINFO_EXTENSION);
+            $ext = strtolower(pathinfo($_FILES['attachment']['name'], PATHINFO_EXTENSION));
+            $allowed_exts = ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'zip', 'txt'];
+            if (!in_array($ext, $allowed_exts)) {
+                return json_encode(['status' => 'failed', 'msg' => 'Invalid file attachment format. Allowed types: PDF, Images, Documents, Spreadsheets.']);
+            }
+            $fname = 'uploads/assets/asset_' . $tenant_id . '_' . time() . '.' . $ext;
             $dir_path = base_app . 'uploads/assets';
             if (!is_dir($dir_path)) {
                 mkdir($dir_path, 0777, true);
@@ -228,6 +233,313 @@ class Master extends DBConnection
             return json_encode(['status' => 'success', 'id' => $acc_id, 'msg' => 'Bank account added successfully.']);
         }
         return json_encode(['status' => 'failed', 'msg' => 'Failed to add bank account. ' . $this->conn->error]);
+    }
+
+    /* Dolibarr Inspired CRM Opportunity Methods */
+    public function save_opportunity()
+    {
+        $tenant_id = $this->settings->active_tenant_id();
+        $user_id = $this->settings->userdata('id');
+        extract($_POST);
+
+        if (empty($title)) {
+            return json_encode(['status' => 'failed', 'msg' => 'Opportunity Title is required.']);
+        }
+
+        $data = " `tenant_id` = '{$tenant_id}' ";
+        $data .= ", `title` = '{$this->conn->real_escape_string($title)}' ";
+        $data .= ", `party_id` = " . (!empty($party_id) ? intval($party_id) : "NULL") . " ";
+        $data .= ", `stage` = '{$this->conn->real_escape_string($stage ?? 'qualification')}' ";
+        $data .= ", `amount` = '" . (!empty($amount) ? floatval($amount) : 0.00) . "' ";
+        $data .= ", `probability` = '" . (!empty($probability) ? intval($probability) : 20) . "' ";
+        $data .= ", `expected_close_date` = " . (!empty($expected_close_date) ? "'{$this->conn->real_escape_string($expected_close_date)}'" : "NULL") . " ";
+        $data .= ", `notes` = '{$this->conn->real_escape_string($notes ?? '')}' ";
+        $data .= ", `created_by` = '{$user_id}' ";
+
+        if (empty($id)) {
+            $save = $this->conn->query("INSERT INTO `crm_opportunities` SET {$data}");
+            $opp_id = $this->conn->insert_id;
+        } else {
+            $save = $this->conn->query("UPDATE `crm_opportunities` SET {$data} WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'");
+            $opp_id = $id;
+        }
+
+        if ($save) {
+            $this->settings->log_audit(empty($id) ? "Created CRM Deal" : "Updated CRM Deal", "CRM Opportunities", "Title: {$title}");
+            return json_encode(['status' => 'success', 'id' => $opp_id, 'msg' => 'CRM Opportunity saved successfully.']);
+        }
+        return json_encode(['status' => 'failed', 'msg' => 'Failed to save opportunity. ' . $this->conn->error]);
+    }
+
+    public function delete_opportunity()
+    {
+        $tenant_id = $this->settings->active_tenant_id();
+        $id = intval($_POST['id'] ?? 0);
+
+        $del = $this->conn->query("DELETE FROM `crm_opportunities` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'");
+        if ($del) {
+            $this->settings->log_audit("Deleted CRM Deal", "CRM Opportunities", "ID #{$id}");
+            return json_encode(['status' => 'success', 'msg' => 'CRM opportunity deleted successfully.']);
+        }
+        return json_encode(['status' => 'failed', 'msg' => 'Failed to delete opportunity.']);
+    }
+
+    public function save_proposal_signature()
+    {
+        extract($_POST);
+        $t_id = !empty($tenant_id) ? intval($tenant_id) : $this->settings->active_tenant_id();
+        $so_id = intval($sales_order_id ?? 0);
+
+        if ($so_id <= 0 || empty($signer_name) || empty($signer_email) || empty($signature_data)) {
+            return json_encode(['status' => 'failed', 'msg' => 'Signer Name, Email, and Signature drawing are required.']);
+        }
+
+        $ip = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
+        $s_name = $this->conn->real_escape_string($signer_name);
+        $s_email = $this->conn->real_escape_string($signer_email);
+        $sig_data = $this->conn->real_escape_string($signature_data);
+
+        $save = $this->conn->query("
+            INSERT INTO `proposal_signatures`
+            (`tenant_id`, `sales_order_id`, `signer_name`, `signer_email`, `signature_data`, `ip_address`, `status`)
+            VALUES ('{$t_id}', '{$so_id}', '{$s_name}', '{$s_email}', '{$sig_data}', '{$ip}', 'accepted')
+        ");
+
+        if ($save) {
+            // Update sales order status to confirmed
+            $this->conn->query("UPDATE `sales_order_list` SET `status` = 'confirmed' WHERE id = '{$so_id}'");
+            $this->settings->log_audit("Signed Commercial Proposal", "Customer Portal", "Quote ID #{$so_id} signed by {$signer_name}");
+            return json_encode(['status' => 'success', 'msg' => 'Proposal signed and confirmed successfully.']);
+        }
+        return json_encode(['status' => 'failed', 'msg' => 'Failed to save digital signature. ' . $this->conn->error]);
+    }
+
+    /* Dolibarr Inspired Helpdesk Ticket Methods */
+    public function save_ticket()
+    {
+        $tenant_id = $this->settings->active_tenant_id();
+        $user_id = $this->settings->userdata('id');
+        extract($_POST);
+
+        if (empty($subject)) {
+            return json_encode(['status' => 'failed', 'msg' => 'Ticket Subject is required.']);
+        }
+
+        if (empty($id)) {
+            $code = 'TCK-' . sprintf('%05d', rand(100, 99999));
+            $data = " `tenant_id` = '{$tenant_id}' ";
+            $data .= ", `ticket_code` = '{$code}' ";
+            $data .= ", `subject` = '{$this->conn->real_escape_string($subject)}' ";
+            $data .= ", `party_id` = " . (!empty($party_id) ? intval($party_id) : "NULL") . " ";
+            $data .= ", `priority` = '{$this->conn->real_escape_string($priority ?? 'medium')}' ";
+            $data .= ", `status` = '{$this->conn->real_escape_string($status ?? 'new')}' ";
+            $data .= ", `assigned_to` = " . (!empty($assigned_to) ? intval($assigned_to) : "NULL") . " ";
+            $data .= ", `created_by` = '{$user_id}' ";
+
+            $save = $this->conn->query("INSERT INTO `tickets` SET {$data}");
+            if ($save) {
+                $ticket_id = $this->conn->insert_id;
+                if (!empty($initial_message)) {
+                    $msg = $this->conn->real_escape_string($initial_message);
+                    $this->conn->query("INSERT INTO `ticket_messages` (`ticket_id`, `user_id`, `message`) VALUES ('{$ticket_id}', '{$user_id}', '{$msg}')");
+                }
+                $this->settings->log_audit("Created Ticket", "Helpdesk", "Ticket #{$code}: {$subject}");
+                return json_encode(['status' => 'success', 'id' => $ticket_id, 'msg' => 'Ticket created successfully.']);
+            }
+        } else {
+            $data = " `subject` = '{$this->conn->real_escape_string($subject)}' ";
+            $data .= ", `party_id` = " . (!empty($party_id) ? intval($party_id) : "NULL") . " ";
+            $data .= ", `priority` = '{$this->conn->real_escape_string($priority ?? 'medium')}' ";
+            $data .= ", `status` = '{$this->conn->real_escape_string($status ?? 'new')}' ";
+            $data .= ", `assigned_to` = " . (!empty($assigned_to) ? intval($assigned_to) : "NULL") . " ";
+
+            $save = $this->conn->query("UPDATE `tickets` SET {$data} WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'");
+            if ($save) {
+                return json_encode(['status' => 'success', 'id' => $id, 'msg' => 'Ticket updated successfully.']);
+            }
+        }
+        return json_encode(['status' => 'failed', 'msg' => 'Failed to save ticket. ' . $this->conn->error]);
+    }
+
+    public function reply_ticket()
+    {
+        $tenant_id = $this->settings->active_tenant_id();
+        $user_id = $this->settings->userdata('id');
+        extract($_POST);
+
+        $t_id = intval($ticket_id ?? 0);
+        if ($t_id <= 0 || empty($message)) {
+            return json_encode(['status' => 'failed', 'msg' => 'Message content is required.']);
+        }
+
+        $msg = $this->conn->real_escape_string($message);
+        $save = $this->conn->query("INSERT INTO `ticket_messages` (`ticket_id`, `user_id`, `message`) VALUES ('{$t_id}', '{$user_id}', '{$msg}')");
+
+        if ($save) {
+            if (!empty($status)) {
+                $st = $this->conn->real_escape_string($status);
+                $this->conn->query("UPDATE `tickets` SET `status` = '{$st}' WHERE id = '{$t_id}' AND tenant_id = '{$tenant_id}'");
+            }
+            return json_encode(['status' => 'success', 'msg' => 'Reply posted successfully.']);
+        }
+        return json_encode(['status' => 'failed', 'msg' => 'Failed to post reply.']);
+    }
+
+    /* Dolibarr Inspired Contract Methods */
+    public function save_contract()
+    {
+        $tenant_id = $this->settings->active_tenant_id();
+        extract($_POST);
+
+        if (empty($title) || empty($party_id) || empty($amount)) {
+            return json_encode(['status' => 'failed', 'msg' => 'Title, Customer, and Amount are required.']);
+        }
+
+        if (empty($id)) {
+            $c_no = 'CTR-' . sprintf('%05d', rand(100, 99999));
+            $data = " `tenant_id` = '{$tenant_id}' ";
+            $data .= ", `contract_no` = '{$c_no}' ";
+            $data .= ", `title` = '{$this->conn->real_escape_string($title)}' ";
+            $data .= ", `party_id` = '" . intval($party_id) . "' ";
+            $data .= ", `billing_frequency` = '{$this->conn->real_escape_string($billing_frequency ?? 'monthly')}' ";
+            $data .= ", `amount` = '" . floatval($amount) . "' ";
+            $data .= ", `start_date` = '{$this->conn->real_escape_string($start_date)}' ";
+            $data .= ", `end_date` = " . (!empty($end_date) ? "'{$this->conn->real_escape_string($end_date)}'" : "NULL") . " ";
+            $data .= ", `status` = '{$this->conn->real_escape_string($status ?? 'active')}' ";
+            $data .= ", `notes` = '{$this->conn->real_escape_string($notes ?? '')}' ";
+
+            $save = $this->conn->query("INSERT INTO `contracts` SET {$data}");
+            if ($save) {
+                $contract_id = $this->conn->insert_id;
+                $this->settings->log_audit("Created Contract", "Contracts", "Contract #{$c_no}: {$title}");
+                return json_encode(['status' => 'success', 'id' => $contract_id, 'msg' => 'Contract created successfully.']);
+            }
+        } else {
+            $data = " `title` = '{$this->conn->real_escape_string($title)}' ";
+            $data .= ", `party_id` = '" . intval($party_id) . "' ";
+            $data .= ", `billing_frequency` = '{$this->conn->real_escape_string($billing_frequency ?? 'monthly')}' ";
+            $data .= ", `amount` = '" . floatval($amount) . "' ";
+            $data .= ", `start_date` = '{$this->conn->real_escape_string($start_date)}' ";
+            $data .= ", `end_date` = " . (!empty($end_date) ? "'{$this->conn->real_escape_string($end_date)}'" : "NULL") . " ";
+            $data .= ", `status` = '{$this->conn->real_escape_string($status ?? 'active')}' ";
+            $data .= ", `notes` = '{$this->conn->real_escape_string($notes ?? '')}' ";
+
+            $save = $this->conn->query("UPDATE `contracts` SET {$data} WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'");
+            if ($save) {
+                return json_encode(['status' => 'success', 'id' => $id, 'msg' => 'Contract updated successfully.']);
+            }
+        }
+        return json_encode(['status' => 'failed', 'msg' => 'Failed to save contract. ' . $this->conn->error]);
+    }
+
+    /* Dolibarr Inspired Warehouse Methods */
+    public function save_warehouse()
+    {
+        $tenant_id = $this->settings->active_tenant_id();
+        extract($_POST);
+
+        if (empty($name)) {
+            return json_encode(['status' => 'failed', 'msg' => 'Warehouse Name is required.']);
+        }
+
+        $w_name = $this->conn->real_escape_string($name);
+        $w_loc = $this->conn->real_escape_string($location ?? '');
+
+        $save = $this->conn->query("INSERT INTO `warehouses` (`tenant_id`, `name`, `location`, `status`) VALUES ('{$tenant_id}', '{$w_name}', '{$w_loc}', 1)");
+        if ($save) {
+            $this->settings->log_audit("Added Warehouse", "Warehouses", "Name: {$name}");
+            return json_encode(['status' => 'success', 'id' => $this->conn->insert_id, 'msg' => 'Warehouse created successfully.']);
+        }
+        return json_encode(['status' => 'failed', 'msg' => 'Failed to save warehouse.']);
+    }
+
+    public function transfer_stock()
+    {
+        $tenant_id = $this->settings->active_tenant_id();
+        $user_id = $this->settings->userdata('id');
+        extract($_POST);
+
+        $from_wh = intval($from_warehouse_id ?? 0);
+        $to_wh = intval($to_warehouse_id ?? 0);
+        $p_id = intval($product_id ?? 0);
+        $transfer_qty = floatval($qty ?? 0);
+
+        if ($p_id <= 0 || $transfer_qty <= 0) {
+            return json_encode(['status' => 'failed', 'msg' => 'Valid Product and Quantity (> 0) are required.']);
+        }
+
+        $save = $this->conn->query("
+            INSERT INTO `warehouse_transfers`
+            (`tenant_id`, `from_warehouse_id`, `to_warehouse_id`, `product_id`, `qty`, `notes`, `created_by`)
+            VALUES ('{$tenant_id}', '{$from_wh}', '{$to_wh}', '{$p_id}', '{$transfer_qty}', '{$this->conn->real_escape_string($notes ?? '')}', '{$user_id}')
+        ");
+
+        if ($save) {
+            $this->settings->log_audit("Transferred Stock", "Warehouses", "Product ID #{$p_id}, Qty: {$transfer_qty}");
+            return json_encode(['status' => 'success', 'msg' => 'Stock transfer recorded successfully.']);
+        }
+        return json_encode(['status' => 'failed', 'msg' => 'Failed to record stock transfer.']);
+    }
+
+    /* Dolibarr Inspired Employee Expense Claim Methods */
+    public function save_expense_claim()
+    {
+        $tenant_id = $this->settings->active_tenant_id();
+        extract($_POST);
+
+        $emp_id = intval($employee_id ?? 0);
+        $c_amount = floatval($amount ?? 0);
+
+        if ($emp_id <= 0 || $c_amount <= 0 || empty($claim_date)) {
+            return json_encode(['status' => 'failed', 'msg' => 'Employee, Date, and Amount are required.']);
+        }
+
+        $c_no = 'EXP-' . sprintf('%05d', rand(100, 99999));
+        $data = " `tenant_id` = '{$tenant_id}' ";
+        $data .= ", `claim_no` = '{$c_no}' ";
+        $data .= ", `employee_id` = '{$emp_id}' ";
+        $data .= ", `claim_date` = '{$this->conn->real_escape_string($claim_date)}' ";
+        $data .= ", `category` = '{$this->conn->real_escape_string($category ?? 'Travel & Meals')}' ";
+        $data .= ", `amount` = '{$c_amount}' ";
+        $data .= ", `description` = '{$this->conn->real_escape_string($description ?? '')}' ";
+        $data .= ", `status` = 'pending' ";
+
+        if (isset($_FILES['attachment']) && $_FILES['attachment']['tmp_name'] != '') {
+            $ext = strtolower(pathinfo($_FILES['attachment']['name'], PATHINFO_EXTENSION));
+            $allowed_exts = ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'xls', 'xlsx', 'txt'];
+            if (!in_array($ext, $allowed_exts)) {
+                return json_encode(['status' => 'failed', 'msg' => 'Invalid receipt attachment format. Allowed: PDF, Images, Documents.']);
+            }
+            $fname = 'uploads/expenses/claim_' . $tenant_id . '_' . time() . '.' . $ext;
+            $dir_path = base_app . 'uploads/expenses';
+            if (!is_dir($dir_path)) {
+                mkdir($dir_path, 0777, true);
+            }
+            if (move_uploaded_file($_FILES['attachment']['tmp_name'], base_app . $fname)) {
+                $data .= ", `attachment_path` = '{$fname}' ";
+            }
+        }
+
+        $save = $this->conn->query("INSERT INTO `expense_reports` SET {$data}");
+        if ($save) {
+            $this->settings->log_audit("Submitted Expense Claim", "Expense Claims", "Claim #{$c_no}, Amount: {$c_amount}");
+            return json_encode(['status' => 'success', 'id' => $this->conn->insert_id, 'msg' => 'Expense claim submitted successfully.']);
+        }
+        return json_encode(['status' => 'failed', 'msg' => 'Failed to submit expense claim. ' . $this->conn->error]);
+    }
+
+    public function approve_expense_claim()
+    {
+        $tenant_id = $this->settings->active_tenant_id();
+        $user_id = $this->settings->userdata('id');
+        $id = intval($_POST['id'] ?? 0);
+
+        $save = $this->conn->query("UPDATE `expense_reports` SET `status` = 'approved', `approved_by` = '{$user_id}' WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'");
+        if ($save) {
+            $this->settings->log_audit("Approved Expense Claim", "Expense Claims", "Claim ID #{$id}");
+            return json_encode(['status' => 'success', 'msg' => 'Expense claim approved successfully.']);
+        }
+        return json_encode(['status' => 'failed', 'msg' => 'Failed to approve expense claim.']);
     }
 
     /* Journal Actions */
@@ -1039,6 +1351,36 @@ switch ($action) {
         break;
     case 'save_bank_account':
         echo $Master->save_bank_account();
+        break;
+    case 'save_opportunity':
+        echo $Master->save_opportunity();
+        break;
+    case 'delete_opportunity':
+        echo $Master->delete_opportunity();
+        break;
+    case 'save_proposal_signature':
+        echo $Master->save_proposal_signature();
+        break;
+    case 'save_ticket':
+        echo $Master->save_ticket();
+        break;
+    case 'reply_ticket':
+        echo $Master->reply_ticket();
+        break;
+    case 'save_contract':
+        echo $Master->save_contract();
+        break;
+    case 'save_warehouse':
+        echo $Master->save_warehouse();
+        break;
+    case 'transfer_stock':
+        echo $Master->transfer_stock();
+        break;
+    case 'save_expense_claim':
+        echo $Master->save_expense_claim();
+        break;
+    case 'approve_expense_claim':
+        echo $Master->approve_expense_claim();
         break;
     case 'delete_accounts_bulk':
         echo $Master->delete_accounts_bulk();
