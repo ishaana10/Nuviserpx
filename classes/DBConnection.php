@@ -68,6 +68,7 @@ class DBConnection{
                 $this->check_currency_migrations();
                 $this->check_frappe_hrms_migrations();
                 $this->check_vms_v3_migrations();
+                $this->check_frcs_accreditation_migrations();
             }
 
             // Run versioned migrations
@@ -801,6 +802,46 @@ class DBConnection{
         @$this->conn->query($sql2);
         @$this->conn->query($sql3);
         @$this->conn->query($sql4);
+    }
+
+    public function check_frcs_accreditation_migrations(){
+        if (!$this->conn) return;
+
+        // 1. Tenant PKCS#12 SDC Certificates
+        $sql1 = "CREATE TABLE IF NOT EXISTS `tenant_vsdc_certificates` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `tenant_id` int(30) NOT NULL DEFAULT 1,
+          `cert_name` varchar(150) NOT NULL,
+          `p12_path` varchar(255) NOT NULL,
+          `cert_expires_at` datetime DEFAULT NULL,
+          `serial_number` varchar(100) DEFAULT NULL,
+          `status` tinyint(1) NOT NULL DEFAULT 1,
+          `date_uploaded` datetime NOT NULL DEFAULT current_timestamp(),
+          PRIMARY KEY (`id`),
+          KEY `tenant_id` (`tenant_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+
+        // 2. FRCS Non-Repudiation Audit Vault
+        $sql2 = "CREATE TABLE IF NOT EXISTS `frcs_audit_vault` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `tenant_id` int(30) NOT NULL DEFAULT 1,
+          `invoice_id` int(30) DEFAULT NULL,
+          `invoice_no` varchar(100) NOT NULL,
+          `sdc_invoice_no` varchar(100) NOT NULL,
+          `invoice_type` int(2) NOT NULL DEFAULT 1,
+          `transaction_type` int(2) NOT NULL DEFAULT 1,
+          `mrc` varchar(100) NOT NULL,
+          `verification_url` text NOT NULL,
+          `raw_payload` longtext NOT NULL,
+          `signature` text NOT NULL,
+          `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+          PRIMARY KEY (`id`),
+          KEY `tenant_id` (`tenant_id`),
+          KEY `invoice_id` (`invoice_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+
+        @$this->conn->query($sql1);
+        @$this->conn->query($sql2);
     }
 
     public function check_vms_v3_migrations(){

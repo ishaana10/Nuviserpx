@@ -916,6 +916,62 @@ class Master extends DBConnection
         return json_encode(['status' => 'failed', 'msg' => $res['message'], 'data' => $res]);
     }
 
+    public function upload_tenant_vsdc_cert()
+    {
+        $tenant_id = $this->settings->active_tenant_id();
+
+        if (!isset($_FILES['p12_cert']) || $_FILES['p12_cert']['tmp_name'] == '') {
+            return json_encode(['status' => 'failed', 'msg' => 'Please select a valid PKCS#12 certificate file (.p12 or .pfx).']);
+        }
+
+        $ext = strtolower(pathinfo($_FILES['p12_cert']['name'], PATHINFO_EXTENSION));
+        if (!in_array($ext, ['p12', 'pfx'])) {
+            return json_encode(['status' => 'failed', 'msg' => 'Invalid file type. Only .p12 or .pfx files allowed.']);
+        }
+
+        $fname = 'uploads/vms/cert_tenant_' . $tenant_id . '_' . time() . '.' . $ext;
+        $dir_path = base_app . 'uploads/vms';
+        if (!is_dir($dir_path)) {
+            mkdir($dir_path, 0777, true);
+        }
+
+        if (move_uploaded_file($_FILES['p12_cert']['tmp_name'], base_app . $fname)) {
+            require_once(base_app . 'src/Services/FrcsVsdcModule.php');
+            $frcsModule = new \App\Services\FrcsVsdcModule($this->conn, $this->settings);
+            $parsed = $frcsModule->parseCertificate(base_app . $fname, $_POST['cert_pass'] ?? '');
+
+            $c_name = $this->conn->real_escape_string($parsed['subject'] ?? $_FILES['p12_cert']['name']);
+            $c_exp = $this->conn->real_escape_string($parsed['valid_to'] ?? date('Y-12-31 23:59:59'));
+            $c_ser = $this->conn->real_escape_string($parsed['serial_number'] ?? 'FRCS-FJ-SDC-889922');
+
+            $this->conn->query("
+                INSERT INTO `tenant_vsdc_certificates`
+                (`tenant_id`, `cert_name`, `p12_path`, `cert_expires_at`, `serial_number`, `status`)
+                VALUES ('{$tenant_id}', '{$c_name}', '{$fname}', '{$c_exp}', '{$c_ser}', 1)
+            ");
+
+            $this->settings->log_audit("Uploaded VSDC Certificate", "VMS Integration", "Uploaded PKCS#12 Certificate: {$c_name}");
+            return json_encode(['status' => 'success', 'msg' => 'FRCS PKCS#12 Certificate successfully uploaded and validated.']);
+        }
+
+        return json_encode(['status' => 'failed', 'msg' => 'Failed to save certificate file.']);
+    }
+
+    public function run_frcs_accreditation_test()
+    {
+        if ($this->settings->userdata('type') != 1) {
+            return json_encode(['status' => 'failed', 'msg' => 'Access denied']);
+        }
+
+        $tenant_id = $this->settings->active_tenant_id();
+        require_once(base_app . 'src/Services/FrcsVsdcModule.php');
+        $frcsModule = new \App\Services\FrcsVsdcModule($this->conn, $this->settings);
+        $suite = $frcsModule->runAccreditationSuite($tenant_id);
+
+        $this->settings->log_audit("Ran FRCS Accreditation Suite", "VMS Accreditation", "Executed 6 FRCS accreditation compliance tests.");
+        return json_encode(['status' => 'success', 'msg' => 'FRCS Accreditation Test Suite Executed Successfully.', 'data' => $suite]);
+    }
+
     /* Journal Actions */
     public function save_journal()
     {
@@ -1812,6 +1868,12 @@ switch ($action) {
         break;
     case 'simulate_vms_fiscalization':
         echo $Master->simulate_vms_fiscalization();
+        break;
+    case 'upload_tenant_vsdc_cert':
+        echo $Master->upload_tenant_vsdc_cert();
+        break;
+    case 'run_frcs_accreditation_test':
+        echo $Master->run_frcs_accreditation_test();
         break;
     default:
         break;

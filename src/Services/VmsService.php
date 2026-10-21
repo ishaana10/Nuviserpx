@@ -121,7 +121,7 @@ class VmsService
         $jsonPayload = json_encode($payload, JSON_PRETTY_PRINT);
 
         // Simulation for Sandbox or Local environments
-        if ($config['mode'] === 'sandbox' || str_contains($config['sdc_url'], 'localhost')) {
+        if ($config['mode'] === 'sandbox' || strpos($config['sdc_url'], 'localhost') !== false) {
             $mrc = 'MRC-' . sprintf('%06d', rand(1, 999999));
             $sdcInvoiceNo = $config['tin'] . '-SDC-' . rand(100000, 999999);
             $verificationUrl = 'https://vms.frcs.org.fj/verify/' . $sdcInvoiceNo;
