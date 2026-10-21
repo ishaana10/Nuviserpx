@@ -605,6 +605,116 @@ class Master extends DBConnection
         return json_encode(['status' => 'failed', 'msg' => 'Failed to delete custom extrafield.']);
     }
 
+    public function save_currency()
+    {
+        $tenant_id = $this->settings->active_tenant_id();
+        extract($_POST);
+
+        if (empty($code) || empty($name) || empty($symbol)) {
+            return json_encode(['status' => 'failed', 'msg' => 'Currency code, name, and symbol are required.']);
+        }
+
+        $c_code = $this->conn->real_escape_string(strtoupper(trim($code)));
+        $c_name = $this->conn->real_escape_string(trim($name));
+        $c_sym = $this->conn->real_escape_string(trim($symbol));
+        $c_rate = !empty($exchange_rate) ? floatval($exchange_rate) : 1.000000;
+        $is_def = isset($is_default) && $is_default == '1' ? 1 : 0;
+
+        if ($is_def == 1) {
+            $this->conn->query("UPDATE `currencies` SET `is_default` = 0 WHERE `tenant_id` = '{$tenant_id}'");
+        }
+
+        $target_id = !empty($id) ? intval($id) : 0;
+        if ($target_id <= 0) {
+            $save = $this->conn->query("
+                INSERT INTO `currencies` (`tenant_id`, `code`, `name`, `symbol`, `exchange_rate`, `is_default`, `status`)
+                VALUES ('{$tenant_id}', '{$c_code}', '{$c_name}', '{$c_sym}', '{$c_rate}', '{$is_def}', 1)
+            ");
+        } else {
+            $save = $this->conn->query("
+                UPDATE `currencies` SET `code` = '{$c_code}', `name` = '{$c_name}', `symbol` = '{$c_sym}', `exchange_rate` = '{$c_rate}', `is_default` = '{$is_def}'
+                WHERE id = '{$target_id}' AND tenant_id = '{$tenant_id}'
+            ");
+        }
+
+        if ($save) {
+            $this->settings->log_audit("Saved Currency", "Currencies", "Currency: {$c_code} ({$c_sym}), Rate: {$c_rate}");
+            return json_encode(['status' => 'success', 'msg' => 'Currency saved successfully.']);
+        }
+        return json_encode(['status' => 'failed', 'msg' => 'Failed to save currency. ' . $this->conn->error]);
+    }
+
+    public function delete_currency()
+    {
+        $tenant_id = $this->settings->active_tenant_id();
+        $id = intval($_POST['id'] ?? 0);
+
+        $del = $this->conn->query("DELETE FROM `currencies` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}' AND `is_default` = 0");
+        if ($del) {
+            $this->settings->log_audit("Deleted Currency", "Currencies", "ID #{$id}");
+            return json_encode(['status' => 'success', 'msg' => 'Currency deleted successfully.']);
+        }
+        return json_encode(['status' => 'failed', 'msg' => 'Failed to delete currency or currency is set as base default.']);
+    }
+
+    public function backup_db()
+    {
+        if ($this->settings->userdata('type') != 1) {
+            return json_encode(['status' => 'failed', 'msg' => 'Super Administrator permission required.']);
+        }
+
+        $tables = [];
+        $res = $this->conn->query("SHOW TABLES");
+        while ($row = $res->fetch_array()) {
+            $tables[] = $row[0];
+        }
+
+        $sql_dump = "-- NuvisERPX Database Dump\n-- Generated on: " . date('Y-m-d H:i:s') . "\n\n";
+        foreach ($tables as $tbl) {
+            $res_create = $this->conn->query("SHOW CREATE TABLE `{$tbl}`");
+            $row_create = $res_create->fetch_array();
+            $sql_dump .= "DROP TABLE IF EXISTS `{$tbl}`;\n" . $row_create[1] . ";\n\n";
+
+            $res_data = $this->conn->query("SELECT * FROM `{$tbl}`");
+            while ($row_data = $res_data->fetch_assoc()) {
+                $cols = array_keys($row_data);
+                $escaped = array_map(function ($val) {
+                    if (is_null($val)) return "NULL";
+                    return "'" . $this->conn->real_escape_string($val) . "'";
+                }, array_values($row_data));
+
+                $sql_dump .= "INSERT INTO `{$tbl}` (`" . implode("`, `", $cols) . "`) VALUES (" . implode(", ", $escaped) . ");\n";
+            }
+            $sql_dump .= "\n";
+        }
+
+        $filename = 'backup_nuviserpx_' . date('Ymd_His') . '.sql';
+        header('Content-Type: application/octet-stream');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        echo $sql_dump;
+        exit;
+    }
+
+    public function optimize_db()
+    {
+        if ($this->settings->userdata('type') != 1) {
+            return json_encode(['status' => 'failed', 'msg' => 'Access denied']);
+        }
+
+        $tables = [];
+        $res = $this->conn->query("SHOW TABLES");
+        while ($row = $res->fetch_array()) {
+            $tables[] = $row[0];
+        }
+
+        foreach ($tables as $tbl) {
+            $this->conn->query("OPTIMIZE TABLE `{$tbl}`");
+        }
+
+        $this->settings->log_audit("Optimized Database", "System Settings", "Executed OPTIMIZE TABLE on " . count($tables) . " tables.");
+        return json_encode(['status' => 'success', 'msg' => 'All database tables successfully optimized.']);
+    }
+
     /* Journal Actions */
     public function save_journal()
     {
@@ -1462,6 +1572,18 @@ switch ($action) {
         break;
     case 'change_tax_rate_bulk':
         echo $Master->change_tax_rate_bulk();
+        break;
+    case 'save_currency':
+        echo $Master->save_currency();
+        break;
+    case 'delete_currency':
+        echo $Master->delete_currency();
+        break;
+    case 'backup_db':
+        $Master->backup_db();
+        break;
+    case 'optimize_db':
+        echo $Master->optimize_db();
         break;
     default:
         break;

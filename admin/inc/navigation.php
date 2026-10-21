@@ -415,6 +415,18 @@ if($t_qry && $t_qry->num_rows > 0){
                                         </a>
                                     </li>
                                     <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=settings/financial_settings" class="nav-link nav-settings_financial_settings tree-item">
+                                            <i class="nav-icon fas fa-calculator"></i>
+                                            <p>Financial Settings</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=settings/currencies" class="nav-link nav-settings_currencies tree-item">
+                                            <i class="nav-icon fas fa-coins"></i>
+                                            <p>Currencies & Rates</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=system_info" class="nav-link nav-system_info tree-item">
                                             <i class="nav-icon fas fa-sliders-h"></i>
                                             <p>System & VMS</p>
@@ -442,6 +454,24 @@ if($t_qry && $t_qry->num_rows > 0){
                                         <a href="<?php echo base_url ?>admin/?page=settings/extrafields" class="nav-link nav-settings_extrafields tree-item">
                                             <i class="nav-icon fas fa-sliders-h"></i>
                                             <p>Custom Extrafields</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=settings/email_templates" class="nav-link nav-settings_email_templates tree-item">
+                                            <i class="nav-icon fas fa-envelope-open-text"></i>
+                                            <p>Email Templates</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=settings/audit_logs" class="nav-link nav-settings_audit_logs tree-item">
+                                            <i class="nav-icon fas fa-history"></i>
+                                            <p>Audit Trail Logs</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=settings/backup" class="nav-link nav-settings_backup tree-item">
+                                            <i class="nav-icon fas fa-database"></i>
+                                            <p>DB Backup & Storage</p>
                                         </a>
                                     </li>
                                     <li class="nav-item">

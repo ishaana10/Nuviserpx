@@ -65,6 +65,7 @@ class DBConnection{
                 $this->check_dolibarr_crm_migrations();
                 $this->check_dolibarr_extended_migrations();
                 $this->check_extrafields_migrations();
+                $this->check_currency_migrations();
             }
 
             // Run versioned migrations
@@ -731,6 +732,28 @@ class DBConnection{
         foreach ($queries as $sql) {
             @$this->conn->query($sql);
         }
+    }
+
+    public function check_currency_migrations(){
+        if (!$this->conn) return;
+
+        $sql = "CREATE TABLE IF NOT EXISTS `currencies` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `tenant_id` int(30) NOT NULL DEFAULT 1,
+          `code` varchar(10) NOT NULL,
+          `name` varchar(100) NOT NULL,
+          `symbol` varchar(10) NOT NULL,
+          `exchange_rate` decimal(12,6) NOT NULL DEFAULT 1.000000,
+          `is_default` tinyint(1) NOT NULL DEFAULT 0,
+          `status` tinyint(1) NOT NULL DEFAULT 1,
+          `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+          `date_updated` datetime DEFAULT NULL ON UPDATE current_timestamp(),
+          PRIMARY KEY (`id`),
+          KEY `tenant_id` (`tenant_id`),
+          UNIQUE KEY `curr_tenant_code` (`tenant_id`, `code`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+
+        @$this->conn->query($sql);
     }
 
     public function auto_install_schema(){
