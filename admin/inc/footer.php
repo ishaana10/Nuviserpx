@@ -24,7 +24,11 @@
         start_loader()
         var targetUrl = $url;
         if(typeof _base_url_ !== 'undefined' && !targetUrl.startsWith('http://') && !targetUrl.startsWith('https://') && !targetUrl.startsWith('/')){
-            targetUrl = _base_url_ + 'admin/' + targetUrl;
+            if(!targetUrl.startsWith('admin/')){
+                targetUrl = _base_url_ + 'admin/' + targetUrl;
+            } else {
+                targetUrl = _base_url_ + targetUrl;
+            }
         }
         $.ajax({
             url: targetUrl,

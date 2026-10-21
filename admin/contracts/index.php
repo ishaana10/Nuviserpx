@@ -113,12 +113,20 @@ while($row = $qry->fetch_assoc()){
 
 <script>
 $(document).ready(function(){
+    if ($.fn.DataTable.isDataTable('#contracts-table')) {
+        $('#contracts-table').DataTable().destroy();
+    }
     $('#contracts-table').dataTable();
-    $('#btn_new_contract').click(function(){
+
+    $(document).on('click', '#btn_new_contract', function(e){
+        e.preventDefault();
         uni_modal("New Service Contract", "contracts/manage_contract.php", "mid-large");
     });
-    $('.edit_contract').click(function(){
-        uni_modal("Edit Contract Details", "contracts/manage_contract.php?id=" + $(this).data('id'), "mid-large");
+
+    $(document).on('click', '.edit_contract', function(e){
+        e.preventDefault();
+        var id = $(this).data('id');
+        uni_modal("Edit Contract Details", "contracts/manage_contract.php?id=" + id, "mid-large");
     });
 });
 </script>
