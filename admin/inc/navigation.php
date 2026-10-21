@@ -445,6 +445,12 @@ if($t_qry && $t_qry->num_rows > 0){
                                         </a>
                                     </li>
                                     <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=settings/security" class="nav-link nav-settings_security tree-item">
+                                            <i class="nav-icon fas fa-shield-alt"></i>
+                                            <p>Security & 2FA Policy</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=settings/currencies" class="nav-link nav-settings_currencies tree-item">
                                             <i class="nav-icon fas fa-coins"></i>
                                             <p>Currencies & Rates</p>
@@ -490,6 +496,18 @@ if($t_qry && $t_qry->num_rows > 0){
                                         <a href="<?php echo base_url ?>admin/?page=settings/audit_logs" class="nav-link nav-settings_audit_logs tree-item">
                                             <i class="nav-icon fas fa-history"></i>
                                             <p>Audit Trail Logs</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=settings/active_sessions" class="nav-link nav-settings_active_sessions tree-item">
+                                            <i class="nav-icon fas fa-users-cog"></i>
+                                            <p>Active User Sessions</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=settings/login_activity" class="nav-link nav-settings_login_activity tree-item">
+                                            <i class="nav-icon fas fa-exclamation-triangle"></i>
+                                            <p>Login Security Log</p>
                                         </a>
                                     </li>
                                     <li class="nav-item">

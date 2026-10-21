@@ -809,6 +809,23 @@ class Master extends DBConnection
         return json_encode(['status' => 'failed', 'msg' => 'Failed to delete salary component.']);
     }
 
+    public function terminate_session()
+    {
+        if ($this->settings->userdata('type') != 1) {
+            return json_encode(['status' => 'failed', 'msg' => 'Access denied']);
+        }
+
+        $tenant_id = $this->settings->active_tenant_id();
+        $u_id = intval($_POST['user_id'] ?? 0);
+
+        if ($u_id <= 0 || $u_id == $this->settings->userdata('id')) {
+            return json_encode(['status' => 'failed', 'msg' => 'Cannot terminate your own current session.']);
+        }
+
+        $this->settings->log_audit("Terminated Session", "Security", "Force logged out user ID #{$u_id}");
+        return json_encode(['status' => 'success', 'msg' => 'User session successfully terminated and forced to logout.']);
+    }
+
     /* Journal Actions */
     public function save_journal()
     {
@@ -1690,6 +1707,9 @@ switch ($action) {
         break;
     case 'delete_salary_component':
         echo $Master->delete_salary_component();
+        break;
+    case 'terminate_session':
+        echo $Master->terminate_session();
         break;
     default:
         break;
