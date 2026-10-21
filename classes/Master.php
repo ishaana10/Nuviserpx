@@ -715,6 +715,100 @@ class Master extends DBConnection
         return json_encode(['status' => 'success', 'msg' => 'All database tables successfully optimized.']);
     }
 
+    public function save_shift_type()
+    {
+        $tenant_id = $this->settings->active_tenant_id();
+        extract($_POST);
+
+        if (empty($name) || empty($start_time) || empty($end_time)) {
+            return json_encode(['status' => 'failed', 'msg' => 'Shift Name, Start Time, and End Time are required.']);
+        }
+
+        $s_name = $this->conn->real_escape_string($name);
+        $s_start = $this->conn->real_escape_string($start_time);
+        $s_end = $this->conn->real_escape_string($end_time);
+        $s_break = intval($break_duration_mins ?? 30);
+
+        $save = $this->conn->query("
+            INSERT INTO `shift_types` (`tenant_id`, `name`, `start_time`, `end_time`, `break_duration_mins`, `status`)
+            VALUES ('{$tenant_id}', '{$s_name}', '{$s_start}', '{$s_end}', '{$s_break}', 1)
+        ");
+
+        if ($save) {
+            $this->settings->log_audit("Created Shift Type", "HR & Attendance", "Shift: {$name} ({$start_time} - {$end_time})");
+            return json_encode(['status' => 'success', 'msg' => 'Shift type saved successfully.']);
+        }
+        return json_encode(['status' => 'failed', 'msg' => 'Failed to save shift type. ' . $this->conn->error]);
+    }
+
+    public function save_shift_assignment()
+    {
+        $tenant_id = $this->settings->active_tenant_id();
+        extract($_POST);
+
+        $emp_id = intval($employee_id ?? 0);
+        $shift_id = intval($shift_type_id ?? 0);
+
+        if ($emp_id <= 0 || $shift_id <= 0 || empty($start_date)) {
+            return json_encode(['status' => 'failed', 'msg' => 'Employee, Shift Type, and Start Date are required.']);
+        }
+
+        $s_date = $this->conn->real_escape_string($start_date);
+        $e_date = !empty($end_date) ? "'{$this->conn->real_escape_string($end_date)}'" : "NULL";
+
+        $save = $this->conn->query("
+            INSERT INTO `shift_assignments` (`tenant_id`, `employee_id`, `shift_type_id`, `start_date`, `end_date`, `status`)
+            VALUES ('{$tenant_id}', '{$emp_id}', '{$shift_id}', '{$s_date}', {$e_date}, 1)
+        ");
+
+        if ($save) {
+            $this->settings->log_audit("Assigned Shift Roster", "HR & Attendance", "Employee ID #{$emp_id}, Shift ID #{$shift_id}");
+            return json_encode(['status' => 'success', 'msg' => 'Shift roster assigned successfully.']);
+        }
+        return json_encode(['status' => 'failed', 'msg' => 'Failed to assign shift roster.']);
+    }
+
+    public function save_salary_component()
+    {
+        $tenant_id = $this->settings->active_tenant_id();
+        extract($_POST);
+
+        if (empty($code) || empty($name)) {
+            return json_encode(['status' => 'failed', 'msg' => 'Component Code and Name are required.']);
+        }
+
+        $c_code = $this->conn->real_escape_string(strtoupper(trim($code)));
+        $c_name = $this->conn->real_escape_string(trim($name));
+        $c_type = $this->conn->real_escape_string($type ?? 'earning');
+        $c_tax = isset($is_taxable) ? 1 : 0;
+        $c_fnpf = isset($is_fnpf_subject) ? 1 : 0;
+        $c_amt = floatval($default_amount ?? 0);
+
+        $save = $this->conn->query("
+            INSERT INTO `salary_components` (`tenant_id`, `code`, `name`, `type`, `is_taxable`, `is_fnpf_subject`, `default_amount`, `status`)
+            VALUES ('{$tenant_id}', '{$c_code}', '{$c_name}', '{$c_type}', '{$c_tax}', '{$c_fnpf}', '{$c_amt}', 1)
+        ");
+
+        if ($save) {
+            $this->settings->log_audit("Created Salary Component", "Payroll", "Code: {$c_code}, Name: {$c_name}");
+            return json_encode(['status' => 'success', 'msg' => 'Salary component created successfully.']);
+        }
+        return json_encode(['status' => 'failed', 'msg' => 'Failed to save salary component. ' . $this->conn->error]);
+    }
+
+    public function delete_salary_component()
+    {
+        $tenant_id = $this->settings->active_tenant_id();
+        $id = intval($_POST['id'] ?? 0);
+
+        $del = $this->conn->query("DELETE FROM `salary_components` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'");
+        if ($del) {
+            $this->settings->log_audit("Deleted Salary Component", "Payroll", "ID #{$id}");
+            return json_encode(['status' => 'success', 'msg' => 'Salary component deleted.']);
+        }
+        return json_encode(['status' => 'failed', 'msg' => 'Failed to delete salary component.']);
+    }
+
     /* Journal Actions */
     public function save_journal()
     {
@@ -1584,6 +1678,18 @@ switch ($action) {
         break;
     case 'optimize_db':
         echo $Master->optimize_db();
+        break;
+    case 'save_shift_type':
+        echo $Master->save_shift_type();
+        break;
+    case 'save_shift_assignment':
+        echo $Master->save_shift_assignment();
+        break;
+    case 'save_salary_component':
+        echo $Master->save_salary_component();
+        break;
+    case 'delete_salary_component':
+        echo $Master->delete_salary_component();
         break;
     default:
         break;

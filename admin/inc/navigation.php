@@ -360,7 +360,13 @@ if($t_qry && $t_qry->num_rows > 0){
                                     <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=attendance" class="nav-link nav-attendance tree-item">
                                             <i class="nav-icon fas fa-user-clock"></i>
-                                            <p>Attendance</p>
+                                            <p>Attendance Log</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=attendance/shift_roster" class="nav-link nav-attendance_shift_roster tree-item">
+                                            <i class="nav-icon fas fa-clock"></i>
+                                            <p>Shift Rosters</p>
                                         </a>
                                     </li>
                                     <li class="nav-item">
@@ -372,7 +378,25 @@ if($t_qry && $t_qry->num_rows > 0){
                                     <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=payroll" class="nav-link nav-payroll tree-item">
                                             <i class="nav-icon fas fa-file-invoice-dollar"></i>
-                                            <p>Payroll Run</p>
+                                            <p>Payroll Processing</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=payroll/salary_components" class="nav-link nav-payroll_salary_components tree-item">
+                                            <i class="nav-icon fas fa-sliders-h"></i>
+                                            <p>Payhead Components</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=payroll/fnpf_schedule" class="nav-link nav-payroll_fnpf_schedule tree-item">
+                                            <i class="nav-icon fas fa-file-contract"></i>
+                                            <p>FNPF CS3 Schedule</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=payroll/fiji_ems_export" class="nav-link nav-payroll_fiji_ems_export tree-item">
+                                            <i class="nav-icon fas fa-file-csv"></i>
+                                            <p>FRCS EMS Tax Export</p>
                                         </a>
                                     </li>
                                     <li class="nav-item">
