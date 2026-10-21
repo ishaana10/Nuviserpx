@@ -67,6 +67,7 @@ class DBConnection{
                 $this->check_extrafields_migrations();
                 $this->check_currency_migrations();
                 $this->check_frappe_hrms_migrations();
+                $this->check_vms_v3_migrations();
             }
 
             // Run versioned migrations
@@ -800,6 +801,65 @@ class DBConnection{
         @$this->conn->query($sql2);
         @$this->conn->query($sql3);
         @$this->conn->query($sql4);
+    }
+
+    public function check_vms_v3_migrations(){
+        if (!$this->conn) return;
+
+        // 1. Tenant VMS Configurations
+        $sql1 = "CREATE TABLE IF NOT EXISTS `tenant_vms_config` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `tenant_id` int(30) NOT NULL DEFAULT 1,
+          `sdc_url` varchar(255) NOT NULL DEFAULT 'http://localhost:8088/api/v1/sdc',
+          `tin` varchar(50) NOT NULL DEFAULT '50-00000-0-0',
+          `pos_operator_id` varchar(100) NOT NULL DEFAULT 'OPERATOR_01',
+          `pac_code` varchar(50) DEFAULT NULL,
+          `default_tax_group` varchar(10) NOT NULL DEFAULT 'A',
+          `mode` enum('disabled','sandbox','production') NOT NULL DEFAULT 'sandbox',
+          `status` tinyint(1) NOT NULL DEFAULT 1,
+          `date_updated` datetime DEFAULT NULL ON UPDATE current_timestamp(),
+          PRIMARY KEY (`id`),
+          UNIQUE KEY `vms_tenant_config` (`tenant_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+
+        // 2. VMS Transaction Logs
+        $sql2 = "CREATE TABLE IF NOT EXISTS `vms_logs` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `tenant_id` int(30) NOT NULL DEFAULT 1,
+          `invoice_id` int(30) DEFAULT NULL,
+          `invoice_no` varchar(100) NOT NULL,
+          `sdc_invoice_no` varchar(100) DEFAULT NULL,
+          `mrc` varchar(100) DEFAULT NULL,
+          `verification_url` text DEFAULT NULL,
+          `qr_code_data` text DEFAULT NULL,
+          `request_json` longtext DEFAULT NULL,
+          `response_json` longtext DEFAULT NULL,
+          `status` enum('success','failed','queued') NOT NULL DEFAULT 'success',
+          `error_msg` text DEFAULT NULL,
+          `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+          PRIMARY KEY (`id`),
+          KEY `tenant_id` (`tenant_id`),
+          KEY `invoice_id` (`invoice_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+
+        // 3. VMS Async Queues
+        $sql3 = "CREATE TABLE IF NOT EXISTS `vms_queues` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `tenant_id` int(30) NOT NULL DEFAULT 1,
+          `invoice_id` int(30) NOT NULL,
+          `payload_json` longtext NOT NULL,
+          `attempts` int(3) NOT NULL DEFAULT 0,
+          `status` enum('pending','processing','completed','failed') NOT NULL DEFAULT 'pending',
+          `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+          `date_updated` datetime DEFAULT NULL ON UPDATE current_timestamp(),
+          PRIMARY KEY (`id`),
+          KEY `tenant_id` (`tenant_id`),
+          KEY `invoice_id` (`invoice_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+
+        @$this->conn->query($sql1);
+        @$this->conn->query($sql2);
+        @$this->conn->query($sql3);
     }
 
     public function check_currency_migrations(){
