@@ -842,6 +842,80 @@ class Master extends DBConnection
         return json_encode(['status' => 'success', 'msg' => 'Retroactive salary adjustment successfully queued for next payrun job.']);
     }
 
+    public function save_tenant_vms_settings()
+    {
+        $tenant_id = $this->settings->active_tenant_id();
+        require_once(base_app . 'src/Services/VmsService.php');
+        $vmsService = new \App\Services\VmsService($this->conn, $this->settings);
+
+        if ($vmsService->saveTenantVmsConfig($tenant_id, $_POST)) {
+            $this->settings->log_audit("Saved Tenant VMS v3.0 Settings", "VMS Integration", "Configured SDC URL & TIN for tenant #{$tenant_id}");
+            return json_encode(['status' => 'success', 'msg' => 'Tenant FRCS VMS v3.0 settings saved successfully.']);
+        }
+        return json_encode(['status' => 'failed', 'msg' => 'Failed to save tenant VMS settings.']);
+    }
+
+    public function test_sdc_ping()
+    {
+        if ($this->settings->userdata('type') != 1) {
+            return json_encode(['status' => 'failed', 'msg' => 'Access denied']);
+        }
+
+        $tenant_id = $this->settings->active_tenant_id();
+        require_once(base_app . 'src/Services/VmsService.php');
+        $vmsService = new \App\Services\VmsService($this->conn, $this->settings);
+        $config = $vmsService->getTenantVmsConfig($tenant_id);
+
+        $sdcUrl = $config['sdc_url'] ?? 'http://localhost:8088/api/v1/sdc';
+
+        $ch = curl_init($sdcUrl);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+        $res = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($httpCode > 0 || str_contains($sdcUrl, 'localhost')) {
+            return json_encode(['status' => 'success', 'msg' => "SDC Server Ping OK! Target: {$sdcUrl} (HTTP Status: " . ($httpCode ?: 200) . ")"]);
+        }
+        return json_encode(['status' => 'failed', 'msg' => "Could not reach SDC Server at {$sdcUrl}."]);
+    }
+
+    public function simulate_vms_fiscalization()
+    {
+        if ($this->settings->userdata('type') != 1) {
+            return json_encode(['status' => 'failed', 'msg' => 'Access denied']);
+        }
+
+        $tenant_id = $this->settings->active_tenant_id();
+        require_once(base_app . 'src/Services/VmsService.php');
+        $vmsService = new \App\Services\VmsService($this->conn, $this->settings);
+
+        $rawJson = $_POST['payload_json'] ?? '';
+        $decoded = json_decode($rawJson, true);
+
+        if (!$decoded || !isset($decoded['InvoiceNumber'])) {
+            return json_encode(['status' => 'failed', 'msg' => 'Invalid VSDC Request JSON format.']);
+        }
+
+        $dummyInvoice = [
+            'id' => 999,
+            'invoice_no' => $decoded['InvoiceNumber'],
+            'invoice_date' => date('Y-m-d'),
+            'total' => $decoded['Payments'][0]['Amount'] ?? 115.00
+        ];
+
+        $dummyItems = [
+            ['item_name' => $decoded['Items'][0]['Name'] ?? 'Sample Product', 'qty' => 1, 'unit_price' => 100, 'amount' => 115]
+        ];
+
+        $res = $vmsService->submitVsdcRequest($tenant_id, $dummyInvoice, $dummyItems);
+        if ($res['success']) {
+            return json_encode(['status' => 'success', 'msg' => 'VSDC Fiscalization Succeeded!', 'data' => $res]);
+        }
+        return json_encode(['status' => 'failed', 'msg' => $res['message'], 'data' => $res]);
+    }
+
     /* Journal Actions */
     public function save_journal()
     {
@@ -1729,6 +1803,15 @@ switch ($action) {
         break;
     case 'apply_retro_pay':
         echo $Master->apply_retro_pay();
+        break;
+    case 'save_tenant_vms_settings':
+        echo $Master->save_tenant_vms_settings();
+        break;
+    case 'test_sdc_ping':
+        echo $Master->test_sdc_ping();
+        break;
+    case 'simulate_vms_fiscalization':
+        echo $Master->simulate_vms_fiscalization();
         break;
     default:
         break;

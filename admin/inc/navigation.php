@@ -469,9 +469,15 @@ if($t_qry && $t_qry->num_rows > 0){
                                         </a>
                                     </li>
                                     <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=settings/vms_settings" class="nav-link nav-settings_vms_settings tree-item">
+                                            <i class="nav-icon fas fa-microchip"></i>
+                                            <p>FRCS VMS v3.0 Config</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=system_info" class="nav-link nav-system_info tree-item">
                                             <i class="nav-icon fas fa-sliders-h"></i>
-                                            <p>System & VMS</p>
+                                            <p>System & Branding</p>
                                         </a>
                                     </li>
                                     <li class="nav-item">
@@ -565,6 +571,12 @@ if($t_qry && $t_qry->num_rows > 0){
                                         <a href="<?php echo base_url ?>admin/?page=developer/portal_preview" class="nav-link nav-developer_portal_preview tree-item">
                                             <i class="nav-icon fas fa-desktop text-success"></i>
                                             <p>Customer Portal Inspector</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=developer/vms_inspector" class="nav-link nav-developer_vms_inspector tree-item">
+                                            <i class="nav-icon fas fa-microchip text-warning"></i>
+                                            <p>VMS v3.0 SDC Inspector</p>
                                         </a>
                                     </li>
                                     <li class="nav-item">
