@@ -60,6 +60,24 @@ $config = $vmsService->getTenantVmsConfig($tenant_id);
                 </div>
             </div>
         </form>
+
+        <h5 class="font-weight-bold text-dark border-top pt-3 mb-3"><i class="fas fa-certificate text-secondary mr-2"></i> Tenant FRCS PKCS#12 Digital Smartcard Certificate (.p12)</h5>
+        <form action="" id="vsdc-cert-form" enctype="multipart/form-data">
+            <div class="row align-items-end">
+                <div class="col-md-6 form-group mb-0">
+                    <label for="p12_cert" class="font-weight-bold text-dark text-sm">Upload SDC Certificate (.p12 / .pfx)</label>
+                    <input type="file" name="p12_cert" id="p12_cert" class="form-control-file text-sm" accept=".p12,.pfx" required>
+                    <small class="text-muted">Digital certificate issued by FRCS EFD Portal</small>
+                </div>
+                <div class="col-md-4 form-group mb-0">
+                    <label for="cert_pass" class="font-weight-bold text-dark text-sm">Certificate Password / Key</label>
+                    <input type="password" name="cert_pass" id="cert_pass" class="form-control form-control-sm rounded-0" placeholder="Certificate Password">
+                </div>
+                <div class="col-md-2 form-group mb-0">
+                    <button type="submit" class="btn btn-sm btn-outline-warning btn-flat font-weight-bold w-100"><i class="fas fa-upload mr-1"></i> Upload Cert</button>
+                </div>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -89,5 +107,33 @@ $(document).ready(function(){
             }
         });
     });
+
+        $('#vsdc-cert-form').submit(function(e){
+            e.preventDefault();
+            start_loader();
+            $.ajax({
+                url: _base_url_ + "classes/Master.php?f=upload_tenant_vsdc_cert",
+                data: new FormData($(this)[0]),
+                cache: false,
+                contentType: false,
+                processData: false,
+                method: 'POST',
+                type: 'POST',
+                dataType: "json",
+                error: err => {
+                    console.log(err);
+                    alert_toast("An error occurred uploading certificate.", "error");
+                    end_loader();
+                },
+                success: function(resp){
+                    end_loader();
+                    if(resp.status == 'success'){
+                        alert_toast(resp.msg, "success");
+                    } else {
+                        alert_toast(resp.msg || "Failed to upload certificate.", "error");
+                    }
+                }
+            });
+        });
 });
 </script>

@@ -37,7 +37,8 @@ $logs_qry = $conn->query("
             <div class="tab-pane fade show active" id="vms-sim" role="tabpanel">
                 <div class="row">
                     <div class="col-md-6">
-                        <form id="vsdc-sim-form">
+                        <form id="vsdc-sim-form" onsubmit="return false;">
+                            <input type="hidden" name="page" value="developer/vms_inspector">
                             <div class="form-group mb-3">
                                 <label for="sim_sdc_url" class="font-weight-bold text-dark text-sm">Target SDC Endpoint URL</label>
                                 <input type="text" name="sdc_url" id="sim_sdc_url" class="form-control form-control-sm rounded-0" value="<?= htmlspecialchars($_settings->info('vms_url') ?: 'http://localhost:8088/api/v1/sdc') ?>">
@@ -71,7 +72,7 @@ $logs_qry = $conn->query("
 }</textarea>
                             </div>
 
-                            <button type="submit" class="btn btn-sm btn-primary btn-flat font-weight-bold w-100"><i class="fas fa-paper-plane mr-1"></i> Transmit Payload to VSDC</button>
+                            <button type="button" id="btn_transmit_vsdc" class="btn btn-sm btn-primary btn-flat font-weight-bold w-100"><i class="fas fa-paper-plane mr-1"></i> Transmit Payload to VSDC</button>
                         </form>
                     </div>
 
@@ -131,16 +132,59 @@ $logs_qry = $conn->query("
 </div>
 
 <script>
+function execute_vsdc_transmission(){
+    start_loader();
+    $.ajax({
+        url: _base_url_ + "classes/Master.php?f=simulate_vms_fiscalization",
+        method: "POST",
+        data: $('#vsdc-sim-form').serialize(),
+        dataType: "json",
+        error: function(err) {
+            console.log(err);
+            $('#vsdc_output').text(JSON.stringify(err, null, 2));
+            alert_toast("Simulation error.", "error");
+            end_loader();
+        },
+        success: function(resp){
+            end_loader();
+            $('#vsdc_output').text(JSON.stringify(resp, null, 2));
+            if(resp.status == 'success'){
+                alert_toast("VSDC Payload transmitted successfully!", "success");
+            } else {
+                alert_toast("Transmission failed.", "error");
+            }
+        }
+    });
+}
+
 $(document).ready(function(){
+    if ($.fn.DataTable.isDataTable('#vms-logs-table')) {
+        $('#vms-logs-table').DataTable().destroy();
+    }
     $('#vms-logs-table').dataTable();
 
-    $('#btn_ping_sdc').click(function(){
+    $(document).on('click', '#btn_transmit_vsdc', function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        execute_vsdc_transmission();
+        return false;
+    });
+
+    $(document).on('submit', '#vsdc-sim-form', function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        execute_vsdc_transmission();
+        return false;
+    });
+
+    $(document).on('click', '#btn_ping_sdc', function(e){
+        e.preventDefault();
         start_loader();
         $.ajax({
             url: _base_url_ + "classes/Master.php?f=test_sdc_ping",
             method: "POST",
             dataType: "json",
-            error: err => {
+            error: function(err) {
                 console.log(err);
                 alert_toast("An error occurred.", "error");
                 end_loader();
@@ -151,32 +195,6 @@ $(document).ready(function(){
                     alert_toast(resp.msg, "success");
                 } else {
                     alert_toast(resp.msg || "SDC Ping Failed.", "error");
-                }
-            }
-        });
-    });
-
-    $('#vsdc-sim-form').submit(function(e){
-        e.preventDefault();
-        start_loader();
-        $.ajax({
-            url: _base_url_ + "classes/Master.php?f=simulate_vms_fiscalization",
-            method: "POST",
-            data: $(this).serialize(),
-            dataType: "json",
-            error: err => {
-                console.log(err);
-                $('#vsdc_output').text(JSON.stringify(err, null, 2));
-                alert_toast("Simulation error.", "error");
-                end_loader();
-            },
-            success: function(resp){
-                end_loader();
-                $('#vsdc_output').text(JSON.stringify(resp, null, 2));
-                if(resp.status == 'success'){
-                    alert_toast("VSDC Payload transmitted successfully!", "success");
-                } else {
-                    alert_toast("Transmission failed.", "error");
                 }
             }
         });
