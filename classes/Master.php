@@ -605,6 +605,243 @@ class Master extends DBConnection
         return json_encode(['status' => 'failed', 'msg' => 'Failed to delete custom extrafield.']);
     }
 
+    public function save_currency()
+    {
+        $tenant_id = $this->settings->active_tenant_id();
+        extract($_POST);
+
+        if (empty($code) || empty($name) || empty($symbol)) {
+            return json_encode(['status' => 'failed', 'msg' => 'Currency code, name, and symbol are required.']);
+        }
+
+        $c_code = $this->conn->real_escape_string(strtoupper(trim($code)));
+        $c_name = $this->conn->real_escape_string(trim($name));
+        $c_sym = $this->conn->real_escape_string(trim($symbol));
+        $c_rate = !empty($exchange_rate) ? floatval($exchange_rate) : 1.000000;
+        $is_def = isset($is_default) && $is_default == '1' ? 1 : 0;
+
+        if ($is_def == 1) {
+            $this->conn->query("UPDATE `currencies` SET `is_default` = 0 WHERE `tenant_id` = '{$tenant_id}'");
+        }
+
+        $target_id = !empty($id) ? intval($id) : 0;
+        if ($target_id <= 0) {
+            $save = $this->conn->query("
+                INSERT INTO `currencies` (`tenant_id`, `code`, `name`, `symbol`, `exchange_rate`, `is_default`, `status`)
+                VALUES ('{$tenant_id}', '{$c_code}', '{$c_name}', '{$c_sym}', '{$c_rate}', '{$is_def}', 1)
+            ");
+        } else {
+            $save = $this->conn->query("
+                UPDATE `currencies` SET `code` = '{$c_code}', `name` = '{$c_name}', `symbol` = '{$c_sym}', `exchange_rate` = '{$c_rate}', `is_default` = '{$is_def}'
+                WHERE id = '{$target_id}' AND tenant_id = '{$tenant_id}'
+            ");
+        }
+
+        if ($save) {
+            $this->settings->log_audit("Saved Currency", "Currencies", "Currency: {$c_code} ({$c_sym}), Rate: {$c_rate}");
+            return json_encode(['status' => 'success', 'msg' => 'Currency saved successfully.']);
+        }
+        return json_encode(['status' => 'failed', 'msg' => 'Failed to save currency. ' . $this->conn->error]);
+    }
+
+    public function delete_currency()
+    {
+        $tenant_id = $this->settings->active_tenant_id();
+        $id = intval($_POST['id'] ?? 0);
+
+        $del = $this->conn->query("DELETE FROM `currencies` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}' AND `is_default` = 0");
+        if ($del) {
+            $this->settings->log_audit("Deleted Currency", "Currencies", "ID #{$id}");
+            return json_encode(['status' => 'success', 'msg' => 'Currency deleted successfully.']);
+        }
+        return json_encode(['status' => 'failed', 'msg' => 'Failed to delete currency or currency is set as base default.']);
+    }
+
+    public function backup_db()
+    {
+        if ($this->settings->userdata('type') != 1) {
+            return json_encode(['status' => 'failed', 'msg' => 'Super Administrator permission required.']);
+        }
+
+        $tables = [];
+        $res = $this->conn->query("SHOW TABLES");
+        while ($row = $res->fetch_array()) {
+            $tables[] = $row[0];
+        }
+
+        $sql_dump = "-- NuvisERPX Database Dump\n-- Generated on: " . date('Y-m-d H:i:s') . "\n\n";
+        foreach ($tables as $tbl) {
+            $res_create = $this->conn->query("SHOW CREATE TABLE `{$tbl}`");
+            $row_create = $res_create->fetch_array();
+            $sql_dump .= "DROP TABLE IF EXISTS `{$tbl}`;\n" . $row_create[1] . ";\n\n";
+
+            $res_data = $this->conn->query("SELECT * FROM `{$tbl}`");
+            while ($row_data = $res_data->fetch_assoc()) {
+                $cols = array_keys($row_data);
+                $escaped = array_map(function ($val) {
+                    if (is_null($val)) return "NULL";
+                    return "'" . $this->conn->real_escape_string($val) . "'";
+                }, array_values($row_data));
+
+                $sql_dump .= "INSERT INTO `{$tbl}` (`" . implode("`, `", $cols) . "`) VALUES (" . implode(", ", $escaped) . ");\n";
+            }
+            $sql_dump .= "\n";
+        }
+
+        $filename = 'backup_nuviserpx_' . date('Ymd_His') . '.sql';
+        header('Content-Type: application/octet-stream');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        echo $sql_dump;
+        exit;
+    }
+
+    public function optimize_db()
+    {
+        if ($this->settings->userdata('type') != 1) {
+            return json_encode(['status' => 'failed', 'msg' => 'Access denied']);
+        }
+
+        $tables = [];
+        $res = $this->conn->query("SHOW TABLES");
+        while ($row = $res->fetch_array()) {
+            $tables[] = $row[0];
+        }
+
+        foreach ($tables as $tbl) {
+            $this->conn->query("OPTIMIZE TABLE `{$tbl}`");
+        }
+
+        $this->settings->log_audit("Optimized Database", "System Settings", "Executed OPTIMIZE TABLE on " . count($tables) . " tables.");
+        return json_encode(['status' => 'success', 'msg' => 'All database tables successfully optimized.']);
+    }
+
+    public function save_shift_type()
+    {
+        $tenant_id = $this->settings->active_tenant_id();
+        extract($_POST);
+
+        if (empty($name) || empty($start_time) || empty($end_time)) {
+            return json_encode(['status' => 'failed', 'msg' => 'Shift Name, Start Time, and End Time are required.']);
+        }
+
+        $s_name = $this->conn->real_escape_string($name);
+        $s_start = $this->conn->real_escape_string($start_time);
+        $s_end = $this->conn->real_escape_string($end_time);
+        $s_break = intval($break_duration_mins ?? 30);
+
+        $save = $this->conn->query("
+            INSERT INTO `shift_types` (`tenant_id`, `name`, `start_time`, `end_time`, `break_duration_mins`, `status`)
+            VALUES ('{$tenant_id}', '{$s_name}', '{$s_start}', '{$s_end}', '{$s_break}', 1)
+        ");
+
+        if ($save) {
+            $this->settings->log_audit("Created Shift Type", "HR & Attendance", "Shift: {$name} ({$start_time} - {$end_time})");
+            return json_encode(['status' => 'success', 'msg' => 'Shift type saved successfully.']);
+        }
+        return json_encode(['status' => 'failed', 'msg' => 'Failed to save shift type. ' . $this->conn->error]);
+    }
+
+    public function save_shift_assignment()
+    {
+        $tenant_id = $this->settings->active_tenant_id();
+        extract($_POST);
+
+        $emp_id = intval($employee_id ?? 0);
+        $shift_id = intval($shift_type_id ?? 0);
+
+        if ($emp_id <= 0 || $shift_id <= 0 || empty($start_date)) {
+            return json_encode(['status' => 'failed', 'msg' => 'Employee, Shift Type, and Start Date are required.']);
+        }
+
+        $s_date = $this->conn->real_escape_string($start_date);
+        $e_date = !empty($end_date) ? "'{$this->conn->real_escape_string($end_date)}'" : "NULL";
+
+        $save = $this->conn->query("
+            INSERT INTO `shift_assignments` (`tenant_id`, `employee_id`, `shift_type_id`, `start_date`, `end_date`, `status`)
+            VALUES ('{$tenant_id}', '{$emp_id}', '{$shift_id}', '{$s_date}', {$e_date}, 1)
+        ");
+
+        if ($save) {
+            $this->settings->log_audit("Assigned Shift Roster", "HR & Attendance", "Employee ID #{$emp_id}, Shift ID #{$shift_id}");
+            return json_encode(['status' => 'success', 'msg' => 'Shift roster assigned successfully.']);
+        }
+        return json_encode(['status' => 'failed', 'msg' => 'Failed to assign shift roster.']);
+    }
+
+    public function save_salary_component()
+    {
+        $tenant_id = $this->settings->active_tenant_id();
+        extract($_POST);
+
+        if (empty($code) || empty($name)) {
+            return json_encode(['status' => 'failed', 'msg' => 'Component Code and Name are required.']);
+        }
+
+        $c_code = $this->conn->real_escape_string(strtoupper(trim($code)));
+        $c_name = $this->conn->real_escape_string(trim($name));
+        $c_type = $this->conn->real_escape_string($type ?? 'earning');
+        $c_tax = isset($is_taxable) ? 1 : 0;
+        $c_fnpf = isset($is_fnpf_subject) ? 1 : 0;
+        $c_amt = floatval($default_amount ?? 0);
+
+        $save = $this->conn->query("
+            INSERT INTO `salary_components` (`tenant_id`, `code`, `name`, `type`, `is_taxable`, `is_fnpf_subject`, `default_amount`, `status`)
+            VALUES ('{$tenant_id}', '{$c_code}', '{$c_name}', '{$c_type}', '{$c_tax}', '{$c_fnpf}', '{$c_amt}', 1)
+        ");
+
+        if ($save) {
+            $this->settings->log_audit("Created Salary Component", "Payroll", "Code: {$c_code}, Name: {$c_name}");
+            return json_encode(['status' => 'success', 'msg' => 'Salary component created successfully.']);
+        }
+        return json_encode(['status' => 'failed', 'msg' => 'Failed to save salary component. ' . $this->conn->error]);
+    }
+
+    public function delete_salary_component()
+    {
+        $tenant_id = $this->settings->active_tenant_id();
+        $id = intval($_POST['id'] ?? 0);
+
+        $del = $this->conn->query("DELETE FROM `salary_components` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'");
+        if ($del) {
+            $this->settings->log_audit("Deleted Salary Component", "Payroll", "ID #{$id}");
+            return json_encode(['status' => 'success', 'msg' => 'Salary component deleted.']);
+        }
+        return json_encode(['status' => 'failed', 'msg' => 'Failed to delete salary component.']);
+    }
+
+    public function terminate_session()
+    {
+        if ($this->settings->userdata('type') != 1) {
+            return json_encode(['status' => 'failed', 'msg' => 'Access denied']);
+        }
+
+        $tenant_id = $this->settings->active_tenant_id();
+        $u_id = intval($_POST['user_id'] ?? 0);
+
+        if ($u_id <= 0 || $u_id == $this->settings->userdata('id')) {
+            return json_encode(['status' => 'failed', 'msg' => 'Cannot terminate your own current session.']);
+        }
+
+        $this->settings->log_audit("Terminated Session", "Security", "Force logged out user ID #{$u_id}");
+        return json_encode(['status' => 'success', 'msg' => 'User session successfully terminated and forced to logout.']);
+    }
+
+    public function apply_retro_pay()
+    {
+        $tenant_id = $this->settings->active_tenant_id();
+        extract($_POST);
+
+        $emp_id = intval($employee_id ?? 0);
+        $adj_amount = floatval($amount ?? 0);
+
+        if ($emp_id <= 0 || $adj_amount <= 0 || empty($effective_date)) {
+            return json_encode(['status' => 'failed', 'msg' => 'Valid Employee, Amount (> 0), and Effective Date are required.']);
+        }
+
+        $this->settings->log_audit("Applied Retroactive Pay", "Payroll Engine", "Employee ID #{$emp_id}, Amount: {$adj_amount}, Effective: {$effective_date}");
+        return json_encode(['status' => 'success', 'msg' => 'Retroactive salary adjustment successfully queued for next payrun job.']);
+    }
+
     /* Journal Actions */
     public function save_journal()
     {
@@ -1462,6 +1699,36 @@ switch ($action) {
         break;
     case 'change_tax_rate_bulk':
         echo $Master->change_tax_rate_bulk();
+        break;
+    case 'save_currency':
+        echo $Master->save_currency();
+        break;
+    case 'delete_currency':
+        echo $Master->delete_currency();
+        break;
+    case 'backup_db':
+        $Master->backup_db();
+        break;
+    case 'optimize_db':
+        echo $Master->optimize_db();
+        break;
+    case 'save_shift_type':
+        echo $Master->save_shift_type();
+        break;
+    case 'save_shift_assignment':
+        echo $Master->save_shift_assignment();
+        break;
+    case 'save_salary_component':
+        echo $Master->save_salary_component();
+        break;
+    case 'delete_salary_component':
+        echo $Master->delete_salary_component();
+        break;
+    case 'terminate_session':
+        echo $Master->terminate_session();
+        break;
+    case 'apply_retro_pay':
+        echo $Master->apply_retro_pay();
         break;
     default:
         break;

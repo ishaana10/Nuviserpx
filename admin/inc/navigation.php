@@ -360,7 +360,13 @@ if($t_qry && $t_qry->num_rows > 0){
                                     <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=attendance" class="nav-link nav-attendance tree-item">
                                             <i class="nav-icon fas fa-user-clock"></i>
-                                            <p>Attendance</p>
+                                            <p>Attendance Log</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=attendance/shift_roster" class="nav-link nav-attendance_shift_roster tree-item">
+                                            <i class="nav-icon fas fa-clock"></i>
+                                            <p>Shift Rosters</p>
                                         </a>
                                     </li>
                                     <li class="nav-item">
@@ -372,7 +378,37 @@ if($t_qry && $t_qry->num_rows > 0){
                                     <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=payroll" class="nav-link nav-payroll tree-item">
                                             <i class="nav-icon fas fa-file-invoice-dollar"></i>
-                                            <p>Payroll Run</p>
+                                            <p>Payroll Processing</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=payroll/payrun_engine" class="nav-link nav-payroll_payrun_engine tree-item">
+                                            <i class="nav-icon fas fa-cogs"></i>
+                                            <p>Payrun Engine & Retro</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=payroll/tax_rules" class="nav-link nav-payroll_tax_rules tree-item">
+                                            <i class="nav-icon fas fa-balance-scale"></i>
+                                            <p>FRCS Tax Regulations</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=payroll/salary_components" class="nav-link nav-payroll_salary_components tree-item">
+                                            <i class="nav-icon fas fa-sliders-h"></i>
+                                            <p>Payhead Components</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=payroll/fnpf_schedule" class="nav-link nav-payroll_fnpf_schedule tree-item">
+                                            <i class="nav-icon fas fa-file-contract"></i>
+                                            <p>FNPF CS3 Schedule</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=payroll/fiji_ems_export" class="nav-link nav-payroll_fiji_ems_export tree-item">
+                                            <i class="nav-icon fas fa-file-csv"></i>
+                                            <p>FRCS EMS Tax Export</p>
                                         </a>
                                     </li>
                                     <li class="nav-item">
@@ -415,6 +451,24 @@ if($t_qry && $t_qry->num_rows > 0){
                                         </a>
                                     </li>
                                     <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=settings/financial_settings" class="nav-link nav-settings_financial_settings tree-item">
+                                            <i class="nav-icon fas fa-calculator"></i>
+                                            <p>Financial Settings</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=settings/security" class="nav-link nav-settings_security tree-item">
+                                            <i class="nav-icon fas fa-shield-alt"></i>
+                                            <p>Security & 2FA Policy</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=settings/currencies" class="nav-link nav-settings_currencies tree-item">
+                                            <i class="nav-icon fas fa-coins"></i>
+                                            <p>Currencies & Rates</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=system_info" class="nav-link nav-system_info tree-item">
                                             <i class="nav-icon fas fa-sliders-h"></i>
                                             <p>System & VMS</p>
@@ -442,6 +496,36 @@ if($t_qry && $t_qry->num_rows > 0){
                                         <a href="<?php echo base_url ?>admin/?page=settings/extrafields" class="nav-link nav-settings_extrafields tree-item">
                                             <i class="nav-icon fas fa-sliders-h"></i>
                                             <p>Custom Extrafields</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=settings/email_templates" class="nav-link nav-settings_email_templates tree-item">
+                                            <i class="nav-icon fas fa-envelope-open-text"></i>
+                                            <p>Email Templates</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=settings/audit_logs" class="nav-link nav-settings_audit_logs tree-item">
+                                            <i class="nav-icon fas fa-history"></i>
+                                            <p>Audit Trail Logs</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=settings/active_sessions" class="nav-link nav-settings_active_sessions tree-item">
+                                            <i class="nav-icon fas fa-users-cog"></i>
+                                            <p>Active User Sessions</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=settings/login_activity" class="nav-link nav-settings_login_activity tree-item">
+                                            <i class="nav-icon fas fa-exclamation-triangle"></i>
+                                            <p>Login Security Log</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=settings/backup" class="nav-link nav-settings_backup tree-item">
+                                            <i class="nav-icon fas fa-database"></i>
+                                            <p>DB Backup & Storage</p>
                                         </a>
                                     </li>
                                     <li class="nav-item">

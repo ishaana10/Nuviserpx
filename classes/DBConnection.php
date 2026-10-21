@@ -65,6 +65,8 @@ class DBConnection{
                 $this->check_dolibarr_crm_migrations();
                 $this->check_dolibarr_extended_migrations();
                 $this->check_extrafields_migrations();
+                $this->check_currency_migrations();
+                $this->check_frappe_hrms_migrations();
             }
 
             // Run versioned migrations
@@ -731,6 +733,95 @@ class DBConnection{
         foreach ($queries as $sql) {
             @$this->conn->query($sql);
         }
+    }
+
+    public function check_frappe_hrms_migrations(){
+        if (!$this->conn) return;
+
+        // 1. Shift Types
+        $sql1 = "CREATE TABLE IF NOT EXISTS `shift_types` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `tenant_id` int(30) NOT NULL DEFAULT 1,
+          `name` varchar(150) NOT NULL,
+          `start_time` time NOT NULL,
+          `end_time` time NOT NULL,
+          `break_duration_mins` int(5) NOT NULL DEFAULT 30,
+          `status` tinyint(1) NOT NULL DEFAULT 1,
+          `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+          PRIMARY KEY (`id`),
+          KEY `tenant_id` (`tenant_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+
+        // 2. Shift Assignments
+        $sql2 = "CREATE TABLE IF NOT EXISTS `shift_assignments` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `tenant_id` int(30) NOT NULL DEFAULT 1,
+          `employee_id` int(30) NOT NULL,
+          `shift_type_id` int(30) NOT NULL,
+          `start_date` date NOT NULL,
+          `end_date` date DEFAULT NULL,
+          `status` tinyint(1) NOT NULL DEFAULT 1,
+          `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+          PRIMARY KEY (`id`),
+          KEY `tenant_id` (`tenant_id`),
+          KEY `employee_id` (`employee_id`),
+          KEY `shift_type_id` (`shift_type_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+
+        // 3. Salary Components / Payheads
+        $sql3 = "CREATE TABLE IF NOT EXISTS `salary_components` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `tenant_id` int(30) NOT NULL DEFAULT 1,
+          `code` varchar(50) NOT NULL,
+          `name` varchar(150) NOT NULL,
+          `type` enum('earning','deduction') NOT NULL DEFAULT 'earning',
+          `is_taxable` tinyint(1) NOT NULL DEFAULT 1,
+          `is_fnpf_subject` tinyint(1) NOT NULL DEFAULT 1,
+          `default_amount` decimal(12,2) NOT NULL DEFAULT 0.00,
+          `status` tinyint(1) NOT NULL DEFAULT 1,
+          `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+          PRIMARY KEY (`id`),
+          KEY `tenant_id` (`tenant_id`),
+          UNIQUE KEY `comp_tenant_code` (`tenant_id`, `code`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+
+        // 4. Payroll Component Items
+        $sql4 = "CREATE TABLE IF NOT EXISTS `payroll_component_items` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `payroll_id` int(30) NOT NULL,
+          `component_id` int(30) NOT NULL,
+          `amount` decimal(12,2) NOT NULL DEFAULT 0.00,
+          PRIMARY KEY (`id`),
+          KEY `payroll_id` (`payroll_id`),
+          KEY `component_id` (`component_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+
+        @$this->conn->query($sql1);
+        @$this->conn->query($sql2);
+        @$this->conn->query($sql3);
+        @$this->conn->query($sql4);
+    }
+
+    public function check_currency_migrations(){
+        if (!$this->conn) return;
+
+        $sql = "CREATE TABLE IF NOT EXISTS `currencies` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `tenant_id` int(30) NOT NULL DEFAULT 1,
+          `code` varchar(10) NOT NULL,
+          `name` varchar(100) NOT NULL,
+          `symbol` varchar(10) NOT NULL,
+          `exchange_rate` decimal(12,6) NOT NULL DEFAULT 1.000000,
+          `is_default` tinyint(1) NOT NULL DEFAULT 0,
+          `status` tinyint(1) NOT NULL DEFAULT 1,
+          `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+          `date_updated` datetime DEFAULT NULL ON UPDATE current_timestamp(),
+          PRIMARY KEY (`id`),
+          KEY `tenant_id` (`tenant_id`),
+          UNIQUE KEY `curr_tenant_code` (`tenant_id`, `code`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+
+        @$this->conn->query($sql);
     }
 
     public function auto_install_schema(){
