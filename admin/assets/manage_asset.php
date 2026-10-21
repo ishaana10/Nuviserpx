@@ -2,8 +2,8 @@
 require_once(__DIR__ . '/../../config.php');
 $tenant_id = $_settings->active_tenant_id();
 
-$id = isset($_GET['id']) ? $_GET['id'] : '';
-if(!empty($id)){
+$id = isset($_GET['id']) ? intval($_GET['id']) : 0;
+if($id > 0){
     $qry = $conn->query("SELECT * FROM `fixed_assets` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'");
     if($qry->num_rows > 0){
         $res = $qry->fetch_assoc();

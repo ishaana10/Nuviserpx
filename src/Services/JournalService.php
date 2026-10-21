@@ -74,6 +74,7 @@ class JournalService
                     if (empty($v)) continue;
                     if (!empty($dataStr)) $dataStr .= ", ";
 
+                    $acc_id = intval($v);
                     $d_val = isset($debit[$k]) && $debit[$k] !== '' ? floatval($debit[$k]) : 0;
                     $c_val = isset($credit[$k]) && $credit[$k] !== '' ? floatval($credit[$k]) : 0;
 
@@ -85,14 +86,14 @@ class JournalService
                         $group = 2;
                         $amt = $c_val;
                     } else {
-                        $group = $group_id[$k] ?? 1;
-                        $amt = $amount[$k] ?? 0;
+                        $group = isset($group_id[$k]) ? intval($group_id[$k]) : 1;
+                        $amt = isset($amount[$k]) ? floatval($amount[$k]) : 0;
                     }
 
                     $line_desc = isset($line_description[$k]) ? $this->conn->real_escape_string((string)$line_description[$k]) : '';
                     $line_tax = isset($tax_rate[$k]) ? $this->conn->real_escape_string((string)$tax_rate[$k]) : 'No Tax (0%)';
 
-                    $dataStr .= "('{$jid}','{$v}','{$group}','{$amt}','{$line_desc}','{$line_tax}')";
+                    $dataStr .= "('{$jid}','{$acc_id}','{$group}','{$amt}','{$line_desc}','{$line_tax}')";
                 }
             }
 

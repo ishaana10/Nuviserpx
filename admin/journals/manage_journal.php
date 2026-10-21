@@ -20,7 +20,8 @@ while($row = $groups->fetch_assoc()){
 }
 
 if(isset($_GET['id'])){
-    $qry = $conn->query("SELECT * FROM `journal_entries` where id = '{$_GET['id']}' and tenant_id = '{$tenant_id}'");
+    $id = intval($_GET['id']);
+    $qry = $conn->query("SELECT * FROM `journal_entries` where id = '{$id}' and tenant_id = '{$tenant_id}'");
     if($qry->num_rows > 0){
         $res = $qry->fetch_array();
         foreach($res as $k => $v){
