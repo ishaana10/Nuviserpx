@@ -102,12 +102,18 @@ $qry = $conn->query("
 
 <script>
 $(document).ready(function(){
+    if ($.fn.DataTable.isDataTable('#expenses-table')) {
+        $('#expenses-table').DataTable().destroy();
+    }
     $('#expenses-table').dataTable();
-    $('#btn_new_expense').click(function(){
+
+    $(document).on('click', '#btn_new_expense', function(e){
+        e.preventDefault();
         uni_modal("Submit Expense Claim", "expense_reports/manage_claim.php", "mid-large");
     });
 
-    $('.approve_claim').click(function(){
+    $(document).on('click', '.approve_claim', function(e){
+        e.preventDefault();
         var claimId = $(this).data('id');
         if(confirm("Approve this employee expense claim?")){
             start_loader();

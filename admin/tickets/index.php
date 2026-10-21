@@ -104,8 +104,13 @@ $qry = $conn->query("
 
 <script>
 $(document).ready(function(){
+    if ($.fn.DataTable.isDataTable('#tickets-table')) {
+        $('#tickets-table').DataTable().destroy();
+    }
     $('#tickets-table').dataTable();
-    $('#btn_new_ticket').click(function(){
+
+    $(document).on('click', '#btn_new_ticket', function(e){
+        e.preventDefault();
         uni_modal("Create Support Ticket", "tickets/manage_ticket.php", "mid-large");
     });
 });

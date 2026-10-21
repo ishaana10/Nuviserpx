@@ -75,20 +75,29 @@
 </div>
 <script>
 	$(document).ready(function(){
-		$('.delete_data').click(function(){
-			_conf("Are you sure to delete this Tenant? Data associated with this tenant will be inaccessible.","delete_tenant",[$(this).attr('data-id')])
-		})
-		$('#create_new').click(function(){
-			uni_modal("<i class='fa fa-plus'></i> Add New Tenant","tenants/manage_tenant.php")
-		})
-		$('.edit_data').click(function(){
-			uni_modal("<i class='fa fa-edit'></i> Edit Tenant","tenants/manage_tenant.php?id="+$(this).attr('data-id'))
-		})
+		if ($.fn.DataTable.isDataTable('#list')) {
+			$('#list').DataTable().destroy();
+		}
 		$('#list').dataTable({
 			columnDefs: [
 					{ orderable: false, targets: [5,6] }
 			],
 			order: [0, 'asc']
+		});
+
+		$(document).on('click', '.delete_data', function(e){
+			e.preventDefault();
+			_conf("Are you sure to delete this Tenant? Data associated with this tenant will be inaccessible.","delete_tenant",[$(this).attr('data-id')])
+		});
+
+		$(document).on('click', '#create_new', function(e){
+			e.preventDefault();
+			uni_modal("<i class='fa fa-plus'></i> Add New Tenant","tenants/manage_tenant.php")
+		});
+
+		$(document).on('click', '.edit_data', function(e){
+			e.preventDefault();
+			uni_modal("<i class='fa fa-edit'></i> Edit Tenant","tenants/manage_tenant.php?id="+$(this).attr('data-id'))
 		});
 	})
 	function delete_tenant($id){

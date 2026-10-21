@@ -87,10 +87,12 @@ $transfers = $conn->query("
 
 <script>
 $(document).ready(function(){
-    $('#btn_new_warehouse').click(function(){
+    $(document).on('click', '#btn_new_warehouse', function(e){
+        e.preventDefault();
         uni_modal("Add Warehouse Location", "warehouses/manage_warehouse.php", "mid-large");
     });
-    $('#btn_transfer_stock').click(function(){
+    $(document).on('click', '#btn_transfer_stock', function(e){
+        e.preventDefault();
         uni_modal("Inter-Warehouse Stock Transfer", "warehouses/transfer.php", "mid-large");
     });
 });
