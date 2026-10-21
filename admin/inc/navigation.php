@@ -382,6 +382,18 @@ if($t_qry && $t_qry->num_rows > 0){
                                         </a>
                                     </li>
                                     <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=payroll/payrun_engine" class="nav-link nav-payroll_payrun_engine tree-item">
+                                            <i class="nav-icon fas fa-cogs"></i>
+                                            <p>Payrun Engine & Retro</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=payroll/tax_rules" class="nav-link nav-payroll_tax_rules tree-item">
+                                            <i class="nav-icon fas fa-balance-scale"></i>
+                                            <p>FRCS Tax Regulations</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=payroll/salary_components" class="nav-link nav-payroll_salary_components tree-item">
                                             <i class="nav-icon fas fa-sliders-h"></i>
                                             <p>Payhead Components</p>

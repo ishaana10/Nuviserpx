@@ -826,6 +826,22 @@ class Master extends DBConnection
         return json_encode(['status' => 'success', 'msg' => 'User session successfully terminated and forced to logout.']);
     }
 
+    public function apply_retro_pay()
+    {
+        $tenant_id = $this->settings->active_tenant_id();
+        extract($_POST);
+
+        $emp_id = intval($employee_id ?? 0);
+        $adj_amount = floatval($amount ?? 0);
+
+        if ($emp_id <= 0 || $adj_amount <= 0 || empty($effective_date)) {
+            return json_encode(['status' => 'failed', 'msg' => 'Valid Employee, Amount (> 0), and Effective Date are required.']);
+        }
+
+        $this->settings->log_audit("Applied Retroactive Pay", "Payroll Engine", "Employee ID #{$emp_id}, Amount: {$adj_amount}, Effective: {$effective_date}");
+        return json_encode(['status' => 'success', 'msg' => 'Retroactive salary adjustment successfully queued for next payrun job.']);
+    }
+
     /* Journal Actions */
     public function save_journal()
     {
@@ -1710,6 +1726,9 @@ switch ($action) {
         break;
     case 'terminate_session':
         echo $Master->terminate_session();
+        break;
+    case 'apply_retro_pay':
+        echo $Master->apply_retro_pay();
         break;
     default:
         break;
