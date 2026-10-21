@@ -22,21 +22,34 @@
   }
     window.uni_modal = function($title = '' , $url='',$size=""){
         start_loader()
+        var targetUrl = $url;
+        if(typeof _base_url_ !== 'undefined' && !targetUrl.startsWith('http://') && !targetUrl.startsWith('https://') && !targetUrl.startsWith('/')){
+            targetUrl = _base_url_ + 'admin/' + targetUrl;
+        }
         $.ajax({
-            url:$url,
+            url: targetUrl,
             error:err=>{
-                console.log()
-                alert("An error occured")
+                console.log(err)
+                alert("An error occurred loading the modal form.")
+                end_loader()
             },
             success:function(resp){
                 if(resp){
                     $('#uni_modal .modal-title').html($title)
                     $('#uni_modal .modal-body').html(resp)
-                    if($size != ''){
-                        $('#uni_modal .modal-dialog').addClass($size+'  modal-dialog-centered')
-                    }else{
-                        $('#uni_modal .modal-dialog').removeAttr("class").addClass("modal-dialog modal-md modal-dialog-centered")
+                    var dialogClass = "modal-dialog modal-dialog-centered ";
+                    if($size === 'mid-large' || $size === 'large' || $size === 'modal-lg'){
+                        dialogClass += "modal-lg";
+                    } else if($size === 'extra-large' || $size === 'modal-xl'){
+                        dialogClass += "modal-xl";
+                    } else if($size === 'small' || $size === 'modal-sm'){
+                        dialogClass += "modal-sm";
+                    } else if($size != ''){
+                        dialogClass += $size;
+                    } else {
+                        dialogClass += "modal-md";
                     }
+                    $('#uni_modal .modal-dialog').removeAttr("class").addClass(dialogClass);
                     $('#uni_modal').modal({
                       show:true,
                       backdrop:'static',
