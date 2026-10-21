@@ -20,8 +20,8 @@ $transfers = $conn->query("
     <div class="card-header d-flex align-items-center justify-content-between">
         <h3 class="card-title font-weight-bold"><i class="fas fa-warehouse text-primary mr-2"></i> Multi-Warehouse & Stock Transfers</h3>
         <div class="card-tools">
-            <button type="button" class="btn btn-sm btn-outline-primary btn-flat mr-2" id="btn_new_warehouse"><i class="fas fa-plus mr-1"></i> Add Warehouse</button>
-            <button type="button" class="btn btn-sm btn-primary btn-flat" id="btn_transfer_stock"><i class="fas fa-exchange-alt mr-1"></i> Transfer Stock</button>
+            <button type="button" class="btn btn-sm btn-outline-primary btn-flat mr-2" id="btn_new_warehouse" onclick="uni_modal('Add Warehouse Location', 'warehouses/manage_warehouse.php', 'mid-large')"><i class="fas fa-plus mr-1"></i> Add Warehouse</button>
+            <button type="button" class="btn btn-sm btn-primary btn-flat" id="btn_transfer_stock" onclick="uni_modal('Inter-Warehouse Stock Transfer', 'warehouses/transfer.php', 'mid-large')"><i class="fas fa-exchange-alt mr-1"></i> Transfer Stock</button>
         </div>
     </div>
     <div class="card-body">
@@ -84,16 +84,3 @@ $transfers = $conn->query("
         </div>
     </div>
 </div>
-
-<script>
-$(document).ready(function(){
-    $(document).on('click', '#btn_new_warehouse', function(e){
-        e.preventDefault();
-        uni_modal("Add Warehouse Location", "warehouses/manage_warehouse.php", "mid-large");
-    });
-    $(document).on('click', '#btn_transfer_stock', function(e){
-        e.preventDefault();
-        uni_modal("Inter-Warehouse Stock Transfer", "warehouses/transfer.php", "mid-large");
-    });
-});
-</script>

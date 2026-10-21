@@ -1,13 +1,13 @@
 function start_loader() {
-    $('body').append('<div id="preloader"><div class="loader-holder"><div></div><div></div><div></div><div></div>')
+    $('body').append('<div id="preloader"><div class="loader-holder"><div></div><div></div><div></div><div></div>');
 }
 
 function end_loader() {
     $('#preloader').fadeOut('fast', function() {
         $('#preloader').remove();
-    })
+    });
 }
-// function 
+
 window.alert_toast = function($msg = 'TEST', $bg = 'success', $pos = '') {
     var Toast = Swal.mixin({
         toast: true,
@@ -18,8 +18,80 @@ window.alert_toast = function($msg = 'TEST', $bg = 'success', $pos = '') {
     Toast.fire({
         icon: $bg,
         title: $msg
-    })
-}
+    });
+};
+
+window.viewer_modal = function($src = ''){
+    start_loader();
+    var t = $src.split('.');
+    t = t[1];
+    if(t =='mp4'){
+      var view = $("<video src='"+$src+"' controls autoplay></video>");
+    }else{
+      var view = $("<img src='"+$src+"' />");
+    }
+    $('#viewer_modal .modal-content video,#viewer_modal .modal-content img').remove();
+    $('#viewer_modal .modal-content').append(view);
+    $('#viewer_modal').modal({
+            show:true,
+            backdrop:'static',
+            keyboard:false,
+            focus:true
+          });
+    end_loader();
+};
+
+window.uni_modal = function($title = '' , $url='',$size=""){
+    start_loader();
+    var targetUrl = $url;
+    if(typeof _base_url_ !== 'undefined' && !targetUrl.startsWith('http://') && !targetUrl.startsWith('https://') && !targetUrl.startsWith('/')){
+        if(!targetUrl.startsWith('admin/')){
+            targetUrl = _base_url_ + 'admin/' + targetUrl;
+        } else {
+            targetUrl = _base_url_ + targetUrl;
+        }
+    }
+    $.ajax({
+        url: targetUrl,
+        error: err => {
+            console.log(err);
+            alert("An error occurred loading the modal form.");
+            end_loader();
+        },
+        success: function(resp){
+            if(resp){
+                $('#uni_modal .modal-title').html($title);
+                $('#uni_modal .modal-body').html(resp);
+                var dialogClass = "modal-dialog modal-dialog-centered ";
+                if($size === 'mid-large' || $size === 'large' || $size === 'modal-lg'){
+                    dialogClass += "modal-lg";
+                } else if($size === 'extra-large' || $size === 'modal-xl'){
+                    dialogClass += "modal-xl";
+                } else if($size === 'small' || $size === 'modal-sm'){
+                    dialogClass += "modal-sm";
+                } else if($size != ''){
+                    dialogClass += $size;
+                } else {
+                    dialogClass += "modal-md";
+                }
+                $('#uni_modal .modal-dialog').removeAttr("class").addClass(dialogClass);
+                $('#uni_modal').modal({
+                  show: true,
+                  backdrop: 'static',
+                  keyboard: false,
+                  focus: true
+                });
+                end_loader();
+            }
+        }
+    });
+};
+
+window._conf = function($msg='',$func='',$params = []){
+   $('#confirm_modal #confirm').attr('onclick',$func+"("+$params.join(',')+")");
+   $('#confirm_modal .modal-body').html($msg);
+   $('#confirm_modal').modal('show');
+};
 
 $(document).ready(function() {
     // Login

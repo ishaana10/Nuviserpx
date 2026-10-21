@@ -22,7 +22,7 @@ $qry = $conn->query("
     <div class="card-header d-flex align-items-center justify-content-between">
         <h3 class="card-title font-weight-bold"><i class="fas fa-headset text-primary mr-2"></i> Helpdesk & Support Tickets</h3>
         <div class="card-tools">
-            <button type="button" class="btn btn-sm btn-primary btn-flat" id="btn_new_ticket"><i class="fas fa-plus mr-1"></i> New Ticket</button>
+            <button type="button" class="btn btn-sm btn-primary btn-flat" id="btn_new_ticket" onclick="uni_modal('Create Support Ticket', 'tickets/manage_ticket.php', 'mid-large')"><i class="fas fa-plus mr-1"></i> New Ticket</button>
         </div>
     </div>
     <div class="card-body">
@@ -109,9 +109,5 @@ $(document).ready(function(){
     }
     $('#tickets-table').dataTable();
 
-    $(document).on('click', '#btn_new_ticket', function(e){
-        e.preventDefault();
-        uni_modal("Create Support Ticket", "tickets/manage_ticket.php", "mid-large");
-    });
 });
 </script>
