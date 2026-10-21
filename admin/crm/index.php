@@ -104,7 +104,7 @@ while($row = $qry->fetch_assoc()){
     <div class="card-header d-flex align-items-center justify-content-between">
         <h3 class="card-title font-weight-bold"><i class="fas fa-handshake text-primary mr-2"></i> CRM Opportunities & Sales Pipeline</h3>
         <div class="card-tools">
-            <button type="button" class="btn btn-sm btn-primary btn-flat" id="btn_new_opportunity"><i class="fas fa-plus mr-1"></i> New Opportunity</button>
+            <button type="button" class="btn btn-sm btn-primary btn-flat" id="btn_new_opportunity" onclick="uni_modal('New Opportunity Deal', 'crm/manage_opportunity.php', 'mid-large')"><i class="fas fa-plus mr-1"></i> New Opportunity</button>
         </div>
     </div>
     <div class="card-body">

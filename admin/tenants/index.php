@@ -7,7 +7,7 @@
 	<div class="card-header">
 		<h3 class="card-title">List of Tenants / Companies</h3>
 		<div class="card-tools">
-			<a href="javascript:void(0)" id="create_new" class="btn btn-flat btn-primary"><span class="fas fa-plus"></span> Add New Tenant</a>
+			<a href="javascript:void(0)" id="create_new" onclick="uni_modal('<i class=\'fa fa-plus\'></i> Add New Tenant', 'tenants/manage_tenant.php')" class="btn btn-flat btn-primary"><span class="fas fa-plus"></span> Add New Tenant</a>
 		</div>
 	</div>
 	<div class="card-body">
@@ -61,7 +61,7 @@
 				                    <span class="sr-only">Toggle Dropdown</span>
 				                  </button>
 				                  <div class="dropdown-menu" role="menu">
-				                    <a class="dropdown-item edit_data" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>"><span class="fa fa-edit text-primary"></span> Edit</a>
+				                    <a class="dropdown-item edit_data" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>" onclick="uni_modal('<i class=\'fa fa-edit\'></i> Edit Tenant', 'tenants/manage_tenant.php?id=<?php echo $row['id'] ?>')"><span class="fa fa-edit text-primary"></span> Edit</a>
 				                    <div class="dropdown-divider"></div>
 				                    <a class="dropdown-item delete_data" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>"><span class="fa fa-trash text-danger"></span> Delete</a>
 				                  </div>
@@ -90,15 +90,6 @@
 			_conf("Are you sure to delete this Tenant? Data associated with this tenant will be inaccessible.","delete_tenant",[$(this).attr('data-id')])
 		});
 
-		$(document).on('click', '#create_new', function(e){
-			e.preventDefault();
-			uni_modal("<i class='fa fa-plus'></i> Add New Tenant","tenants/manage_tenant.php")
-		});
-
-		$(document).on('click', '.edit_data', function(e){
-			e.preventDefault();
-			uni_modal("<i class='fa fa-edit'></i> Edit Tenant","tenants/manage_tenant.php?id="+$(this).attr('data-id'))
-		});
 	})
 	function delete_tenant($id){
 		start_loader();

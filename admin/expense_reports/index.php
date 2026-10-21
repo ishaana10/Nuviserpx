@@ -21,7 +21,7 @@ $qry = $conn->query("
     <div class="card-header d-flex align-items-center justify-content-between">
         <h3 class="card-title font-weight-bold"><i class="fas fa-file-invoice-dollar text-primary mr-2"></i> Employee Expense Claims</h3>
         <div class="card-tools">
-            <button type="button" class="btn btn-sm btn-primary btn-flat" id="btn_new_expense"><i class="fas fa-plus mr-1"></i> Submit Expense Claim</button>
+            <button type="button" class="btn btn-sm btn-primary btn-flat" id="btn_new_expense" onclick="uni_modal('Submit Expense Claim', 'expense_reports/manage_claim.php', 'mid-large')"><i class="fas fa-plus mr-1"></i> Submit Expense Claim</button>
         </div>
     </div>
     <div class="card-body">
@@ -107,10 +107,6 @@ $(document).ready(function(){
     }
     $('#expenses-table').dataTable();
 
-    $(document).on('click', '#btn_new_expense', function(e){
-        e.preventDefault();
-        uni_modal("Submit Expense Claim", "expense_reports/manage_claim.php", "mid-large");
-    });
 
     $(document).on('click', '.approve_claim', function(e){
         e.preventDefault();

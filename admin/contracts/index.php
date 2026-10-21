@@ -33,7 +33,7 @@ while($row = $qry->fetch_assoc()){
     <div class="card-header d-flex align-items-center justify-content-between">
         <h3 class="card-title font-weight-bold"><i class="fas fa-file-contract text-primary mr-2"></i> Contracts & Subscriptions</h3>
         <div class="card-tools">
-            <button type="button" class="btn btn-sm btn-primary btn-flat" id="btn_new_contract"><i class="fas fa-plus mr-1"></i> New Contract</button>
+            <button type="button" class="btn btn-sm btn-primary btn-flat" id="btn_new_contract" onclick="uni_modal('New Service Contract', 'contracts/manage_contract.php', 'mid-large')"><i class="fas fa-plus mr-1"></i> New Contract</button>
         </div>
     </div>
     <div class="card-body">
@@ -96,7 +96,7 @@ while($row = $qry->fetch_assoc()){
                             </span>
                         </td>
                         <td class="text-center align-middle">
-                            <button type="button" class="btn btn-xs btn-outline-primary btn-flat edit_contract" data-id="<?= $row['id'] ?>"><i class="fas fa-edit mr-1"></i> Edit</button>
+                            <button type="button" class="btn btn-xs btn-outline-primary btn-flat edit_contract" data-id="<?= $row['id'] ?>" onclick="uni_modal('Edit Contract Details', 'contracts/manage_contract.php?id=<?= $row['id'] ?>', 'mid-large')"><i class="fas fa-edit mr-1"></i> Edit</button>
                         </td>
                     </tr>
                     <?php endforeach; ?>
@@ -118,15 +118,5 @@ $(document).ready(function(){
     }
     $('#contracts-table').dataTable();
 
-    $(document).on('click', '#btn_new_contract', function(e){
-        e.preventDefault();
-        uni_modal("New Service Contract", "contracts/manage_contract.php", "mid-large");
-    });
-
-    $(document).on('click', '.edit_contract', function(e){
-        e.preventDefault();
-        var id = $(this).data('id');
-        uni_modal("Edit Contract Details", "contracts/manage_contract.php?id=" + id, "mid-large");
-    });
 });
 </script>
