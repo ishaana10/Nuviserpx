@@ -123,9 +123,10 @@ class Master extends DBConnection
         }
 
         // Check unique asset number within tenant
+        $target_id = !empty($id) ? intval($id) : 0;
         $chk_sql = "SELECT id FROM `fixed_assets` WHERE `tenant_id` = '{$tenant_id}' AND `asset_number` = '{$this->conn->real_escape_string($asset_number)}' ";
-        if (!empty($id)) {
-            $chk_sql .= " AND id != '{$id}' ";
+        if ($target_id > 0) {
+            $chk_sql .= " AND id != '{$target_id}' ";
         }
         $check = $this->conn->query($chk_sql);
         if ($check && $check->num_rows > 0) {
@@ -168,12 +169,12 @@ class Master extends DBConnection
             }
         }
 
-        if (empty($id)) {
+        if ($target_id <= 0) {
             $save = $this->conn->query("INSERT INTO `fixed_assets` SET {$data}");
             $asset_id = $this->conn->insert_id;
         } else {
-            $save = $this->conn->query("UPDATE `fixed_assets` SET {$data} WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'");
-            $asset_id = $id;
+            $save = $this->conn->query("UPDATE `fixed_assets` SET {$data} WHERE id = '{$target_id}' AND tenant_id = '{$tenant_id}'");
+            $asset_id = $target_id;
         }
 
         if ($save) {
@@ -256,12 +257,13 @@ class Master extends DBConnection
         $data .= ", `notes` = '{$this->conn->real_escape_string($notes ?? '')}' ";
         $data .= ", `created_by` = '{$user_id}' ";
 
-        if (empty($id)) {
+        $target_id = !empty($id) ? intval($id) : 0;
+        if ($target_id <= 0) {
             $save = $this->conn->query("INSERT INTO `crm_opportunities` SET {$data}");
             $opp_id = $this->conn->insert_id;
         } else {
-            $save = $this->conn->query("UPDATE `crm_opportunities` SET {$data} WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'");
-            $opp_id = $id;
+            $save = $this->conn->query("UPDATE `crm_opportunities` SET {$data} WHERE id = '{$target_id}' AND tenant_id = '{$tenant_id}'");
+            $opp_id = $target_id;
         }
 
         if ($save) {
@@ -325,7 +327,8 @@ class Master extends DBConnection
             return json_encode(['status' => 'failed', 'msg' => 'Ticket Subject is required.']);
         }
 
-        if (empty($id)) {
+        $target_id = !empty($id) ? intval($id) : 0;
+        if ($target_id <= 0) {
             $code = 'TCK-' . sprintf('%05d', rand(100, 99999));
             $data = " `tenant_id` = '{$tenant_id}' ";
             $data .= ", `ticket_code` = '{$code}' ";
@@ -353,9 +356,9 @@ class Master extends DBConnection
             $data .= ", `status` = '{$this->conn->real_escape_string($status ?? 'new')}' ";
             $data .= ", `assigned_to` = " . (!empty($assigned_to) ? intval($assigned_to) : "NULL") . " ";
 
-            $save = $this->conn->query("UPDATE `tickets` SET {$data} WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'");
+            $save = $this->conn->query("UPDATE `tickets` SET {$data} WHERE id = '{$target_id}' AND tenant_id = '{$tenant_id}'");
             if ($save) {
-                return json_encode(['status' => 'success', 'id' => $id, 'msg' => 'Ticket updated successfully.']);
+                return json_encode(['status' => 'success', 'id' => $target_id, 'msg' => 'Ticket updated successfully.']);
             }
         }
         return json_encode(['status' => 'failed', 'msg' => 'Failed to save ticket. ' . $this->conn->error]);
@@ -395,7 +398,8 @@ class Master extends DBConnection
             return json_encode(['status' => 'failed', 'msg' => 'Title, Customer, and Amount are required.']);
         }
 
-        if (empty($id)) {
+        $target_id = !empty($id) ? intval($id) : 0;
+        if ($target_id <= 0) {
             $c_no = 'CTR-' . sprintf('%05d', rand(100, 99999));
             $data = " `tenant_id` = '{$tenant_id}' ";
             $data .= ", `contract_no` = '{$c_no}' ";
@@ -424,9 +428,9 @@ class Master extends DBConnection
             $data .= ", `status` = '{$this->conn->real_escape_string($status ?? 'active')}' ";
             $data .= ", `notes` = '{$this->conn->real_escape_string($notes ?? '')}' ";
 
-            $save = $this->conn->query("UPDATE `contracts` SET {$data} WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'");
+            $save = $this->conn->query("UPDATE `contracts` SET {$data} WHERE id = '{$target_id}' AND tenant_id = '{$tenant_id}'");
             if ($save) {
-                return json_encode(['status' => 'success', 'id' => $id, 'msg' => 'Contract updated successfully.']);
+                return json_encode(['status' => 'success', 'id' => $target_id, 'msg' => 'Contract updated successfully.']);
             }
         }
         return json_encode(['status' => 'failed', 'msg' => 'Failed to save contract. ' . $this->conn->error]);
@@ -540,6 +544,65 @@ class Master extends DBConnection
             return json_encode(['status' => 'success', 'msg' => 'Expense claim approved successfully.']);
         }
         return json_encode(['status' => 'failed', 'msg' => 'Failed to approve expense claim.']);
+    }
+
+    public function save_module_settings()
+    {
+        $modules = ['mod_accounting', 'mod_fixed_assets', 'mod_sales_crm', 'mod_tickets', 'mod_contracts', 'mod_warehouses', 'mod_expense_reports', 'mod_payroll'];
+        foreach ($modules as $m) {
+            $val = isset($_POST[$m]) ? '1' : '0';
+            $check = $this->conn->query("SELECT id FROM `system_info` WHERE `meta_field` = '{$m}'");
+            if ($check && $check->num_rows > 0) {
+                $this->conn->query("UPDATE `system_info` SET `meta_value` = '{$val}' WHERE `meta_field` = '{$m}'");
+            } else {
+                $this->conn->query("INSERT INTO `system_info` (`meta_field`, `meta_value`) VALUES ('{$m}', '{$val}')");
+            }
+        }
+        $this->settings->log_audit("Updated Module Configuration", "System Settings", "Module toggles updated.");
+        return json_encode(['status' => 'success', 'msg' => 'Module configuration updated successfully.']);
+    }
+
+    /* Dolibarr Inspired Custom Extrafields Methods */
+    public function save_extrafield()
+    {
+        $tenant_id = $this->settings->active_tenant_id();
+        extract($_POST);
+
+        if (empty($element_type) || empty($field_code) || empty($field_label)) {
+            return json_encode(['status' => 'failed', 'msg' => 'Target entity, field code, and field label are required.']);
+        }
+
+        $elem = $this->conn->real_escape_string($element_type);
+        $f_code = $this->conn->real_escape_string(preg_replace('/[^a-z0-9_]/', '', strtolower($field_code)));
+        $f_label = $this->conn->real_escape_string($field_label);
+        $f_type = $this->conn->real_escape_string($field_type ?? 'text');
+        $f_opts = $this->conn->real_escape_string($field_options ?? '');
+        $req = isset($is_required) ? 1 : 0;
+
+        $save = $this->conn->query("
+            INSERT INTO `custom_extrafields`
+            (`tenant_id`, `element_type`, `field_code`, `field_label`, `field_type`, `field_options`, `is_required`, `status`)
+            VALUES ('{$tenant_id}', '{$elem}', '{$f_code}', '{$f_label}', '{$f_type}', '{$f_opts}', '{$req}', 1)
+        ");
+
+        if ($save) {
+            $this->settings->log_audit("Added Custom Extrafield", "Custom Fields", "Target: {$element_type}, Code: {$field_code}");
+            return json_encode(['status' => 'success', 'id' => $this->conn->insert_id, 'msg' => 'Custom extrafield created successfully.']);
+        }
+        return json_encode(['status' => 'failed', 'msg' => 'Failed to save custom extrafield. ' . $this->conn->error]);
+    }
+
+    public function delete_extrafield()
+    {
+        $tenant_id = $this->settings->active_tenant_id();
+        $id = intval($_POST['id'] ?? 0);
+
+        $del = $this->conn->query("DELETE FROM `custom_extrafields` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'");
+        if ($del) {
+            $this->settings->log_audit("Deleted Custom Extrafield", "Custom Fields", "ID #{$id}");
+            return json_encode(['status' => 'success', 'msg' => 'Custom extrafield deleted.']);
+        }
+        return json_encode(['status' => 'failed', 'msg' => 'Failed to delete custom extrafield.']);
     }
 
     /* Journal Actions */
@@ -1381,6 +1444,15 @@ switch ($action) {
         break;
     case 'approve_expense_claim':
         echo $Master->approve_expense_claim();
+        break;
+    case 'save_module_settings':
+        echo $Master->save_module_settings();
+        break;
+    case 'save_extrafield':
+        echo $Master->save_extrafield();
+        break;
+    case 'delete_extrafield':
+        echo $Master->delete_extrafield();
         break;
     case 'delete_accounts_bulk':
         echo $Master->delete_accounts_bulk();

@@ -64,6 +64,7 @@ class DBConnection{
                 $this->check_journal_options_migrations();
                 $this->check_dolibarr_crm_migrations();
                 $this->check_dolibarr_extended_migrations();
+                $this->check_extrafields_migrations();
             }
 
             // Run versioned migrations
@@ -331,6 +332,41 @@ class DBConnection{
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
 
         @$this->conn->query($sql);
+    }
+
+    public function check_extrafields_migrations(){
+        if (!$this->conn) return;
+
+        $sql1 = "CREATE TABLE IF NOT EXISTS `custom_extrafields` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `tenant_id` int(30) NOT NULL DEFAULT 1,
+          `element_type` varchar(100) NOT NULL,
+          `field_code` varchar(100) NOT NULL,
+          `field_label` varchar(200) NOT NULL,
+          `field_type` enum('text','number','date','select') NOT NULL DEFAULT 'text',
+          `field_options` text DEFAULT NULL,
+          `is_required` tinyint(1) NOT NULL DEFAULT 0,
+          `status` tinyint(1) NOT NULL DEFAULT 1,
+          `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+          PRIMARY KEY (`id`),
+          KEY `tenant_id` (`tenant_id`),
+          UNIQUE KEY `extra_tenant_code` (`tenant_id`, `element_type`, `field_code`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+
+        $sql2 = "CREATE TABLE IF NOT EXISTS `custom_extrafield_values` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `tenant_id` int(30) NOT NULL DEFAULT 1,
+          `element_type` varchar(100) NOT NULL,
+          `element_id` int(30) NOT NULL,
+          `field_code` varchar(100) NOT NULL,
+          `field_value` text DEFAULT NULL,
+          PRIMARY KEY (`id`),
+          KEY `tenant_id` (`tenant_id`),
+          KEY `elem_idx` (`element_type`, `element_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+
+        @$this->conn->query($sql1);
+        @$this->conn->query($sql2);
     }
 
     public function check_dolibarr_extended_migrations(){

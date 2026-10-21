@@ -427,6 +427,24 @@ if($t_qry && $t_qry->num_rows > 0){
                                         </a>
                                     </li>
                                     <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=user/permissions" class="nav-link nav-user_permissions tree-item">
+                                            <i class="nav-icon fas fa-table"></i>
+                                            <p>Permissions Matrix</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=system_info/modules" class="nav-link nav-system_info_modules tree-item">
+                                            <i class="nav-icon fas fa-th-large"></i>
+                                            <p>Modules Manager</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=settings/extrafields" class="nav-link nav-settings_extrafields tree-item">
+                                            <i class="nav-icon fas fa-sliders-h"></i>
+                                            <p>Custom Extrafields</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=tenants" class="nav-link nav-tenants tree-item">
                                             <i class="nav-icon fas fa-building"></i>
                                             <p>Tenants / Companies</p>
