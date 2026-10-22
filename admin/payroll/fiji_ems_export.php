@@ -12,21 +12,51 @@ if(isset($_GET['export_csv']) && $_GET['export_csv'] == 1){
     ");
 
     header('Content-Type: text/csv');
-    header('Content-Disposition: attachment; filename="frcs_ems_export_' . strtolower(str_replace(' ', '_', $month)) . '.csv"');
+    header('Content-Disposition: attachment; filename="frcs_tpos_ems_export_' . strtolower(str_replace(' ', '_', $month)) . '.csv"');
 
     $output = fopen('php://output', 'w');
-    fputcsv($output, ['TIN_NUMBER', 'EMPLOYEE_NAME', 'TAX_CODE', 'RESIDENT_STATUS', 'GROSS_PAY', 'PAYE_TAX', 'SRT_TAX', 'NET_PAY']);
+    fputcsv($output, [
+        'EMPLOYER_TIN',
+        'EMPLOYER_NAME',
+        'BRANCH_NUMBER',
+        'RETURN_PERIOD',
+        'EMPLOYEE_TIN',
+        'EMPLOYEE_FULL_NAME',
+        'TAX_CODE',
+        'RESIDENTIAL_STATUS',
+        'GROSS_EMPLOYMENT_INCOME',
+        'PAYE_FINAL_DEDUCTED',
+        'SRT_DEDUCTED',
+        'LUMP_SUM_PAYMENTS',
+        'REDUNDANCY_PAYMENTS',
+        'OTHER_PAYE',
+        'TOTAL_TAX_REMITTED'
+    ]);
+
+    $empTin = $_settings->info('company_tin') ?: ($_settings->info('vms_tin') ?: '50-00000-0-0');
+    $empName = $_settings->info('name') ?: 'Nuvis ERPX';
 
     while($row = $qry->fetch_assoc()){
+        $gross = floatval($row['gross_salary']);
+        $paye = floatval($row['paye_tax']);
+        $srt = floatval($row['srt_tax']);
+
         fputcsv($output, [
+            $empTin,
+            $empName,
+            '01',
+            $row['pay_date'] ?: date('Y-m-d'),
             $row['tin'] ?: 'N/A',
             $row['firstname'] . ' ' . $row['lastname'],
             $row['tax_code'] ?: 'P',
             $row['is_resident'] == 1 ? 'Resident' : 'Non-Resident',
-            number_format($row['gross_salary'], 2, '.', ''),
-            number_format($row['paye_tax'], 2, '.', ''),
-            number_format($row['srt_tax'], 2, '.', ''),
-            number_format($row['net_salary'], 2, '.', '')
+            number_format($gross, 2, '.', ''),
+            number_format($paye, 2, '.', ''),
+            number_format($srt, 2, '.', ''),
+            '0.00',
+            '0.00',
+            '0.00',
+            number_format($paye + $srt, 2, '.', '')
         ]);
     }
     fclose($output);

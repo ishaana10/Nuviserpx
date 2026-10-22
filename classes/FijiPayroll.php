@@ -1,6 +1,7 @@
 <?php
 /**
  * Fiji Payroll Engine for Nuvis ERPX
+ * Compliant with Income Tax Act 2015, FNPF Act 2011 (2026-2027 Budget), and ERA 2007
  * Nuvis Technologies (nuvistechnologies.com.fj)
  */
 
@@ -22,117 +23,99 @@ class FijiPayroll {
     }
 
     /**
-     * Calculate PAYE Tax and SRT (Social Responsibility Tax)
+     * 2026 Integrated Tax Bracket Function
      */
-    public static function calculate_paye($taxableIncome, $frequency = 'Monthly', $isResident = true) {
-        if ($taxableIncome <= 0) {
-            return [
-                'paye' => 0.0,
-                'basic_tax' => 0.0,
-                'srt' => 0.0,
-                'annual_equivalent' => 0.0,
-                'annual_tax' => 0.0
-            ];
-        }
+    public static function tax_lookup($income, $isResident = true, $taxCode = 'P') {
+        if ($income <= 0) return 0.0;
 
-        $periods = self::get_periods_per_year($frequency);
-        $annualEquivalent = $taxableIncome * $periods;
+        if ($taxCode === 'S') {
+            return round($income * 0.20, 2);
+        }
 
         if (!$isResident) {
-            $paye = round($taxableIncome * 0.20, 2);
-            return [
-                'paye' => $paye,
-                'basic_tax' => $paye,
-                'srt' => 0.0,
-                'annual_equivalent' => $annualEquivalent,
-                'annual_tax' => round($paye * $periods, 2)
-            ];
+            if ($income <= 30000) return round($income * 0.20, 2);
+            if ($income <= 50000) return round(6000 + ($income - 30000) * 0.20, 2);
+            if ($income <= 270000) return round(10000 + ($income - 50000) * 0.20, 2);
+            if ($income <= 300000) return round(54000 + ($income - 270000) * 0.33, 2);
+            if ($income <= 350000) return round(63900 + ($income - 300000) * 0.34, 2);
+            if ($income <= 400000) return round(80900 + ($income - 350000) * 0.35, 2);
+            if ($income <= 450000) return round(98400 + ($income - 400000) * 0.36, 2);
+            if ($income <= 500000) return round(116400 + ($income - 450000) * 0.37, 2);
+            if ($income <= 1000000) return round(134900 + ($income - 500000) * 0.38, 2);
+            return round(324900 + ($income - 1000000) * 0.39, 2);
         }
 
-        $annualBreakdown = self::calculate_annual_tax_breakdown($annualEquivalent);
-
-        $periodBasic = round($annualBreakdown['basic'] / $periods, 2);
-        $periodSrt = round($annualBreakdown['srt'] / $periods, 2);
-        $periodTax = round($annualBreakdown['total'] / $periods, 2);
-
-        return [
-            'paye' => $periodTax,
-            'basic_tax' => $periodBasic,
-            'srt' => $periodSrt,
-            'annual_equivalent' => $annualEquivalent,
-            'annual_tax' => $annualBreakdown['total']
-        ];
+        // Resident (Code P)
+        if ($income <= 30000) return 0.0;
+        if ($income <= 50000) return round(($income - 30000) * 0.18, 2);
+        if ($income <= 270000) return round(3600 + ($income - 50000) * 0.20, 2);
+        if ($income <= 300000) return round(47600 + ($income - 270000) * 0.33, 2);
+        if ($income <= 350000) return round(57500 + ($income - 300000) * 0.34, 2);
+        if ($income <= 400000) return round(74500 + ($income - 350000) * 0.35, 2);
+        if ($income <= 450000) return round(92000 + ($income - 400000) * 0.36, 2);
+        if ($income <= 500000) return round(110000 + ($income - 450000) * 0.37, 2);
+        if ($income <= 1000000) return round(128500 + ($income - 500000) * 0.38, 2);
+        return round(318500 + ($income - 1000000) * 0.39, 2);
     }
 
     /**
-     * Annual Tax Breakdown for Fiji Resident
+     * FRCS Regulation 6 Cumulative PAYE Calculation Formula
      */
-    public static function calculate_annual_tax_breakdown($income) {
-        if ($income <= 0) {
-            return ['basic' => 0.0, 'srt' => 0.0, 'total' => 0.0];
+    public static function calculate_reg6_paye($input = []) {
+        $P = self::get_periods_per_year($input['pay_frequency'] ?? 'Monthly');
+        $n = intval($input['pay_period_n'] ?? 1);
+        if ($n < 1) $n = 1;
+        if ($n > $P) $n = $P;
+
+        $gYtdPrior = floatval($input['g_ytd_prior'] ?? 0);
+        $tYtdPrior = floatval($input['t_ytd_prior'] ?? 0);
+
+        $W_n = floatval($input['regular_pay'] ?? 0);
+        $O_n = floatval($input['overtime_pay'] ?? 0);
+        $L_n = floatval($input['lump_sum_pay'] ?? 0);
+        $R_n = floatval($input['redundancy_pay'] ?? 0);
+
+        $isResident = isset($input['is_resident']) ? (bool)$input['is_resident'] : true;
+        $taxCode = $input['tax_code'] ?? 'P';
+
+        // 1. Regular & Overtime Income
+        $G_n = $W_n + $O_n;
+        $Y_est = $gYtdPrior + $G_n + ($W_n * ($P - $n));
+        $Y_base = $gYtdPrior + ($W_n * ($P - $n + 1));
+
+        $taxYbase = self::tax_lookup($Y_base, $isResident, $taxCode);
+        $tBase = max(0, ($taxYbase - $tYtdPrior) / ($P - $n + 1));
+
+        $taxYbaseOt = self::tax_lookup($Y_base + $O_n, $isResident, $taxCode);
+        $tOt = max(0, $taxYbaseOt - $taxYbase);
+
+        $tPeriod = round(max(0, $tBase + $tOt), 2);
+
+        // 2. Lump Sum Payments (Bonuses / Leave Encashment)
+        $tLump = 0.0;
+        if ($L_n > 0) {
+            $taxYest = self::tax_lookup($Y_est, $isResident, $taxCode);
+            $taxYestLump = self::tax_lookup($Y_est + $L_n, $isResident, $taxCode);
+            $tLump = round(max(0, $taxYestLump - $taxYest), 2);
         }
 
-        // Basic Income Tax
-        $basic = 0.0;
-        if ($income <= 30000) {
-            $basic = 0.0;
-        } elseif ($income <= 50000) {
-            $basic = ($income - 30000) * 0.18;
-        } elseif ($income <= 270000) {
-            $basic = 3600 + ($income - 50000) * 0.20;
-        } else {
-            $basic = 47600 + ($income - 270000) * 0.20;
+        // 3. Redundancy Payments ($15,000 tax free cap, 15% flat excess)
+        $tRedundancy = 0.0;
+        if ($R_n > 15000) {
+            $tRedundancy = round(($R_n - 15000) * 0.15, 2);
         }
 
-        // Social Responsibility Tax (SRT) for income above 270,000
-        $srt = 0.0;
-        if ($income > 270000) {
-            $srt = self::calculate_srt($income);
-        }
-
-        $total = round($basic + $srt, 2);
+        $totalPaye = round($tPeriod + $tLump + $tRedundancy, 2);
 
         return [
-            'basic' => round($basic, 2),
-            'srt' => round($srt, 2),
-            'total' => $total
+            'paye_normal' => $tPeriod,
+            'paye_base' => round($tBase, 2),
+            'paye_ot' => round($tOt, 2),
+            'paye_lump' => $tLump,
+            'paye_redundancy' => $tRedundancy,
+            'total_paye' => $totalPaye,
+            'y_est' => $Y_est
         ];
-    }
-
-    /**
-     * Progressive SRT calculation above FJD 270,000
-     */
-    protected static function calculate_srt($income) {
-        $srt = 0.0;
-        $remaining = $income - 270000;
-
-        $bands = [
-            [30000,  0.13], // 270k - 300k
-            [50000,  0.14], // 300k - 350k
-            [50000,  0.15], // 350k - 400k
-            [50000,  0.16], // 400k - 450k
-            [50000,  0.17], // 450k - 500k
-            [500000, 0.18], // 500k - 1m
-            [null,   0.19]  // 1m+
-        ];
-
-        foreach ($bands as $band) {
-            $size = $band[0];
-            $rate = $band[1];
-
-            if ($remaining <= 0) break;
-
-            if ($size === null) {
-                $srt += $remaining * $rate;
-                break;
-            }
-
-            $taxable = min($remaining, $size);
-            $srt += $taxable * $rate;
-            $remaining -= $taxable;
-        }
-
-        return $srt;
     }
 
     /**
@@ -140,263 +123,100 @@ class FijiPayroll {
      */
     public static function calculate($input = []) {
         $basic          = (float)($input['basic_salary'] ?? $input['basic'] ?? 0);
-        $overtime       = (float)($input['overtime'] ?? 0);
+        $ot15Hours      = (float)($input['overtime_1_5_hours'] ?? 0);
+        $ot20Hours      = (float)($input['overtime_2_0_hours'] ?? 0);
+        $hourlyRate     = (float)($input['hourly_rate'] ?? 0);
+
+        if ($hourlyRate <= 0 && $basic > 0) {
+            $weeklyHours = (float)($input['weekly_hours'] ?? 45);
+            $hourlyRate = round(($basic * self::get_periods_per_year($input['pay_frequency'] ?? 'Monthly')) / (52 * $weeklyHours), 4);
+        }
+
+        $ot15Amount     = round($ot15Hours * $hourlyRate * 1.5, 2);
+        $ot20Amount     = round($ot20Hours * $hourlyRate * 2.0, 2);
+        $overtime       = (float)($input['overtime'] ?? ($ot15Amount + $ot20Amount));
+
         $allowances     = (float)($input['allowances'] ?? 0);
         $otherEarnings  = (float)($input['other_earnings'] ?? 0);
+        $lumpSum        = (float)($input['lump_sum_payments'] ?? $input['lump_sum'] ?? 0);
+        $redundancy     = (float)($input['redundancy_payments'] ?? $input['redundancy'] ?? 0);
         $deductions     = (float)($input['deductions'] ?? 0);
+
+        $familyCarePay  = (float)($input['family_care_leave_pay'] ?? 0);
+        $paternityPay   = (float)($input['paternity_leave_pay'] ?? 0);
+
         $isResident     = isset($input['is_resident']) ? (bool)$input['is_resident'] : true;
         $frequency      = $input['pay_frequency'] ?? $input['frequency'] ?? 'Monthly';
+        $taxCode        = $input['tax_code'] ?? 'P';
 
-        $empFnpfRate    = (float)($input['employee_fnpf_rate'] ?? 0.08); // 8% default
-        $emprFnpfRate   = (float)($input['employer_fnpf_rate'] ?? 0.08); // 8% default
-        $enableWorkcare = isset($input['enable_workcare']) ? (bool)$input['enable_workcare'] : true;
-        $enableTraining = isset($input['enable_training']) ? (bool)$input['enable_training'] : false;
+        // 2026-2027 Relief Rates (8% Employee + 8% Employer)
+        $empFnpfRate    = (float)($input['employee_fnpf_rate'] ?? 0.08);
+        $emprFnpfRate   = (float)($input['employer_fnpf_rate'] ?? 0.08);
+        $emprFnpfVolRate= (float)($input['fnpf_employer_voluntary'] ?? 0.00);
 
-        $gross = round($basic + $overtime + $allowances + $otherEarnings, 2);
-
-        $fnpfBase = $gross; // FNPF eligible wage base
+        $gross = round($basic + $overtime + $allowances + $otherEarnings + $lumpSum + $redundancy, 2);
+        $fnpfBase = round($basic + $overtime + $allowances + $otherEarnings + $lumpSum, 2);
 
         $employeeFnpf = round($fnpfBase * $empFnpfRate, 2);
-        $employerFnpf = round($fnpfBase * $emprFnpfRate, 2);
+        $employerFnpfMandatory = round($fnpfBase * $emprFnpfRate, 2);
+        $employerFnpfVoluntaryExcess = round($fnpfBase * ($emprFnpfVolRate / 100), 2);
+        $employerFnpfTotal = $employerFnpfMandatory + $employerFnpfVoluntaryExcess;
 
-        // Taxable Income (Employee FNPF is tax deductible in Fiji)
-        $taxableIncome = max(0, $gross - $employeeFnpf);
+        $reg6Result = self::calculate_reg6_paye([
+            'pay_frequency' => $frequency,
+            'pay_period_n' => intval($input['pay_period_n'] ?? 1),
+            'g_ytd_prior' => floatval($input['g_ytd_prior'] ?? 0),
+            't_ytd_prior' => floatval($input['t_ytd_prior'] ?? 0),
+            'regular_pay' => $basic + $allowances,
+            'overtime_pay' => $overtime + $otherEarnings,
+            'lump_sum_pay' => $lumpSum,
+            'redundancy_pay' => $redundancy,
+            'is_resident' => $isResident,
+            'tax_code' => $taxCode
+        ]);
 
-        $payeResult = self::calculate_paye($taxableIncome, $frequency, $isResident);
-        $payeAmount = $payeResult['paye'];
-        $basicTax   = $payeResult['basic_tax'];
-        $srtTax     = $payeResult['srt'];
+        $payeAmount = $reg6Result['total_paye'];
 
-        $workcare = $enableWorkcare ? round($gross * 0.01, 2) : 0.0;
-        $training = $enableTraining ? round($gross * 0.01, 2) : 0.0;
+        $workcare = round($gross * 0.01, 2);
+        $fnuLevy = round($gross * 0.01, 2);
 
-        $netSalary   = round($gross - $employeeFnpf - $payeAmount - $deductions, 2);
-        $employerCost = round($gross + $employerFnpf + $workcare + $training, 2);
+        $netSalary = round($gross - $employeeFnpf - $payeAmount - $deductions, 2);
+        $employerCost = round($gross + $employerFnpfTotal + $workcare + $fnuLevy, 2);
+
+        // 150% Corporate Tax Rebate Tracker Sum
+        $rebate150Sum = round($familyCarePay + $paternityPay + $employerFnpfVoluntaryExcess, 2);
 
         return [
             'basic_salary'    => $basic,
             'overtime'        => $overtime,
+            'overtime_1_5'    => $ot15Amount,
+            'overtime_2_0'    => $ot20Amount,
             'allowances'      => $allowances,
             'other_earnings'  => $otherEarnings,
+            'lump_sum_payments'=> $lumpSum,
+            'redundancy_payments'=> $redundancy,
             'gross_salary'    => $gross,
             'fnpf_base'       => $fnpfBase,
             'employee_fnpf'   => $employeeFnpf,
-            'employer_fnpf'   => $employerFnpf,
-            'taxable_income'  => $taxableIncome,
+            'employer_fnpf'   => $employerFnpfTotal,
+            'fnpf_er_mandatory' => $employerFnpfMandatory,
+            'fnpf_er_voluntary_excess' => $employerFnpfVoluntaryExcess,
+            'taxable_income'  => $gross,
             'paye_tax'        => $payeAmount,
-            'basic_tax'       => $basicTax,
-            'srt_tax'         => $srtTax,
+            'paye_normal'     => $reg6Result['paye_normal'],
+            'paye_lump_sum'   => $reg6Result['paye_lump'],
+            'srt_tax'         => 0.00,
             'deductions'      => $deductions,
             'net_salary'      => $netSalary,
             'workcare_levy'   => $workcare,
-            'training_levy'   => $training,
+            'training_levy'   => $fnuLevy,
+            'fnu_levy_er'     => $fnuLevy,
+            'rebate_150_sum'  => $rebate150Sum,
             'employer_cost'   => $employerCost,
             'is_resident'     => $isResident,
+            'tax_code'        => $taxCode,
             'pay_frequency'   => $frequency
         ];
-    }
-
-    /**
-     * Generate CSV content for Bank Exports (BSP, ANZ, HFC, BRED, Generic)
-     */
-    public static function generate_bank_export($rows, $bankCode = 'bsp', $runRef = 'PAYROLL') {
-        $bankCode = strtolower($bankCode);
-        $csvRows = [];
-
-        switch ($bankCode) {
-            case 'anz':
-                $csvRows[] = ['Payment Date', 'Account Number', 'Account Name', 'Amount', 'Currency', 'Particulars', 'Analysis Code', 'Reference'];
-                foreach ($rows as $r) {
-                    $acc = preg_replace('/\D/', '', $r['bank_account'] ?? '');
-                    $name = substr(preg_replace('/[^A-Za-z0-9 \-]/', '', $r['emp_name'] ?? ''), 0, 50);
-                    $payDate = !empty($r['pay_date']) ? $r['pay_date'] : date('Y-m-d');
-                    $csvRows[] = [
-                        $payDate,
-                        $acc,
-                        $name,
-                        number_format($r['net_salary'], 2, '.', ''),
-                        'FJD',
-                        'Salary Payment',
-                        'SALARY',
-                        $runRef . '-' . ($r['employee_code'] ?? $r['id'])
-                    ];
-                }
-                break;
-
-            case 'hfc':
-                $csvRows[] = ['Account Number', 'Beneficiary Name', 'Amount', 'Narration', 'Reference', 'Value Date'];
-                foreach ($rows as $r) {
-                    $acc = preg_replace('/\D/', '', $r['bank_account'] ?? '');
-                    $name = substr(preg_replace('/[^A-Za-z0-9 \-]/', '', $r['emp_name'] ?? ''), 0, 40);
-                    $payDate = !empty($r['pay_date']) ? $r['pay_date'] : date('Y-m-d');
-                    $csvRows[] = [
-                        $acc,
-                        $name,
-                        number_format($r['net_salary'], 2, '.', ''),
-                        'SALARY ' . $runRef,
-                        $runRef . '-' . ($r['employee_code'] ?? $r['id']),
-                        $payDate
-                    ];
-                }
-                break;
-
-            case 'bred':
-                $csvRows[] = ['Account Number', 'Account Name', 'Amount', 'Currency', 'Particulars', 'Reference'];
-                foreach ($rows as $r) {
-                    $acc = preg_replace('/\D/', '', $r['bank_account'] ?? '');
-                    $name = substr(preg_replace('/[^A-Za-z0-9 \-]/', '', $r['emp_name'] ?? ''), 0, 40);
-                    $csvRows[] = [
-                        $acc,
-                        $name,
-                        number_format($r['net_salary'], 2, '.', ''),
-                        'FJD',
-                        'Salary',
-                        $runRef . '-' . ($r['employee_code'] ?? $r['id'])
-                    ];
-                }
-                break;
-
-            case 'generic':
-                $csvRows[] = ['Employee Name', 'Employee Code', 'Bank Account Number', 'Bank Code', 'Amount (FJD)', 'Particulars', 'Payroll Reference'];
-                foreach ($rows as $r) {
-                    $acc = preg_replace('/\D/', '', $r['bank_account'] ?? '');
-                    $csvRows[] = [
-                        $r['emp_name'] ?? '',
-                        $r['employee_code'] ?? '',
-                        $acc,
-                        strtoupper($r['bank_code'] ?? 'OTHER'),
-                        number_format($r['net_salary'], 2, '.', ''),
-                        'Salary ' . $runRef,
-                        $runRef
-                    ];
-                }
-                break;
-
-            case 'bsp':
-            default:
-                $csvRows[] = ['Account Number', 'Account Name', 'Amount', 'Particulars', 'Code', 'Reference'];
-                foreach ($rows as $r) {
-                    $acc = preg_replace('/\D/', '', $r['bank_account'] ?? '');
-                    $name = substr(preg_replace('/[^A-Za-z0-9 \-]/', '', $r['emp_name'] ?? ''), 0, 40);
-                    $csvRows[] = [
-                        $acc,
-                        $name,
-                        number_format($r['net_salary'], 2, '.', ''),
-                        'SALARY',
-                        'SAL',
-                        $runRef . '-' . ($r['employee_code'] ?? $r['id'])
-                    ];
-                }
-                break;
-        }
-
-        return self::to_csv($csvRows);
-    }
-
-    /**
-     * Generate FRCS TPOS PAYE Export CSV
-     */
-    public static function generate_frcs_tpos_export($rows, $employerTin = '', $runRef = 'PAYROLL') {
-        $csvRows = [];
-        $csvRows[] = [
-            'Employer TIN',
-            'Payroll Period Start',
-            'Payroll Period End',
-            'Pay Date',
-            'Employee TIN',
-            'Employee Name',
-            'Tax Code',
-            'Resident (Y/N)',
-            'Gross Earnings',
-            'FNPF Deducted (Employee)',
-            'Taxable Income',
-            'PAYE Deducted',
-            'Other Deductions',
-            'Net Pay',
-            'Employer FNPF',
-            'Employee Number',
-            'FNPF Number'
-        ];
-
-        foreach ($rows as $r) {
-            $csvRows[] = [
-                $employerTin,
-                $r['period_start'] ?? '',
-                $r['period_end'] ?? '',
-                $r['pay_date'] ?? date('Y-m-d'),
-                $r['tin'] ?? '',
-                $r['emp_name'] ?? '',
-                $r['tax_code'] ?? 'P',
-                (!isset($r['is_resident']) || $r['is_resident']) ? 'Y' : 'N',
-                number_format($r['gross_salary'] ?? 0, 2, '.', ''),
-                number_format($r['employee_fnpf'] ?? 0, 2, '.', ''),
-                number_format($r['taxable_income'] ?? 0, 2, '.', ''),
-                number_format($r['paye_tax'] ?? 0, 2, '.', ''),
-                number_format($r['deductions'] ?? 0, 2, '.', ''),
-                number_format($r['net_salary'] ?? 0, 2, '.', ''),
-                number_format($r['employer_fnpf'] ?? 0, 2, '.', ''),
-                $r['employee_code'] ?? '',
-                $r['fnpf_no'] ?? ''
-            ];
-        }
-
-        return self::to_csv($csvRows);
-    }
-
-    /**
-     * Generate FNPF Schedule Export CSV
-     */
-    public static function generate_fnpf_schedule_export($rows, $employerFnpfRef = '', $runRef = 'PAYROLL') {
-        $csvRows = [];
-        $csvRows[] = [
-            'Employer FNPF Ref',
-            'Salary Period',
-            'Employee Code',
-            'Employee Name',
-            'FNPF Number',
-            'TIN',
-            'Gross Wages',
-            'FNPF Wage Base',
-            'Employee Contribution (8%)',
-            'Employer Contribution (8%)',
-            'Total FNPF Contribution (16%)'
-        ];
-
-        foreach ($rows as $r) {
-            $empFnpf = (float)($r['employee_fnpf'] ?? 0);
-            $emprFnpf = (float)($r['employer_fnpf'] ?? 0);
-            $totalFnpf = $empFnpf + $emprFnpf;
-
-            $csvRows[] = [
-                $employerFnpfRef,
-                $r['salary_month'] ?? '',
-                $r['employee_code'] ?? '',
-                $r['emp_name'] ?? '',
-                $r['fnpf_no'] ?? '',
-                $r['tin'] ?? '',
-                number_format($r['gross_salary'] ?? 0, 2, '.', ''),
-                number_format($r['fnpf_base'] ?? 0, 2, '.', ''),
-                number_format($empFnpf, 2, '.', ''),
-                number_format($emprFnpf, 2, '.', ''),
-                number_format($totalFnpf, 2, '.', '')
-            ];
-        }
-
-        return self::to_csv($csvRows);
-    }
-
-    /**
-     * Helper to output CSV string
-     */
-    protected static function to_csv(array $rows) {
-        $fh = fopen('php://temp', 'r+');
-        foreach ($rows as $row) {
-            fputcsv($fh, $row);
-        }
-        rewind($fh);
-        $csv = stream_get_contents($fh);
-        fclose($fh);
-        return $csv;
     }
 }
 ?>

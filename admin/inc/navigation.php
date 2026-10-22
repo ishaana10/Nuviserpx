@@ -412,6 +412,18 @@ if($t_qry && $t_qry->num_rows > 0){
                                         </a>
                                     </li>
                                     <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=payroll/tax_rebate_report" class="nav-link nav-payroll_tax_rebate_report tree-item">
+                                            <i class="nav-icon fas fa-hand-holding-usd text-success"></i>
+                                            <p>150% Tax Rebate Report</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=payroll/sandbox" class="nav-link nav-payroll_sandbox tree-item">
+                                            <i class="nav-icon fas fa-calculator text-primary"></i>
+                                            <p>Payroll Test Sandbox</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=expense_reports" class="nav-link nav-expense_reports tree-item">
                                             <i class="nav-icon fas fa-receipt"></i>
                                             <p>Expense Claims</p>
