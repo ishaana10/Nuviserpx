@@ -305,6 +305,21 @@ class SystemSettings extends DBConnection{
 			return json_encode(['status' => 'failed', 'msg' => 'Failed to flush Redis cache or Redis is disconnected.']);
 		}
 	}
+
+	function log_audit($action, $module, $details = ''){
+		$tenant_id = $this->active_tenant_id();
+		$user_id = $this->userdata('id') ? intval($this->userdata('id')) : "NULL";
+		$ip = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
+
+		$action_esc = $this->conn->real_escape_string($action);
+		$module_esc = $this->conn->real_escape_string($module);
+		$details_esc = $this->conn->real_escape_string($details);
+		$ip_esc = $this->conn->real_escape_string($ip);
+
+		$sql = "INSERT INTO `audit_logs` (`tenant_id`, `user_id`, `action`, `module`, `details`, `ip_address`)
+		        VALUES ('{$tenant_id}', {$user_id}, '{$action_esc}', '{$module_esc}', '{$details_esc}', '{$ip_esc}')";
+		@$this->conn->query($sql);
+	}
 }
 $_settings = new SystemSettings();
 $_settings->load_system_info();

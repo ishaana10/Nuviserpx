@@ -1,7 +1,7 @@
 <?php
 $tenant_id = $_settings->active_tenant_id();
 
-$where = "WHERE al.tenant_id = '{$tenant_id}'";
+$where = "WHERE (al.tenant_id = '{$tenant_id}' OR al.tenant_id = 0 OR al.tenant_id IS NULL)";
 
 $module = isset($_GET['module']) ? $_GET['module'] : '';
 if(!empty($module) && $module != 'all'){

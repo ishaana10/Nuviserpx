@@ -5,7 +5,7 @@ $users_qry = $conn->query("
     SELECT u.*, r.name as role_name
     FROM `users` u
     LEFT JOIN `roles` r ON u.role_id = r.id
-    WHERE u.tenant_id = '{$tenant_id}'
+    WHERE (u.tenant_id = '{$tenant_id}' OR u.tenant_id = 1 OR u.tenant_id = 0 OR u.type = 1)
     ORDER BY u.last_login DESC
 ");
 ?>

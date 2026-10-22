@@ -5,7 +5,7 @@ $qry = $conn->query("
     SELECT al.*, u.username
     FROM `audit_logs` al
     LEFT JOIN `users` u ON al.user_id = u.id
-    WHERE al.tenant_id = '{$tenant_id}' AND (al.module = 'Authentication' OR al.action LIKE '%login%' OR al.action LIKE '%Logout%')
+    WHERE (al.tenant_id = '{$tenant_id}' OR al.tenant_id = 0 OR al.tenant_id IS NULL) AND (al.module = 'Authentication' OR al.action LIKE '%login%' OR al.action LIKE '%Logout%' OR al.action LIKE '%Auth%')
     ORDER BY al.id DESC
     LIMIT 200
 ");
