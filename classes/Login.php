@@ -48,13 +48,26 @@ class Login extends DBConnection {
 					}
 				}
 				$this->settings->set_userdata('login_type', 1);
+
+				// Update last_login timestamp
+				$this->conn->query("UPDATE `users` SET `last_login` = NOW() WHERE id = '{$res['id']}'");
+
+				// Record successful login in audit trail
+				$this->settings->log_audit("User Login", "Authentication", "User '{$res['username']}' logged in successfully.");
+
 				return json_encode(array('status'=>'success'));
 			}
+		}
+
+		if(!empty($username)){
+			$this->settings->log_audit("Failed Login Attempt", "Authentication", "Failed login attempt for username: " . htmlspecialchars($username));
 		}
 
 		return json_encode(array('status'=>'incorrect', 'error'=>$this->conn->error));
 	}
 	public function logout(){
+		$u_name = $this->settings->userdata('username') ?: 'User';
+		$this->settings->log_audit("User Logout", "Authentication", "User '{$u_name}' logged out.");
 		if($this->settings->sess_des()){
 			redirect('admin/login.php');
 		}
