@@ -69,6 +69,7 @@ class DBConnection{
                 $this->check_frappe_hrms_migrations();
                 $this->check_vms_v3_migrations();
                 $this->check_frcs_accreditation_migrations();
+                $this->check_fiji_2026_statutory_migrations();
             }
 
             // Run versioned migrations
@@ -78,6 +79,80 @@ class DBConnection{
             }
         }    
         
+    }
+
+    public function check_fiji_2026_statutory_migrations(){
+        if (!$this->conn) return;
+
+        // Employee List Statutory Columns
+        $emp_cols = array(
+            'birth_count_tracker' => "ALTER TABLE `employee_list` ADD COLUMN `birth_count_tracker` int(3) NOT NULL DEFAULT 0 AFTER `bank_account`",
+            'ytd_opening_gross' => "ALTER TABLE `employee_list` ADD COLUMN `ytd_opening_gross` decimal(12,2) NOT NULL DEFAULT 0.00 AFTER `birth_count_tracker`",
+            'ytd_opening_paye' => "ALTER TABLE `employee_list` ADD COLUMN `ytd_opening_paye` decimal(12,2) NOT NULL DEFAULT 0.00 AFTER `ytd_opening_gross`",
+            'fnpf_employer_voluntary' => "ALTER TABLE `employee_list` ADD COLUMN `fnpf_employer_voluntary` decimal(5,2) NOT NULL DEFAULT 0.00 AFTER `ytd_opening_paye`"
+        );
+
+        foreach ($emp_cols as $col => $sql) {
+            $res = @$this->conn->query("SHOW COLUMNS FROM `employee_list` LIKE '{$col}'");
+            if ($res && $res->num_rows == 0) {
+                @$this->conn->query($sql);
+            }
+        }
+
+        // Tax Brackets Table
+        $sql_brackets = "CREATE TABLE IF NOT EXISTS `tax_brackets` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `tenant_id` int(30) NOT NULL DEFAULT 1,
+          `residency_status` enum('RESIDENT','NON_RESIDENT') NOT NULL DEFAULT 'RESIDENT',
+          `band` int(3) NOT NULL,
+          `min_income` decimal(12,2) NOT NULL DEFAULT 0.00,
+          `max_income` decimal(12,2) NOT NULL DEFAULT 0.00,
+          `base_tax` decimal(12,2) NOT NULL DEFAULT 0.00,
+          `rate_percent` decimal(5,2) NOT NULL DEFAULT 0.00,
+          `status` tinyint(1) NOT NULL DEFAULT 1,
+          PRIMARY KEY (`id`),
+          KEY `tenant_id` (`tenant_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+
+        // Payroll Run Detailed Lines Table
+        $sql_lines = "CREATE TABLE IF NOT EXISTS `payroll_run_lines` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `tenant_id` int(30) NOT NULL DEFAULT 1,
+          `payroll_id` int(30) NOT NULL,
+          `employee_id` int(30) NOT NULL,
+          `pay_period_n` int(3) NOT NULL DEFAULT 1,
+          `normal_gross` decimal(12,2) NOT NULL DEFAULT 0.00,
+          `overtime_1_5_hours` decimal(10,2) NOT NULL DEFAULT 0.00,
+          `overtime_1_5_amount` decimal(12,2) NOT NULL DEFAULT 0.00,
+          `overtime_2_0_hours` decimal(10,2) NOT NULL DEFAULT 0.00,
+          `overtime_2_0_amount` decimal(12,2) NOT NULL DEFAULT 0.00,
+          `allowances_taxable` decimal(12,2) NOT NULL DEFAULT 0.00,
+          `allowances_nontaxable` decimal(12,2) NOT NULL DEFAULT 0.00,
+          `lump_sum_payments` decimal(12,2) NOT NULL DEFAULT 0.00,
+          `redundancy_payments` decimal(12,2) NOT NULL DEFAULT 0.00,
+          `annual_leave_pay` decimal(12,2) NOT NULL DEFAULT 0.00,
+          `sick_leave_pay` decimal(12,2) NOT NULL DEFAULT 0.00,
+          `bereavement_leave_pay` decimal(12,2) NOT NULL DEFAULT 0.00,
+          `family_care_leave_pay` decimal(12,2) NOT NULL DEFAULT 0.00,
+          `maternity_leave_pay` decimal(12,2) NOT NULL DEFAULT 0.00,
+          `paternity_leave_pay` decimal(12,2) NOT NULL DEFAULT 0.00,
+          `paye_normal` decimal(12,2) NOT NULL DEFAULT 0.00,
+          `paye_lump_sum` decimal(12,2) NOT NULL DEFAULT 0.00,
+          `fnpf_emp_mandatory` decimal(12,2) NOT NULL DEFAULT 0.00,
+          `fnpf_emp_voluntary` decimal(12,2) NOT NULL DEFAULT 0.00,
+          `fnpf_er_mandatory` decimal(12,2) NOT NULL DEFAULT 0.00,
+          `fnpf_er_voluntary_excess` decimal(12,2) NOT NULL DEFAULT 0.00,
+          `fnu_levy_er` decimal(12,2) NOT NULL DEFAULT 0.00,
+          `net_pay` decimal(12,2) NOT NULL DEFAULT 0.00,
+          `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+          PRIMARY KEY (`id`),
+          KEY `tenant_id` (`tenant_id`),
+          KEY `payroll_id` (`payroll_id`),
+          KEY `employee_id` (`employee_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+
+        @$this->conn->query($sql_brackets);
+        @$this->conn->query($sql_lines);
     }
 
     public function check_fiji_payroll_migrations(){
