@@ -12,6 +12,7 @@ class SystemSettings extends DBConnection{
 	}
 	function load_system_info(){
 		// if(!isset($_SESSION['system_info'])){
+			if(!$this->conn) return;
 			$sql = "SELECT * FROM system_info";
 			$qry = @$this->conn->query($sql);
 			if(!$qry){
@@ -27,6 +28,7 @@ class SystemSettings extends DBConnection{
 		// }
 	}
 	function update_system_info(){
+		if(!$this->conn) return true;
 		$sql = "SELECT * FROM system_info";
 		$qry = $this->conn->query($sql);
 			while($row = $qry->fetch_assoc()){

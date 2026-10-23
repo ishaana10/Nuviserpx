@@ -26,6 +26,10 @@ class DBConnection{
                 // If database does not exist or access failed, connect without database to create it
                 @$server_conn = new mysqli($this->host, $this->username, $this->password);
                 if ($server_conn->connect_error) {
+                    if (defined('TESTING') && TESTING) {
+                        $this->conn = null;
+                        return;
+                    }
                     die("<div style='padding:20px; font-family:sans-serif; background:#fee2e2; border:1px solid #f87171; color:#991b1b; border-radius:8px;'>
                         <h3 style='margin-top:0;'>Database Connection Failed</h3>
                         <p>Unable to connect to the MySQL database server at <b>{$this->host}</b> with username <b>{$this->username}</b>.</p>
@@ -40,6 +44,10 @@ class DBConnection{
                     $server_conn->close();
                     @$this->conn = new mysqli($this->host, $this->username, $this->password, $this->database);
                 } else {
+                    if (defined('TESTING') && TESTING) {
+                        $this->conn = null;
+                        return;
+                    }
                     die("<div style='padding:20px; font-family:sans-serif; background:#fee2e2; border:1px solid #f87171; color:#991b1b; border-radius:8px;'>
                         <h3 style='margin-top:0;'>Database Auto-Creation Failed</h3>
                         <p>Could not auto-create database <b>{$this->database}</b>: " . htmlspecialchars($server_conn->error) . "</p>
