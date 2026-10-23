@@ -2,9 +2,10 @@
 $tenant_id = $_settings->active_tenant_id();
 
 $qry = $conn->query("
-    SELECT al.*, u.username
+    SELECT al.*, u.username, COALESCE(t.name, 'System / Global') as tenant_name
     FROM `audit_logs` al
     LEFT JOIN `users` u ON al.user_id = u.id
+    LEFT JOIN `tenants` t ON al.tenant_id = t.id
     WHERE (al.tenant_id = '{$tenant_id}' OR al.tenant_id = 0 OR al.tenant_id IS NULL) AND (al.module = 'Authentication' OR al.action LIKE '%login%' OR al.action LIKE '%Logout%' OR al.action LIKE '%Auth%')
     ORDER BY al.id DESC
     LIMIT 200
@@ -29,6 +30,7 @@ $qry = $conn->query("
                     <tr class="bg-gradient-navy text-white">
                         <th class="text-center" style="width: 5%;">#</th>
                         <th>Timestamp</th>
+                        <th>Tenant / Organization</th>
                         <th>User Account</th>
                         <th>Event Action</th>
                         <th>Event Description / Status</th>
@@ -40,11 +42,13 @@ $qry = $conn->query("
                     $i = 1;
                     if($qry && $qry->num_rows > 0):
                         while($row = $qry->fetch_assoc()):
+                            $tenant_name = $row['tenant_name'];
                             $is_failed = strpos(strtolower($row['action']), 'failed') !== false || strpos(strtolower($row['details']), 'failed') !== false;
                     ?>
                     <tr class="<?= $is_failed ? 'table-danger' : '' ?>">
                         <td class="text-center align-middle"><?= $i++; ?></td>
                         <td class="align-middle text-xs font-monospace"><?= date("d M Y H:i:s", strtotime($row['date_created'])) ?></td>
+                        <td class="align-middle text-xs"><span class="badge badge-light border px-2 py-1"><?= htmlspecialchars($tenant_name) ?></span></td>
                         <td class="align-middle font-weight-bold"><?= htmlspecialchars($row['username'] ?: 'Unknown User') ?></td>
                         <td class="align-middle">
                             <?php if($is_failed): ?>
@@ -61,7 +65,7 @@ $qry = $conn->query("
                     else:
                     ?>
                     <tr>
-                        <td colspan="6" class="text-center py-4 text-muted">No security login activity logged yet.</td>
+                        <td colspan="7" class="text-center py-4 text-muted">No security login activity logged yet.</td>
                     </tr>
                     <?php endif; ?>
                 </tbody>
