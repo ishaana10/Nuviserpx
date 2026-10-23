@@ -1,8 +1,9 @@
 <?php
 require_once(__DIR__ . '/../../config.php');
-if(isset($_GET['id']) && $_GET['id'] > 0){
-    $qry = $conn->query("SELECT p.*, e.employee_code, e.firstname, e.lastname, e.department, e.designation, e.phone, e.tin as emp_tin, e.fnpf_no as emp_fnpf, e.bank_code as emp_bank_code, e.bank_account as emp_bank_acc from `payroll_list` p inner join `employee_list` e on p.employee_id = e.id where p.id = '{$_GET['id']}' ");
-    if($qry->num_rows > 0){
+if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
+    $id = intval($_GET['id']);
+    $qry = $conn->query("SELECT p.*, e.employee_code, e.firstname, e.lastname, e.department, e.designation, e.phone, e.tin as emp_tin, e.fnpf_no as emp_fnpf, e.bank_code as emp_bank_code, e.bank_account as emp_bank_acc from `payroll_list` p inner join `employee_list` e on p.employee_id = e.id where p.id = '{$id}' ");
+    if($qry && $qry->num_rows > 0){
         foreach($qry->fetch_assoc() as $k => $v){
             $$k=$v;
         }
