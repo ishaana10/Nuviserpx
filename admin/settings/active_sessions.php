@@ -2,9 +2,10 @@
 $tenant_id = $_settings->active_tenant_id();
 
 $users_qry = $conn->query("
-    SELECT u.*, r.name as role_name
+    SELECT u.*, r.name as role_name, t.name as tenant_name
     FROM `users` u
     LEFT JOIN `roles` r ON u.role_id = r.id
+    LEFT JOIN `tenants` t ON u.tenant_id = t.id
     WHERE (u.tenant_id = '{$tenant_id}' OR u.tenant_id = 1 OR u.tenant_id = 0 OR u.type = 1)
     ORDER BY u.last_login DESC
 ");
@@ -29,6 +30,7 @@ $users_qry = $conn->query("
                         <th class="text-center" style="width: 5%;">#</th>
                         <th>User / Staff Name</th>
                         <th>Username / Email</th>
+                        <th>Tenant</th>
                         <th>Assigned Role</th>
                         <th>Last Login Timestamp</th>
                         <th class="text-center">Account Status</th>
@@ -50,6 +52,9 @@ $users_qry = $conn->query("
                             <?php endif; ?>
                         </td>
                         <td class="align-middle font-monospace"><?= htmlspecialchars($row['username']) ?></td>
+                        <td class="align-middle font-weight-bold text-secondary">
+                            <?= htmlspecialchars($row['tenant_name'] ?: 'Default Tenant') ?>
+                        </td>
                         <td class="align-middle">
                             <?php if($row['type'] == 1): ?>
                                 <span class="badge badge-danger px-2 py-1"><i class="fas fa-user-shield mr-1"></i> Super Admin</span>
@@ -76,7 +81,7 @@ $users_qry = $conn->query("
                     else:
                     ?>
                     <tr>
-                        <td colspan="7" class="text-center py-4 text-muted">No users found.</td>
+                        <td colspan="8" class="text-center py-4 text-muted">No users found.</td>
                     </tr>
                     <?php endif; ?>
                 </tbody>
