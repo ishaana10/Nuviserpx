@@ -19,7 +19,7 @@ Class Users extends DBConnection {
 		$data = '';
 		if(isset($oldpassword)){
 			$curr_pass = $this->settings->userdata('password');
-			if (!password_verify($oldpassword, $curr_pass) && md5($oldpassword) !== $curr_pass) {
+			if (!password_verify($oldpassword, $curr_pass)) {
 				return 4;
 			}
 		}
@@ -137,7 +137,7 @@ Class Users extends DBConnection {
 		$data = '';
 		if(isset($oldpassword)){
 			$curr_pass = $this->settings->userdata('password');
-			if (!password_verify($oldpassword, $curr_pass) && md5($oldpassword) !== $curr_pass) {
+			if (!password_verify($oldpassword, $curr_pass)) {
 				return json_encode(array("status"=>'failed',
 										 "msg"=>'Old Password is Incorrect'));
 			}
