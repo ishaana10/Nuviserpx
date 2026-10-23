@@ -2,17 +2,17 @@
 require_once(__DIR__ . '/../../config.php');
 
 $is_batch = isset($_GET['batch']) && $_GET['batch'] == 1;
+$tenant_id = $_settings->active_tenant_id();
 
-if(isset($_GET['id']) && $_GET['id'] > 0){
-    $qry = $conn->query("SELECT * from `payroll_list` where id = '{$_GET['id']}' ");
-    if($qry->num_rows > 0){
+if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
+    $payroll_id_clean = intval($_GET['id']);
+    $qry = $conn->query("SELECT * from `payroll_list` where id = '{$payroll_id_clean}' and tenant_id = '{$tenant_id}' ");
+    if($qry && $qry->num_rows > 0){
         foreach($qry->fetch_assoc() as $k => $v){
             $$k=$v;
         }
     }
 }
-
-$tenant_id = $_settings->active_tenant_id();
 ?>
 
 <div class="container-fluid">
