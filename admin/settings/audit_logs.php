@@ -15,9 +15,10 @@ if(!empty($start_date) && !empty($end_date)){
 }
 
 $qry = $conn->query("
-    SELECT al.*, u.username, u.firstname, u.lastname
+    SELECT al.*, u.username, u.firstname, u.lastname, t.name as tenant_name
     FROM `audit_logs` al
     LEFT JOIN `users` u ON al.user_id = u.id
+    LEFT JOIN `tenants` t ON al.tenant_id = t.id
     {$where}
     ORDER BY al.id DESC
     LIMIT 200
@@ -69,6 +70,7 @@ $qry = $conn->query("
                         <th class="text-center" style="width: 5%;">#</th>
                         <th>Timestamp</th>
                         <th>User</th>
+                        <th>Tenant</th>
                         <th>Module</th>
                         <th>Action Performed</th>
                         <th>Details / Parameters</th>
@@ -80,12 +82,16 @@ $qry = $conn->query("
                     $i = 1;
                     if($qry && $qry->num_rows > 0):
                         while($row = $qry->fetch_assoc()):
+                            $tenant_name = !empty($row['tenant_name']) ? $row['tenant_name'] : 'System / Default';
                     ?>
                     <tr>
                         <td class="text-center align-middle"><?= $i++; ?></td>
                         <td class="align-middle text-nowrap text-xs"><?= date("d M Y H:i:s", strtotime($row['date_created'])) ?></td>
                         <td class="align-middle font-weight-bold">
                             <?= !empty($row['username']) ? htmlspecialchars($row['username']) : 'System / Portal User' ?>
+                        </td>
+                        <td class="align-middle text-xs font-weight-bold">
+                            <?= htmlspecialchars($tenant_name) ?>
                         </td>
                         <td class="align-middle text-capitalize">
                             <span class="badge badge-light border px-2 py-1"><?= htmlspecialchars($row['module'] ?: 'General') ?></span>
@@ -99,7 +105,7 @@ $qry = $conn->query("
                     else:
                     ?>
                     <tr>
-                        <td colspan="7" class="text-center py-4 text-muted">No audit logs found matching the selected filter criteria.</td>
+                        <td colspan="8" class="text-center py-4 text-muted">No audit logs found matching the selected filter criteria.</td>
                     </tr>
                     <?php endif; ?>
                 </tbody>
