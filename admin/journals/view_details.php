@@ -1,8 +1,9 @@
 <?php
 require_once(__DIR__ . '/../../config.php');
 if(isset($_GET['id'])){
-    $qry = $conn->query("SELECT b.*,h.name as `hall`,concat(c.lastname,', ',c.firstname,' ', c.middlename) as fullname, c.contact, c.address from `booking_list` b inner join `hall_list` h on b.hall_id = h.id inner join client_list c on b.client_id = c.id where b.id = '{$_GET['id']}' ");
-    if($qry->num_rows > 0){
+    $id = intval($_GET['id']);
+    $qry = $conn->query("SELECT b.*,h.name as `hall`,concat(c.lastname,', ',c.firstname,' ', c.middlename) as fullname, c.contact, c.address from `booking_list` b inner join `hall_list` h on b.hall_id = h.id inner join client_list c on b.client_id = c.id where b.id = '{$id}' ");
+    if($qry && $qry->num_rows > 0){
         $res = $qry->fetch_array();
         foreach($res as $k => $v){
             if(!is_numeric($k))
@@ -10,11 +11,22 @@ if(isset($_GET['id'])){
         }
         $services = "";
         if(!empty($services_ids)){
-            $services_ids = str_replace("|","",$services_ids);
-            $services_qry = $conn->query("SELECT * FROM `service_list` where id in ({$services_ids})");
-            while($row = $services_qry->fetch_assoc()){
-                if(!empty($services)) $services .= ", ";
-                $services .= $row['name'];
+            $services_ids_arr = explode(',', str_replace("|", ",", $services_ids));
+            $clean_service_ids = [];
+            foreach($services_ids_arr as $s_id){
+                if(is_numeric(trim($s_id))){
+                    $clean_service_ids[] = intval(trim($s_id));
+                }
+            }
+            if(!empty($clean_service_ids)){
+                $clean_ids_str = implode(',', $clean_service_ids);
+                $services_qry = $conn->query("SELECT * FROM `service_list` where id in ({$clean_ids_str})");
+                if($services_qry){
+                    while($row = $services_qry->fetch_assoc()){
+                        if(!empty($services)) $services .= ", ";
+                        $services .= $row['name'];
+                    }
+                }
             }
         }
         $services = !empty($services) ? $services : "N/A";
