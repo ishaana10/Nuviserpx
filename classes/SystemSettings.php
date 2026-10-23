@@ -179,8 +179,10 @@ class SystemSettings extends DBConnection{
 	}
 	function flashdata($flash = ''){
 		if(!empty($flash)){
-			$_tmp = $_SESSION['flashdata'][$flash];
-			unset($_SESSION['flashdata']);
+			$_tmp = isset($_SESSION['flashdata'][$flash]) ? $_SESSION['flashdata'][$flash] : null;
+			if(isset($_SESSION['flashdata'][$flash])){
+				unset($_SESSION['flashdata'][$flash]);
+			}
 			return $_tmp;
 		}else{
 			return false;
