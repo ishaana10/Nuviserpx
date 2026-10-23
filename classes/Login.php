@@ -1,5 +1,6 @@
 <?php
-require_once '../config.php';
+require_once __DIR__ . '/../config.php';
+if(!class_exists('Login')){
 class Login extends DBConnection {
 	private $settings;
 	public function __construct(){
@@ -158,6 +159,7 @@ class Login extends DBConnection {
 			return json_encode(['status' => 'failed', 'msg' => 'Invalid or expired OTP code.']);
 		}
 	}
+}
 }
 $action = !isset($_GET['f']) ? 'none' : strtolower($_GET['f']);
 $auth = new Login();
