@@ -33,10 +33,12 @@ class Login extends DBConnection {
 
 			if (password_verify($password, $db_pass)) {
 				$authenticated = true;
-			} elseif (md5($password) === $db_pass) {
-				$authenticated = true;
-				$new_hash = password_hash($password, PASSWORD_BCRYPT);
-				$this->conn->query("UPDATE `users` SET `password` = '{$new_hash}' WHERE id = '{$res['id']}'");
+				if (password_needs_rehash($db_pass, PASSWORD_BCRYPT)) {
+					$new_hash = password_hash($password, PASSWORD_BCRYPT);
+					$stmt_u = $this->conn->prepare("UPDATE `users` SET `password` = ? WHERE id = ?");
+					$stmt_u->bind_param('si', $new_hash, $res['id']);
+					$stmt_u->execute();
+				}
 			}
 
 			if ($authenticated) {
@@ -74,32 +76,35 @@ class Login extends DBConnection {
 	}
 	function client_login(){
 		extract($_POST);
-		$stmt = $this->conn->prepare("SELECT *,concat(lastname,', ',firstname,' ',middlename) as fullname from client_list where email = ? and `password` = ? ");
-		$pw = md5($password);
-		$stmt->bind_param('ss',$email,$pw);
+		$stmt = $this->conn->prepare("SELECT *,concat(lastname,', ',firstname,' ',middlename) as fullname from client_list where email = ? LIMIT 1");
+		$stmt->bind_param('s',$email);
 		$stmt->execute();
 		$qry = $stmt->get_result();
 		if($this->conn->error){
 			$resp['status'] = 'failed';
 			$resp['msg'] = "An error occurred while fetching data. Error:". $this->conn->error;
 		}else{
-		if($qry->num_rows > 0){
-			$res = $qry->fetch_array();
-			if($res['status'] == 1){
-				foreach($res as $k => $v){
-					$this->settings->set_userdata($k,$v);
+			if($qry->num_rows > 0){
+				$res = $qry->fetch_array();
+				if (password_verify($password, $res['password'])) {
+					if($res['status'] == 1){
+						foreach($res as $k => $v){
+							$this->settings->set_userdata($k,$v);
+						}
+						$this->settings->set_userdata('login_type',2);
+						$resp['status'] = 'success';
+					}else{
+						$resp['status'] = 'failed';
+						$resp['msg'] = "Your Account has been blocked. Contact the management.";
+					}
+				}else{
+					$resp['status'] = 'failed';
+					$resp['msg'] = "Invalid email or password.";
 				}
-				$this->settings->set_userdata('login_type',2);
-				$resp['status'] = 'success';
 			}else{
 				$resp['status'] = 'failed';
-				$resp['msg'] = "Your Account has been blocked. Contact the management.";
+				$resp['msg'] = "Invalid email or password.";
 			}
-			
-		}else{
-		$resp['status'] = 'failed';
-		$resp['msg'] = "Invalid email or password.";
-		}
 		}
 		return json_encode($resp);
 	}
