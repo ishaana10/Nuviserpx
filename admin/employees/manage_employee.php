@@ -1,7 +1,8 @@
 <?php
 require_once(__DIR__ . '/../../config.php');
 if(isset($_GET['id']) && $_GET['id'] > 0){
-    $qry = $conn->query("SELECT * from `employee_list` where id = '{$_GET['id']}' ");
+    $id_clean = intval($_GET['id']);
+    $qry = $conn->query("SELECT * from `employee_list` where id = '{$id_clean}' ");
     if($qry->num_rows > 0){
         foreach($qry->fetch_assoc() as $k => $v){
             $$k=$v;
