@@ -2,8 +2,9 @@
 require_once(__DIR__ . '/../../config.php');
 $tenant_id = $_settings->active_tenant_id();
 
-if(isset($_GET['id'])){
-    $qry = $conn->query("SELECT * FROM `account_list` where id = '{$_GET['id']}' and tenant_id = '{$tenant_id}'");
+if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
+    $id_clean = intval($_GET['id']);
+    $qry = $conn->query("SELECT * FROM `account_list` where id = '{$id_clean}' and tenant_id = '{$tenant_id}'");
     if($qry->num_rows > 0){
         $res = $qry->fetch_array();
         foreach($res as $k => $v){
