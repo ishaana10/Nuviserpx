@@ -2,13 +2,19 @@
 require_once(__DIR__ . '/../../config.php');
 if(isset($_GET['id']) && is_numeric($_GET['id'])){
     $id_clean = intval($_GET['id']);
-    $qry = $conn->query("SELECT * FROM `group_list` where id = '{$id_clean}'");
-    if($qry->num_rows > 0){
-        $res = $qry->fetch_array();
-        foreach($res as $k => $v){
-            if(!is_numeric($k))
-            $$k = $v;
+    $stmt = $conn->prepare("SELECT * FROM `group_list` WHERE id = ?");
+    if($stmt){
+        $stmt->bind_param("i", $id_clean);
+        $stmt->execute();
+        $qry = $stmt->get_result();
+        if($qry && $qry->num_rows > 0){
+            $res = $qry->fetch_array();
+            foreach($res as $k => $v){
+                if(!is_numeric($k))
+                $$k = $v;
+            }
         }
+        $stmt->close();
     }
 }
 ?>
