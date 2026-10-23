@@ -1,12 +1,17 @@
 <?php
 require_once(__DIR__ . '/../../config.php');
 if(isset($_GET['id']) && $_GET['id'] > 0){
-    $qry = $conn->query("SELECT * from `leave_list` where id = '{$_GET['id']}' ");
+    $id = intval($_GET['id']);
+    $stmt = $conn->prepare("SELECT * from `leave_list` where id = ?");
+    $stmt->bind_param("i", $id);
+    $stmt->execute();
+    $qry = $stmt->get_result();
     if($qry->num_rows > 0){
         foreach($qry->fetch_assoc() as $k => $v){
             $$k=$v;
         }
     }
+    $stmt->close();
 }
 ?>
 <div class="container-fluid">
