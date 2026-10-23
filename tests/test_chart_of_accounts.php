@@ -14,6 +14,11 @@ if (!str_contains($manage_code, 'name="code"') || !str_contains($manage_code, 'n
     exit(1);
 }
 
+if (!str_contains($manage_code, "intval(\$_GET['id'])") && !str_contains($manage_code, "is_numeric(\$_GET['id'])")) {
+    echo "FAILED: admin/accounts/manage_account.php does not sanitize \$_GET['id'] against SQL injection\n";
+    exit(1);
+}
+
 $master_code = file_get_contents(__DIR__ . '/../classes/Master.php');
 if (!str_contains($master_code, 'delete_accounts_bulk') || !str_contains($master_code, 'archive_accounts_bulk') || !str_contains($master_code, 'change_tax_rate_bulk')) {
     echo "FAILED: classes/Master.php missing bulk account action methods\n";
