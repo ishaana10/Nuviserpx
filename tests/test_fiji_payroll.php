@@ -13,7 +13,6 @@ $input = [
     'is_resident' => true
 ];
 $res = FijiPayroll::calculate($input);
-print_r($res);
 
 assert($res['gross_salary'] == 3350, "Gross salary calculation");
 assert($res['employee_fnpf'] == round(3350 * 0.08, 2), "Employee FNPF 8%");
@@ -23,12 +22,10 @@ assert($res['taxable_income'] == (3350 - 268), "Taxable Income calculation");
 echo "=== TEST 2: High Earner Annual Tax Breakdown (Basic + SRT) ===\n";
 $taxableHigh = 25000; // Monthly 25k = 300k annual
 $payeHigh = FijiPayroll::calculate_paye($taxableHigh, 'Monthly', true);
-print_r($payeHigh);
 assert($payeHigh['srt'] > 0, "SRT should be > 0 for high earner above FJD 270k");
 
 echo "=== TEST 3: Non-Resident 20% Flat Tax Calculation ===\n";
 $payeNonRes = FijiPayroll::calculate_paye(2000, 'Monthly', false);
-print_r($payeNonRes);
 assert($payeNonRes['paye'] == 400.00, "Non-Resident 20% tax");
 
 echo "=== TEST 4: Bank Exports (BSP, ANZ, HFC, BRED, Generic) ===\n";
