@@ -36,6 +36,7 @@ $service = new DashboardService(
     (int)$_settings->userdata('id'),
     fn (string $perm): bool => (bool)$_settings->can_access($perm)
 );
+$service->yearEndMonth = max(1, min(12, (int)($_settings->info('fiscal_year_end_month') ?: 12)));
 $service->ensureTable();
 
 $action = strtolower($_GET['f'] ?? '');

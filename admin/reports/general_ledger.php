@@ -1,193 +1,144 @@
 <?php
-function format_num($number){
-	return number_format($number, 2);
-}
+/**
+ * General ledger.
+ *  - All accounts: opening, debits, credits and closing per account (click to drill in).
+ *  - One account: every transaction with a running balance.
+ */
+require_once __DIR__ . '/_kit.php';
 
-$tenant_id = $_settings->active_tenant_id();
-$tenant_name = $_settings->info('name');
-$t_qry = $conn->query("SELECT name FROM `tenants` WHERE id = '{$tenant_id}'");
-if($t_qry && $t_qry->num_rows > 0){
-    $t_row = $t_qry->fetch_assoc();
-    if(!empty($t_row['name'])){
-        $tenant_name = $t_row['name'];
+use App\Services\LedgerService;
+
+$periods = nvr_periods();
+$from = nvr_date($_GET['from'] ?? null, $periods['this_month'][1]);
+$to = nvr_date($_GET['to'] ?? null, $periods['this_month'][2]);
+if ($from > $to) {
+    [$from, $to] = [$to, $from];
+}
+$account_id = isset($_GET['account_id']) && ctype_digit((string)$_GET['account_id']) ? (int)$_GET['account_id'] : 0;
+$hide_empty = !isset($_GET['all']) || $_GET['all'] !== '1';
+
+$ledger = nvr_ledger();
+
+// Account picker
+$acc_opts = '<option value="">All accounts (summary)</option>';
+$stmt = $conn->prepare("SELECT id, code, name, type FROM account_list WHERE tenant_id = ? AND delete_flag = 0 ORDER BY code IS NULL, code = '', CAST(code AS UNSIGNED), code, name");
+$tid = (int)$_settings->active_tenant_id();
+if ($stmt) {
+    $stmt->bind_param('i', $tid);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    $groups = [];
+    foreach ($res ? $res->fetch_all(MYSQLI_ASSOC) : [] as $a) {
+        $groups[LedgerService::CLASS_LABELS[LedgerService::classify($a['type'])['class']]][] = $a;
+    }
+    foreach (['Assets', 'Liabilities', 'Equity', 'Income', 'Expenses'] as $g) {
+        if (empty($groups[$g])) { continue; }
+        $acc_opts .= '<optgroup label="' . $g . '">';
+        foreach ($groups[$g] as $a) {
+            $acc_opts .= '<option value="' . (int)$a['id'] . '"' . ($account_id === (int)$a['id'] ? ' selected' : '') . '>'
+                . htmlspecialchars(trim(($a['code'] ? $a['code'] . ' · ' : '') . $a['name'])) . '</option>';
+        }
+        $acc_opts .= '</optgroup>';
     }
 }
-
-$from = isset($_GET['from']) ? $conn->real_escape_string($_GET['from']) : date("Y-m-01");
-$to = isset($_GET['to']) ? $conn->real_escape_string($_GET['to']) : date("Y-m-t");
-$account_id = isset($_GET['account_id']) ? $conn->real_escape_string($_GET['account_id']) : 'all';
-
-$account_where = "";
-if($account_id != 'all' && is_numeric($account_id)){
-	$acc_id_clean = intval($account_id);
-	$account_where = " AND a.id = '{$acc_id_clean}' ";
+$extra = '<div class="nvr-field nvr-wide"><label for="nvr-acc">Account</label><select id="nvr-acc" name="account_id" class="custom-select nvr-select2">' . $acc_opts . '</select></div>';
+if (!$account_id) {
+    $extra .= '<div class="nvr-field"><label>&nbsp;</label><label class="nvr-toggle" style="text-transform:none;letter-spacing:0;font-weight:500"><input type="checkbox" name="all" value="1"' . ($hide_empty ? '' : ' checked') . '> Include accounts without movement</label></div>';
 }
-?>
 
-<div class="card card-outline card-primary">
-	<div class="card-header">
-		<h3 class="card-title"><i class="fas fa-book-open text-primary"></i> General Ledger Report</h3>
-	</div>
-	<div class="card-body">
-        <div class="callout border-primary shadow rounded-0">
-            <h5 class="text-navy font-weight-bold"><i class="fas fa-filter"></i> Filter Options</h5>
-            <form action="" id="filter">
-            <div class="row align-items-end">
-                <div class="col-md-3 form-group">
-                    <label for="from" class="control-label">Date From</label>
-                    <input type="date" id="from" name="from" value="<?= $from ?>" class="form-control form-control-sm rounded-0">
-                </div>
-                <div class="col-md-3 form-group">
-                    <label for="to" class="control-label">Date To</label>
-                    <input type="date" id="to" name="to" value="<?= $to ?>" class="form-control form-control-sm rounded-0">
-                </div>
-                <div class="col-md-4 form-group">
-                    <label for="account_id" class="control-label">Account</label>
-                    <select id="account_id" name="account_id" class="form-control form-control-sm rounded-0 select2">
-			<option value="all" <?= $account_id == 'all' ? 'selected' : '' ?>>All Accounts</option>
-			<?php
-			$accounts = $conn->query("SELECT * FROM `account_list` WHERE tenant_id = '{$tenant_id}' AND delete_flag = 0 ORDER BY name ASC");
-			while($acc = $accounts->fetch_assoc()):
-			?>
-			<option value="<?= $acc['id'] ?>" <?= $account_id == $acc['id'] ? 'selected' : '' ?>><?= $acc['name'] ?></option>
-			<?php endwhile; ?>
-                    </select>
-                </div>
-                <div class="col-md-2 form-group">
-                    <button class="btn btn-navy bg-gradient-navy btn-flat btn-sm"><i class="fa fa-filter"></i> Filter</button>
-			        <button class="btn btn-default border btn-flat btn-sm" id="print" type="button"><i class="fa fa-print"></i> Print</button>
-                </div>
-            </div>
-            </form>
-        </div>
+$detail = $account_id ? $ledger->accountTransactions($account_id, $from, $to) : null;
+$title = $detail ? 'Account Transactions' : 'General Ledger';
 
-        <div class="container-fluid" id="outprint">
-            <div class="text-center mb-3">
-		<h3 class="font-weight-bold m-0"><?= htmlspecialchars($tenant_name) ?></h3>
-		<h4 class="font-weight-bold text-navy">GENERAL LEDGER REPORT</h4>
-		<p class="m-0 text-muted small"><?= date("d M Y" , strtotime($from)) . ' to ' . date("d M Y" , strtotime($to)) ?></p>
-            </div>
-            <hr>
+nvr_header([
+    'page' => 'reports/general_ledger',
+    'title' => $title,
+    'icon' => 'fas fa-book-open',
+    'mode' => 'range',
+    'from' => $from,
+    'to' => $to,
+    'extra' => $extra,
+    'subtitle' => ($detail ? trim(($detail['account']['code'] ? $detail['account']['code'] . ' · ' : '') . $detail['account']['name']) . ' · ' : '')
+        . nvr_nice_date($from) . ' – ' . nvr_nice_date($to),
+]);
 
-            <?php
-            $acc_qry = $conn->query("SELECT a.*,
-		(SELECT g.name FROM `journal_items` ji INNER JOIN `group_list` g ON ji.group_id = g.id WHERE ji.account_id = a.id LIMIT 1) as group_name,
-		(SELECT g.type FROM `journal_items` ji INNER JOIN `group_list` g ON ji.group_id = g.id WHERE ji.account_id = a.id LIMIT 1) as group_type
-		FROM `account_list` a
-		WHERE a.tenant_id = '{$tenant_id}' AND a.delete_flag = 0 {$account_where}
-		ORDER BY a.name ASC");
-
-            while($acc = $acc_qry->fetch_assoc()):
-		$current_acc_id = $acc['id'];
-
-		// Get transactions
-		$items_qry = $conn->query("SELECT j.journal_date, j.code, j.description as journal_desc, ji.amount, g.type as entry_type
-			FROM `journal_items` ji
-			INNER JOIN `journal_entries` j ON ji.journal_id = j.id
-			INNER JOIN `group_list` g ON ji.group_id = g.id
-			WHERE ji.account_id = '{$current_acc_id}' AND j.tenant_id = '{$tenant_id}'
-			AND date(j.journal_date) BETWEEN '{$from}' AND '{$to}'
-			ORDER BY date(j.journal_date) ASC, j.id ASC");
-
-		if($items_qry->num_rows == 0 && $account_id != 'all') continue;
-            ?>
-
-            <div class="card card-outline card-navy mb-4 shadow-none border">
-		<div class="card-header bg-navy text-white py-1">
-			<h6 class="card-title m-0 font-weight-bold"><?= $acc['name'] ?> <small class="text-light">(<?= $acc['group_name'] ?? 'Account' ?>)</small></h6>
-		</div>
-		<div class="card-body p-0">
-			<table class="table table-sm table-bordered table-striped m-0">
-				<thead class="bg-light">
-					<tr>
-						<th width="12%">Date</th>
-						<th width="15%">Journal Ref</th>
-						<th>Description</th>
-						<th width="15%" class="text-right">Debit (FJD)</th>
-						<th width="15%" class="text-right">Credit (FJD)</th>
-						<th width="15%" class="text-right">Running Balance</th>
-					</tr>
-				</thead>
-				<tbody>
-					<?php
-					$running_bal = 0;
-					$tot_debit = 0;
-					$tot_credit = 0;
-
-					if($items_qry->num_rows > 0):
-						while($item = $items_qry->fetch_assoc()):
-							$debit = ($item['entry_type'] == 1) ? (float)$item['amount'] : 0;
-							$credit = ($item['entry_type'] == 2) ? (float)$item['amount'] : 0;
-							$tot_debit += $debit;
-							$tot_credit += $credit;
-
-							// Assets/Expenses: Balance = Debit - Credit; Liabilities/Equity/Revenue: Balance = Credit - Debit
-							if(isset($acc['group_type']) && $acc['group_type'] == 2){
-								$running_bal += ($credit - $debit);
-							} else {
-								$running_bal += ($debit - $credit);
-							}
-					?>
-					<tr>
-						<td><?= date('d M Y', strtotime($item['journal_date'])) ?></td>
-						<td><b><?= $item['code'] ?></b></td>
-						<td><?= htmlspecialchars($item['journal_desc']) ?></td>
-						<td class="text-right"><?= $debit > 0 ? format_num($debit) : '—' ?></td>
-						<td class="text-right"><?= $credit > 0 ? format_num($credit) : '—' ?></td>
-						<td class="text-right font-weight-bold"><?= format_num($running_bal) ?></td>
-					</tr>
-					<?php
-						endwhile;
-					else:
-					?>
-					<tr>
-						<td colspan="6" class="text-center text-muted">No transactions found for this period.</td>
-					</tr>
-					<?php endif; ?>
-				</tbody>
-				<tfoot class="bg-light font-weight-bold">
-					<tr>
-						<td colspan="3" class="text-right">Period Totals:</td>
-						<td class="text-right text-primary"><?= format_num($tot_debit) ?></td>
-						<td class="text-right text-success"><?= format_num($tot_credit) ?></td>
-						<td class="text-right text-navy h6 mb-0"><?= format_num($running_bal) ?></td>
-					</tr>
-				</tfoot>
-			</table>
-		</div>
-            </div>
-            <?php endwhile; ?>
-        </div>
-	</div>
-</div>
-
-<script>
-	$(document).ready(function(){
-		$('.select2').select2({ width: '100%' });
-
-        $('#filter').submit(function(e){
-            e.preventDefault();
-            location.href="./?page=reports/general_ledger&"+$(this).serialize();
-        });
-
-        $('#print').click(function(){
-            start_loader();
-            var _h = $('head').clone();
-            var _p = $('#outprint').clone();
-            var el = $('<div>');
-            _h.find('title').text('General Ledger Report')
-            el.append(_h);
-            el.append(_p);
-            var nw = window.open("","_blank","width=900,height=700");
-            nw.document.write(el.html());
-            nw.document.close();
-            setTimeout(() => {
-                nw.print();
-                setTimeout(() => {
-                    nw.close();
-                    end_loader();
-                }, 200);
-            }, 500);
-        });
-	});
-</script>
+if ($detail):
+    $a = $detail['account'];
+    ?>
+    <div class="nvr-summary">
+        <div class="nvr-stat"><div class="k">Opening balance</div><div class="v"><?= nvr_money($detail['opening'], false) ?></div><div class="s"><?= nvr_nice_date($from) ?></div></div>
+        <div class="nvr-stat"><div class="k">Debits</div><div class="v"><?= nvr_money($detail['debit'], false) ?></div><div class="s"><?= count($detail['lines']) ?> transaction<?= count($detail['lines']) === 1 ? '' : 's' ?></div></div>
+        <div class="nvr-stat"><div class="k">Credits</div><div class="v"><?= nvr_money($detail['credit'], false) ?></div></div>
+        <div class="nvr-stat"><div class="k">Closing balance</div><div class="v<?= $detail['closing'] < 0 ? ' neg' : '' ?>"><?= nvr_money($detail['closing'], false) ?></div><div class="s"><?= htmlspecialchars($a['type'] ?: 'Unclassified') ?> · normal <?= $a['normal'] ?? (in_array($a['class'], ['asset', 'expense'], true) ? 'debit' : 'credit') ?> balance</div></div>
+    </div>
+    <div class="nvr-scroll">
+    <table class="nvr-table">
+        <thead>
+            <tr><th>Date</th><th>Journal</th><th>Description</th><th class="num">Debit</th><th class="num">Credit</th><th class="num">Balance</th></tr>
+        </thead>
+        <tbody>
+            <tr class="open"><td colspan="5">Opening balance</td><td class="num"><?= nvr_money($detail['opening'], false) ?></td></tr>
+            <?php foreach ($detail['lines'] as $l): ?>
+            <tr class="acct">
+                <td style="white-space:nowrap"><?= date('j M Y', strtotime($l['date'])) ?></td>
+                <td style="white-space:nowrap"><a class="nvr-drill" href="javascript:void(0)" onclick="uni_modal('Journal <?= htmlspecialchars($l['code'], ENT_QUOTES) ?>','journals/view_details.php?id=<?= $l['journal_id'] ?>','modal-lg')"><?= htmlspecialchars($l['code']) ?></a></td>
+                <td><?= htmlspecialchars($l['description']) ?></td>
+                <td class="num"><?= $l['debit'] ? nvr_money($l['debit']) : '' ?></td>
+                <td class="num"><?= $l['credit'] ? nvr_money($l['credit']) : '' ?></td>
+                <td class="num<?= $l['balance'] < 0 ? ' neg' : '' ?>"><?= nvr_money($l['balance'], false) ?></td>
+            </tr>
+            <?php endforeach; ?>
+            <?php if (!$detail['lines']): ?>
+            <tr><td colspan="6" class="text-center muted" style="padding:24px">No transactions in this period.</td></tr>
+            <?php endif; ?>
+        </tbody>
+        <tfoot>
+            <tr class="grand"><td colspan="3">Closing balance</td><td class="num"><?= nvr_money($detail['debit'], false) ?></td><td class="num"><?= nvr_money($detail['credit'], false) ?></td><td class="num"><?= nvr_money($detail['closing'], false) ?></td></tr>
+        </tfoot>
+    </table>
+    </div>
+    <?php
+    nvr_footer(['Balances are shown in the account\'s natural sign: positive means a normal balance, brackets mean the account has swung the other way.']);
+else:
+    $rows = $ledger->balances($from, $to, !$hide_empty);
+    if ($hide_empty) {
+        $rows = array_filter($rows, fn ($r) => $r['dr'] != 0.0 || $r['cr'] != 0.0);
+    }
+    usort($rows, fn ($x, $y) => array_search($x['class'], ['asset', 'liability', 'equity', 'income', 'expense']) <=> array_search($y['class'], ['asset', 'liability', 'equity', 'income', 'expense']));
+    $tdr = array_sum(array_column($rows, 'dr'));
+    $tcr = array_sum(array_column($rows, 'cr'));
+    ?>
+    <?php if (!$rows): ?>
+        <div class="nvr-empty"><i class="fas fa-book-open"></i><b>No transactions in this period</b>Try a wider date range or tick “Include accounts without movement”.</div>
+    <?php else: ?>
+    <div class="nvr-checks"><?= nvr_check(abs($tdr - $tcr) < 0.005, $tdr - $tcr, 'Period debits equal credits', 'Period out of balance') ?></div>
+    <div class="nvr-scroll">
+    <table class="nvr-table">
+        <thead>
+            <tr><th>Account</th><th>Code</th><th class="num">Opening</th><th class="num">Debits</th><th class="num">Credits</th><th class="num">Closing</th></tr>
+        </thead>
+        <tbody>
+        <?php $cls = null; foreach ($rows as $r):
+            $open = LedgerService::natural($r['class'], $r['open_dr'], $r['open_cr']);
+            $close = LedgerService::natural($r['class'], $r['open_dr'] + $r['dr'], $r['open_cr'] + $r['cr']);
+            if ($r['class'] !== $cls): $cls = $r['class']; ?>
+                <tr class="sec"><td colspan="6"><?= LedgerService::CLASS_LABELS[$cls] ?></td></tr>
+            <?php endif; ?>
+            <tr class="acct">
+                <td><?= nvr_gl_link($r['id'], $from, $to, $r['name']) ?></td>
+                <td class="code"><?= htmlspecialchars($r['code']) ?></td>
+                <td class="num"><?= nvr_money($open) ?></td>
+                <td class="num"><?= nvr_money($r['dr']) ?></td>
+                <td class="num"><?= nvr_money($r['cr']) ?></td>
+                <td class="num<?= $close < 0 ? ' neg' : '' ?>"><?= nvr_money($close) ?></td>
+            </tr>
+        <?php endforeach; ?>
+        </tbody>
+        <tfoot>
+            <tr class="grand"><td colspan="3">Total movement</td><td class="num"><?= nvr_money($tdr, false) ?></td><td class="num"><?= nvr_money($tcr, false) ?></td><td></td></tr>
+        </tfoot>
+    </table>
+    </div>
+    <?php endif; ?>
+    <?php
+    nvr_footer(['Choose an account above, or click one in the list, to see each transaction with a running balance.']);
+endif;

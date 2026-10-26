@@ -33,14 +33,21 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
             <div class="col-md-6 form-group">
                 <label for="type" class="control-label font-weight-bold">Account Type</label>
                 <select name="type" id="type" class="form-control form-control-sm" required>
-                    <option value="Assets" <?= isset($type) && $type == 'Assets' ? 'selected' : '' ?>>Assets</option>
-                    <option value="Bank" <?= isset($type) && $type == 'Bank' ? 'selected' : '' ?>>Bank</option>
-                    <option value="Liabilities" <?= isset($type) && $type == 'Liabilities' ? 'selected' : '' ?>>Liabilities</option>
-                    <option value="Equity" <?= isset($type) && $type == 'Equity' ? 'selected' : '' ?>>Equity</option>
-                    <option value="Expense" <?= isset($type) && ($type == 'Expense' || $type == 'Expenses') ? 'selected' : '' ?>>Expense</option>
-                    <option value="Direct Costs" <?= isset($type) && $type == 'Direct Costs' ? 'selected' : '' ?>>Direct Costs</option>
-                    <option value="Revenue" <?= isset($type) && $type == 'Revenue' ? 'selected' : '' ?>>Revenue</option>
+                    <?php
+                    $cur_type = isset($type) && $type !== '' ? $type : 'Expense';
+                    $known = array_merge(...array_values(\App\Services\AccountService::ACCOUNT_TYPES));
+                    if (!in_array($cur_type, $known, true)): ?>
+                        <option value="<?= htmlspecialchars($cur_type) ?>" selected><?= htmlspecialchars($cur_type) ?> (current)</option>
+                    <?php endif;
+                    foreach (\App\Services\AccountService::ACCOUNT_TYPES as $grp => $types): ?>
+                        <optgroup label="<?= $grp ?>">
+                            <?php foreach ($types as $t): ?>
+                                <option value="<?= $t ?>" <?= $cur_type === $t ? 'selected' : '' ?>><?= $t ?></option>
+                            <?php endforeach; ?>
+                        </optgroup>
+                    <?php endforeach; ?>
                 </select>
+                <small class="text-muted">Decides where this account appears on the balance sheet or profit and loss.</small>
             </div>
             <div class="col-md-6 form-group">
                 <label for="tax_rate" class="control-label font-weight-bold">Default Tax Rate</label>

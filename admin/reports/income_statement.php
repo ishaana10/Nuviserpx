@@ -1,188 +1,117 @@
 <?php
-function format_num($number){
-	return number_format($number, 2);
-}
+/**
+ * Profit and loss: trading income, cost of sales, gross profit, other income,
+ * operating expenses and net profit, with an optional comparison period.
+ */
+require_once __DIR__ . '/_kit.php';
 
-$tenant_id = $_settings->active_tenant_id();
-$tenant_name = $_settings->info('name');
-$t_qry = $conn->query("SELECT name FROM `tenants` WHERE id = '{$tenant_id}'");
-if($t_qry && $t_qry->num_rows > 0){
-    $t_row = $t_qry->fetch_assoc();
-    if(!empty($t_row['name'])){
-        $tenant_name = $t_row['name'];
+use App\Services\LedgerService;
+
+$periods = nvr_periods();
+$from = nvr_date($_GET['from'] ?? null, $periods['fy_to_date'][1]);
+$to = nvr_date($_GET['to'] ?? null, $periods['fy_to_date'][2]);
+if ($from > $to) {
+    [$from, $to] = [$to, $from];
+}
+$compare = in_array($_GET['compare'] ?? '', ['previous_period', 'previous_year'], true) ? $_GET['compare'] : 'none';
+
+$ledger = nvr_ledger();
+$pl = LedgerService::incomeStatement($ledger->balances($from, $to));
+
+$cmp = null;
+$cmpLabel = '';
+if ($compare !== 'none') {
+    if ($compare === 'previous_year') {
+        $cFrom = date('Y-m-d', strtotime($from . ' -1 year'));
+        $cTo = date('Y-m-d', strtotime($to . ' -1 year'));
+    } else {
+        $days = (int)((strtotime($to) - strtotime($from)) / 86400);
+        $cTo = date('Y-m-d', strtotime($from . ' -1 day'));
+        $cFrom = date('Y-m-d', strtotime($cTo . " -{$days} days"));
     }
+    $cmp = LedgerService::incomeStatement($ledger->balances($cFrom, $cTo));
+    $cmpLabel = date('j M y', strtotime($cFrom)) . ' – ' . date('j M y', strtotime($cTo));
 }
 
-$from = isset($_GET['from']) ? $conn->real_escape_string($_GET['from']) : date("Y-01-01");
-$to = isset($_GET['to']) ? $conn->real_escape_string($_GET['to']) : date("Y-m-d");
-
-// Query Revenue & Expense accounts
-$qry = $conn->query("
-    SELECT a.id, a.name AS account_name, g.name AS group_name,
-           SUM(CASE WHEN g.type = 1 THEN ji.amount ELSE 0 END) AS total_debit,
-           SUM(CASE WHEN g.type = 2 THEN ji.amount ELSE 0 END) AS total_credit
-    FROM `journal_items` ji
-    INNER JOIN `account_list` a ON ji.account_id = a.id
-    INNER JOIN `group_list` g ON ji.group_id = g.id
-    INNER JOIN `journal_entries` j ON ji.journal_id = j.id
-    WHERE a.tenant_id = '{$tenant_id}' AND j.tenant_id = '{$tenant_id}' AND a.delete_flag = 0
-    AND date(j.journal_date) BETWEEN '{$from}' AND '{$to}' AND g.name IN ('Revenue', 'Expenses')
-    GROUP BY a.id, a.name, g.name
-    ORDER BY g.name ASC, a.name ASC
-");
-
-$revenue_items = [];
-$expense_items = [];
-$tot_revenue = 0;
-$tot_expense = 0;
-
-while($row = $qry->fetch_assoc()){
-    $debit = (float)$row['total_debit'];
-    $credit = (float)$row['total_credit'];
-
-    if($row['group_name'] == 'Revenue'){
-        $bal = $credit - $debit;
-        if($bal != 0){
-            $revenue_items[] = ['name' => $row['account_name'], 'amount' => $bal];
-            $tot_revenue += $bal;
-        }
-    } elseif($row['group_name'] == 'Expenses'){
-        $bal = $debit - $credit;
-        if($bal != 0){
-            $expense_items[] = ['name' => $row['account_name'], 'amount' => $bal];
-            $tot_expense += $bal;
+/** Account amounts from the comparison statement, keyed by section+account. */
+$cmpMap = [];
+if ($cmp) {
+    foreach ($cmp['sections'] as $sk => $s) {
+        foreach ($s['lines'] as $l) {
+            $cmpMap[$sk][$l['id']] = $l;
         }
     }
 }
 
-$net_profit = $tot_revenue - $tot_expense;
+$cols = $cmp ? 4 : 2;
+function nvr_pl_row(string $class, string $label, float $cur, ?float $prev, bool $hasCmp, bool $isCost = false): string
+{
+    $h = '<tr class="' . $class . '"><td>' . $label . '</td><td class="num' . ($cur < 0 ? ' neg' : '') . '">' . nvr_money($cur, $class !== 'acct') . '</td>';
+    if ($hasCmp) {
+        $prev = (float)$prev;
+        $ch = nvr_change($cur, $prev);
+        $good = $ch === null ? '' : (($isCost ? $ch <= 0 : $ch >= 0) ? 'up' : 'down');
+        $h .= '<td class="num muted">' . nvr_money($prev) . '</td><td class="num ' . $good . '">' . ($ch === null ? '–' : ($ch > 0 ? '+' : '') . number_format($ch, 1) . '%') . '</td>';
+    }
+    return $h . '</tr>';
+}
+
+nvr_header([
+    'page' => 'reports/income_statement',
+    'title' => 'Profit and Loss',
+    'icon' => 'fas fa-chart-line',
+    'mode' => 'range',
+    'from' => $from,
+    'to' => $to,
+    'compare' => ['none' => 'No comparison', 'previous_period' => 'Previous period', 'previous_year' => 'Same period last year'],
+    'compareValue' => $compare,
+    'subtitle' => 'For the period ' . nvr_nice_date($from) . ' to ' . nvr_nice_date($to),
+]);
+$hasData = $pl['total_income'] != 0.0 || $pl['total_expenses'] != 0.0 || ($cmp && ($cmp['total_income'] != 0.0 || $cmp['total_expenses'] != 0.0));
 ?>
-
-<div class="card card-outline card-info">
-	<div class="card-header">
-		<h3 class="card-title"><i class="fas fa-file-invoice-dollar text-info"></i> Income Statement (Profit & Loss)</h3>
-	</div>
-	<div class="card-body">
-        <div class="callout border-info shadow rounded-0">
-            <form action="" id="filter">
-            <div class="row align-items-end">
-                <div class="col-md-4 form-group">
-                    <label for="from" class="control-label">Period From</label>
-                    <input type="date" id="from" name="from" value="<?= $from ?>" class="form-control form-control-sm rounded-0">
-                </div>
-                <div class="col-md-4 form-group">
-                    <label for="to" class="control-label">Period To</label>
-                    <input type="date" id="to" name="to" value="<?= $to ?>" class="form-control form-control-sm rounded-0">
-                </div>
-                <div class="col-md-4 form-group">
-                    <button class="btn btn-info btn-flat btn-sm"><i class="fa fa-filter"></i> Apply Filter</button>
-			        <button class="btn btn-default border btn-flat btn-sm" id="print" type="button"><i class="fa fa-print"></i> Print Statement</button>
-                </div>
-            </div>
-            </form>
-        </div>
-
-        <div class="container-fluid" id="outprint">
-            <div class="text-center mb-4">
-		<h3 class="font-weight-bold m-0"><?= htmlspecialchars($tenant_name) ?></h3>
-		<h4 class="font-weight-bold text-info">INCOME STATEMENT (PROFIT & LOSS)</h4>
-		<p class="m-0 text-muted small"><?= date("d M Y" , strtotime($from)) . ' to ' . date("d M Y" , strtotime($to)) ?></p>
-            </div>
-            <hr>
-
-            <div class="card card-outline card-success mb-4 shadow-none border">
-		<div class="card-header bg-success text-white py-1">
-			<h6 class="card-title font-weight-bold m-0"><i class="fas fa-arrow-down mr-1"></i> OPERATING REVENUE</h6>
-		</div>
-		<div class="card-body p-0">
-			<table class="table table-sm table-striped m-0">
-				<tbody>
-					<?php if(!empty($revenue_items)): foreach($revenue_items as $r): ?>
-					<tr>
-						<td><?= htmlspecialchars($r['name']) ?></td>
-						<td class="text-right font-weight-bold" width="200">$<?= format_num($r['amount']) ?></td>
-					</tr>
-					<?php endforeach; else: ?>
-					<tr><td colspan="2" class="text-center text-muted">No revenue entries recorded for this period.</td></tr>
-					<?php endif; ?>
-				</tbody>
-				<tfoot class="bg-light">
-					<tr class="h6">
-						<th class="font-weight-bold text-navy">TOTAL OPERATING REVENUE</th>
-						<th class="text-right font-weight-bold text-success">$<?= format_num($tot_revenue) ?></th>
-					</tr>
-				</tfoot>
-			</table>
-		</div>
-            </div>
-
-            <div class="card card-outline card-danger mb-4 shadow-none border">
-		<div class="card-header bg-danger text-white py-1">
-			<h6 class="card-title font-weight-bold m-0"><i class="fas fa-arrow-up mr-1"></i> OPERATING EXPENSES & COST OF SALES</h6>
-		</div>
-		<div class="card-body p-0">
-			<table class="table table-sm table-striped m-0">
-				<tbody>
-					<?php if(!empty($expense_items)): foreach($expense_items as $e): ?>
-					<tr>
-						<td><?= htmlspecialchars($e['name']) ?></td>
-						<td class="text-right font-weight-bold" width="200">$<?= format_num($e['amount']) ?></td>
-					</tr>
-					<?php endforeach; else: ?>
-					<tr><td colspan="2" class="text-center text-muted">No expense entries recorded for this period.</td></tr>
-					<?php endif; ?>
-				</tbody>
-				<tfoot class="bg-light">
-					<tr class="h6">
-						<th class="font-weight-bold text-navy">TOTAL OPERATING EXPENSES</th>
-						<th class="text-right font-weight-bold text-danger">$<?= format_num($tot_expense) ?></th>
-					</tr>
-				</tfoot>
-			</table>
-		</div>
-            </div>
-
-            <!-- Net Profit / Loss Banner -->
-            <div class="card bg-navy text-white p-3 shadow-none">
-		<div class="row align-items-center">
-			<div class="col-8">
-				<h5 class="m-0 font-weight-bold text-uppercase"><i class="fas fa-calculator text-warning mr-2"></i> NET OPERATING PROFIT / (LOSS)</h5>
-				<small class="text-light">Revenue minus Expenses for period</small>
-			</div>
-			<div class="col-4 text-right">
-				<h3 class="m-0 font-weight-bold text-<?= $net_profit >= 0 ? 'warning' : 'danger' ?>">$<?= format_num($net_profit) ?></h3>
-			</div>
-		</div>
-            </div>
-        </div>
-	</div>
+<div class="nvr-summary">
+    <div class="nvr-stat"><div class="k">Income</div><div class="v"><?= nvr_money($pl['total_income'], false) ?></div><div class="s">Trading + other income</div></div>
+    <div class="nvr-stat"><div class="k">Gross profit</div><div class="v<?= $pl['gross_profit'] < 0 ? ' neg' : '' ?>"><?= nvr_money($pl['gross_profit'], false) ?></div><div class="s">Margin <?= nvr_pct($pl['gross_margin']) ?></div></div>
+    <div class="nvr-stat"><div class="k">Expenses</div><div class="v"><?= nvr_money($pl['total_expenses'], false) ?></div><div class="s">Cost of sales + operating</div></div>
+    <div class="nvr-stat"><div class="k">Net profit</div><div class="v<?= $pl['net_profit'] < 0 ? ' neg' : '' ?>"><?= nvr_money($pl['net_profit'], false) ?></div><div class="s">Margin <?= nvr_pct($pl['net_margin']) ?><?php if ($cmp): $c = nvr_change($pl['net_profit'], $cmp['net_profit']); ?> · <?= $c === null ? 'no prior figure' : (($c > 0 ? '+' : '') . number_format($c, 1) . '% vs comparison') ?><?php endif; ?></div></div>
 </div>
 
-<script>
-	$(document).ready(function(){
-        $('#filter').submit(function(e){
-            e.preventDefault();
-            location.href="./?page=reports/income_statement&"+$(this).serialize();
-        });
-
-        $('#print').click(function(){
-            start_loader();
-            var _h = $('head').clone();
-            var _p = $('#outprint').clone();
-            var el = $('<div>');
-            _h.find('title').text('Income Statement (Profit & Loss)')
-            el.append(_h);
-            el.append(_p);
-            var nw = window.open("","_blank","width=900,height=700");
-            nw.document.write(el.html());
-            nw.document.close();
-            setTimeout(() => {
-                nw.print();
-                setTimeout(() => {
-                    nw.close();
-                    end_loader();
-                }, 200);
-            }, 500);
-        });
-	});
-</script>
+<?php if (!$hasData): ?>
+    <div class="nvr-empty"><i class="fas fa-chart-line"></i><b>No income or expenses in this period</b>Check the dates, or make sure revenue and expense accounts have the right account type.</div>
+<?php else: ?>
+<div class="nvr-scroll">
+<table class="nvr-table">
+    <thead>
+        <tr>
+            <th></th>
+            <th class="num"><?= date('j M y', strtotime($from)) ?> – <?= date('j M y', strtotime($to)) ?></th>
+            <?php if ($cmp): ?><th class="num"><?= htmlspecialchars($cmpLabel) ?></th><th class="num">Change</th><?php endif; ?>
+        </tr>
+    </thead>
+    <tbody>
+    <?php
+    $render = function (string $sk, bool $isCost) use ($pl, $cmp, $cmpMap, $cols, $from, $to) {
+        $s = $pl['sections'][$sk];
+        $ids = [];
+        foreach ($s['lines'] as $l) { $ids[$l['id']] = $l; }
+        foreach ($cmpMap[$sk] ?? [] as $id => $l) { if (!isset($ids[$id])) { $ids[$id] = ['id' => $id, 'name' => $l['name'], 'code' => $l['code'], 'amount' => 0.0]; } }
+        if (!$ids) { return; }
+        echo '<tr class="sec"><td colspan="' . $cols . '">' . htmlspecialchars($s['label']) . '</td></tr>';
+        foreach ($ids as $id => $l) {
+            echo nvr_pl_row('acct', nvr_gl_link($id, $from, $to, $l['name']), (float)$l['amount'], $cmp ? (float)($cmpMap[$sk][$id]['amount'] ?? 0) : null, (bool)$cmp, $isCost);
+        }
+        echo nvr_pl_row('sub', 'Total ' . htmlspecialchars(strtolower($s['label'])), $s['total'], $cmp ? $cmp['sections'][$sk]['total'] : null, (bool)$cmp, $isCost);
+    };
+    $render('revenue', false);
+    $render('direct_costs', true);
+    echo nvr_pl_row('key', 'Gross profit', $pl['gross_profit'], $cmp ? $cmp['gross_profit'] : null, (bool)$cmp);
+    $render('other_income', false);
+    $render('expense', true);
+    echo nvr_pl_row('grand', 'Net profit', $pl['net_profit'], $cmp ? $cmp['net_profit'] : null, (bool)$cmp);
+    ?>
+    </tbody>
+</table>
+</div>
+<?php endif; ?>
+<?php
+nvr_footer(['Accounts are grouped by their account type (Revenue, Other Income, Direct Costs, Expense). Click any account to see its transactions.']);

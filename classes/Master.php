@@ -58,20 +58,11 @@ class Master extends DBConnection
 
     public function delete_accounts_bulk()
     {
-        $tenant_id = $this->settings->active_tenant_id();
         $ids = $_POST['account_ids'] ?? [];
         if (!is_array($ids) || empty($ids)) {
             return json_encode(['status' => 'failed', 'msg' => 'No accounts selected.']);
         }
-
-        $sanitized_ids = array_map('intval', $ids);
-        $id_list = implode(',', $sanitized_ids);
-
-        $del = $this->conn->query("UPDATE `account_list` SET delete_flag = 1 WHERE tenant_id = '{$tenant_id}' AND id IN ({$id_list})");
-        if ($del) {
-            return json_encode(['status' => 'success', 'msg' => 'Selected accounts successfully deleted.']);
-        }
-        return json_encode(['status' => 'failed', 'msg' => 'Failed to delete selected accounts.']);
+        return $this->container->make(AccountService::class)->deleteAccounts($ids);
     }
 
     public function archive_accounts_bulk()

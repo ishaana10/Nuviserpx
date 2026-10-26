@@ -1,0 +1,94 @@
+/* ==========================================================================
+   Nuvis ERPX — financial reports
+   ========================================================================== */
+.nvr { padding: 2px 2px 28px; color: #0f172a; }
+
+.nvr-top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.nvr-back { font-size: .82rem; color: #64748b; font-weight: 500; }
+.nvr-back:hover { color: #2563eb; text-decoration: none; }
+.nvr-title { font-size: 1.5rem; font-weight: 700; margin: 4px 0 0; display: flex; align-items: center; gap: 10px; letter-spacing: -.01em; }
+.nvr-title > i { width: 34px; height: 34px; border-radius: 9px; background: #eff6ff; color: #2563eb; display: inline-flex; align-items: center; justify-content: center; font-size: .9rem; }
+.nvr-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.nvr-actions .btn { height: 36px; display: inline-flex; align-items: center; gap: 6px; font-size: .86rem; }
+
+.nvr-filters {
+  display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 14px;
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 16px; margin-bottom: 16px;
+}
+.nvr-field { display: flex; flex-direction: column; min-width: 150px; }
+.nvr-field label { font-size: .74rem; font-weight: 600; color: #64748b; margin-bottom: 4px; text-transform: uppercase; letter-spacing: .04em; }
+.nvr-field .form-control, .nvr-field .custom-select { height: 36px; font-size: .88rem; border-radius: 7px !important; }
+.nvr-field.nvr-wide { min-width: 260px; flex: 1; max-width: 380px; }
+.nvr-field.nvr-quick .btn { height: 36px; font-size: .8rem; }
+.nvr-field.nvr-submit .btn { height: 36px; display: inline-flex; align-items: center; gap: 6px; }
+.nvr-toggle { display: flex; align-items: center; gap: 6px; height: 36px; font-size: .86rem; color: #334155; }
+.nvr-toggle input { width: 16px; height: 16px; }
+
+/* Statement sheet */
+.nvr-sheet {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 28px 32px 22px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+}
+.nvr-sheet-head { text-align: center; margin-bottom: 20px; }
+.nvr-company { font-size: .82rem; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: .08em; }
+.nvr-sheet-title { font-size: 1.35rem; font-weight: 700; margin-top: 2px; }
+.nvr-sheet-sub { font-size: .9rem; color: #475569; margin-top: 2px; }
+.nvr-sheet-foot { margin-top: 18px; font-size: .76rem; color: #94a3b8; display: grid; gap: 3px; }
+
+.nvr-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-bottom: 20px; }
+.nvr-stat { border: 1px solid #eef2f7; border-radius: 10px; padding: 12px 14px; background: #fbfcfe; }
+.nvr-stat .k { font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: #64748b; font-weight: 600; }
+.nvr-stat .v { font-size: 1.25rem; font-weight: 700; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.nvr-stat .s { font-size: .76rem; color: #64748b; margin-top: 2px; }
+.nvr-stat .v.neg { color: #b91c1c; }
+
+table.nvr-table { width: 100%; border-collapse: collapse; font-size: .9rem; font-variant-numeric: tabular-nums; }
+table.nvr-table th {
+  font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: #64748b; font-weight: 600;
+  padding: 8px 10px; border-bottom: 2px solid #e2e8f0; text-align: left; white-space: nowrap; background: #fff;
+}
+table.nvr-table td { padding: 7px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
+table.nvr-table .num { text-align: right; white-space: nowrap; width: 1%; min-width: 120px; }
+table.nvr-table .muted { color: #94a3b8; }
+table.nvr-table .code { color: #64748b; width: 1%; white-space: nowrap; }
+table.nvr-table tr.sec td { padding-top: 18px; font-weight: 700; font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; color: #334155; border-bottom: 1px solid #e2e8f0; }
+table.nvr-table tr.acct td:first-child { padding-left: 22px; }
+table.nvr-table tr.acct:hover td { background: #f8fafc; }
+table.nvr-table tr.sub td { font-weight: 600; border-top: 1px solid #cbd5e1; border-bottom: 0; background: #fbfcfe; }
+table.nvr-table tr.key td { font-weight: 700; background: #f1f5f9; border-top: 1px solid #94a3b8; border-bottom: 1px solid #94a3b8; }
+table.nvr-table tr.grand td { font-weight: 700; font-size: .98rem; border-top: 2px solid #0f172a; border-bottom: 4px double #0f172a; background: #fff; }
+table.nvr-table tr.computed td:first-child { font-style: italic; color: #475569; }
+table.nvr-table tr.open td, table.nvr-table tr.close td { background: #fbfcfe; font-weight: 600; }
+table.nvr-table .neg { color: #b91c1c; }
+table.nvr-table .up { color: #15803d; }
+table.nvr-table .down { color: #b91c1c; }
+.nvr-drill { color: inherit; border-bottom: 1px dashed #cbd5e1; }
+.nvr-drill:hover { color: #2563eb; text-decoration: none; border-bottom-color: #2563eb; }
+.nvr-pill { font-size: .7rem; font-weight: 600; padding: 1px 8px; border-radius: 999px; background: #f1f5f9; color: #475569; white-space: nowrap; }
+
+.nvr-check { display: inline-flex; align-items: center; gap: 6px; font-size: .84rem; font-weight: 600; padding: 4px 12px; border-radius: 999px; }
+.nvr-check.ok { background: #ecfdf3; color: #15803d; }
+.nvr-check.bad { background: #fef2f2; color: #b91c1c; }
+.nvr-checks { display: flex; justify-content: center; margin: -8px 0 18px; }
+
+.nvr-empty { text-align: center; padding: 40px 16px; color: #64748b; }
+.nvr-empty i { font-size: 1.8rem; color: #cbd5e1; display: block; margin-bottom: 10px; }
+.nvr-empty b { color: #0f172a; display: block; margin-bottom: 4px; }
+
+.nvr-scroll { overflow-x: auto; }
+
+@media (max-width: 767.98px) {
+  .nvr-sheet { padding: 18px 14px; }
+  .nvr-field, .nvr-field.nvr-wide { min-width: 0; flex: 1 1 140px; max-width: none; }
+  table.nvr-table .num { min-width: 96px; }
+}
+
+@media print {
+  @page { margin: 14mm; }
+  .main-header, .main-sidebar, .main-footer, .d-print-none, #uni_modal, .control-sidebar { display: none !important; }
+  .content-wrapper { margin: 0 !important; padding: 0 !important; background: #fff !important; }
+  body { background: #fff !important; }
+  .nvr-sheet { border: 0; box-shadow: none; padding: 0; }
+  .nvr-drill { border: 0; }
+  table.nvr-table tr { page-break-inside: avoid; }
+}
