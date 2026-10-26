@@ -61,7 +61,7 @@
       <div class="modal-body rounded-0">
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-primary btn-flat" id='submit' onclick="$('#uni_modal form').submit()">Save</button>
+        <button type="button" class="btn btn-primary btn-flat" id='submit' onclick="window.NuvisUI ? NuvisUI.submitModal('#uni_modal') : $('#uni_modal form').submit()"><i class="fas fa-check mr-1"></i> Save</button>
         <button type="button" class="btn btn-secondary btn-flat" data-dismiss="modal">Cancel</button>
       </div>
       </div>

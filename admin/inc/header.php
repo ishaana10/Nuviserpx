@@ -37,6 +37,7 @@
     <!-- Theme style -->
     <link rel="stylesheet" href="<?php echo base_url ?>dist/css/adminlte.css?v=<?php echo $assetVer ?>">
     <link rel="stylesheet" href="<?php echo base_url ?>dist/css/custom.css?v=<?php echo $assetVer ?>">
+    <link rel="stylesheet" href="<?php echo base_url ?>dist/css/nuvis-ui.css?v=<?php echo $assetVer ?>">
     <!-- overlayScrollbars -->
     <link rel="stylesheet" href="<?php echo base_url ?>plugins/overlayScrollbars/css/OverlayScrollbars.min.css">
     <!-- Daterange picker -->

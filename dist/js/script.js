@@ -62,7 +62,7 @@ window.uni_modal = function($title = '' , $url='',$size=""){
             if(resp){
                 $('#uni_modal .modal-title').html($title);
                 $('#uni_modal .modal-body').html(resp);
-                var dialogClass = "modal-dialog modal-dialog-centered ";
+                var dialogClass = "modal-dialog modal-dialog-centered modal-dialog-scrollable ";
                 if($size === 'mid-large' || $size === 'large' || $size === 'modal-lg'){
                     dialogClass += "modal-lg";
                 } else if($size === 'extra-large' || $size === 'modal-xl'){
