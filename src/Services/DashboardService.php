@@ -61,15 +61,15 @@ class DashboardService
             'kpi_revenue'          => ['title' => 'Revenue invoiced',      'category' => 'Finance',   'type' => 'kpi',   'icon' => 'fas fa-file-invoice-dollar', 'tone' => 'blue',   'perm' => 'invoices_view', 'size' => 'sm', 'sizes' => $kpi,   'ranged' => true,  'description' => 'Total of issued invoices in the period, compared with the previous period.'],
             'kpi_receipts'         => ['title' => 'Cash received',         'category' => 'Finance',   'type' => 'kpi',   'icon' => 'fas fa-hand-holding-usd',    'tone' => 'green',  'perm' => 'payments_view', 'size' => 'sm', 'sizes' => $kpi,   'ranged' => true,  'description' => 'Posted customer receipts in the period.'],
             'kpi_receivables'      => ['title' => 'Outstanding receivables','category' => 'Finance',  'type' => 'kpi',   'icon' => 'fas fa-balance-scale',       'tone' => 'amber',  'perm' => 'invoices_view', 'size' => 'sm', 'sizes' => $kpi,   'ranged' => false, 'description' => 'Unpaid invoice balances today, with the overdue share.'],
-            'kpi_journals'         => ['title' => 'Journal entries',       'category' => 'Finance',   'type' => 'kpi',   'icon' => 'fas fa-book',                'tone' => 'indigo', 'perm' => 'journals_view', 'size' => 'sm', 'sizes' => $kpi,   'ranged' => true,  'description' => 'Journals dated in the period.'],
-            'chart_financial'      => ['title' => 'Debits vs credits',     'category' => 'Finance',   'type' => 'chart', 'icon' => 'fas fa-chart-bar',           'tone' => 'blue',   'perm' => 'journals_view', 'size' => 'xl', 'sizes' => $chart, 'ranged' => true,  'description' => 'Monthly journal movement split by debit and credit groups.', 'charts' => ['bar', 'line', 'area']],
+            'kpi_journals'         => ['title' => 'Journal entries',       'category' => 'Finance',   'type' => 'kpi',   'icon' => 'fas fa-book',                'tone' => 'indigo', 'perm' => 'journals_view', 'size' => 'sm', 'sizes' => $kpi,   'ranged' => true,  'description' => 'Posted journals dated in the period.'],
+            'chart_financial'      => ['title' => 'Debits vs credits',     'category' => 'Finance',   'type' => 'chart', 'icon' => 'fas fa-chart-bar',           'tone' => 'blue',   'perm' => 'journals_view', 'size' => 'xl', 'sizes' => $chart, 'ranged' => true,  'description' => 'Monthly debits and credits from posted journals.', 'charts' => ['bar', 'line', 'area']],
             'chart_cashflow'       => ['title' => 'Invoiced vs received',  'category' => 'Finance',   'type' => 'chart', 'icon' => 'fas fa-chart-area',          'tone' => 'green',  'perm' => 'invoices_view', 'size' => 'lg', 'sizes' => $chart, 'ranged' => true,  'description' => 'Monthly invoiced revenue against cash collected.', 'charts' => ['area', 'line', 'bar']],
             'chart_invoice_status' => ['title' => 'Invoices by status',    'category' => 'Finance',   'type' => 'chart', 'icon' => 'fas fa-chart-pie',           'tone' => 'amber',  'perm' => 'invoices_view', 'size' => 'md', 'sizes' => $chart, 'ranged' => true,  'description' => 'Value of invoices in each status.', 'charts' => ['donut', 'bar']],
             'list_overdue'         => ['title' => 'Overdue invoices',      'category' => 'Finance',   'type' => 'list',  'icon' => 'fas fa-exclamation-circle',  'tone' => 'red',    'perm' => 'invoices_view', 'size' => 'lg', 'sizes' => $list,  'ranged' => false, 'description' => 'Invoices past their due date, oldest first.'],
             'list_recent_invoices' => ['title' => 'Recent invoices',       'category' => 'Finance',   'type' => 'list',  'icon' => 'fas fa-receipt',             'tone' => 'blue',   'perm' => 'invoices_view', 'size' => 'lg', 'sizes' => $list,  'ranged' => false, 'description' => 'The latest invoices raised.'],
             'list_top_customers'   => ['title' => 'Top customers',         'category' => 'Finance',   'type' => 'list',  'icon' => 'fas fa-crown',               'tone' => 'amber',  'perm' => 'invoices_view', 'size' => 'md', 'sizes' => $list,  'ranged' => true,  'description' => 'Customers ranked by invoiced value in the period.'],
             'list_journals'        => ['title' => 'Recent journals',       'category' => 'Finance',   'type' => 'list',  'icon' => 'fas fa-stream',              'tone' => 'indigo', 'perm' => 'journals_view', 'size' => 'lg', 'sizes' => $list,  'ranged' => false, 'description' => 'Latest journal vouchers and their totals.'],
-            'list_accounts'        => ['title' => 'Chart of accounts',     'category' => 'Finance',   'type' => 'list',  'icon' => 'fas fa-list-alt',            'tone' => 'indigo', 'perm' => 'journals_view', 'size' => 'lg', 'sizes' => $list,  'ranged' => false, 'description' => 'A quick look at active accounts and their groups.'],
+            'list_accounts'        => ['title' => 'Largest account balances',     'category' => 'Finance',   'type' => 'list',  'icon' => 'fas fa-list-alt',            'tone' => 'indigo', 'perm' => 'journals_view', 'size' => 'lg', 'sizes' => $list,  'ranged' => false, 'description' => 'Accounts with the biggest balances — income and expenses for the financial year to date.'],
 
             // People
             'kpi_employees'        => ['title' => 'Active staff',          'category' => 'People',    'type' => 'kpi',   'icon' => 'fas fa-users',               'tone' => 'cyan',   'perm' => 'employees_view', 'size' => 'sm', 'sizes' => $kpi,  'ranged' => true,  'description' => 'Active employees, with new joiners in the period.'],
@@ -522,7 +522,7 @@ class DashboardService
 
     private function w_kpi_journals(array $r): array
     {
-        $sql = "SELECT COUNT(*) FROM journal_entries WHERE tenant_id = ? AND journal_date BETWEEN ? AND ?";
+        $sql = "SELECT COUNT(*) FROM journal_entries j WHERE j.tenant_id = ? AND j.journal_date BETWEEN ? AND ? AND " . LedgerService::POSTED_SQL;
         $cur = $this->sumOne($sql, 'iss', $this->tenantId, $r['from'], $r['to']);
         $prev = $this->sumOne($sql, 'iss', $this->tenantId, $r['prev_from'], $r['prev_to']);
         return $this->kpi($cur, $prev, ['format' => 'number', 'link' => './?page=journals']);
@@ -533,12 +533,12 @@ class DashboardService
         $b = self::monthBuckets($r['from'], $r['to']);
         $first = array_key_first($b) . '-01';
         $rows = $this->rows(
-            "SELECT DATE_FORMAT(j.journal_date,'%Y-%m') ym, g.type, SUM(ji.amount) total
+            "SELECT DATE_FORMAT(j.journal_date,'%Y-%m') ym, " . LedgerService::SIDE_SQL . " type, SUM(ji.amount) total
              FROM journal_items ji
              INNER JOIN journal_entries j ON ji.journal_id = j.id
-             INNER JOIN group_list g ON ji.group_id = g.id
-             WHERE j.tenant_id = ? AND j.journal_date BETWEEN ? AND ?
-             GROUP BY ym, g.type",
+             LEFT JOIN group_list g ON ji.group_id = g.id
+             WHERE j.tenant_id = ? AND j.journal_date BETWEEN ? AND ? AND " . LedgerService::POSTED_SQL . "
+             GROUP BY ym, type",
             'iss', $this->tenantId, $first, $r['to']
         );
         $deb = array_filter($rows, fn ($x) => (int)$x['type'] === 1);
@@ -652,8 +652,8 @@ class DashboardService
     {
         $rows = $this->rows(
             "SELECT j.id, j.code, j.journal_date, j.description,
-                    (SELECT COALESCE(SUM(ji.amount),0) FROM journal_items ji INNER JOIN group_list g ON g.id = ji.group_id WHERE ji.journal_id = j.id AND g.type = 1) amount
-             FROM journal_entries j WHERE j.tenant_id = ? ORDER BY j.journal_date DESC, j.id DESC LIMIT 8",
+                    (SELECT COALESCE(SUM(ji.amount),0) FROM journal_items ji LEFT JOIN group_list g ON g.id = ji.group_id WHERE ji.journal_id = j.id AND " . LedgerService::SIDE_SQL . " = 1) amount
+             FROM journal_entries j WHERE j.tenant_id = ? AND " . LedgerService::POSTED_SQL . " ORDER BY j.journal_date DESC, j.id DESC LIMIT 8",
             'i', $this->tenantId
         );
         return [
@@ -664,29 +664,33 @@ class DashboardService
         ];
     }
 
+    /** Financial year end month (1–12), used for year-to-date account balances. */
+    public int $yearEndMonth = 12;
+
     private function w_list_accounts(array $r): array
     {
-        $rows = $this->rows(
-            "SELECT a.code, a.name, g.name group_name, g.type
-             FROM account_list a INNER JOIN group_list g ON a.group_id = g.id
-             WHERE a.tenant_id = ? AND a.delete_flag = 0 AND a.status = 1
-             ORDER BY a.code LIMIT 8",
-            'i', $this->tenantId
-        );
-        foreach ($rows as &$x) {
-            $x['type'] = (int)$x['type'] === 1 ? 'Debit' : 'Credit';
+        $today = date('Y-m-d');
+        $ledger = new LedgerService($this->conn, $this->tenantId);
+        $bal = $ledger->balances(LedgerService::fyStart($today, $this->yearEndMonth), $today);
+        $rows = [];
+        foreach ($bal as $b) {
+            $isPl = in_array($b['class'], ['income', 'expense'], true);
+            $amount = $isPl ? LedgerService::natural($b['class'], $b['dr'], $b['cr'])
+                : LedgerService::natural($b['class'], $b['open_dr'] + $b['dr'], $b['open_cr'] + $b['cr']);
+            if (abs($amount) < 0.005) {
+                continue;
+            }
+            $rows[] = ['id' => $b['id'], 'code' => $b['code'], 'name' => $b['name'],
+                'group_name' => LedgerService::SECTIONS[$b['section']]['label'], 'balance' => round($amount, 2),
+                'href' => './?page=reports/general_ledger&account_id=' . $b['id']];
         }
-        unset($x);
-        $counts = $this->rows(
-            "SELECT (SELECT COUNT(*) FROM group_list WHERE tenant_id = ? AND delete_flag = 0 AND status = 1) g,
-                    (SELECT COUNT(*) FROM account_list WHERE tenant_id = ? AND delete_flag = 0 AND status = 1) a",
-            'ii', $this->tenantId, $this->tenantId
-        );
+        usort($rows, fn ($a, $b) => abs($b['balance']) <=> abs($a['balance']));
+        $count = $this->sumOne("SELECT COUNT(*) FROM account_list WHERE tenant_id = ? AND delete_flag = 0 AND status = 1", 'i', $this->tenantId);
         return [
-            'columns' => [['key' => 'code', 'label' => 'Code'], ['key' => 'name', 'label' => 'Account'], ['key' => 'group_name', 'label' => 'Group'], ['key' => 'type', 'label' => 'Type', 'format' => 'status', 'align' => 'right']],
-            'rows' => $rows,
-            'meta' => ((int)($counts[0]['g'] ?? 0)) . ' groups · ' . ((int)($counts[0]['a'] ?? 0)) . ' accounts',
-            'empty' => 'Set up your chart of accounts to start posting.',
+            'columns' => [['key' => 'code', 'label' => 'Code'], ['key' => 'name', 'label' => 'Account'], ['key' => 'group_name', 'label' => 'Section'], ['key' => 'balance', 'label' => 'Balance', 'format' => 'money', 'align' => 'right']],
+            'rows' => array_slice($rows, 0, 8),
+            'meta' => (int)$count . ' accounts',
+            'empty' => $count > 0 ? 'No posted balances yet this year.' : 'Set up your chart of accounts to start posting.',
             'link' => './?page=accounts',
         ];
     }

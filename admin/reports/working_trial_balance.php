@@ -1,138 +1,87 @@
 <?php
-function format_num($number){
-	$decimals = 0;
-	$num_ex = explode('.',$number);
-	$decimals = isset($num_ex[1]) ? strlen($num_ex[1]) : 0 ;
-	return number_format($number,$decimals);
+/**
+ * Working trial balance: opening balance, period debits and credits, and closing
+ * balance for every account — the worksheet accountants use before adjustments.
+ */
+require_once __DIR__ . '/_kit.php';
+
+use App\Services\LedgerService;
+
+$periods = nvr_periods();
+$from = nvr_date($_GET['from'] ?? null, $periods['fy_to_date'][1]);
+$to = nvr_date($_GET['to'] ?? null, $periods['fy_to_date'][2]);
+if ($from > $to) {
+    [$from, $to] = [$to, $from];
 }
-$tenant_id = $_settings->active_tenant_id();
-$tenant_name = $_settings->info('name');
-$t_qry = $conn->query("SELECT name FROM `tenants` WHERE id = '{$tenant_id}'");
-if($t_qry && $t_qry->num_rows > 0){
-    $t_row = $t_qry->fetch_assoc();
-    if(!empty($t_row['name'])){
-        $tenant_name = $t_row['name'];
+$ws = LedgerService::worksheet(nvr_ledger()->balances($from, $to));
+
+/** Signed balance shown with Dr/Cr suffix. */
+function nvr_drcr(float $v): string
+{
+    if (round($v, 2) == 0.0) {
+        return '–';
     }
+    return number_format(abs($v), 2) . ' <span class="muted">' . ($v > 0 ? 'Dr' : 'Cr') . '</span>';
 }
 
-$from = isset($_GET['from']) ? $conn->real_escape_string($_GET['from']) : date("Y-m-d",strtotime(date('Y-m-d')." -1 week"));
-$to = isset($_GET['to']) ? $conn->real_escape_string($_GET['to']) : date("Y-m-d");
+nvr_header([
+    'page' => 'reports/working_trial_balance',
+    'title' => 'Working Trial Balance',
+    'icon' => 'fas fa-th-list',
+    'mode' => 'range',
+    'from' => $from,
+    'to' => $to,
+    'subtitle' => nvr_nice_date($from) . ' – ' . nvr_nice_date($to),
+]);
+$t = $ws['totals'];
+$okOpen = abs($t['open_dr'] - $t['open_cr']) < 0.005;
+$okMove = abs($t['dr'] - $t['cr']) < 0.005;
 ?>
-<style>
-	th.p-0, td.p-0{
-		padding: 0 !important;
-	}
-</style>
-<div class="card card-outline card-primary">
-	<div class="card-header">
-		<h3 class="card-title">Working Trial Balance</h3>
-		<div class="card-tools">
-		</div>
-	</div>
-	<div class="card-body">
-        <div class="callout border-primary shadow rounded-0">
-            <h4 class="text-muted">Filter Date</h4>
-            <form action="" id="filter">
-            <div class="row align-items-end">
-                <div class="col-md-4 form-group">
-                    <label for="from" class="control-label">Date From</label>
-                    <input type="date" id="from" name="from" value="<?= $from ?>" class="form-control form-control-sm rounded-0">
-                </div>
-                <div class="col-md-4 form-group">
-                    <label for="to" class="control-label">Date To</label>
-                    <input type="date" id="to" name="to" value="<?= $to ?>" class="form-control form-control-sm rounded-0">
-                </div>
-                <div class="col-md-4 form-group">
-                    <button class="btn btn-default bg-gradient-navy btn-flat btn-sm"><i class="fa fa-filter"></i> Filter</button>
-			        <button class="btn btn-default border btn-flat btn-sm" id="print" type="button"><i class="fa fa-print"></i> Print</button>
-                </div>
-            </div>
-            </form>
-        </div>
-        <div class="container-fluid" id="outprint">
-            <h3 class="text-center"><b><?= htmlspecialchars($tenant_name) ?></b></h3>
-            <h4 class="text-center"><b>Working Trial Balance</b></h4>
-            <?php if($from == $to): ?>
-            <p class="m-0 text-center"><?= date("M d, Y" , strtotime($from)) ?></p>
-            <?php else: ?>
-            <p class="m-0 text-center"><?= date("M d, Y" , strtotime($from)). ' - '.date("M d, Y" , strtotime($to)) ?></p>
+<?php if (!$ws['lines']): ?>
+    <div class="nvr-empty"><i class="fas fa-th-list"></i><b>No account activity</b>There are no posted journals up to <?= nvr_nice_date($to) ?>.</div>
+<?php else: ?>
+    <div class="nvr-checks"><?= nvr_check($okOpen && $okMove, $okMove ? $t['open_dr'] - $t['open_cr'] : $t['dr'] - $t['cr'], 'Opening balances and movements balance', 'Out of balance') ?></div>
+    <div class="nvr-scroll">
+    <table class="nvr-table">
+        <thead>
+            <tr>
+                <th>Account</th>
+                <th>Code</th>
+                <th class="num">Opening</th>
+                <th class="num">Debits</th>
+                <th class="num">Credits</th>
+                <th class="num">Net movement</th>
+                <th class="num">Closing</th>
+            </tr>
+        </thead>
+        <tbody>
+        <?php $cls = null; foreach ($ws['lines'] as $l): ?>
+            <?php if ($l['class'] !== $cls): $cls = $l['class']; ?>
+                <tr class="sec"><td colspan="7"><?= LedgerService::CLASS_LABELS[$cls] ?></td></tr>
             <?php endif; ?>
-            <hr>
-			<table class="table table-hover table-bordered">
-                <thead>
-                    <tr>
-                        <th class="text-center">Date</th>
-                        <th class="text-center">Description</th>
-                        <th class="text-center">Ref. Code.</th>
-                        <th class="text-center">Amount</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php 
-                    $balance = 0;
-                    $journal = $conn->query("SELECT * FROM `journal_entries` WHERE tenant_id = '{$tenant_id}' AND date(journal_date) BETWEEN '{$from}' AND '{$to}'");
-                    $journal_arr = [];
-                    while($row = $journal->fetch_assoc()){
-                        $journal_arr[$row['id']] = $row;
-                    }
-                    $accounts = $conn->query("SELECT * FROM `account_list` WHERE tenant_id = '{$tenant_id}' AND delete_flag = 0 AND id IN (SELECT account_id FROM `journal_items` WHERE journal_id IN (SELECT id FROM `journal_entries` WHERE tenant_id = '{$tenant_id}' AND date(journal_date) BETWEEN '{$from}' AND '{$to}' ))");
-                    while($arow = $accounts->fetch_assoc()):
-                        $items = $conn->query("SELECT j.*, g.type FROM `journal_items` j INNER JOIN `group_list` g ON j.group_id = g.id WHERE j.account_id = '{$arow['id']}' AND j.journal_id IN (SELECT id FROM `journal_entries` WHERE tenant_id = '{$tenant_id}' AND date(journal_date) BETWEEN '{$from}' AND '{$to}' )");
-                    ?>
-                    <tr>
-                        <th colspan="4"><?= htmlspecialchars($arow['name']) ?></th>
-                    </tr>
-                    <?php 
-                    while($irow = $items->fetch_assoc()): 
-                        if($irow['type'] == 1)
-                            $balance += $irow['amount'];
-                        else    
-                            $balance -= $irow['amount'];
-                    ?>
-                        <tr>
-                            <td><?= isset($journal_arr[$irow['journal_id']]) ? date("M d, Y",strtotime($journal_arr[$irow['journal_id']]['journal_date'])) : "" ?></td>
-                            <td><?= isset($journal_arr[$irow['journal_id']]) ? htmlspecialchars($journal_arr[$irow['journal_id']]['description']) : "" ?></td>
-                            <td><?= isset($journal_arr[$irow['journal_id']]) ? htmlspecialchars($journal_arr[$irow['journal_id']]['code']) : "" ?></td>
-                            <td class="text-right"><?= $irow['type'] == 1 ? format_num($irow['amount']) : '-'.(format_num($irow['amount']))  ?></td>
-                        </tr>
-                    <?php endwhile; ?>
-				<?php endwhile; ?>
-                </tbody>
-                <tfoot>
-                    <th colspan="3" class="text-center">Total</th>
-                    <th class="text-right"><?= format_num($balance) ?></th>
-                </tfoot>
-			</table>
-		</div>
-	</div>
-</div>
-<script>
-	$(document).ready(function(){
-        $('#filter').submit(function(e){
-            e.preventDefault()
-            location.href="./?page=reports/working_trial_balance&"+$(this).serialize();
-        })
-        $('#print').click(function(){
-            start_loader()
-            var _h = $('head').clone();
-            var _p = $('#outprint').clone();
-            var el = $('<div>')
-            _h.find('title').text('Working Trial Balance - Print View')
-            _h.append('<style>html,body{ min-height: unset !important;}</style>')
-            el.append(_h)
-            el.append(_p)
-             var nw = window.open("","_blank","width=900,height=700,top=50,left=250")
-             nw.document.write(el.html())
-             nw.document.close()
-             setTimeout(() => {
-                 nw.print()
-                 setTimeout(() => {
-                     nw.close()
-                     end_loader()
-                 }, 200);
-             }, 500);
-        })
-		
-		$('.table td,.table th').addClass('py-1 px-2 align-middle')
-	})
-</script>
+            <tr class="acct">
+                <td><?= nvr_gl_link($l['id'], $from, $to, $l['name']) ?></td>
+                <td class="code"><?= htmlspecialchars($l['code']) ?></td>
+                <td class="num"><?= nvr_drcr($l['opening']) ?></td>
+                <td class="num"><?= nvr_money($l['dr']) ?></td>
+                <td class="num"><?= nvr_money($l['cr']) ?></td>
+                <td class="num"><?= nvr_drcr($l['dr'] - $l['cr']) ?></td>
+                <td class="num"><?= nvr_drcr($l['closing']) ?></td>
+            </tr>
+        <?php endforeach; ?>
+        </tbody>
+        <tfoot>
+            <tr class="grand">
+                <td colspan="2">Total</td>
+                <td class="num"><?= number_format($t['open_dr'], 2) ?> / <?= number_format($t['open_cr'], 2) ?></td>
+                <td class="num"><?= nvr_money($t['dr'], false) ?></td>
+                <td class="num"><?= nvr_money($t['cr'], false) ?></td>
+                <td class="num"></td>
+                <td class="num"><?= number_format($t['close_dr'], 2) ?> / <?= number_format($t['close_cr'], 2) ?></td>
+            </tr>
+        </tfoot>
+    </table>
+    </div>
+<?php endif; ?>
+<?php
+nvr_footer(['Opening and closing totals are shown as debit / credit. Click an account to see the transactions behind its movement.']);

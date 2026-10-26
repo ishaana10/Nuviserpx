@@ -1,102 +1,108 @@
 <?php
+/**
+ * Journal detail (opened in the modal from the journal list and the ledger).
+ */
 require_once(__DIR__ . '/../../config.php');
-if(isset($_GET['id'])){
-    $id = intval($_GET['id']);
-    $qry = $conn->query("SELECT b.*,h.name as `hall`,concat(c.lastname,', ',c.firstname,' ', c.middlename) as fullname, c.contact, c.address from `booking_list` b inner join `hall_list` h on b.hall_id = h.id inner join client_list c on b.client_id = c.id where b.id = '{$id}' ");
-    if($qry && $qry->num_rows > 0){
-        $res = $qry->fetch_array();
-        foreach($res as $k => $v){
-            if(!is_numeric($k))
-            $$k = $v;
-        }
-        $services = "";
-        if(!empty($services_ids)){
-            $services_ids_arr = explode(',', str_replace("|", ",", $services_ids));
-            $clean_service_ids = [];
-            foreach($services_ids_arr as $s_id){
-                if(is_numeric(trim($s_id))){
-                    $clean_service_ids[] = intval(trim($s_id));
-                }
-            }
-            if(!empty($clean_service_ids)){
-                $clean_ids_str = implode(',', $clean_service_ids);
-                $services_qry = $conn->query("SELECT * FROM `service_list` where id in ({$clean_ids_str})");
-                if($services_qry){
-                    while($row = $services_qry->fetch_assoc()){
-                        if(!empty($services)) $services .= ", ";
-                        $services .= $row['name'];
-                    }
-                }
-            }
-        }
-        $services = !empty($services) ? $services : "N/A";
-    }
+
+use App\Services\JournalService;
+use App\Services\LedgerService;
+
+$tenant_id = (int)$_settings->active_tenant_id();
+$id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+
+$journal = null;
+$lines = [];
+$stmt = $conn->prepare("SELECT j.*, CONCAT(u.firstname, ' ', u.lastname) author FROM journal_entries j LEFT JOIN users u ON u.id = j.user_id WHERE j.id = ? AND j.tenant_id = ?");
+if ($stmt) {
+    $stmt->bind_param('ii', $id, $tenant_id);
+    $stmt->execute();
+    $journal = $stmt->get_result()->fetch_assoc();
+}
+if ($journal) {
+    $side = LedgerService::SIDE_SQL;
+    $q = $conn->prepare("SELECT ji.*, a.code, a.name account, a.type, {$side} side
+        FROM journal_items ji INNER JOIN account_list a ON a.id = ji.account_id
+        LEFT JOIN group_list g ON g.id = ji.group_id
+        WHERE ji.journal_id = ? AND a.tenant_id = ? ORDER BY ji.id");
+    $q->bind_param('ii', $id, $tenant_id);
+    $q->execute();
+    $lines = $q->get_result()->fetch_all(MYSQLI_ASSOC);
+}
+$status = strtolower((string)($journal['status'] ?? 'posted'));
+$cancelled = in_array($status, ['cancelled', 'canceled', 'void', '2', '3'], true);
+$label = $cancelled ? 'Cancelled' : ($status === 'draft' ? 'Draft' : 'Posted');
+$badge = $cancelled ? 'secondary' : ($status === 'draft' ? 'warning' : 'success');
+$tdr = $tcr = 0.0;
+$source = null;
+if ($journal) {
+    $source = (new JournalService($conn, $_settings))->sourceDocument($id, $tenant_id);
 }
 ?>
 <style>
-    #uni_modal .modal-footer{
-        display:none;
-    }
+    #uni_modal .modal-footer { display: none; }
+    .jv-meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px 16px; margin-bottom: 16px; }
+    .jv-meta .k { font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: #64748b; font-weight: 600; }
+    .jv-meta .v { font-weight: 600; color: #0f172a; }
+    .jv-table { width: 100%; font-size: .9rem; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+    .jv-table th { font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: #64748b; padding: 6px 8px; border-bottom: 2px solid #e2e8f0; }
+    .jv-table td { padding: 8px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
+    .jv-table .num { text-align: right; white-space: nowrap; }
+    .jv-table tfoot td { font-weight: 700; border-top: 2px solid #0f172a; border-bottom: 0; }
+    .jv-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
 </style>
 <div class="container-fluid">
-    <div id="outprint" class="list-group">
-        <div class="row">
-            <div class="col-4 bg-gradient-primary border">Reference Code:</div>
-            <div class="col-8 text-dark border"><?= isset($code) ? $code : "N/A" ?></div>
-            <div class="col-4 bg-gradient-primary border">Client Name:</div>
-            <div class="col-8 text-dark border"><?= isset($fullname) ? $fullname : "N/A" ?></div>
-            <div class="col-4 bg-gradient-primary border">Contact #:</div>
-            <div class="col-8 text-dark border"><?= isset($contact) ? $contact : "N/A" ?></div>
-            <div class="col-4 bg-gradient-primary border">Address:</div>
-            <div class="col-8 text-dark border"><?= isset($address) ? $address : "N/A" ?></div>
-            <div class="col-4 bg-gradient-primary border">Hall:</div>
-            <div class="col-8 text-dark border"><?= isset($hall) ? $hall : "N/A" ?></div>
-            <div class="col-4 bg-gradient-primary border">Services:</div>
-            <div class="col-8 text-dark border"><?= isset($services) ? $services : "N/A" ?></div>
-            <div class="col-4 bg-gradient-primary border">Wedding Schedule:</div>
-            <div class="col-8 text-dark border"><?= isset($wedding_schedule) ? date("M d, Y", strtotime($wedding_schedule)) : "N/A" ?></div>
-            <div class="col-4 bg-gradient-primary border">Total Guests:</div>
-            <div class="col-8 text-dark border"><?= isset($total_guests) ? $total_guests : "N/A" ?></div>
-            <div class="col-4 bg-gradient-primary border">Status:</div>
-            <div class="col-8 text-dark border">
-                <?php 
-                $status = isset($status) ? $status : "";
-                    switch ($status){
-                        case 0:
-                            echo '<span class="rounded-pill badge badge-secondary bg-gradient-secondary px-3">Pending</span>';
-                            break;
-                        case 1:
-                            echo '<span class="rounded-pill badge badge-primary bg-gradient-primary px-3">Confirmed</span>';
-                            break;
-                        case 2:
-                            echo '<span class="rounded-pill badge badge-success bg-gradient-success px-3">Done</span>';
-                            break;
-                        case 3:
-                            echo '<span class="rounded-pill badge badge-danger bg-gradient-danger px-3">Cancelled</span>';
-                            break;
-                        default:
-                            echo '<span class="rounded-pill badge badge-default bg-gradient-default border px-3">N/A</span>';
-                            break;
-                    }
-                ?>
-            </div>
-            <div class="col-4 bg-gradient-primary border">Remarks:</div>
-            <div class="col-8 text-dark border"><?= isset($remarks) ? $remarks : "N/A" ?></div>
-        </div>
+<?php if (!$journal): ?>
+    <div class="nv-empty"><div class="nv-empty-icon"><i class="fas fa-search"></i></div><div class="nv-empty-title">Journal not found</div></div>
+<?php else: ?>
+    <div class="jv-meta">
+        <div><div class="k">Reference</div><div class="v"><?= htmlspecialchars($journal['code']) ?></div></div>
+        <div><div class="k">Date</div><div class="v"><?= date('j M Y', strtotime($journal['journal_date'])) ?></div></div>
+        <div><div class="k">Status</div><div class="v"><span class="badge badge-<?= $badge ?>"><?= $label ?></span></div></div>
+        <div><div class="k">Created by</div><div class="v"><?= htmlspecialchars(trim((string)$journal['author']) ?: '—') ?></div></div>
+        <?php if (!empty($journal['auto_reversing_date'])): ?>
+        <div><div class="k">Reverses on</div><div class="v"><?= date('j M Y', strtotime($journal['auto_reversing_date'])) ?></div></div>
+        <?php endif; ?>
+        <?php if ($source): ?>
+        <div><div class="k">Source</div><div class="v"><?= htmlspecialchars(ucfirst($source)) ?></div></div>
+        <?php endif; ?>
     </div>
-    <div class="clear-fix my-2"></div>
-    <div class="text-right">
-        <button class="btn btn-sm btn-flat btn-primary" type="button" id="edit_booking"><i class="fa fa-edit"></i> Edit</button>
-        <button class="btn btn-sm btn-flat btn-dark" type="button" data-dismiss="modal"><i class="fa fa-times"></i> Close</button>
+    <p class="mb-3"><?= nl2br(htmlspecialchars($journal['description'])) ?></p>
+    <table class="jv-table">
+        <thead><tr><th>Account</th><th>Description</th><th>Tax</th><th class="num">Debit</th><th class="num">Credit</th></tr></thead>
+        <tbody>
+        <?php foreach ($lines as $l): $dr = (int)$l['side'] === 1 ? (float)$l['amount'] : 0; $cr = (int)$l['side'] === 2 ? (float)$l['amount'] : 0; $tdr += $dr; $tcr += $cr; ?>
+            <tr>
+                <td><b><?= htmlspecialchars($l['account']) ?></b><?php if ($l['code']): ?><div class="small text-muted"><?= htmlspecialchars($l['code']) ?> · <?= htmlspecialchars($l['type'] ?? '') ?></div><?php endif; ?></td>
+                <td><?= htmlspecialchars((string)($l['description'] ?? '')) ?></td>
+                <td class="small text-muted"><?= htmlspecialchars((string)($l['tax_rate'] ?? '')) ?></td>
+                <td class="num"><?= $dr ? number_format($dr, 2) : '' ?></td>
+                <td class="num"><?= $cr ? number_format($cr, 2) : '' ?></td>
+            </tr>
+        <?php endforeach; ?>
+        </tbody>
+        <tfoot><tr><td colspan="3">Total<?php if (abs($tdr - $tcr) >= 0.005): ?> <span class="badge badge-danger ml-2">Out by <?= number_format(abs($tdr - $tcr), 2) ?></span><?php endif; ?></td><td class="num"><?= number_format($tdr, 2) ?></td><td class="num"><?= number_format($tcr, 2) ?></td></tr></tfoot>
+    </table>
+    <div class="jv-actions">
+        <?php if (!$cancelled && !$source): ?>
+            <a class="btn btn-default" href="./?page=journals/manage_journal&id=<?= $id ?>"><i class="fas fa-edit mr-1"></i> Edit</a>
+            <button type="button" class="btn btn-default text-danger" onclick="nvCancelJournal(<?= $id ?>)"><i class="fas fa-ban mr-1"></i> Cancel journal</button>
+        <?php endif; ?>
+        <button type="button" class="btn btn-primary" data-dismiss="modal">Close</button>
     </div>
+<?php endif; ?>
 </div>
-
 <script>
-   
-   $(function(){
-        $('#edit_booking').click(function(){
-            uni_modal("Update Booking Details - <?= isset($code) ? $code : '' ?>","bookings/manage_booking.php?id=<?= isset($id) ? $id : '' ?>",'mid-large')
-        })
-   })
-    
+window.nvCancelJournal = function (id) {
+    Swal.fire({
+        title: 'Cancel this journal?',
+        text: 'It stays on record but is removed from every report. This cannot be undone.',
+        icon: 'warning', showCancelButton: true, confirmButtonText: 'Cancel journal', cancelButtonText: 'Keep it',
+        confirmButtonColor: '#dc2626', reverseButtons: true, focusCancel: true
+    }).then(function (r) {
+        if (!(r.isConfirmed || r.value)) { return; }
+        $.post(_base_url_ + 'classes/Master.php?f=cancel_journal', { id: id }, null, 'json').done(function (resp) {
+            if (resp && resp.status === 'success') { location.reload(); } else { alert_toast((resp && resp.msg) || 'The journal could not be cancelled.', 'error'); }
+        }).fail(function () { alert_toast('The journal could not be cancelled.', 'error'); });
+    });
+};
 </script>

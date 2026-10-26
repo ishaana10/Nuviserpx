@@ -1,225 +1,120 @@
 <?php
-function format_num($number){
-	return number_format($number, 2);
+/**
+ * Balance sheet: assets, liabilities and equity at a date. Profit for the current
+ * financial year and earlier years is rolled into equity, so the sheet balances.
+ */
+require_once __DIR__ . '/_kit.php';
+
+use App\Services\LedgerService;
+
+$as_of = nvr_date($_GET['as_of'] ?? null, date('Y-m-d'));
+$compare = in_array($_GET['compare'] ?? '', ['last_month', 'last_year'], true) ? $_GET['compare'] : 'none';
+$yem = nvr_year_end_month();
+$ledger = nvr_ledger();
+
+$build = function (string $date) use ($ledger, $yem): array {
+    return LedgerService::balanceSheet($ledger->balances(LedgerService::fyStart($date, $yem), $date));
+};
+$bs = $build($as_of);
+
+$cmp = null;
+$cmpDate = null;
+if ($compare !== 'none') {
+    $cmpDate = $compare === 'last_year'
+        ? date('Y-m-d', strtotime($as_of . ' -1 year'))
+        : date('Y-m-d', strtotime('last day of previous month', strtotime($as_of)));
+    $cmp = $build($cmpDate);
 }
 
-$tenant_id = $_settings->active_tenant_id();
-$tenant_name = $_settings->info('name');
-$t_qry = $conn->query("SELECT name FROM `tenants` WHERE id = '{$tenant_id}'");
-if($t_qry && $t_qry->num_rows > 0){
-    $t_row = $t_qry->fetch_assoc();
-    if(!empty($t_row['name'])){
-        $tenant_name = $t_row['name'];
+$cmpMap = [];
+if ($cmp) {
+    foreach ($cmp['sections'] as $sk => $s) {
+        foreach ($s['lines'] as $l) {
+            $cmpMap[$sk][$l['id'] ?? $l['name']] = $l['amount'];
+        }
     }
 }
+$cols = $cmp ? 3 : 2;
+$fy_start = LedgerService::fyStart($as_of, $yem);
 
-$as_of = isset($_GET['as_of']) ? $conn->real_escape_string($_GET['as_of']) : date("Y-m-d");
+nvr_header([
+    'page' => 'reports/balance_sheet',
+    'title' => 'Balance Sheet',
+    'icon' => 'fas fa-landmark',
+    'mode' => 'asat',
+    'asat' => $as_of,
+    'compare' => ['none' => 'No comparison', 'last_month' => 'End of previous month', 'last_year' => 'Same date last year'],
+    'compareValue' => $compare,
+    'subtitle' => 'As at ' . nvr_nice_date($as_of),
+]);
 
-// Fetch accounts categorized by group (Assets, Liabilities, Equity)
-$qry = $conn->query("
-    SELECT a.id, a.name AS account_name, g.name AS group_name, g.type AS group_type,
-           SUM(CASE WHEN g.type = 1 THEN ji.amount ELSE 0 END) AS total_debit,
-           SUM(CASE WHEN g.type = 2 THEN ji.amount ELSE 0 END) AS total_credit
-    FROM `journal_items` ji
-    INNER JOIN `account_list` a ON ji.account_id = a.id
-    INNER JOIN `group_list` g ON ji.group_id = g.id
-    INNER JOIN `journal_entries` j ON ji.journal_id = j.id
-    WHERE a.tenant_id = '{$tenant_id}' AND j.tenant_id = '{$tenant_id}' AND a.delete_flag = 0 AND date(j.journal_date) <= '{$as_of}' AND g.name IN ('Assets', 'Liabilities', 'Equity')
-    GROUP BY a.id, a.name, g.name, g.type
-    ORDER BY g.name ASC, a.name ASC
-");
-
-$assets = [];
-$liabilities = [];
-$equity = [];
-
-$tot_assets = 0;
-$tot_liabilities = 0;
-$tot_equity = 0;
-
-while($row = $qry->fetch_assoc()){
-    $debit = (float)$row['total_debit'];
-    $credit = (float)$row['total_credit'];
-
-    if($row['group_name'] == 'Assets'){
-        $bal = $debit - $credit; // Asset balance = Dr - Cr
-        $assets[] = ['name' => $row['account_name'], 'balance' => $bal];
-        $tot_assets += $bal;
-    } elseif($row['group_name'] == 'Liabilities'){
-        $bal = $credit - $debit; // Liability balance = Cr - Dr
-        $liabilities[] = ['name' => $row['account_name'], 'balance' => $bal];
-        $tot_liabilities += $bal;
-    } elseif($row['group_name'] == 'Equity'){
-        $bal = $credit - $debit; // Equity balance = Cr - Dr
-        $equity[] = ['name' => $row['account_name'], 'balance' => $bal];
-        $tot_equity += $bal;
+$row = function (string $class, string $label, float $cur, ?float $prev) use ($cmp): string {
+    return '<tr class="' . $class . '"><td>' . $label . '</td><td class="num' . ($cur < 0 ? ' neg' : '') . '">' . nvr_money($cur, $class !== 'acct' && $class !== 'computed acct') . '</td>'
+        . ($cmp ? '<td class="num muted">' . nvr_money((float)$prev) . '</td>' : '') . '</tr>';
+};
+$render = function (array $keys, bool $subtotals = true) use ($bs, $cmp, $cmpMap, $cols, $row, $fy_start, $as_of): void {
+    foreach ($keys as $sk) {
+        $s = $bs['sections'][$sk];
+        $lines = [];
+        foreach ($s['lines'] as $l) { $lines[$l['id'] ?? $l['name']] = $l; }
+        foreach ($cmpMap[$sk] ?? [] as $k => $amt) {
+            if (!isset($lines[$k])) {
+                foreach ($cmp['sections'][$sk]['lines'] as $cl) {
+                    if (($cl['id'] ?? $cl['name']) === $k) { $lines[$k] = array_merge($cl, ['amount' => 0.0]); }
+                }
+            }
+        }
+        if (!$lines) { continue; }
+        echo '<tr class="sec"><td colspan="' . $cols . '">' . htmlspecialchars($s['label']) . '</td></tr>';
+        foreach ($lines as $k => $l) {
+            $label = !empty($l['computed']) ? htmlspecialchars($l['name']) : nvr_gl_link($l['id'], $fy_start, $as_of, $l['name']);
+            echo $row(!empty($l['computed']) ? 'computed acct' : 'acct', $label, (float)$l['amount'], $cmp ? (float)($cmpMap[$sk][$k] ?? 0) : null);
+        }
+        if ($subtotals) {
+            echo $row('sub', 'Total ' . htmlspecialchars(strtolower($s['label'])), $s['total'], $cmp ? $cmp['sections'][$sk]['total'] : null);
+        }
     }
-}
-
-// Calculate Net Income (Profit) up to as_of date to include in Retained Earnings/Equity
-$pnl_qry = $conn->query("
-    SELECT g.name AS group_name,
-           SUM(CASE WHEN g.type = 1 THEN ji.amount ELSE 0 END) AS total_debit,
-           SUM(CASE WHEN g.type = 2 THEN ji.amount ELSE 0 END) AS total_credit
-    FROM `journal_items` ji
-    INNER JOIN `account_list` a ON ji.account_id = a.id
-    INNER JOIN `group_list` g ON ji.group_id = g.id
-    INNER JOIN `journal_entries` j ON ji.journal_id = j.id
-    WHERE a.tenant_id = '{$tenant_id}' AND j.tenant_id = '{$tenant_id}' AND a.delete_flag = 0 AND date(j.journal_date) <= '{$as_of}' AND g.name IN ('Revenue', 'Expenses')
-    GROUP BY g.name
-");
-
-$revenue_tot = 0;
-$expense_tot = 0;
-while($prow = $pnl_qry->fetch_assoc()){
-    if($prow['group_name'] == 'Revenue'){
-        $revenue_tot = (float)$prow['total_credit'] - (float)$prow['total_debit'];
-    } elseif($prow['group_name'] == 'Expenses'){
-        $expense_tot = (float)$prow['total_debit'] - (float)$prow['total_credit'];
-    }
-}
-$net_income = $revenue_tot - $expense_tot;
-$tot_equity += $net_income;
-$tot_liab_equity = $tot_liabilities + $tot_equity;
+};
+$empty = $bs['total_assets'] == 0.0 && $bs['total_liabilities'] == 0.0 && $bs['total_equity'] == 0.0;
 ?>
-
-<div class="card card-outline card-success">
-	<div class="card-header">
-		<h3 class="card-title"><i class="fas fa-balance-scale text-success"></i> Balance Sheet (Statement of Financial Position)</h3>
-	</div>
-	<div class="card-body">
-        <div class="callout border-success shadow rounded-0">
-            <form action="" id="filter">
-            <div class="row align-items-end">
-                <div class="col-md-6 form-group">
-                    <label for="as_of" class="control-label">As of Date</label>
-                    <input type="date" id="as_of" name="as_of" value="<?= $as_of ?>" class="form-control form-control-sm rounded-0">
-                </div>
-                <div class="col-md-6 form-group">
-                    <button class="btn btn-success btn-flat btn-sm"><i class="fa fa-filter"></i> Apply Filter</button>
-			        <button class="btn btn-default border btn-flat btn-sm" id="print" type="button"><i class="fa fa-print"></i> Print</button>
-                </div>
-            </div>
-            </form>
-        </div>
-
-        <div class="container-fluid" id="outprint">
-            <div class="text-center mb-4">
-		<h3 class="font-weight-bold m-0"><?= htmlspecialchars($tenant_name) ?></h3>
-		<h4 class="font-weight-bold text-success">BALANCE SHEET STATEMENT</h4>
-		<p class="m-0 text-muted small">As of <?= date("d F Y" , strtotime($as_of)) ?></p>
-            </div>
-            <hr>
-
-            <div class="row">
-		<!-- Assets Column -->
-		<div class="col-md-6 border-right">
-			<h5 class="font-weight-bold text-navy border-bottom pb-2"><i class="fas fa-university"></i> ASSETS</h5>
-			<table class="table table-sm table-striped">
-				<tbody>
-					<?php foreach($assets as $a): ?>
-					<tr>
-						<td><?= htmlspecialchars($a['name']) ?></td>
-						<td class="text-right font-weight-bold">$<?= format_num($a['balance']) ?></td>
-					</tr>
-					<?php endforeach; ?>
-				</tbody>
-				<tfoot class="bg-light">
-					<tr class="h6">
-						<th class="font-weight-bold text-navy">TOTAL ASSETS</th>
-						<th class="text-right font-weight-bold text-success">$<?= format_num($tot_assets) ?></th>
-					</tr>
-				</tfoot>
-			</table>
-		</div>
-
-		<!-- Liabilities & Equity Column -->
-		<div class="col-md-6">
-			<h5 class="font-weight-bold text-navy border-bottom pb-2"><i class="fas fa-file-invoice-dollar"></i> LIABILITIES</h5>
-			<table class="table table-sm table-striped mb-4">
-				<tbody>
-					<?php foreach($liabilities as $l): ?>
-					<tr>
-						<td><?= htmlspecialchars($l['name']) ?></td>
-						<td class="text-right font-weight-bold">$<?= format_num($l['balance']) ?></td>
-					</tr>
-					<?php endforeach; ?>
-				</tbody>
-				<tfoot class="bg-light">
-					<tr>
-						<th class="font-weight-bold">Total Liabilities</th>
-						<th class="text-right font-weight-bold">$<?= format_num($tot_liabilities) ?></th>
-					</tr>
-				</tfoot>
-			</table>
-
-			<h5 class="font-weight-bold text-navy border-bottom pb-2"><i class="fas fa-chart-line"></i> EQUITY</h5>
-			<table class="table table-sm table-striped">
-				<tbody>
-					<?php foreach($equity as $e): ?>
-					<tr>
-						<td><?= htmlspecialchars($e['name']) ?></td>
-						<td class="text-right font-weight-bold">$<?= format_num($e['balance']) ?></td>
-					</tr>
-					<?php endforeach; ?>
-					<tr>
-						<td>Current Retained Earnings / Net Income</td>
-						<td class="text-right font-weight-bold text-<?= $net_income >= 0 ? 'success' : 'danger' ?>">$<?= format_num($net_income) ?></td>
-					</tr>
-				</tbody>
-				<tfoot class="bg-light">
-					<tr>
-						<th class="font-weight-bold">Total Equity</th>
-						<th class="text-right font-weight-bold">$<?= format_num($tot_equity) ?></th>
-					</tr>
-					<tr class="h6 bg-navy text-white">
-						<th class="font-weight-bold">TOTAL LIABILITIES & EQUITY</th>
-						<th class="text-right font-weight-bold text-warning">$<?= format_num($tot_liab_equity) ?></th>
-					</tr>
-				</tfoot>
-			</table>
-		</div>
-            </div>
-
-            <!-- Balanced Check Badge -->
-            <div class="mt-4 p-3 text-center <?= abs($tot_assets - $tot_liab_equity) < 0.01 ? 'bg-success' : 'bg-danger' ?> text-white rounded">
-		<h6 class="m-0 font-weight-bold">
-			<?php if(abs($tot_assets - $tot_liab_equity) < 0.01): ?>
-				<i class="fas fa-check-circle mr-1"></i> Balance Sheet is Balanced (Assets = Liabilities + Equity: $<?= format_num($tot_assets) ?>)
-			<?php else: ?>
-				<i class="fas fa-exclamation-triangle mr-1"></i> Balance Sheet Unbalanced Difference: $<?= format_num(abs($tot_assets - $tot_liab_equity)) ?>
-			<?php endif; ?>
-		</h6>
-            </div>
-        </div>
-	</div>
+<div class="nvr-summary">
+    <div class="nvr-stat"><div class="k">Total assets</div><div class="v"><?= nvr_money($bs['total_assets'], false) ?></div></div>
+    <div class="nvr-stat"><div class="k">Total liabilities</div><div class="v"><?= nvr_money($bs['total_liabilities'], false) ?></div></div>
+    <div class="nvr-stat"><div class="k">Net assets</div><div class="v<?= $bs['net_assets'] < 0 ? ' neg' : '' ?>"><?= nvr_money($bs['net_assets'], false) ?></div></div>
+    <div class="nvr-stat"><div class="k">Current year earnings</div><div class="v<?= $bs['current_year_earnings'] < 0 ? ' neg' : '' ?>"><?= nvr_money($bs['current_year_earnings'], false) ?></div><div class="s">Since <?= nvr_nice_date($fy_start) ?></div></div>
 </div>
 
-<script>
-	$(document).ready(function(){
-        $('#filter').submit(function(e){
-            e.preventDefault();
-            location.href="./?page=reports/balance_sheet&"+$(this).serialize();
-        });
+<?php if ($empty): ?>
+    <div class="nvr-empty"><i class="fas fa-landmark"></i><b>Nothing to report yet</b>No posted balances up to <?= nvr_nice_date($as_of) ?>.</div>
+<?php else: ?>
+<div class="nvr-checks"><?= nvr_check($bs['balanced'], $bs['difference'], 'Net assets equal equity', 'Does not balance') ?></div>
+<div class="nvr-scroll">
+<table class="nvr-table">
+    <thead>
+        <tr>
+            <th></th>
+            <th class="num"><?= date('j M Y', strtotime($as_of)) ?></th>
+            <?php if ($cmp): ?><th class="num"><?= date('j M Y', strtotime($cmpDate)) ?></th><?php endif; ?>
+        </tr>
+    </thead>
+    <tbody>
+        <tr class="sec"><td colspan="<?= $cols ?>" style="font-size:.9rem">Assets</td></tr>
+        <?php $render(['bank', 'current_asset', 'fixed_asset', 'non_current_asset']); ?>
+        <?= $row('key', 'Total assets', $bs['total_assets'], $cmp ? $cmp['total_assets'] : null) ?>
 
-        $('#print').click(function(){
-            start_loader();
-            var _h = $('head').clone();
-            var _p = $('#outprint').clone();
-            var el = $('<div>');
-            _h.find('title').text('Balance Sheet Statement')
-            el.append(_h);
-            el.append(_p);
-            var nw = window.open("","_blank","width=900,height=700");
-            nw.document.write(el.html());
-            nw.document.close();
-            setTimeout(() => {
-                nw.print();
-                setTimeout(() => {
-                    nw.close();
-                    end_loader();
-                }, 200);
-            }, 500);
-        });
-	});
-</script>
+        <tr class="sec"><td colspan="<?= $cols ?>" style="font-size:.9rem">Liabilities</td></tr>
+        <?php $render(['current_liability', 'non_current_liability']); ?>
+        <?= $row('key', 'Total liabilities', $bs['total_liabilities'], $cmp ? $cmp['total_liabilities'] : null) ?>
+
+        <?= $row('key', 'Net assets', $bs['net_assets'], $cmp ? $cmp['net_assets'] : null) ?>
+
+        <?php $render(['equity'], false); ?>
+        <?= $row('grand', 'Total equity', $bs['total_equity'], $cmp ? $cmp['total_equity'] : null) ?>
+    </tbody>
+</table>
+</div>
+<?php endif; ?>
+<?php
+nvr_footer([
+    'Financial year starts ' . nvr_nice_date($fy_start) . ' (year end month is set in Financial Settings). Profit before that date is shown as retained earnings.',
+]);

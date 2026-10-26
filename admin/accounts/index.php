@@ -1,45 +1,59 @@
 <?php
-$tenant_id = $_settings->active_tenant_id();
+use App\Services\LedgerService;
+
+$tenant_id = (int)$_settings->active_tenant_id();
 
 // Active tab filter
-$tab = $_GET['tab'] ?? 'all';
+$tab = in_array($_GET['tab'] ?? 'all', ['all', 'assets', 'liabilities', 'equity', 'revenue', 'expenses', 'archive'], true) ? ($_GET['tab'] ?? 'all') : 'all';
 $search = trim($_GET['s'] ?? '');
+$tab_class = ['assets' => 'asset', 'liabilities' => 'liability', 'equity' => 'equity', 'revenue' => 'income', 'expenses' => 'expense'];
 
-// Filter query construction
-$where = "WHERE a.tenant_id = '{$tenant_id}' AND a.delete_flag = 0";
+$sql = "SELECT * FROM `account_list` WHERE tenant_id = ? AND delete_flag = 0";
+$params = [$tenant_id];
+$types = 'i';
+if ($search !== '') {
+    $sql .= " AND (code LIKE ? OR name LIKE ? OR description LIKE ? OR type LIKE ?)";
+    $like = '%' . $search . '%';
+    array_push($params, $like, $like, $like, $like);
+    $types .= 'ssss';
+}
+$sql .= " ORDER BY code IS NULL, code = '', CAST(code AS UNSIGNED), code, name";
+$stmt = $conn->prepare($sql);
+$stmt->bind_param($types, ...$params);
+$stmt->execute();
+$all_accounts = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
-if ($tab === 'archive') {
-    $where .= " AND a.is_archived = 1";
-} else {
-    $where .= " AND a.is_archived = 0";
-    if ($tab === 'assets') {
-        $where .= " AND (a.type LIKE '%Asset%' OR a.type = 'Bank')";
-    } elseif ($tab === 'liabilities') {
-        $where .= " AND a.type LIKE '%Liabilit%'";
-    } elseif ($tab === 'equity') {
-        $where .= " AND a.type LIKE '%Equity%'";
-    } elseif ($tab === 'expenses') {
-        $where .= " AND (a.type LIKE '%Expense%' OR a.type = 'Direct Costs')";
-    } elseif ($tab === 'revenue') {
-        $where .= " AND a.type LIKE '%Revenue%'";
+// Balances: balance-sheet accounts show the balance to date; P&L accounts the
+// financial year to date. Only posted journals count.
+$today = date('Y-m-d');
+$fy_start = LedgerService::fyStart($today, (int)($_settings->info('fiscal_year_end_month') ?: 12));
+$bal = (new LedgerService($conn, $tenant_id))->balances($fy_start, $today, true);
+
+$tab_counts = array_fill_keys(array_keys($tab_class), 0) + ['all' => 0, 'archive' => 0];
+$rows = [];
+foreach ($all_accounts as $a) {
+    $c = LedgerService::classify($a['type']);
+    $a['class'] = $c['class'];
+    $b = $bal[(int)$a['id']] ?? null;
+    if ($b) {
+        $a['balance'] = in_array($c['class'], ['income', 'expense'], true)
+            ? LedgerService::natural($c['class'], $b['dr'], $b['cr'])
+            : LedgerService::natural($c['class'], $b['open_dr'] + $b['dr'], $b['open_cr'] + $b['cr']);
+    } else {
+        $a['balance'] = 0.0;
+    }
+    $archived = !empty($a['is_archived']);
+    if ($archived) {
+        $tab_counts['archive']++;
+    } else {
+        $tab_counts['all']++;
+        $tab_counts[array_search($c['class'], $tab_class, true)]++;
+    }
+    $show = $tab === 'archive' ? $archived : (!$archived && ($tab === 'all' || $tab_class[$tab] === $c['class']));
+    if ($show) {
+        $rows[] = $a;
     }
 }
-
-if (!empty($search)) {
-    $s_esc = $conn->real_escape_string($search);
-    $where .= " AND (a.code LIKE '%{$s_esc}%' OR a.name LIKE '%{$s_esc}%' OR a.description LIKE '%{$s_esc}%')";
-}
-
-$qry = $conn->query("
-    SELECT a.*,
-           IFNULL(SUM(CASE WHEN g.type = 1 THEN ji.amount ELSE -ji.amount END), 0.00) AS ytd_balance
-    FROM `account_list` a
-    LEFT JOIN `journal_items` ji ON ji.account_id = a.id
-    LEFT JOIN `group_list` g ON ji.group_id = g.id
-    {$where}
-    GROUP BY a.id
-    ORDER BY CAST(a.code AS UNSIGNED) ASC, a.code ASC, a.name ASC
-");
 ?>
 
 <style>
@@ -168,15 +182,6 @@ $qry = $conn->query("
             </button>
         </div>
 
-        <!-- Default Chart Notice Alert -->
-        <div class="coa-notice" id="notice-box">
-            <div>
-                <i class="fas fa-info-circle mr-2 text-warning"></i>
-                You're using the default chart of accounts. You can customize this, find out how in our <a href="#" class="text-dark font-weight-bold">Help Centre</a>.
-            </div>
-            <button type="button" class="close text-muted" onclick="$('#notice-box').slideUp();">&times;</button>
-        </div>
-
         <!-- Action Toolbar -->
         <div class="coa-toolbar d-flex flex-wrap align-items-center justify-content-between mb-4 gap-2">
             <div class="d-flex align-items-center gap-2">
@@ -186,14 +191,11 @@ $qry = $conn->query("
                 <button type="button" class="btn btn-coa btn-coa-primary" id="btn_add_bank">
                     <i class="fas fa-university mr-1"></i> Add Bank Account
                 </button>
-                <a href="./reports/general_ledger.php?print=1" target="_blank" class="btn btn-coa">
-                    <i class="fas fa-file-pdf text-danger mr-1"></i> Print PDF
+                <a href="./?page=reports/trial_balance" class="btn btn-coa">
+                    <i class="fas fa-balance-scale text-primary mr-1"></i> Trial balance
                 </a>
-                <button type="button" class="btn btn-coa" onclick="alert_toast('Import CSV feature initialized. Select a file to upload.', 'info');">
-                    <i class="fas fa-file-import text-info mr-1"></i> Import
-                </button>
-                <button type="button" class="btn btn-coa" onclick="window.location.href='?page=accounts&export=csv';">
-                    <i class="fas fa-file-export text-success mr-1"></i> Export
+                <button type="button" class="btn btn-coa" id="btn_export_coa">
+                    <i class="fas fa-file-export text-success mr-1"></i> Export CSV
                 </button>
             </div>
         </div>
@@ -201,25 +203,25 @@ $qry = $conn->query("
         <!-- Filter Tabs -->
         <ul class="nav nav-tabs nav-tabs-coa mb-3">
             <li class="nav-item">
-                <a class="nav-link <?= $tab == 'all' ? 'active' : '' ?>" href="./?page=accounts&tab=all">All Accounts</a>
+                <a class="nav-link <?= $tab == 'all' ? 'active' : '' ?>" href="./?page=accounts&tab=all">All Accounts <span class="badge badge-light border ml-1"><?= $tab_counts['all'] ?></span></a>
             </li>
             <li class="nav-item">
-                <a class="nav-link <?= $tab == 'assets' ? 'active' : '' ?>" href="./?page=accounts&tab=assets">Assets</a>
+                <a class="nav-link <?= $tab == 'assets' ? 'active' : '' ?>" href="./?page=accounts&tab=assets">Assets <span class="badge badge-light border ml-1"><?= $tab_counts['assets'] ?></span></a>
             </li>
             <li class="nav-item">
-                <a class="nav-link <?= $tab == 'liabilities' ? 'active' : '' ?>" href="./?page=accounts&tab=liabilities">Liabilities</a>
+                <a class="nav-link <?= $tab == 'liabilities' ? 'active' : '' ?>" href="./?page=accounts&tab=liabilities">Liabilities <span class="badge badge-light border ml-1"><?= $tab_counts['liabilities'] ?></span></a>
             </li>
             <li class="nav-item">
-                <a class="nav-link <?= $tab == 'equity' ? 'active' : '' ?>" href="./?page=accounts&tab=equity">Equity</a>
+                <a class="nav-link <?= $tab == 'equity' ? 'active' : '' ?>" href="./?page=accounts&tab=equity">Equity <span class="badge badge-light border ml-1"><?= $tab_counts['equity'] ?></span></a>
             </li>
             <li class="nav-item">
-                <a class="nav-link <?= $tab == 'expenses' ? 'active' : '' ?>" href="./?page=accounts&tab=expenses">Expenses</a>
+                <a class="nav-link <?= $tab == 'expenses' ? 'active' : '' ?>" href="./?page=accounts&tab=expenses">Expenses <span class="badge badge-light border ml-1"><?= $tab_counts['expenses'] ?></span></a>
             </li>
             <li class="nav-item">
-                <a class="nav-link <?= $tab == 'revenue' ? 'active' : '' ?>" href="./?page=accounts&tab=revenue">Revenue</a>
+                <a class="nav-link <?= $tab == 'revenue' ? 'active' : '' ?>" href="./?page=accounts&tab=revenue">Income <span class="badge badge-light border ml-1"><?= $tab_counts['revenue'] ?></span></a>
             </li>
             <li class="nav-item">
-                <a class="nav-link <?= $tab == 'archive' ? 'active' : '' ?>" href="./?page=accounts&tab=archive">Archive</a>
+                <a class="nav-link <?= $tab == 'archive' ? 'active' : '' ?>" href="./?page=accounts&tab=archive">Archive <span class="badge badge-light border ml-1"><?= $tab_counts['archive'] ?></span></a>
             </li>
         </ul>
 
@@ -254,12 +256,12 @@ $qry = $conn->query("
                             <th>Name</th>
                             <th width="140">Type</th>
                             <th width="180">Tax Rate</th>
-                            <th width="120" class="text-right">YTD</th>
+                            <th width="140" class="text-right" title="Balance to date for assets, liabilities and equity; financial-year-to-date for income and expenses">Balance / YTD</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php if ($qry->num_rows > 0): ?>
-                            <?php while ($row = $qry->fetch_assoc()): ?>
+                        <?php if ($rows): ?>
+                            <?php foreach ($rows as $row): ?>
                                 <tr>
                                     <td class="text-center">
                                         <input type="checkbox" name="account_ids[]" class="row-checkbox" value="<?= $row['id'] ?>">
@@ -277,15 +279,16 @@ $qry = $conn->query("
                                     </td>
                                     <td>
                                         <span class="badge badge-light border px-2 py-1 font-weight-normal"><?= htmlspecialchars($row['type'] ?: 'Expense') ?></span>
+                                        <div class="sub-desc"><?= LedgerService::CLASS_LABELS[$row['class']] ?></div>
                                     </td>
                                     <td>
                                         <small class="text-muted"><?= htmlspecialchars($row['tax_rate'] ?: 'Tax Exempt (0%)') ?></small>
                                     </td>
-                                    <td class="text-right font-weight-bold <?= $row['ytd_balance'] >= 0 ? 'text-dark' : 'text-danger' ?>">
-                                        <?= number_format($row['ytd_balance'], 2) ?>
+                                    <td class="text-right font-weight-bold <?= $row['balance'] < 0 ? 'text-danger' : 'text-dark' ?>">
+                                        <a class="text-reset" href="./?page=reports/general_ledger&account_id=<?= (int)$row['id'] ?>&from=<?= $fy_start ?>&to=<?= $today ?>" title="View transactions"><?= $row['balance'] == 0 ? '<span class="text-muted font-weight-normal">–</span>' : number_format($row['balance'], 2) ?></a>
                                     </td>
                                 </tr>
-                            <?php endwhile; ?>
+                            <?php endforeach; ?>
                         <?php else: ?>
                             <tr>
                                 <td colspan="6" class="text-center py-4 text-muted">
@@ -302,6 +305,27 @@ $qry = $conn->query("
 
 <script>
 $(document).ready(function(){
+    $('#btn_export_coa').click(function(){
+        var rows = [['Code', 'Name', 'Type', 'Class', 'Tax rate', 'Balance / YTD']];
+        $('.coa-table tbody tr').each(function(){
+            var $t = $(this).children('td');
+            if ($t.length < 6) { return; }
+            rows.push([
+                $t.eq(1).text().trim(),
+                $t.eq(2).find('a').first().text().trim(),
+                $t.eq(3).find('.badge').text().trim(),
+                $t.eq(3).find('.sub-desc').text().trim(),
+                $t.eq(4).text().trim(),
+                $t.eq(5).text().trim().replace(/,/g, '').replace('–', '0')
+            ]);
+        });
+        var csv = rows.map(function(r){ return r.map(function(v){ return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(','); }).join('\r\n');
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob(['\ufeff' + csv], {type: 'text/csv;charset=utf-8'}));
+        a.download = 'chart-of-accounts.csv';
+        document.body.appendChild(a); a.click(); a.remove();
+    });
+
     $('#btn_add_account').click(function(){
         uni_modal("Add Account", "accounts/manage_account.php", "mid-large");
     });
