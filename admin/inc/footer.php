@@ -36,6 +36,15 @@
     <script src="<?php echo base_url ?>plugins/datatables-bs4/js/dataTables.bootstrap4.min.js"></script>
     <script src="<?php echo base_url ?>plugins/datatables-responsive/js/dataTables.responsive.min.js"></script>
     <script src="<?php echo base_url ?>plugins/datatables-responsive/js/responsive.bootstrap4.min.js"></script>
+    <!-- DataTables Buttons: column picker, CSV/Excel export, print -->
+    <script src="<?php echo base_url ?>plugins/jszip/jszip.min.js"></script>
+    <script src="<?php echo base_url ?>plugins/datatables-buttons/js/dataTables.buttons.min.js"></script>
+    <script src="<?php echo base_url ?>plugins/datatables-buttons/js/buttons.bootstrap4.min.js"></script>
+    <script src="<?php echo base_url ?>plugins/datatables-buttons/js/buttons.html5.min.js"></script>
+    <script src="<?php echo base_url ?>plugins/datatables-buttons/js/buttons.print.min.js"></script>
+    <script src="<?php echo base_url ?>plugins/datatables-buttons/js/buttons.colVis.min.js"></script>
+    <!-- Nuvis UI layer: table toolbar, form validation, modal behaviour -->
+    <script src="<?php echo base_url ?>dist/js/nuvis-ui.js?v=<?php echo class_exists('AppVersion') ? urlencode(AppVersion::get('commit')) : '1.0' ?>"></script>
     <script src="<?php echo base_url ?>plugins/moment/moment.min.js"></script>
     <script src="<?php echo base_url ?>plugins/fullcalendar/main.js"></script>
     <!-- overlayScrollbars -->
