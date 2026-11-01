@@ -605,6 +605,39 @@ class LedgerService
         return ['customers' => $list, 'totals' => array_map(fn ($v) => round($v, 2), $totals)];
     }
 
+    /**
+     * Group open vendor bills by vendor and age bucket — the payables mirror of agedReceivables().
+     * $rows: [vendor_id, vendor_name, party_code, id, bill_no, bill_date, due_date, total, balance]
+     *
+     * Returns ['vendors' => [...], 'totals' => [...]] with the same bucket shape as receivables,
+     * each vendor carrying a 'bills' list for the drill-down view.
+     */
+    public static function agedPayables(array $rows, string $asOf): array
+    {
+        $empty = array_fill_keys(array_keys(self::AGING_BUCKETS), 0.0);
+        $vendors = [];
+        $totals = $empty + ['total' => 0.0];
+        foreach ($rows as $r) {
+            $bal = round((float)$r['balance'], 2);
+            if ($bal == 0.0) {
+                continue;
+            }
+            [$bucket, $days] = self::agingBucket($r['due_date'] ?? null, (string)$r['bill_date'], $asOf);
+            $vid = (int)$r['vendor_id'];
+            $vendors[$vid] ??= ['id' => $vid, 'name' => (string)$r['vendor_name'], 'code' => (string)($r['party_code'] ?? ''), 'bills' => []] + $empty + ['total' => 0.0, 'oldest' => 0];
+            $vendors[$vid][$bucket] += $bal;
+            $vendors[$vid]['total'] += $bal;
+            $vendors[$vid]['oldest'] = max($vendors[$vid]['oldest'], $days);
+            $vendors[$vid]['bills'][] = ['id' => (int)$r['id'], 'bill_no' => (string)$r['bill_no'], 'bill_date' => (string)$r['bill_date'],
+                'due_date' => $r['due_date'] ?? null, 'total' => (float)$r['total'], 'balance' => $bal, 'bucket' => $bucket, 'days' => $days];
+            $totals[$bucket] += $bal;
+            $totals['total'] += $bal;
+        }
+        $list = array_values($vendors);
+        usort($list, fn ($a, $b) => $b['total'] <=> $a['total']);
+        return ['vendors' => $list, 'totals' => array_map(fn ($v) => round($v, 2), $totals)];
+    }
+
     /* ==================================================================
      * VAT
      * ================================================================== */
