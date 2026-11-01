@@ -1,5 +1,10 @@
-<?php 
+<?php
 require_once(__DIR__ . '/../../config.php');
+
+if(!$_settings->can_access('users_manage')){
+	echo '<div class="alert alert-danger m-3"><i class="fas fa-ban mr-2"></i>You don\'t have permission to manage system users.</div>';
+	return;
+}
 
 $tenant_id = $_settings->active_tenant_id();
 
@@ -42,6 +47,7 @@ $user_tenant_id = isset($meta['tenant_id']) ? $meta['tenant_id'] : $tenant_id;
 			<div id="msg"></div>
 			<form action="" id="manage-user">	
 				<input type="hidden" name="id" value="<?php echo isset($meta['id']) ? $meta['id']: '' ?>">
+				<input type="hidden" name="csrf_token" value="<?php echo $_settings->csrf_token() ?>">
 
 				<div class="row">
 					<div class="form-group col-md-6 col-12">
@@ -77,9 +83,14 @@ $user_tenant_id = isset($meta['tenant_id']) ? $meta['tenant_id'] : $tenant_id;
 					<div class="form-group col-md-6 col-12">
 						<label for="type" class="control-label font-weight-bold text-navy">User Privilege Level</label>
 						<select name="type" id="type" class="form-control form-control-sm rounded-0" required>
+							<?php if($_settings->is_super_admin()): ?>
 							<option value="1" <?php echo isset($meta['type']) && $meta['type'] == 1 ? 'selected': '' ?>>Super Administrator (Full System Access)</option>
+							<?php endif; ?>
 							<option value="2" <?php echo !isset($meta['type']) || $meta['type'] == 2 ? 'selected': '' ?>>Staff User (Role-Based Permissions)</option>
 						</select>
+						<?php if(!$_settings->is_super_admin()): ?>
+						<small class="text-muted"><i>Only super administrators can grant full system access.</i></small>
+						<?php endif; ?>
 					</div>
 
 					<div class="form-group col-md-6 col-12" id="role-group" style="<?php echo isset($meta['type']) && $meta['type'] == 1 ? 'display:none;' : '' ?>">

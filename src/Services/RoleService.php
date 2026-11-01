@@ -6,6 +6,7 @@ namespace App\Services;
 
 use mysqli;
 use SystemSettings;
+use App\Support\Permissions;
 
 class RoleService
 {
@@ -22,7 +23,9 @@ class RoleService
 
         $name = isset($name) ? $this->conn->real_escape_string((string)$name) : '';
         $description = isset($description) ? $this->conn->real_escape_string((string)$description) : '';
-        $permissions = isset($permissions) && is_array($permissions) ? implode(',', $permissions) : '';
+        // Only registry-known permission keys are stored; the wildcard and any
+        // unknown keys submitted via a crafted request are discarded.
+        $permissions = implode(',', Permissions::sanitize($permissions ?? null));
         $status = isset($status) ? (int)$status : 1;
 
         $check = $this->conn->query("SELECT * FROM `roles` WHERE `name` = '{$name}' AND tenant_id = '{$tenant_id}' AND delete_flag = 0 " . (!empty($id) ? " AND id != '{$id}'" : ""))->num_rows;
@@ -83,7 +86,14 @@ class RoleService
         $id = !empty($id) ? $this->conn->real_escape_string((string)$id) : '';
 
         $name = isset($name) ? $this->conn->real_escape_string((string)$name) : '';
-        $permissions = isset($permissions) && is_array($permissions) ? implode(',', $permissions) : '*';
+        // API keys may carry the wildcard only when a super administrator issues
+        // them; any other caller is reduced to valid registry permission keys.
+        $submitted_perms = $permissions ?? null;
+        if ($this->settings->is_super_admin() && ($submitted_perms === '*' || $submitted_perms === null || $submitted_perms === '')) {
+            $permissions = '*';
+        } else {
+            $permissions = implode(',', Permissions::sanitize($submitted_perms));
+        }
         $status = isset($status) ? (int)$status : 1;
 
         if (empty($id)) {
