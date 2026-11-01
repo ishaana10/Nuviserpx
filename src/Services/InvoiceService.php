@@ -166,6 +166,37 @@ class InvoiceService
             $resp['status'] = 'success';
             $resp['msg'] = empty($id) ? " Invoice created successfully." : " Invoice updated successfully.";
             $this->settings->set_flashdata('success', $resp['msg']);
+
+            // Emit integration event (webhooks + workflows).
+            $event = empty($id)
+                ? \App\Support\IntegrationEvents::INVOICE_CREATED
+                : \App\Support\IntegrationEvents::INVOICE_UPDATED;
+            $this->emit($event, [
+                'invoice_id'   => (int)$invoice_id,
+                'invoice_no'   => $invoice_no,
+                'party_id'     => (int)$party_id,
+                'party_name'   => $party['name'] ?? '',
+                'party_email'  => $party['email'] ?? '',
+                'subtotal'     => (float)$subtotal,
+                'tax_amount'   => (float)$tax_amount,
+                'discount'     => (float)$discount,
+                'total'        => (float)$total,
+                'paid_amount'  => (float)$paid_amount,
+                'balance'      => (float)$balance,
+                'status'       => $status,
+                'invoice_date' => $invoice_date,
+                'due_date'     => $due_date,
+            ], (int)$tenant_id);
+
+            if ($status === InvoiceStatus::CANCELLED->value) {
+                $this->emit(\App\Support\IntegrationEvents::INVOICE_CANCELLED, [
+                    'invoice_id' => (int)$invoice_id,
+                    'invoice_no' => $invoice_no,
+                    'party_id'   => (int)$party_id,
+                    'party_name' => $party['name'] ?? '',
+                    'total'      => (float)$total,
+                ], (int)$tenant_id);
+            }
         } else {
             $resp['status'] = 'failed';
             $resp['msg'] = "An error occurred while saving invoice.";
@@ -175,11 +206,28 @@ class InvoiceService
         return json_encode($resp);
     }
 
+    /**
+     * Fire an integration event through ModuleManager (webhooks + workflows).
+     * Guarded so a missing/loaded-out-of-order ModuleManager never breaks a save.
+     *
+     * @param array<string,mixed> $payload
+     */
+    private function emit(string $event, array $payload, int $tenant_id): void
+    {
+        if (class_exists('ModuleManager')) {
+            try {
+                \ModuleManager::trigger_hook($event, $payload, $tenant_id);
+            } catch (\Throwable $e) {
+                // integration failures must not surface to the core transaction
+            }
+        }
+    }
+
     public function deleteInvoice(int $id): string
     {
         $tenant_id = $this->settings->active_tenant_id();
 
-        $inv = $this->conn->query("SELECT journal_id FROM `invoice_list` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'")->fetch_assoc();
+        $inv = $this->conn->query("SELECT invoice_no, journal_id FROM `invoice_list` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'")->fetch_assoc();
         if (!empty($inv['journal_id'])) {
             $this->conn->query("DELETE FROM `journal_entries` WHERE id = '{$inv['journal_id']}'");
         }
@@ -188,6 +236,10 @@ class InvoiceService
         if ($del) {
             $resp['status'] = 'success';
             $this->settings->set_flashdata('success', " Invoice deleted successfully.");
+            $this->emit(\App\Support\IntegrationEvents::INVOICE_DELETED, [
+                'invoice_id' => (int)$id,
+                'invoice_no' => $inv['invoice_no'] ?? '',
+            ], (int)$tenant_id);
         } else {
             $resp['status'] = 'failed';
             $resp['error'] = $this->conn->error;

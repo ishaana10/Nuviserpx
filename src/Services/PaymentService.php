@@ -171,11 +171,45 @@ class PaymentService
                 }
 
                 $this->conn->query("UPDATE `invoice_list` SET `paid_amount` = '{$tot_paid}', `balance` = '{$new_bal}', `status` = '{$new_status}' WHERE id = '{$inv_id}'");
+
+                // Emit invoice payment-state events.
+                if ($new_status === 'paid' || $new_status === 'partially_paid') {
+                    $inv_row = $this->conn->query("SELECT i.invoice_no, i.total, p.name AS party_name, p.email AS party_email FROM `invoice_list` i INNER JOIN `party_list` p ON i.party_id = p.id WHERE i.id = '{$inv_id}'");
+                    $inv_row = $inv_row ? $inv_row->fetch_assoc() : [];
+                    $evt = $new_status === 'paid'
+                        ? \App\Support\IntegrationEvents::INVOICE_PAID
+                        : \App\Support\IntegrationEvents::INVOICE_PARTIALLY_PAID;
+                    $this->emit($evt, [
+                        'invoice_id'  => (int)$inv_id,
+                        'invoice_no'  => $inv_row['invoice_no'] ?? '',
+                        'party_id'    => (int)$party_id,
+                        'party_name'  => $inv_row['party_name'] ?? '',
+                        'party_email' => $inv_row['party_email'] ?? '',
+                        'total'       => (float)($inv_row['total'] ?? 0),
+                        'paid_amount' => (float)$tot_paid,
+                        'balance'     => (float)$new_bal,
+                        'status'      => $new_status,
+                    ], (int)$tenant_id);
+                }
             }
 
             $resp['status'] = 'success';
             $resp['msg'] = empty($id) ? " Payment Receipt created and allocated successfully." : " Payment details updated successfully.";
             $this->settings->set_flashdata('success', $resp['msg']);
+
+            // Emit the payment-received event.
+            if (empty($id)) {
+                $this->emit(\App\Support\IntegrationEvents::PAYMENT_RECEIVED, [
+                    'payment_id'  => (int)$payment_id,
+                    'payment_no'  => $payment_no,
+                    'party_id'    => (int)$party_id,
+                    'party_name'  => $party['name'] ?? '',
+                    'party_email' => $party['email'] ?? '',
+                    'amount'      => (float)$amount,
+                    'method'      => $method,
+                    'payment_date'=> $payment_date,
+                ], (int)$tenant_id);
+            }
         } else {
             $resp['status'] = 'failed';
             $resp['msg'] = "An error occurred while saving payment.";
@@ -279,6 +313,22 @@ class PaymentService
             return json_encode(['status' => 'success', 'msg' => "Payment Receipt #{$payment['payment_no']} sent successfully to {$email_to}."]);
         } else {
             return json_encode(['status' => 'failed', 'msg' => 'Failed to send payment receipt email. Please check SMTP settings.']);
+        }
+    }
+
+    /**
+     * Fire an integration event through ModuleManager (webhooks + workflows).
+     *
+     * @param array<string,mixed> $payload
+     */
+    private function emit(string $event, array $payload, int $tenant_id): void
+    {
+        if (class_exists('ModuleManager')) {
+            try {
+                \ModuleManager::trigger_hook($event, $payload, $tenant_id);
+            } catch (\Throwable $e) {
+                // integration failures must not surface to the core transaction
+            }
         }
     }
 }

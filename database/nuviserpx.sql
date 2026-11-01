@@ -774,14 +774,144 @@ CREATE TABLE IF NOT EXISTS `api_keys` (
 CREATE TABLE IF NOT EXISTS `webhooks` (
   `id` int(30) NOT NULL AUTO_INCREMENT,
   `tenant_id` int(30) NOT NULL DEFAULT 1,
+  `name` varchar(150) DEFAULT NULL,
   `event` varchar(100) NOT NULL,
   `target_url` varchar(255) NOT NULL,
   `secret_token` varchar(100) DEFAULT NULL,
   `status` tinyint(1) NOT NULL DEFAULT 1,
+  `max_retries` tinyint(2) NOT NULL DEFAULT 5,
+  `last_triggered_at` datetime DEFAULT NULL,
+  `last_status` varchar(20) DEFAULT NULL,
+  `failure_count` int(11) NOT NULL DEFAULT 0,
   `created_by` int(30) DEFAULT NULL,
   `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+  `date_updated` datetime DEFAULT NULL ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),
-  KEY `tenant_id` (`tenant_id`)
+  KEY `tenant_id` (`tenant_id`),
+  KEY `event_status` (`event`, `status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `webhook_deliveries` (outgoing webhook queue + audit log)
+--
+
+CREATE TABLE IF NOT EXISTS `webhook_deliveries` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `tenant_id` int(30) NOT NULL DEFAULT 1,
+  `webhook_id` int(30) DEFAULT NULL,
+  `event` varchar(100) NOT NULL,
+  `target_url` varchar(255) NOT NULL,
+  `payload` longtext DEFAULT NULL,
+  `signature` varchar(255) DEFAULT NULL,
+  `status` enum('pending','delivering','delivered','failed') NOT NULL DEFAULT 'pending',
+  `attempts` int(11) NOT NULL DEFAULT 0,
+  `max_retries` tinyint(2) NOT NULL DEFAULT 5,
+  `response_code` int(11) DEFAULT NULL,
+  `response_body` text DEFAULT NULL,
+  `error` text DEFAULT NULL,
+  `next_attempt_at` datetime DEFAULT NULL,
+  `delivered_at` datetime DEFAULT NULL,
+  `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+  `date_updated` datetime DEFAULT NULL ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `queue_scan` (`status`, `next_attempt_at`),
+  KEY `tenant_event` (`tenant_id`, `event`),
+  KEY `webhook_id` (`webhook_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `api_request_logs` (API usage metrics)
+--
+
+CREATE TABLE IF NOT EXISTS `api_request_logs` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `tenant_id` int(30) NOT NULL DEFAULT 1,
+  `api_key_id` int(30) DEFAULT NULL,
+  `endpoint` varchar(150) NOT NULL,
+  `method` varchar(10) NOT NULL,
+  `status_code` int(11) NOT NULL DEFAULT 200,
+  `duration_ms` int(11) NOT NULL DEFAULT 0,
+  `ip_address` varchar(64) DEFAULT NULL,
+  `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `tenant_created` (`tenant_id`, `date_created`),
+  KEY `endpoint_idx` (`endpoint`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `workflows` (customisable automation rules)
+--
+
+CREATE TABLE IF NOT EXISTS `workflows` (
+  `id` int(30) NOT NULL AUTO_INCREMENT,
+  `tenant_id` int(30) NOT NULL DEFAULT 1,
+  `name` varchar(150) NOT NULL,
+  `description` varchar(255) DEFAULT NULL,
+  `trigger_event` varchar(100) NOT NULL,
+  `conditions` longtext DEFAULT NULL,
+  `actions` longtext DEFAULT NULL,
+  `match_type` enum('all','any') NOT NULL DEFAULT 'all',
+  `status` tinyint(1) NOT NULL DEFAULT 1,
+  `run_count` int(11) NOT NULL DEFAULT 0,
+  `last_run_at` datetime DEFAULT NULL,
+  `created_by` int(30) DEFAULT NULL,
+  `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+  `date_updated` datetime DEFAULT NULL ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `tenant_trigger` (`tenant_id`, `trigger_event`, `status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `workflow_logs`
+--
+
+CREATE TABLE IF NOT EXISTS `workflow_logs` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `tenant_id` int(30) NOT NULL DEFAULT 1,
+  `workflow_id` int(30) NOT NULL,
+  `trigger_event` varchar(100) NOT NULL,
+  `matched` tinyint(1) NOT NULL DEFAULT 0,
+  `actions_run` text DEFAULT NULL,
+  `result` enum('success','partial','failed','skipped') NOT NULL DEFAULT 'success',
+  `message` text DEFAULT NULL,
+  `context_ref` varchar(100) DEFAULT NULL,
+  `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `workflow_idx` (`workflow_id`),
+  KEY `tenant_created` (`tenant_id`, `date_created`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `tenant_plans` (SaaS subscription tiers)
+--
+
+CREATE TABLE IF NOT EXISTS `tenant_plans` (
+  `id` int(30) NOT NULL AUTO_INCREMENT,
+  `code` varchar(50) NOT NULL,
+  `name` varchar(100) NOT NULL,
+  `description` varchar(255) DEFAULT NULL,
+  `price` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `billing_cycle` enum('monthly','quarterly','yearly','one_time') NOT NULL DEFAULT 'monthly',
+  `max_users` int(11) NOT NULL DEFAULT 0,
+  `max_invoices` int(11) NOT NULL DEFAULT 0,
+  `max_api_calls` int(11) NOT NULL DEFAULT 0,
+  `features` longtext DEFAULT NULL,
+  `status` tinyint(1) NOT NULL DEFAULT 1,
+  `sort_order` int(11) NOT NULL DEFAULT 0,
+  `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+  `date_updated` datetime DEFAULT NULL ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `plan_code` (`code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- --------------------------------------------------------

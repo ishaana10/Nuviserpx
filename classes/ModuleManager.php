@@ -2,16 +2,23 @@
 /**
  * Modular Event Hook & Module Registry Engine for Nuvis ERPX
  * Nuvis Technologies (nuvistechnologies.com.fj)
+ *
+ * trigger_hook() is the single integration spine. When any module emits an event it:
+ *   1. runs in-process callback listeners (register_hook),
+ *   2. evaluates customisable workflow automations (WorkflowService),
+ *   3. queues outgoing webhook deliveries (WebhookService) — drained asynchronously
+ *      by cron/webhook_worker.php so the user's request is never blocked on HTTP.
  */
+
+use App\Services\WebhookService;
+use App\Services\WorkflowService;
 
 class ModuleManager {
 
     private static $modules = [];
     private static $hooks = [];
 
-    /**
-     * Register a module
-     */
+    /** Register a module in the registry (shown in the developer dashboard). */
     public static function register_module($key, $name, $description = '', $version = '1.0.0') {
         self::$modules[$key] = [
             'key' => $key,
@@ -22,9 +29,7 @@ class ModuleManager {
         ];
     }
 
-    /**
-     * Register an event listener hook
-     */
+    /** Register an in-process event listener. */
     public static function register_hook($event, callable $callback) {
         if (!isset(self::$hooks[$event])) {
             self::$hooks[$event] = [];
@@ -33,77 +38,62 @@ class ModuleManager {
     }
 
     /**
-     * Trigger an event hook and notify webhooks
+     * Fire an event: run local listeners, evaluate workflows, queue webhooks.
+     * Never throws — integration failures must not break the core transaction.
+     *
+     * @param string $event   canonical event name (App\Support\IntegrationEvents)
+     * @param array  $payload  flat, serialisable event data
+     * @param int    $tenant_id
      */
     public static function trigger_hook($event, $payload = [], $tenant_id = 1) {
         $results = [];
 
-        // Execute local callback listeners
+        // 1. In-process listeners
         if (isset(self::$hooks[$event])) {
             foreach (self::$hooks[$event] as $callback) {
                 if (is_callable($callback)) {
-                    $results[] = call_user_func($callback, $payload, $tenant_id);
+                    try {
+                        $results[] = call_user_func($callback, $payload, $tenant_id);
+                    } catch (\Throwable $e) {
+                        // swallow — a bad listener must not abort the event
+                    }
                 }
             }
         }
 
-        // Trigger outgoing webhooks if database connection is available
-        self::dispatch_webhooks($event, $payload, $tenant_id);
+        $conn = self::conn();
+        if ($conn instanceof \mysqli) {
+            // 2. Workflow automations
+            try {
+                (new WorkflowService($conn))->run((string)$event, (array)$payload, (int)$tenant_id);
+            } catch (\Throwable $e) {
+                // ignore
+            }
+
+            // 3. Outgoing webhooks (queued, non-blocking)
+            try {
+                (new WebhookService($conn))->enqueue((string)$event, (array)$payload, (int)$tenant_id);
+            } catch (\Throwable $e) {
+                // ignore
+            }
+        }
 
         return $results;
     }
 
-    /**
-     * Dispatch registered webhooks
-     */
-    private static function dispatch_webhooks($event, $payload, $tenant_id) {
-        global $_settings;
-        if (!isset($_settings) || !isset($_settings->conn)) return;
-
-        $conn = $_settings->conn;
-        $event_clean = $conn->real_escape_string($event);
-        $tenant_id = intval($tenant_id);
-
-        $webhooks = $conn->query("SELECT * FROM `webhooks` WHERE tenant_id = '{$tenant_id}' AND status = 1 AND event = '{$event_clean}'");
-        if ($webhooks && $webhooks->num_rows > 0) {
-            while ($wh = $webhooks->fetch_assoc()) {
-                self::send_webhook_http($wh['target_url'], $wh['secret_token'], $event, $payload);
-            }
+    /** Resolve the active mysqli connection from the app globals. */
+    private static function conn(): ?\mysqli {
+        global $_settings, $conn;
+        if (isset($_settings) && isset($_settings->conn) && $_settings->conn instanceof \mysqli) {
+            return $_settings->conn;
         }
+        if (isset($conn) && $conn instanceof \mysqli) {
+            return $conn;
+        }
+        return null;
     }
 
-    /**
-     * Send HTTP POST to webhook endpoint
-     */
-    private static function send_webhook_http($url, $secret, $event, $payload) {
-        $json_data = json_encode([
-            'event' => $event,
-            'timestamp' => date('c'),
-            'data' => $payload
-        ]);
-
-        $signature = hash_hmac('sha256', $json_data, $secret ?: 'nuvis');
-
-        $headers = [
-            'Content-Type: application/json',
-            'X-ERPX-Event: ' . $event,
-            'X-ERPX-Signature: ' . $signature,
-            'User-Agent: Nuvis-ERPX-Webhook-Engine/1.0'
-        ];
-
-        $ch = curl_init($url);
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $json_data);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 5);
-        @curl_exec($ch);
-        curl_close($ch);
-    }
-
-    /**
-     * Get registered modules list
-     */
+    /** @return array registered modules list */
     public static function get_modules() {
         return self::$modules;
     }
@@ -115,4 +105,4 @@ ModuleManager::register_module('invoicing', 'Invoicing & Sales', 'Tax Invoices, 
 ModuleManager::register_module('inventory', 'Commercial Stock & Sales', 'Product Catalog, Stock Movements, Mobile Orders & Proforma');
 ModuleManager::register_module('payroll', 'Fiji Payroll & HR', 'PAYE Tax, FNPF, Batch Processing, Payslips, Compliance Exporters');
 ModuleManager::register_module('emailer', 'Email Notifications', 'SMTP & Mail Delivery Engine for Invoices, Receipts, and OTPs');
-?>
+ModuleManager::register_module('integrations', 'Integrations & Automation', 'Webhooks, REST API, and the customisable Workflow engine');

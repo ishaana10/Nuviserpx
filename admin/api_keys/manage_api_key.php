@@ -76,6 +76,10 @@ $permissions_list = isset($permissions) ? explode(',', $permissions) : ['*'];
 						<input type="checkbox" class="custom-control-input perm-item" id="perm_read_journals" name="permissions[]" value="read_journals" <?php echo in_array('read_journals', $permissions_list) ? 'checked' : '' ?>>
 						<label class="custom-control-label" for="perm_read_journals">Read General Ledger</label>
 					</div>
+					<div class="custom-control custom-checkbox mb-2">
+						<input type="checkbox" class="custom-control-input perm-item" id="perm_manage_webhooks" name="permissions[]" value="manage_webhooks" <?php echo in_array('manage_webhooks', $permissions_list) ? 'checked' : '' ?>>
+						<label class="custom-control-label" for="perm_manage_webhooks">Manage Webhooks</label>
+					</div>
 				</div>
 			</div>
 		</div>
