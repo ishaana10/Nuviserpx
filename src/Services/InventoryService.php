@@ -117,6 +117,7 @@ class InventoryService
         $type = !empty($type) ? $this->conn->real_escape_string((string)$type) : 'in';
         $qty = isset($qty) ? (float)$qty : 0.0;
         $unit_cost = isset($unit_cost) ? (float)$unit_cost : 0.0;
+        $warehouse_id = isset($warehouse_id) ? max(0, (int)$warehouse_id) : 0;
         $reference = isset($reference) ? $this->conn->real_escape_string((string)$reference) : 'Stock Adj ' . date('Ymd');
         $notes = isset($notes) ? $this->conn->real_escape_string((string)$notes) : '';
 
@@ -129,21 +130,31 @@ class InventoryService
             return json_encode(['status' => 'failed', 'msg' => 'Selected product not found.']);
         }
 
+        // Keep the authoritative product total, and mirror the change into the
+        // chosen warehouse location (syncTotal = false — the total is set here).
+        $stockSvc = new WarehouseStockService($this->conn, $this->settings);
         if ($type === 'in') {
             $this->conn->query("UPDATE `product_list` SET `stock_quantity` = `stock_quantity` + {$qty} WHERE id = '{$product_id}'");
+            $stockSvc->adjustLocation($product_id, $warehouse_id, $qty, false);
         } elseif ($type === 'out') {
             $this->conn->query("UPDATE `product_list` SET `stock_quantity` = `stock_quantity` - {$qty} WHERE id = '{$product_id}'");
+            $stockSvc->adjustLocation($product_id, $warehouse_id, -$qty, false);
         } elseif ($type === 'adjustment') {
             if (isset($is_absolute) && $is_absolute == 1) {
                 $this->conn->query("UPDATE `product_list` SET `stock_quantity` = '{$qty}' WHERE id = '{$product_id}'");
+                // Set the chosen location to the absolute count without re-touching the total.
+                $curLoc = $stockSvc->quantityAt($product_id, $warehouse_id);
+                $stockSvc->adjustLocation($product_id, $warehouse_id, round($qty - $curLoc, 4), false);
             } else {
                 $this->conn->query("UPDATE `product_list` SET `stock_quantity` = `stock_quantity` + {$qty} WHERE id = '{$product_id}'");
+                $stockSvc->adjustLocation($product_id, $warehouse_id, $qty, false);
             }
         }
 
         $save_log = $this->conn->query("INSERT INTO `inventory_logs` SET
 			`tenant_id` = '{$tenant_id}',
 			`product_id` = '{$product_id}',
+			`warehouse_id` = '{$warehouse_id}',
 			`type` = '{$type}',
 			`qty` = '{$qty}',
 			`unit_cost` = '{$unit_cost}',

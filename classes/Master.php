@@ -1089,6 +1089,7 @@ class Master extends DBConnection
         $party_id = $this->conn->real_escape_string((string)($party_id ?? 0));
         $order_date = !empty($order_date) ? $this->conn->real_escape_string((string)$order_date) : date('Y-m-d');
         $type = !empty($type) ? $this->conn->real_escape_string((string)$type) : 'proforma';
+        $warehouse_id = isset($warehouse_id) ? max(0, (int)$warehouse_id) : 0;
         $subtotal = isset($subtotal) ? (float)$subtotal : 0.0;
         $tax_amount = isset($tax_amount) ? (float)$tax_amount : 0.0;
         $discount = isset($discount) ? (float)$discount : 0.0;
@@ -1103,6 +1104,7 @@ class Master extends DBConnection
 				`party_id` = '{$party_id}',
 				`order_date` = '{$order_date}',
 				`type` = '{$type}',
+				`warehouse_id` = '{$warehouse_id}',
 				`subtotal` = '{$subtotal}',
 				`tax_amount` = '{$tax_amount}',
 				`discount` = '{$discount}',
@@ -1118,6 +1120,7 @@ class Master extends DBConnection
 				`party_id` = '{$party_id}',
 				`order_date` = '{$order_date}',
 				`type` = '{$type}',
+				`warehouse_id` = '{$warehouse_id}',
 				`subtotal` = '{$subtotal}',
 				`tax_amount` = '{$tax_amount}',
 				`discount` = '{$discount}',
@@ -1194,13 +1197,24 @@ class Master extends DBConnection
                     if ($pid > 0 && $qty > 0) {
                         $prod = $this->conn->query("SELECT cost_price, stock_quantity FROM `product_list` WHERE id = '{$pid}'")->fetch_assoc();
                         $cost = isset($prod['cost_price']) ? (float)$prod['cost_price'] : 0.0;
+                        $wh = isset($order['warehouse_id']) ? max(0, (int)$order['warehouse_id']) : 0;
 
                         $this->conn->query("UPDATE `product_list` SET `stock_quantity` = `stock_quantity` - {$qty} WHERE id = '{$pid}'");
+
+                        // Draw the sold quantity down from the order's warehouse location.
+                        // syncTotal = false because the product total was just decremented above.
+                        try {
+                            $this->container->make(\App\Services\WarehouseStockService::class)
+                                ->adjustLocation($pid, $wh, -$qty, false);
+                        } catch (\Throwable $e) {
+                            // location tracking must not block the sale
+                        }
 
                         $orderNoEsc = $this->conn->real_escape_string((string)$order['order_no']);
                         $this->conn->query("INSERT INTO `inventory_logs` SET
 							`tenant_id` = '{$tenant_id}',
 							`product_id` = '{$pid}',
+							`warehouse_id` = '{$wh}',
 							`type` = 'out',
 							`qty` = '{$qty}',
 							`unit_cost` = '{$cost}',
@@ -1313,6 +1327,7 @@ class Master extends DBConnection
         $order = $this->conn->query("SELECT * FROM `sales_order_list` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'")->fetch_assoc();
         if ($order) {
             if ($order['stock_adjusted'] == 1) {
+                $wh = isset($order['warehouse_id']) ? max(0, (int)$order['warehouse_id']) : 0;
                 $items = $this->conn->query("SELECT * FROM `sales_order_items` WHERE sales_order_id = '{$id}'");
                 if ($items) {
                     while ($it = $items->fetch_assoc()) {
@@ -1320,6 +1335,13 @@ class Master extends DBConnection
                         $qty = (float)$it['qty'];
                         if ($pid > 0 && $qty > 0) {
                             $this->conn->query("UPDATE `product_list` SET `stock_quantity` = `stock_quantity` + {$qty} WHERE id = '{$pid}'");
+                            // Return the stock to the location it was drawn from.
+                            try {
+                                $this->container->make(\App\Services\WarehouseStockService::class)
+                                    ->adjustLocation($pid, $wh, $qty, false);
+                            } catch (\Throwable $e) {
+                                // location tracking must not block the delete
+                            }
                         }
                     }
                 }
