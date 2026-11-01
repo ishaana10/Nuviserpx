@@ -48,6 +48,22 @@ $preset_product_id = isset($_GET['product_id']) ? intval($_GET['product_id']) : 
 			</div>
 		</div>
 
+		<div class="row">
+			<div class="col-md-6 form-group">
+				<label for="warehouse_id" class="control-label">Warehouse</label>
+				<select name="warehouse_id" id="warehouse_id" class="form-control form-control-sm rounded-0">
+					<option value="0" selected>Main / Unassigned</option>
+					<?php
+					$wh_q = @$conn->query("SELECT id, name FROM `warehouses` WHERE tenant_id = '{$tenant_id}' AND status = 1 ORDER BY name ASC");
+					if ($wh_q): while ($w = $wh_q->fetch_assoc()):
+					?>
+					<option value="<?php echo (int)$w['id'] ?>"><?php echo htmlspecialchars($w['name']) ?></option>
+					<?php endwhile; endif; ?>
+				</select>
+				<small class="text-muted">Which location this adjustment applies to.</small>
+			</div>
+		</div>
+
 		<div class="form-group">
 			<label for="notes" class="control-label">Notes / Explanation</label>
 			<textarea name="notes" id="notes" rows="2" class="form-control form-control-sm rounded-0" placeholder="Optional notes..."></textarea>

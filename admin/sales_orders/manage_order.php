@@ -97,6 +97,24 @@ while($p = $products_qry->fetch_assoc()){
 				</div>
 			</div>
 
+			<?php if (!$is_po): ?>
+			<div class="row">
+				<div class="col-md-4 col-12 form-group">
+					<label for="warehouse_id" class="control-label">Fulfil Stock From</label>
+					<select name="warehouse_id" id="warehouse_id" class="form-control form-control-sm rounded-0">
+						<option value="0" <?php echo (!isset($warehouse_id) || (int)$warehouse_id === 0) ? 'selected' : '' ?>>Main / Unassigned</option>
+						<?php
+						$wh_q = @$conn->query("SELECT id, name FROM `warehouses` WHERE tenant_id = '{$tenant_id}' AND status = 1 ORDER BY name ASC");
+						if ($wh_q): while ($w = $wh_q->fetch_assoc()):
+						?>
+						<option value="<?php echo (int)$w['id'] ?>" <?php echo isset($warehouse_id) && (int)$warehouse_id === (int)$w['id'] ? 'selected' : '' ?>><?php echo htmlspecialchars($w['name']) ?></option>
+						<?php endwhile; endif; ?>
+					</select>
+					<small class="text-muted">Stock is drawn from this warehouse when the sale is confirmed.</small>
+				</div>
+			</div>
+			<?php endif; ?>
+
 			<hr class="my-2">
 			<div class="d-flex justify-content-between align-items-center mb-2">
 				<h6 class="font-weight-bold text-navy m-0"><i class="fas fa-boxes"></i> Select Products / Items</h6>
