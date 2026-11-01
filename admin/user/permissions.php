@@ -1,16 +1,26 @@
 <?php
 require_once(__DIR__ . '/../../config.php');
+
+if(!$_settings->can_access('roles_manage')){
+	echo '<div class="alert alert-danger m-3"><i class="fas fa-ban mr-2"></i>You don\'t have permission to view the permissions matrix.</div>';
+	return;
+}
+
 $tenant_id = $_settings->active_tenant_id();
 
 $roles = $conn->query("SELECT * FROM `roles` WHERE tenant_id = '{$tenant_id}' AND delete_flag = 0 ORDER BY name ASC");
 
-$permission_categories = [
-    'Sales & Invoicing' => ['invoices_read', 'invoices_create', 'invoices_delete', 'payments_manage'],
-    'Purchases & Bills' => ['bills_read', 'bills_create', 'purchase_orders_manage'],
-    'Accounting & Journals' => ['chart_of_accounts_manage', 'journals_create', 'fixed_assets_manage'],
-    'Payroll & HR' => ['employees_read', 'payroll_run', 'expense_claims_approve'],
-    'Settings & Dev Tools' => ['system_info_manage', 'user_roles_manage', 'api_keys_manage']
-];
+// Canonical permission registry — identical to the role editor and the
+// server-side enforcement, so this inspector always reflects reality.
+$permission_groups = \App\Support\Permissions::groups();
+
+// Pre-load each role's granted permission keys (stored comma-separated).
+$roles_arr = [];
+while($r = $roles->fetch_assoc()){
+    $r['perm_keys'] = \App\Support\Permissions::parse($r['permissions'] ?? '');
+    $roles_arr[] = $r;
+}
+$col_count = count($roles_arr) + 2;
 ?>
 
 <div class="card card-outline card-primary shadow-sm rounded-0">
@@ -22,7 +32,8 @@ $permission_categories = [
     </div>
     <div class="card-body">
         <p class="text-muted mb-4">
-            Dolibarr-inspired Role Access Control Matrix Inspector. Gives a granular overview of user access capabilities across system modules.
+            A read-only overview of what each custom role can do across system modules.
+            The <b>Super Administrator</b> always has unrestricted access.
         </p>
 
         <div class="table-responsive">
@@ -31,27 +42,29 @@ $permission_categories = [
                     <tr class="bg-gradient-navy text-white">
                         <th>System Module Permission</th>
                         <th class="text-center" style="width: 15%;">Super Administrator</th>
-                        <?php
-                        $roles_arr = [];
-                        while($r = $roles->fetch_assoc()):
-                            $roles_arr[] = $r;
-                        ?>
+                        <?php foreach($roles_arr as $r): ?>
                             <th class="text-center" style="width: 15%;"><?= htmlspecialchars($r['name']) ?></th>
-                        <?php endwhile; ?>
+                        <?php endforeach; ?>
                     </tr>
                 </thead>
                 <tbody>
-                    <?php foreach($permission_categories as $cat => $perms): ?>
+                    <?php if(empty($permission_groups)): ?>
+                        <tr><td colspan="<?= $col_count ?>" class="text-center text-muted">No permissions defined.</td></tr>
+                    <?php endif; ?>
+                    <?php foreach($permission_groups as $cat => $perms): ?>
                         <tr class="bg-light">
-                            <td colspan="<?= count($roles_arr) + 2 ?>" class="font-weight-bold text-dark text-uppercase text-xs"><?= $cat ?></td>
+                            <td colspan="<?= $col_count ?>" class="font-weight-bold text-dark text-uppercase text-xs"><?= htmlspecialchars($cat) ?></td>
                         </tr>
-                        <?php foreach($perms as $p): ?>
+                        <?php foreach($perms as $p_key => $p_label): ?>
                             <tr>
-                                <td class="align-middle pl-4"><code><?= $p ?></code></td>
+                                <td class="align-middle pl-4">
+                                    <div class="font-weight-bold text-navy"><?= htmlspecialchars($p_label) ?></div>
+                                    <code class="text-muted"><?= htmlspecialchars($p_key) ?></code>
+                                </td>
                                 <td class="text-center align-middle text-success font-weight-bold"><i class="fas fa-check-circle"></i> Full Access</td>
                                 <?php foreach($roles_arr as $r):
-                                    $p_list = !empty($r['permissions']) ? json_decode($r['permissions'], true) : [];
-                                    $has_perm = is_array($p_list) && in_array($p, $p_list);
+                                    $has_perm = in_array($p_key, $r['perm_keys'], true)
+                                             || in_array(\App\Support\Permissions::WILDCARD, $r['perm_keys'], true);
                                 ?>
                                     <td class="text-center align-middle">
                                         <?php if($has_perm): ?>

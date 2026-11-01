@@ -158,11 +158,21 @@ class SystemSettings extends DBConnection{
 	}
 
 	function set_active_tenant($tenant_id){
-		if($tenant_id > 0){
-			$_SESSION['userdata']['active_tenant_id'] = (int)$tenant_id;
-			return true;
+		$tenant_id = (int)$tenant_id;
+		if($tenant_id <= 0){
+			return false;
 		}
-		return false;
+		// Only super administrators may hop between companies. A staff user is
+		// pinned to the tenant their account belongs to, regardless of what
+		// tenant_id is submitted — this preserves multi-tenant data isolation.
+		if(!$this->is_super_admin()){
+			$home_tenant = (int)$this->userdata('tenant_id');
+			if($home_tenant > 0 && $tenant_id !== $home_tenant){
+				return false;
+			}
+		}
+		$_SESSION['userdata']['active_tenant_id'] = $tenant_id;
+		return true;
 	}
 	function set_flashdata($flash='',$value=''){
 		if(!empty($flash) && !empty($value)){
@@ -263,6 +273,73 @@ class SystemSettings extends DBConnection{
 		return true;
 	}
 
+	/* ===================================================================
+	 * Access-control guards
+	 *
+	 * These helpers are meant to be called at the very top of a protected
+	 * request handler. On failure they emit a short response and terminate
+	 * the request, so a caller that returns normally is always authorised.
+	 * =================================================================== */
+
+	/** True when the current session belongs to a super administrator. */
+	function is_super_admin(){
+		return $this->userdata('type') == 1;
+	}
+
+	/**
+	 * Emit a denial and stop the request.
+	 *
+	 * @param string $msg  Message shown to the user.
+	 * @param string $as   'json' (AJAX endpoints) or 'page' (view includes).
+	 * @param int    $code HTTP status code.
+	 */
+	function deny($msg = 'You are not authorised to perform this action.', $as = 'json', $code = 403){
+		if(!headers_sent()){
+			http_response_code($code);
+		}
+		if($as === 'page'){
+			echo '<div class="alert alert-danger m-3"><i class="fas fa-ban mr-2"></i>'
+				. htmlspecialchars($msg) . '</div>';
+		}else{
+			header('Content-Type: application/json');
+			echo json_encode(['status' => 'failed', 'msg' => $msg]);
+		}
+		exit;
+	}
+
+	/** Require an authenticated admin (staff/super) session, else stop. */
+	function require_login($as = 'json'){
+		if(!$this->userdata('id') || $this->userdata('login_type') != 1){
+			$this->deny('Your session has expired. Please sign in again.', $as, 401);
+		}
+	}
+
+	/** Require a valid CSRF token on state-changing requests, else stop. */
+	function require_csrf($as = 'json'){
+		if(!$this->verify_csrf()){
+			$this->deny('Security token mismatch. Please refresh the page and try again.', $as, 419);
+		}
+	}
+
+	/**
+	 * Require a specific permission (super admins always pass). Also enforces
+	 * that the caller is logged in, so handlers need only one guard call.
+	 */
+	function require_permission($permission_key, $as = 'json'){
+		$this->require_login($as);
+		if(!$this->can_access($permission_key)){
+			$this->deny("You don't have permission to perform this action.", $as, 403);
+		}
+	}
+
+	/** Require that the current session is a super administrator, else stop. */
+	function require_super_admin($as = 'json'){
+		$this->require_login($as);
+		if(!$this->is_super_admin()){
+			$this->deny('This action is restricted to super administrators.', $as, 403);
+		}
+	}
+
 	function send_test_email(){
 		require_once(__DIR__ . '/Emailer.php');
 		$to = isset($_POST['test_email']) ? trim($_POST['test_email']) : '';
@@ -326,6 +403,8 @@ $action = !isset($_GET['f']) ? 'none' : strtolower($_GET['f']);
 $sysset = new SystemSettings();
 switch ($action) {
 	case 'update_settings':
+		$sysset->require_permission('settings_manage');
+		$sysset->require_csrf();
 		echo $sysset->update_settings_info();
 		break;
 	case 'send_test_email':
@@ -338,9 +417,12 @@ switch ($action) {
 		echo $sysset->flush_redis_cache();
 		break;
 	case 'switch_tenant':
-		if(isset($_POST['tenant_id'])){
-			$sysset->set_active_tenant($_POST['tenant_id']);
+		$sysset->require_login();
+		$sysset->require_csrf();
+		if(isset($_POST['tenant_id']) && $sysset->set_active_tenant($_POST['tenant_id'])){
 			echo json_encode(['status' => 'success']);
+		}else{
+			echo json_encode(['status' => 'failed', 'msg' => 'You are not allowed to switch to that company.']);
 		}
 		break;
 	default:

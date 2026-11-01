@@ -1,3 +1,6 @@
+<?php if(!$_settings->can_access('roles_manage')): ?>
+	<div class="alert alert-danger m-3"><i class="fas fa-ban mr-2"></i>You don't have permission to manage roles and permissions.</div>
+<?php return; endif; ?>
 <?php if($_settings->chk_flashdata('success')): ?>
 <script>
 	alert_toast("<?php echo $_settings->flashdata('success') ?>",'success')

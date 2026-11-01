@@ -11,73 +11,165 @@ Class Users extends DBConnection {
 		parent::__destruct();
 	}
 	public function save_users(){
-		if(!isset($_POST['status']) && $this->settings->userdata('login_type') == 1){
-			$_POST['status'] = 1;
+		$this->settings->require_login();
+		$this->settings->require_csrf();
+
+		$self_id       = (int)$this->settings->userdata('id');
+		$is_super      = $this->settings->is_super_admin();
+		$active_tenant = (int)$this->settings->active_tenant_id();
+
+		$id      = isset($_POST['id']) ? (int)$_POST['id'] : 0;
+		$is_self = ($id > 0 && $id === $self_id);
+		$is_new  = ($id === 0);
+
+		// Authorisation: anyone may edit their OWN profile; creating a new user
+		// or editing someone else requires the users_manage permission.
+		if(!$is_self && !$this->settings->can_access('users_manage')){
+			$this->settings->deny("You don't have permission to manage system users.");
 		}
-		extract($_POST);
-		$oid = $id;
-		$data = '';
-		if(isset($oldpassword)){
+
+		// Load the existing record (for edits) so we can enforce tenant scope
+		// and protect privileged accounts.
+		$target = null;
+		if(!$is_new){
+			$t_qry = $this->conn->query("SELECT `id`,`type`,`tenant_id` FROM `users` WHERE id = {$id}");
+			$target = ($t_qry && $t_qry->num_rows > 0) ? $t_qry->fetch_assoc() : null;
+			if($target === null){
+				return 2; // nothing to update
+			}
+			// A non-super admin can neither touch accounts outside their tenant
+			// nor modify a super-administrator account.
+			if(!$is_super){
+				if((int)$target['tenant_id'] !== $active_tenant){
+					$this->settings->deny('That user belongs to a different company.');
+				}
+				if((int)$target['type'] === 1){
+					$this->settings->deny('You cannot modify a super-administrator account.');
+				}
+			}
+		}
+
+		// Self password change: verify the current password first.
+		if(isset($_POST['oldpassword'])){
 			$curr_pass = $this->settings->userdata('password');
-			if (!password_verify($oldpassword, $curr_pass)) {
+			if (!password_verify($_POST['oldpassword'], $curr_pass)) {
 				return 4;
 			}
 		}
-		$chk = $this->conn->query("SELECT * FROM `users` where username ='{$username}' ".($id>0? " and id!= '{$id}' " : ""))->num_rows;
+
+		// Username uniqueness (escaped; excludes the record being edited).
+		$username = isset($_POST['username']) ? trim((string)$_POST['username']) : '';
+		$username_esc = $this->conn->real_escape_string($username);
+		$chk = $this->conn->query("SELECT id FROM `users` WHERE username = '{$username_esc}' ".($id>0? " AND id != {$id} " : ""))->num_rows;
 		if($chk > 0){
 			return 3;
-			exit;
 		}
-		if(!isset($_POST['tenant_id']) || empty($_POST['tenant_id'])){
-			$_POST['tenant_id'] = $this->settings->active_tenant_id();
+
+		/* ---- Decide which fields this caller is allowed to write ---- */
+		// Everyone may set their basic profile fields.
+		$allowed = array('firstname','middlename','lastname','username');
+		// Only user administrators may set privilege/assignment fields, and
+		// never on their own account (prevents self-escalation / self-lockout).
+		$can_admin_fields = !$is_self && ($is_super || $this->settings->can_access('users_manage'));
+		if($can_admin_fields){
+			$allowed = array_merge($allowed, array('type','role_id','tenant_id','employee_id','status'));
 		}
+
+		// Resolve the tenant this user will belong to.
+		if($is_super && $can_admin_fields && !empty($_POST['tenant_id'])){
+			$target_tenant = (int)$_POST['tenant_id'];
+		}elseif(!$is_new){
+			$target_tenant = (int)$target['tenant_id'];
+		}else{
+			$target_tenant = $active_tenant;
+		}
+
+		// Normalise privilege level: only a super admin may grant type 1.
+		if($can_admin_fields){
+			$req_type = isset($_POST['type']) ? (int)$_POST['type'] : 2;
+			$_POST['type'] = ($is_super && $req_type === 1) ? 1 : 2;
+			$_POST['tenant_id'] = $target_tenant;
+
+			// A staff account must not set a default status implicitly to 0.
+			if(!isset($_POST['status'])){
+				$_POST['status'] = 1;
+			}
+
+			// Validate role_id belongs to the resolved tenant, else clear it.
+			if(!empty($_POST['role_id']) && (int)$_POST['role_id'] > 0){
+				$rid = (int)$_POST['role_id'];
+				$r_ok = $this->conn->query("SELECT id FROM `roles` WHERE id = {$rid} AND tenant_id = {$target_tenant} AND delete_flag = 0");
+				if(!$r_ok || $r_ok->num_rows === 0){ $_POST['role_id'] = 0; }
+			}
+			// Validate employee_id belongs to the resolved tenant, else clear it.
+			if(!empty($_POST['employee_id']) && (int)$_POST['employee_id'] > 0){
+				$eid = (int)$_POST['employee_id'];
+				$e_ok = $this->conn->query("SELECT id FROM `employee_list` WHERE id = {$eid} AND tenant_id = {$target_tenant} AND delete_flag = 0");
+				if(!$e_ok || $e_ok->num_rows === 0){ $_POST['employee_id'] = 0; }
+			}
+			// A super admin (type 1) has no scoped role.
+			if((int)$_POST['type'] === 1){ $_POST['role_id'] = 0; }
+		}
+
+		$data = '';
 		foreach($_POST as $k => $v){
-			if(in_array($k,array('firstname','middlename','lastname','username','type','role_id','tenant_id','employee_id'))){
+			if(in_array($k, $allowed, true)){
 				if(!empty($data)) $data .=" , ";
-				if(($k == 'role_id' || $k == 'employee_id') && (empty($v) || $v == '0')){
+				if(in_array($k, array('role_id','employee_id'), true) && (empty($v) || $v == '0')){
 					$data .= " `{$k}` = NULL ";
-				} else {
+				}elseif(in_array($k, array('type','status','role_id','employee_id','tenant_id'), true)){
+					$data .= " `{$k}` = '".(int)$v."' ";
+				}else{
 					$v_escaped = $this->conn->real_escape_string((string)$v);
 					$data .= " `{$k}` = '{$v_escaped}' ";
 				}
 			}
 		}
-		if(!empty($password)){
+
+		$password = isset($_POST['password']) ? (string)$_POST['password'] : '';
+		if($password !== ''){
 			$password_hash = password_hash($password, PASSWORD_BCRYPT);
 			if(!empty($data)) $data .=" , ";
 			$data .= " `password` = '{$password_hash}' ";
 		}
 
-		if(empty($id)){
-			$qry = $this->conn->query("INSERT INTO users set {$data}");
+		if($data === ''){
+			return 2; // nothing to write
+		}
+
+		if($is_new){
+			// New accounts are always scoped to the resolved tenant.
+			$data .= " , `tenant_id` = '{$target_tenant}' ";
+			$qry = $this->conn->query("INSERT INTO users SET {$data}");
 			if($qry){
-				$id = $this->conn->insert_id;
+				$id = (int)$this->conn->insert_id;
 				$this->settings->set_flashdata('success','User Details successfully saved.');
+				$this->settings->log_audit('Create User','User Management',"Created user '{$username}' (#{$id}).");
 				$resp['status'] = 1;
 			}else{
 				$resp['status'] = 2;
 			}
-
 		}else{
-			$qry = $this->conn->query("UPDATE users set $data where id = {$id}");
+			// Tenant-scope the update for non-super admins.
+			$scope = $is_super ? "" : " AND tenant_id = {$active_tenant} ";
+			$qry = $this->conn->query("UPDATE users SET {$data} WHERE id = {$id} {$scope}");
 			if($qry){
 				$this->settings->set_flashdata('success','User Details successfully updated.');
-				if($id == $this->settings->userdata('id')){
-					foreach($_POST as $k => $v){
-						if($k != 'id'){
-							if(!empty($data)) $data .=" , ";
-							$this->settings->set_userdata($k,$v);
+				$this->settings->log_audit('Update User','User Management',"Updated user #{$id}.");
+				if($is_self){
+					// Refresh only the editable profile fields in the session.
+					foreach(array('firstname','middlename','lastname','username') as $k){
+						if(isset($_POST[$k])){
+							$this->settings->set_userdata($k,$_POST[$k]);
 						}
 					}
-					
 				}
 				$resp['status'] = 1;
 			}else{
 				$resp['status'] = 2;
 			}
-			
 		}
-		
+
 		if(isset($_FILES['img']) && $_FILES['img']['tmp_name'] != ''){
 			$fname = 'uploads/avatar-'.$id.'.png';
 			$dir_path =base_app. $fname;
@@ -118,13 +210,38 @@ Class Users extends DBConnection {
 		return  $resp['status'];
 	}
 	public function delete_users(){
-		extract($_POST);
-		$avatar = $this->conn->query("SELECT avatar FROM users where id = '{$id}'")->fetch_array()['avatar'];
-		$qry = $this->conn->query("DELETE FROM users where id = $id");
-		if($qry){
-			$avatar = explode("?",$avatar)[0];
+		$this->settings->require_permission('users_manage');
+		$this->settings->require_csrf();
+
+		$id = isset($_POST['id']) ? (int)$_POST['id'] : 0;
+		$self_id = (int)$this->settings->userdata('id');
+		$is_super = $this->settings->is_super_admin();
+		$active_tenant = (int)$this->settings->active_tenant_id();
+
+		if($id <= 0 || $id === 1 || $id === $self_id){
+			return json_encode(['status' => 'failed', 'msg' => 'This account cannot be deleted.']);
+		}
+
+		$row = $this->conn->query("SELECT `avatar`,`type`,`tenant_id` FROM users WHERE id = {$id}");
+		$row = ($row && $row->num_rows > 0) ? $row->fetch_assoc() : null;
+		if($row === null){
+			return json_encode(['status' => 'failed', 'msg' => 'User not found.']);
+		}
+
+		// A non-super admin may only delete non-privileged users in their tenant.
+		if(!$is_super){
+			if((int)$row['tenant_id'] !== $active_tenant || (int)$row['type'] === 1){
+				return json_encode(['status' => 'failed', 'msg' => 'You are not allowed to delete that user.']);
+			}
+		}
+
+		$scope = $is_super ? "" : " AND tenant_id = {$active_tenant} ";
+		$qry = $this->conn->query("DELETE FROM users WHERE id = {$id} {$scope}");
+		if($qry && $this->conn->affected_rows > 0){
+			$avatar = explode("?", (string)$row['avatar'])[0];
 			$this->settings->set_flashdata('success','User Details successfully deleted.');
-			if(is_file(base_app.$avatar))
+			$this->settings->log_audit('Delete User','User Management',"Deleted user #{$id}.");
+			if(!empty($avatar) && is_file(base_app.$avatar))
 				unlink(base_app.$avatar);
 			$resp['status'] = 'success';
 		}else{
@@ -142,15 +259,19 @@ Class Users extends DBConnection {
 										 "msg"=>'Old Password is Incorrect'));
 			}
 		}
-		$chk = $this->conn->query("SELECT * FROM `client_list` where email ='{$email}' ".($id>0? " and id!= '{$id}' " : ""))->num_rows;
+		$id = isset($id) ? (int)$id : 0;
+		$email_esc = $this->conn->real_escape_string((string)($email ?? ''));
+		$chk = $this->conn->query("SELECT id FROM `client_list` where email ='{$email_esc}' ".($id>0? " and id != {$id} " : ""))->num_rows;
 		if($chk > 0){
 			return 3;
-			exit;
 		}
 		foreach($_POST as $k => $v){
 			if(!in_array($k,array('id','oldpassword','cpassword','password'))){
+				// Guard against column-name injection via crafted POST keys.
+				if(!preg_match('/^[a-zA-Z0-9_]+$/', $k)) continue;
 				if(!empty($data)) $data .=" , ";
-				$data .= " {$k} = '{$v}' ";
+				$v_escaped = $this->conn->real_escape_string((string)$v);
+				$data .= " `{$k}` = '{$v_escaped}' ";
 			}
 		}
 		if(!empty($password)){
@@ -230,9 +351,9 @@ Class Users extends DBConnection {
 		return  json_encode($resp);
 	}
 	public function delete_client(){
-		extract($_POST);
-		$avatar = $this->conn->query("SELECT avatar FROM client_list where id = '{$id}'")->fetch_array()['avatar'];
-		$qry = $this->conn->query("DELETE FROM client_list where id = $id");
+		$id = isset($_POST['id']) ? (int)$_POST['id'] : 0;
+		$avatar = $this->conn->query("SELECT avatar FROM client_list where id = {$id}")->fetch_array()['avatar'];
+		$qry = $this->conn->query("DELETE FROM client_list where id = {$id}");
 		if($qry){
 			$avatar = explode("?",$avatar)[0];
 			$this->settings->set_flashdata('success','User Details successfully deleted.');
@@ -245,8 +366,8 @@ Class Users extends DBConnection {
 		return json_encode($resp);
 	}
 	public function verify_client(){
-		extract($_POST);
-		$update = $this->conn->query("UPDATE `client_list` set `status` = 1 where id = $id");
+		$id = isset($_POST['id']) ? (int)$_POST['id'] : 0;
+		$update = $this->conn->query("UPDATE `client_list` set `status` = 1 where id = {$id}");
 		if($update){
 			$this->settings->set_flashdata('success','client Account has verified successfully.');
 			$resp['status'] = 'success';
@@ -255,7 +376,32 @@ Class Users extends DBConnection {
 		}
 		return json_encode($resp);
 	}
-	
+
+	/** Activate (verify) a pending system user account. */
+	public function verify_user(){
+		$this->settings->require_permission('users_manage');
+		$this->settings->require_csrf();
+
+		$id = isset($_POST['id']) ? (int)$_POST['id'] : 0;
+		$is_super = $this->settings->is_super_admin();
+		$active_tenant = (int)$this->settings->active_tenant_id();
+
+		if($id <= 0){
+			return json_encode(['status' => 'failed', 'msg' => 'Invalid user.']);
+		}
+
+		$scope = $is_super ? "" : " AND tenant_id = {$active_tenant} ";
+		$update = $this->conn->query("UPDATE `users` SET `status` = 1 WHERE id = {$id} {$scope}");
+		if($update && $this->conn->affected_rows >= 0){
+			$this->settings->set_flashdata('success','User account verified successfully.');
+			$this->settings->log_audit('Verify User','User Management',"Verified user #{$id}.");
+			$resp['status'] = 'success';
+		}else{
+			$resp['status'] = 'failed';
+		}
+		return json_encode($resp);
+	}
+
 }
 
 $users = new users();
@@ -275,6 +421,9 @@ switch ($action) {
 	break;
 	case 'verify_client':
 		echo $users->verify_client();
+	break;
+	case 'verify_user':
+		echo $users->verify_user();
 	break;
 	default:
 		// echo $sysset->index();

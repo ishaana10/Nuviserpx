@@ -964,21 +964,29 @@ class Master extends DBConnection
     /* Role / API Key Actions */
     public function save_role()
     {
+        $this->settings->require_permission('roles_manage');
+        $this->settings->require_csrf();
         return $this->container->make(RoleService::class)->saveRole($_POST);
     }
 
     public function delete_role()
     {
+        $this->settings->require_permission('roles_manage');
+        $this->settings->require_csrf();
         return $this->container->make(RoleService::class)->deleteRole(intval($_POST['id'] ?? 0));
     }
 
     public function save_api_key()
     {
+        $this->settings->require_permission('api_keys_manage');
+        $this->settings->require_csrf();
         return $this->container->make(RoleService::class)->saveApiKey($_POST);
     }
 
     public function delete_api_key()
     {
+        $this->settings->require_permission('api_keys_manage');
+        $this->settings->require_csrf();
         return $this->container->make(RoleService::class)->deleteApiKey(intval($_POST['id'] ?? 0));
     }
 
@@ -1017,16 +1025,22 @@ class Master extends DBConnection
     /* Platform Plan Actions (super-admin) */
     public function save_plan()
     {
+        $this->settings->require_super_admin();
+        $this->settings->require_csrf();
         return $this->container->make(PlanService::class)->savePlan($_POST);
     }
 
     public function delete_plan()
     {
+        $this->settings->require_super_admin();
+        $this->settings->require_csrf();
         return $this->container->make(PlanService::class)->deletePlan(intval($_POST['id'] ?? 0));
     }
 
     public function assign_plan()
     {
+        $this->settings->require_super_admin();
+        $this->settings->require_csrf();
         return $this->container->make(PlanService::class)->assignPlan($_POST);
     }
 
@@ -1498,11 +1512,15 @@ class Master extends DBConnection
 
     public function save_tenant()
     {
+        $this->settings->require_super_admin();
+        $this->settings->require_csrf();
         return $this->container->make(TenantService::class)->saveTenant($_POST);
     }
 
     public function delete_tenant()
     {
+        $this->settings->require_super_admin();
+        $this->settings->require_csrf();
         return $this->container->make(TenantService::class)->deleteTenant(intval($_POST['id'] ?? 0));
     }
 
