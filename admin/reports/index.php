@@ -16,6 +16,7 @@ $sections = [
         ['reports/working_trial_balance', 'Working Trial Balance', 'fas fa-th-list', 'Opening balance, period debits and credits, and closing balance for every account.'],
         ['reports/general_ledger', 'General Ledger', 'fas fa-book-open', 'Movement per account for a period. Pick an account to see each transaction with a running balance.'],
         ['journals', 'Manual Journals', 'fas fa-stream', 'All journals with totals, status and source document.', 'List'],
+        ['bank_reconciliation', 'Bank Reconciliation', 'fas fa-university', 'Match bank statement lines to posted entries and confirm each bank account balances.', 'Tool'],
     ]],
     ['Sales and receivables', 'fas fa-file-invoice-dollar', 'invoices_view', [
         ['reports/sales_by_customer', 'Sales by Customer', 'fas fa-users', 'Invoiced sales, tax, payments and amounts owing per customer for a period.'],
