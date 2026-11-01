@@ -105,7 +105,8 @@ if (!function_exists('nvr_money')) {
      *
      * $opt = [
      *   'page' => 'reports/trial_balance', 'title' => 'Trial balance', 'icon' => 'fas fa-balance-scale',
-     *   'mode' => 'range' | 'asat', 'from' => …, 'to' => …, 'asat' => …,
+     *   'mode' => 'range' | 'asat' | 'live', 'from' => …, 'to' => …, 'asat' => …,
+     *     ('live' = a current snapshot with no date controls)
      *   'compare' => ['none' => 'No comparison', …] (optional), 'compareValue' => 'none',
      *   'extra' => '<html for extra filter fields>' (optional), 'subtitle' => 'As at 31 Oct 2026',
      * ]
@@ -131,7 +132,9 @@ if (!function_exists('nvr_money')) {
 
             <form class="nvr-filters d-print-none" method="get" action="./">
                 <input type="hidden" name="page" value="<?= htmlspecialchars($opt['page']) ?>">
-                <?php if ($mode === 'range'): ?>
+                <?php if ($mode === 'live'): ?>
+                    <?php /* live snapshot: no date controls, only any extra toggles below */ ?>
+                <?php elseif ($mode === 'range'): ?>
                     <div class="nvr-field">
                         <label for="nvr-period">Period</label>
                         <select id="nvr-period" class="custom-select" data-nvr="period">

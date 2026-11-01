@@ -268,6 +268,18 @@ if($t_qry && $t_qry->num_rows > 0){
                                         </a>
                                     </li>
                                     <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=reports/inventory_valuation" class="nav-link nav-reports_inventory_valuation tree-item">
+                                            <i class="nav-icon fas fa-warehouse"></i>
+                                            <p>Inventory Valuation</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=reports/reorder_report" class="nav-link nav-reports_reorder_report tree-item">
+                                            <i class="nav-icon fas fa-dolly-flatbed"></i>
+                                            <p>Reorder Report</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=reports/payroll_accounting" class="nav-link nav-reports_payroll_accounting tree-item">
                                             <i class="nav-icon fas fa-calculator"></i>
                                             <p>Payroll Accounting</p>

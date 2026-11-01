@@ -29,6 +29,12 @@ $sections = [
         ['purchases', 'Purchase Orders', 'fas fa-shopping-bag', 'Every purchase order with status, totals and receiving progress.', 'List'],
         ['purchases/vendor_bills', 'Vendor Bills', 'fas fa-file-invoice-dollar', 'Bills recorded against vendors, with balance and due date.', 'List'],
     ]],
+    ['Inventory', 'fas fa-warehouse', 'reports_view', [
+        ['reports/inventory_valuation', 'Inventory Valuation', 'fas fa-warehouse', 'Stock on hand valued at cost, per product and in total — the figure that ties to your inventory asset account.'],
+        ['reports/reorder_report', 'Reorder Report', 'fas fa-dolly-flatbed', 'Products at or below their reorder level, with a suggested order quantity and the cost to restock.'],
+        ['stock_adjustments', 'Stock Movements', 'fas fa-cubes', 'Every stock movement in, out and adjusted, per product.', 'List'],
+        ['products', 'Products', 'fas fa-box', 'The product catalogue with cost, price and stock on hand.', 'List'],
+    ]],
     ['Tax', 'fas fa-receipt', 'reports_view', [
         ['tax/report', 'VAT Return', 'fas fa-receipt', 'Output VAT on sales and input VAT on purchases for a period, and the net payable to FRCS.'],
     ]],
