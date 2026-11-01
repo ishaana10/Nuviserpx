@@ -13,6 +13,7 @@ use App\Services\PlanService;
 use App\Services\PayrollService;
 use App\Services\PurchaseService;
 use App\Services\BankReconciliationService;
+use App\Services\CrmService;
 use App\Services\RoleService;
 use App\Services\TenantService;
 
@@ -234,38 +235,32 @@ class Master extends DBConnection
     /* Dolibarr Inspired CRM Opportunity Methods */
     public function save_opportunity()
     {
-        $tenant_id = $this->settings->active_tenant_id();
-        $user_id = $this->settings->userdata('id');
-        extract($_POST);
+        return $this->container->make(CrmService::class)->saveOpportunity($_POST);
+    }
 
-        if (empty($title)) {
-            return json_encode(['status' => 'failed', 'msg' => 'Opportunity Title is required.']);
-        }
+    public function move_opportunity_stage()
+    {
+        return $this->container->make(CrmService::class)->moveStage(intval($_POST['id'] ?? 0), (string)($_POST['stage'] ?? ''));
+    }
 
-        $data = " `tenant_id` = '{$tenant_id}' ";
-        $data .= ", `title` = '{$this->conn->real_escape_string($title)}' ";
-        $data .= ", `party_id` = " . (!empty($party_id) ? intval($party_id) : "NULL") . " ";
-        $data .= ", `stage` = '{$this->conn->real_escape_string($stage ?? 'qualification')}' ";
-        $data .= ", `amount` = '" . (!empty($amount) ? floatval($amount) : 0.00) . "' ";
-        $data .= ", `probability` = '" . (!empty($probability) ? intval($probability) : 20) . "' ";
-        $data .= ", `expected_close_date` = " . (!empty($expected_close_date) ? "'{$this->conn->real_escape_string($expected_close_date)}'" : "NULL") . " ";
-        $data .= ", `notes` = '{$this->conn->real_escape_string($notes ?? '')}' ";
-        $data .= ", `created_by` = '{$user_id}' ";
+    public function convert_opportunity()
+    {
+        return $this->container->make(CrmService::class)->convertToInvoice(intval($_POST['id'] ?? 0));
+    }
 
-        $target_id = !empty($id) ? intval($id) : 0;
-        if ($target_id <= 0) {
-            $save = $this->conn->query("INSERT INTO `crm_opportunities` SET {$data}");
-            $opp_id = $this->conn->insert_id;
-        } else {
-            $save = $this->conn->query("UPDATE `crm_opportunities` SET {$data} WHERE id = '{$target_id}' AND tenant_id = '{$tenant_id}'");
-            $opp_id = $target_id;
-        }
+    public function save_crm_activity()
+    {
+        return $this->container->make(CrmService::class)->saveActivity($_POST);
+    }
 
-        if ($save) {
-            $this->settings->log_audit(empty($id) ? "Created CRM Deal" : "Updated CRM Deal", "CRM Opportunities", "Title: {$title}");
-            return json_encode(['status' => 'success', 'id' => $opp_id, 'msg' => 'CRM Opportunity saved successfully.']);
-        }
-        return json_encode(['status' => 'failed', 'msg' => 'Failed to save opportunity. ' . $this->conn->error]);
+    public function toggle_crm_activity()
+    {
+        return $this->container->make(CrmService::class)->toggleActivity(intval($_POST['id'] ?? 0));
+    }
+
+    public function delete_crm_activity()
+    {
+        return $this->container->make(CrmService::class)->deleteActivity(intval($_POST['id'] ?? 0));
     }
 
     public function delete_opportunity()
@@ -1971,6 +1966,21 @@ switch ($action) {
         break;
     case 'delete_opportunity':
         echo $Master->delete_opportunity();
+        break;
+    case 'move_opportunity_stage':
+        echo $Master->move_opportunity_stage();
+        break;
+    case 'convert_opportunity':
+        echo $Master->convert_opportunity();
+        break;
+    case 'save_crm_activity':
+        echo $Master->save_crm_activity();
+        break;
+    case 'toggle_crm_activity':
+        echo $Master->toggle_crm_activity();
+        break;
+    case 'delete_crm_activity':
+        echo $Master->delete_crm_activity();
         break;
     case 'save_proposal_signature':
         echo $Master->save_proposal_signature();

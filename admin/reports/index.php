@@ -20,6 +20,7 @@ $sections = [
     ]],
     ['Sales and receivables', 'fas fa-file-invoice-dollar', 'invoices_view', [
         ['reports/sales_by_customer', 'Sales by Customer', 'fas fa-users', 'Invoiced sales, tax, payments and amounts owing per customer for a period.'],
+        ['reports/sales_pipeline', 'Sales Pipeline', 'fas fa-funnel-dollar', 'Open CRM deals by stage with probability-weighted forecast, win rate and closed-won totals.'],
         ['reports/ar_aging', 'Aged Receivables', 'fas fa-hourglass-half', 'What each customer owes, split into current, 30, 60, 90 and older.'],
         ['invoices', 'Invoices', 'fas fa-file-invoice', 'Every invoice with status, totals and balance due.', 'List'],
         ['payments', 'Payments', 'fas fa-hand-holding-usd', 'Receipts and payments recorded against invoices.', 'List'],
