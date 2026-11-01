@@ -470,7 +470,7 @@ if($t_qry && $t_qry->num_rows > 0){
                             <?php endif; ?>
 
                             <!-- 8b. Access & Users (super admin or delegated permission) -->
-                            <?php if($_settings->can_access('users_manage') || $_settings->can_access('roles_manage') || $_settings->can_access('api_keys_manage')): ?>
+                            <?php if($_settings->is_super_admin() || $_settings->can_access('users_manage') || $_settings->can_access('api_keys_manage')): ?>
                             <li class="nav-item has-treeview">
                                 <a href="#" class="nav-link nav-is-tree">
                                     <i class="nav-icon fas fa-users-cog"></i>
@@ -494,17 +494,17 @@ if($t_qry && $t_qry->num_rows > 0){
                                         </a>
                                     </li>
                                     <?php endif; ?>
-                                    <?php if($_settings->can_access('roles_manage')): ?>
+                                    <?php if($_settings->is_super_admin()): ?>
                                     <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=roles" class="nav-link nav-roles tree-item">
                                             <i class="nav-icon fas fa-user-shield"></i>
-                                            <p>User Roles &amp; Access</p>
+                                            <p>User Roles &amp; Access <small class="badge badge-navy ml-1">Dev</small></p>
                                         </a>
                                     </li>
                                     <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=user/permissions" class="nav-link nav-user_permissions tree-item">
                                             <i class="nav-icon fas fa-table"></i>
-                                            <p>Permissions Matrix</p>
+                                            <p>Permissions Matrix <small class="badge badge-navy ml-1">Dev</small></p>
                                         </a>
                                     </li>
                                     <?php endif; ?>
