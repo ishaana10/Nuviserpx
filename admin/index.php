@@ -18,13 +18,28 @@
         <!-- Main content -->
         <section class="content">
           <div class="container-fluid">
-            <?php 
+            <?php
               $view_file = $page . '.php';
               if(is_dir($page)){
                 $view_file = $page . '/index.php';
               }
 
-              if(file_exists($view_file)){
+              // Central page-level authorisation. The required permission comes
+              // from the registry; super administrators (developer tier) bypass
+              // all checks. Unlisted pages remain open to any logged-in admin.
+              $page_perm = \App\Support\Permissions::forPage($page);
+              $page_allowed = true;
+              if($page_perm === \App\Support\Permissions::SUPER_ONLY){
+                $page_allowed = $_settings->is_super_admin();
+              } elseif(is_string($page_perm)){
+                $page_allowed = $_settings->can_access($page_perm);
+              }
+
+              if(!$page_allowed){
+                echo '<div class="alert alert-danger m-3 shadow-sm"><i class="fas fa-ban mr-2"></i>'
+                   . 'You don\'t have permission to access this page. Contact your administrator if you believe this is a mistake.'
+                   . '</div>';
+              } elseif(file_exists($view_file)){
                 include $view_file;
               } else {
                 include '404.html';

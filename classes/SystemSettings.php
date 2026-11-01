@@ -148,13 +148,20 @@ class SystemSettings extends DBConnection{
 	}
 
 	function active_tenant_id(){
-		if(isset($_SESSION['userdata']['active_tenant_id']) && $_SESSION['userdata']['active_tenant_id'] > 0){
+		$home = isset($_SESSION['userdata']['tenant_id']) ? (int)$_SESSION['userdata']['tenant_id'] : 0;
+
+		// Tenant isolation: a non-super user is ALWAYS pinned to their own
+		// tenant. Any active_tenant_id override is honoured only for super
+		// administrators (the developer tier), who may operate across companies.
+		$is_super = isset($_SESSION['userdata']['type']) && $_SESSION['userdata']['type'] == 1;
+		if(!$is_super){
+			return $home > 0 ? $home : 1;
+		}
+
+		if(isset($_SESSION['userdata']['active_tenant_id']) && (int)$_SESSION['userdata']['active_tenant_id'] > 0){
 			return (int)$_SESSION['userdata']['active_tenant_id'];
 		}
-		if(isset($_SESSION['userdata']['tenant_id']) && $_SESSION['userdata']['tenant_id'] > 0){
-			return (int)$_SESSION['userdata']['tenant_id'];
-		}
-		return 1;
+		return $home > 0 ? $home : 1;
 	}
 
 	function set_active_tenant($tenant_id){
@@ -234,7 +241,9 @@ class SystemSettings extends DBConnection{
 			$qry = $this->conn->query("SELECT * FROM `roles` WHERE id = '{$role_id}' AND tenant_id = '{$tenant_id}' AND status = 1 AND delete_flag = 0");
 			if($qry && $qry->num_rows > 0){
 				$role = $qry->fetch_assoc();
-				$perms = !empty($role['permissions']) ? explode(',', $role['permissions']) : [];
+				// Parse through the registry: expands legacy "<module>_manage"
+				// keys and implies "view" wherever a write action is granted.
+				$perms = \App\Support\Permissions::parse($role['permissions'] ?? '');
 				return ['name' => $role['name'], 'permissions' => $perms];
 			}
 		}
@@ -408,12 +417,17 @@ switch ($action) {
 		echo $sysset->update_settings_info();
 		break;
 	case 'send_test_email':
+		$sysset->require_permission('settings_manage');
+		$sysset->require_csrf();
 		echo $sysset->send_test_email();
 		break;
 	case 'test_redis_connection':
+		$sysset->require_super_admin();
 		echo $sysset->test_redis_connection();
 		break;
 	case 'flush_redis_cache':
+		$sysset->require_super_admin();
+		$sysset->require_csrf();
 		echo $sysset->flush_redis_cache();
 		break;
 	case 'switch_tenant':

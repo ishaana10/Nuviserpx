@@ -964,29 +964,21 @@ class Master extends DBConnection
     /* Role / API Key Actions */
     public function save_role()
     {
-        $this->settings->require_permission('roles_manage');
-        $this->settings->require_csrf();
         return $this->container->make(RoleService::class)->saveRole($_POST);
     }
 
     public function delete_role()
     {
-        $this->settings->require_permission('roles_manage');
-        $this->settings->require_csrf();
         return $this->container->make(RoleService::class)->deleteRole(intval($_POST['id'] ?? 0));
     }
 
     public function save_api_key()
     {
-        $this->settings->require_permission('api_keys_manage');
-        $this->settings->require_csrf();
         return $this->container->make(RoleService::class)->saveApiKey($_POST);
     }
 
     public function delete_api_key()
     {
-        $this->settings->require_permission('api_keys_manage');
-        $this->settings->require_csrf();
         return $this->container->make(RoleService::class)->deleteApiKey(intval($_POST['id'] ?? 0));
     }
 
@@ -1022,25 +1014,19 @@ class Master extends DBConnection
         return $this->container->make(IntegrationService::class)->toggleWorkflow(intval($_POST['id'] ?? 0));
     }
 
-    /* Platform Plan Actions (super-admin) */
+    /* Platform Plan Actions (super-admin — enforced by the central gate) */
     public function save_plan()
     {
-        $this->settings->require_super_admin();
-        $this->settings->require_csrf();
         return $this->container->make(PlanService::class)->savePlan($_POST);
     }
 
     public function delete_plan()
     {
-        $this->settings->require_super_admin();
-        $this->settings->require_csrf();
         return $this->container->make(PlanService::class)->deletePlan(intval($_POST['id'] ?? 0));
     }
 
     public function assign_plan()
     {
-        $this->settings->require_super_admin();
-        $this->settings->require_csrf();
         return $this->container->make(PlanService::class)->assignPlan($_POST);
     }
 
@@ -1512,15 +1498,11 @@ class Master extends DBConnection
 
     public function save_tenant()
     {
-        $this->settings->require_super_admin();
-        $this->settings->require_csrf();
         return $this->container->make(TenantService::class)->saveTenant($_POST);
     }
 
     public function delete_tenant()
     {
-        $this->settings->require_super_admin();
-        $this->settings->require_csrf();
         return $this->container->make(TenantService::class)->deleteTenant(intval($_POST['id'] ?? 0));
     }
 
@@ -1761,6 +1743,31 @@ class Master extends DBConnection
 
 $Master = new Master();
 $action = !isset($_GET['f']) ? 'none' : strtolower($_GET['f']);
+
+/* -------------------------------------------------------------------------
+ * Central access-control gate.
+ *
+ * Every write action is authorised here, in one place, before its handler
+ * runs — so roles are enforced consistently across every module. The required
+ * permission comes from the registry's action map; "save" actions resolve to
+ * create or edit depending on whether a record id is present. Super
+ * administrators (the developer tier) bypass permission checks. Public portal
+ * actions (customer login/registration) are exempt.
+ * ------------------------------------------------------------------------- */
+if ($action !== 'none' && !in_array($action, \App\Support\Permissions::PUBLIC_ACTIONS, true)) {
+    $_settings->require_login();
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $_settings->require_csrf();
+    }
+    $has_id = !empty($_POST['id']);
+    $required = \App\Support\Permissions::forAction($action, $has_id);
+    if ($required === \App\Support\Permissions::SUPER_ONLY) {
+        $_settings->require_super_admin();
+    } elseif ($required !== null) {
+        $_settings->require_permission($required);
+    }
+}
+
 switch ($action) {
     case 'save_group':
         echo $Master->save_group();

@@ -1,5 +1,5 @@
-<?php if(!$_settings->can_access('roles_manage')): ?>
-	<div class="alert alert-danger m-3"><i class="fas fa-ban mr-2"></i>You don't have permission to manage roles and permissions.</div>
+<?php if(!$_settings->is_super_admin()): ?>
+	<div class="alert alert-danger m-3"><i class="fas fa-ban mr-2"></i>Only the developer (super administrator) can define roles and set user access.</div>
 <?php return; endif; ?>
 <?php if($_settings->chk_flashdata('success')): ?>
 <script>
