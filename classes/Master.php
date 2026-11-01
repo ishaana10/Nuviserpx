@@ -11,6 +11,7 @@ use App\Services\PartyService;
 use App\Services\PaymentService;
 use App\Services\PlanService;
 use App\Services\PayrollService;
+use App\Services\PurchaseService;
 use App\Services\RoleService;
 use App\Services\TenantService;
 
@@ -1354,6 +1355,32 @@ class Master extends DBConnection
         return json_encode($resp);
     }
 
+    /* Procurement Actions (Purchase Orders, Goods Receipts, Vendor Bills) */
+    public function save_purchase_order()
+    {
+        return $this->container->make(PurchaseService::class)->savePurchaseOrder($_POST);
+    }
+
+    public function delete_purchase_order()
+    {
+        return $this->container->make(PurchaseService::class)->deletePurchaseOrder(intval($_POST['id'] ?? 0));
+    }
+
+    public function receive_goods()
+    {
+        return $this->container->make(PurchaseService::class)->receiveGoods($_POST);
+    }
+
+    public function save_vendor_bill()
+    {
+        return $this->container->make(PurchaseService::class)->saveVendorBill($_POST);
+    }
+
+    public function delete_vendor_bill()
+    {
+        return $this->container->make(PurchaseService::class)->deleteVendorBill(intval($_POST['id'] ?? 0));
+    }
+
     /* Payroll Actions */
     public function calculate_payroll_ajax()
     {
@@ -1753,6 +1780,21 @@ switch ($action) {
         break;
     case 'delete_sales_order':
         echo $Master->delete_sales_order();
+        break;
+    case 'save_purchase_order':
+        echo $Master->save_purchase_order();
+        break;
+    case 'delete_purchase_order':
+        echo $Master->delete_purchase_order();
+        break;
+    case 'receive_goods':
+        echo $Master->receive_goods();
+        break;
+    case 'save_vendor_bill':
+        echo $Master->save_vendor_bill();
+        break;
+    case 'delete_vendor_bill':
+        echo $Master->delete_vendor_bill();
         break;
     case 'save_stock_adjustment':
         echo $Master->save_stock_adjustment();
