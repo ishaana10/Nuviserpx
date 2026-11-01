@@ -310,6 +310,12 @@ if($t_qry && $t_qry->num_rows > 0){
                                             <p>Manual Journals</p>
                                         </a>
                                     </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=bank_reconciliation" class="nav-link nav-bank_reconciliation tree-item">
+                                            <i class="nav-icon fas fa-university"></i>
+                                            <p>Bank Reconciliation</p>
+                                        </a>
+                                    </li>
                                 </ul>
                             </li>
 

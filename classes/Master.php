@@ -12,6 +12,7 @@ use App\Services\PaymentService;
 use App\Services\PlanService;
 use App\Services\PayrollService;
 use App\Services\PurchaseService;
+use App\Services\BankReconciliationService;
 use App\Services\RoleService;
 use App\Services\TenantService;
 
@@ -1381,6 +1382,52 @@ class Master extends DBConnection
         return $this->container->make(PurchaseService::class)->deleteVendorBill(intval($_POST['id'] ?? 0));
     }
 
+    /* Bank Reconciliation Actions */
+    public function start_reconciliation()
+    {
+        return $this->container->make(BankReconciliationService::class)->startReconciliation($_POST);
+    }
+
+    public function update_reconciliation()
+    {
+        return $this->container->make(BankReconciliationService::class)->updateReconciliation($_POST);
+    }
+
+    public function delete_reconciliation()
+    {
+        return $this->container->make(BankReconciliationService::class)->deleteReconciliation(intval($_POST['id'] ?? 0));
+    }
+
+    public function add_statement_lines()
+    {
+        return $this->container->make(BankReconciliationService::class)->addStatementLines($_POST);
+    }
+
+    public function delete_statement_line()
+    {
+        return $this->container->make(BankReconciliationService::class)->deleteStatementLine(intval($_POST['id'] ?? 0));
+    }
+
+    public function match_statement_line()
+    {
+        return $this->container->make(BankReconciliationService::class)->matchLine($_POST);
+    }
+
+    public function unmatch_statement_line()
+    {
+        return $this->container->make(BankReconciliationService::class)->unmatchLine(intval($_POST['statement_line_id'] ?? 0));
+    }
+
+    public function finalize_reconciliation()
+    {
+        return $this->container->make(BankReconciliationService::class)->finalize(intval($_POST['id'] ?? 0));
+    }
+
+    public function reopen_reconciliation()
+    {
+        return $this->container->make(BankReconciliationService::class)->reopen(intval($_POST['id'] ?? 0));
+    }
+
     /* Payroll Actions */
     public function calculate_payroll_ajax()
     {
@@ -1795,6 +1842,33 @@ switch ($action) {
         break;
     case 'delete_vendor_bill':
         echo $Master->delete_vendor_bill();
+        break;
+    case 'start_reconciliation':
+        echo $Master->start_reconciliation();
+        break;
+    case 'update_reconciliation':
+        echo $Master->update_reconciliation();
+        break;
+    case 'delete_reconciliation':
+        echo $Master->delete_reconciliation();
+        break;
+    case 'add_statement_lines':
+        echo $Master->add_statement_lines();
+        break;
+    case 'delete_statement_line':
+        echo $Master->delete_statement_line();
+        break;
+    case 'match_statement_line':
+        echo $Master->match_statement_line();
+        break;
+    case 'unmatch_statement_line':
+        echo $Master->unmatch_statement_line();
+        break;
+    case 'finalize_reconciliation':
+        echo $Master->finalize_reconciliation();
+        break;
+    case 'reopen_reconciliation':
+        echo $Master->reopen_reconciliation();
         break;
     case 'save_stock_adjustment':
         echo $Master->save_stock_adjustment();
