@@ -23,6 +23,12 @@ $sections = [
         ['invoices', 'Invoices', 'fas fa-file-invoice', 'Every invoice with status, totals and balance due.', 'List'],
         ['payments', 'Payments', 'fas fa-hand-holding-usd', 'Receipts and payments recorded against invoices.', 'List'],
     ]],
+    ['Purchases and payables', 'fas fa-truck', 'reports_view', [
+        ['reports/purchases_by_vendor', 'Purchases by Vendor', 'fas fa-truck', 'Billed purchases, tax, payments and amounts owing per vendor for a period.'],
+        ['reports/ap_aging', 'Aged Payables', 'fas fa-hourglass-half', 'What you owe each vendor, split into current, 30, 60, 90 and older.'],
+        ['purchases', 'Purchase Orders', 'fas fa-shopping-bag', 'Every purchase order with status, totals and receiving progress.', 'List'],
+        ['purchases/vendor_bills', 'Vendor Bills', 'fas fa-file-invoice-dollar', 'Bills recorded against vendors, with balance and due date.', 'List'],
+    ]],
     ['Tax', 'fas fa-receipt', 'reports_view', [
         ['tax/report', 'VAT Return', 'fas fa-receipt', 'Output VAT on sales and input VAT on purchases for a period, and the net payable to FRCS.'],
     ]],
