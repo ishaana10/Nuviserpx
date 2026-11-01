@@ -561,7 +561,19 @@ if($t_qry && $t_qry->num_rows > 0){
                                     <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=api_keys" class="nav-link nav-api_keys tree-item">
                                             <i class="nav-icon fas fa-plug"></i>
-                                            <p>API Keys & Webhooks</p>
+                                            <p>API Keys</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=webhooks" class="nav-link nav-webhooks tree-item">
+                                            <i class="nav-icon fas fa-share-square"></i>
+                                            <p>Webhooks</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=workflows" class="nav-link nav-workflows tree-item">
+                                            <i class="nav-icon fas fa-bolt"></i>
+                                            <p>Automation Workflows</p>
                                         </a>
                                     </li>
                                 </ul>
@@ -579,6 +591,24 @@ if($t_qry && $t_qry->num_rows > 0){
                                     </p>
                                 </a>
                                 <ul class="nav nav-treeview">
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=developer/dashboard" class="nav-link nav-developer_dashboard tree-item">
+                                            <i class="nav-icon fas fa-tachometer-alt text-info"></i>
+                                            <p>Developer Dashboard</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=developer/customer_plans" class="nav-link nav-developer_customer_plans tree-item">
+                                            <i class="nav-icon fas fa-layer-group text-primary"></i>
+                                            <p>Customer Plans</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=developer/customer_requests" class="nav-link nav-developer_customer_requests tree-item">
+                                            <i class="nav-icon fas fa-inbox text-warning"></i>
+                                            <p>Customer Requests</p>
+                                        </a>
+                                    </li>
                                     <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=developer/portal_preview" class="nav-link nav-developer_portal_preview tree-item">
                                             <i class="nav-icon fas fa-desktop text-success"></i>

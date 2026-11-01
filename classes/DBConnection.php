@@ -56,6 +56,7 @@ class DBConnection{
                 $this->check_invoicing_migrations();
                 $this->check_stock_migrations();
                 $this->check_api_migrations();
+                $this->check_automation_migrations();
                 $this->check_rbac_migrations();
                 $this->check_invoice_template_migrations();
                 $this->check_account_list_migrations();
@@ -706,19 +707,184 @@ class DBConnection{
             "CREATE TABLE IF NOT EXISTS `webhooks` (
               `id` int(30) NOT NULL AUTO_INCREMENT,
               `tenant_id` int(30) NOT NULL DEFAULT 1,
+              `name` varchar(150) DEFAULT NULL,
               `event` varchar(100) NOT NULL,
               `target_url` varchar(255) NOT NULL,
               `secret_token` varchar(100) DEFAULT NULL,
               `status` tinyint(1) NOT NULL DEFAULT 1,
+              `max_retries` tinyint(2) NOT NULL DEFAULT 5,
+              `last_triggered_at` datetime DEFAULT NULL,
+              `last_status` varchar(20) DEFAULT NULL,
+              `failure_count` int(11) NOT NULL DEFAULT 0,
               `created_by` int(30) DEFAULT NULL,
               `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+              `date_updated` datetime DEFAULT NULL ON UPDATE current_timestamp(),
               PRIMARY KEY (`id`),
-              KEY `tenant_id` (`tenant_id`)
+              KEY `tenant_id` (`tenant_id`),
+              KEY `event_status` (`event`, `status`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+            /*
+             * Webhook delivery queue + audit log.
+             * status: pending -> delivering -> delivered | failed
+             * Drained asynchronously by cron/webhook_worker.php, or inline as a fallback.
+             */
+            "CREATE TABLE IF NOT EXISTS `webhook_deliveries` (
+              `id` bigint(20) NOT NULL AUTO_INCREMENT,
+              `tenant_id` int(30) NOT NULL DEFAULT 1,
+              `webhook_id` int(30) DEFAULT NULL,
+              `event` varchar(100) NOT NULL,
+              `target_url` varchar(255) NOT NULL,
+              `payload` longtext DEFAULT NULL,
+              `signature` varchar(255) DEFAULT NULL,
+              `status` enum('pending','delivering','delivered','failed') NOT NULL DEFAULT 'pending',
+              `attempts` int(11) NOT NULL DEFAULT 0,
+              `max_retries` tinyint(2) NOT NULL DEFAULT 5,
+              `response_code` int(11) DEFAULT NULL,
+              `response_body` text DEFAULT NULL,
+              `error` text DEFAULT NULL,
+              `next_attempt_at` datetime DEFAULT NULL,
+              `delivered_at` datetime DEFAULT NULL,
+              `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+              `date_updated` datetime DEFAULT NULL ON UPDATE current_timestamp(),
+              PRIMARY KEY (`id`),
+              KEY `queue_scan` (`status`, `next_attempt_at`),
+              KEY `tenant_event` (`tenant_id`, `event`),
+              KEY `webhook_id` (`webhook_id`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+            /* Lightweight API request log for the developer application-performance dashboard. */
+            "CREATE TABLE IF NOT EXISTS `api_request_logs` (
+              `id` bigint(20) NOT NULL AUTO_INCREMENT,
+              `tenant_id` int(30) NOT NULL DEFAULT 1,
+              `api_key_id` int(30) DEFAULT NULL,
+              `endpoint` varchar(150) NOT NULL,
+              `method` varchar(10) NOT NULL,
+              `status_code` int(11) NOT NULL DEFAULT 200,
+              `duration_ms` int(11) NOT NULL DEFAULT 0,
+              `ip_address` varchar(64) DEFAULT NULL,
+              `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+              PRIMARY KEY (`id`),
+              KEY `tenant_created` (`tenant_id`, `date_created`),
+              KEY `endpoint_idx` (`endpoint`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
         );
 
         foreach ($queries as $sql) {
             @$this->conn->query($sql);
+        }
+
+        // Non-destructive column upgrades for pre-existing `webhooks` tables.
+        $webhook_cols = array(
+            'name'              => "ALTER TABLE `webhooks` ADD COLUMN `name` varchar(150) DEFAULT NULL AFTER `tenant_id`",
+            'max_retries'       => "ALTER TABLE `webhooks` ADD COLUMN `max_retries` tinyint(2) NOT NULL DEFAULT 5 AFTER `status`",
+            'last_triggered_at' => "ALTER TABLE `webhooks` ADD COLUMN `last_triggered_at` datetime DEFAULT NULL AFTER `max_retries`",
+            'last_status'       => "ALTER TABLE `webhooks` ADD COLUMN `last_status` varchar(20) DEFAULT NULL AFTER `last_triggered_at`",
+            'failure_count'     => "ALTER TABLE `webhooks` ADD COLUMN `failure_count` int(11) NOT NULL DEFAULT 0 AFTER `last_status`",
+            'date_updated'      => "ALTER TABLE `webhooks` ADD COLUMN `date_updated` datetime DEFAULT NULL ON UPDATE current_timestamp() AFTER `date_created`"
+        );
+        foreach ($webhook_cols as $col => $sql) {
+            $res = @$this->conn->query("SHOW COLUMNS FROM `webhooks` LIKE '{$col}'");
+            if ($res && $res->num_rows == 0) {
+                @$this->conn->query($sql);
+            }
+        }
+    }
+
+    /**
+     * Automation / Workflow engine + SaaS tenant subscription plans.
+     * Backs the customisable workflow builder and the developer customer-plans panel.
+     */
+    public function check_automation_migrations(){
+        if (!$this->conn) return;
+
+        $queries = array(
+            /*
+             * A workflow = one trigger event + JSON conditions + JSON ordered actions.
+             * conditions/actions are stored as JSON so the builder is fully customisable
+             * without schema changes.
+             */
+            "CREATE TABLE IF NOT EXISTS `workflows` (
+              `id` int(30) NOT NULL AUTO_INCREMENT,
+              `tenant_id` int(30) NOT NULL DEFAULT 1,
+              `name` varchar(150) NOT NULL,
+              `description` varchar(255) DEFAULT NULL,
+              `trigger_event` varchar(100) NOT NULL,
+              `conditions` longtext DEFAULT NULL,
+              `actions` longtext DEFAULT NULL,
+              `match_type` enum('all','any') NOT NULL DEFAULT 'all',
+              `status` tinyint(1) NOT NULL DEFAULT 1,
+              `run_count` int(11) NOT NULL DEFAULT 0,
+              `last_run_at` datetime DEFAULT NULL,
+              `created_by` int(30) DEFAULT NULL,
+              `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+              `date_updated` datetime DEFAULT NULL ON UPDATE current_timestamp(),
+              PRIMARY KEY (`id`),
+              KEY `tenant_trigger` (`tenant_id`, `trigger_event`, `status`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+            "CREATE TABLE IF NOT EXISTS `workflow_logs` (
+              `id` bigint(20) NOT NULL AUTO_INCREMENT,
+              `tenant_id` int(30) NOT NULL DEFAULT 1,
+              `workflow_id` int(30) NOT NULL,
+              `trigger_event` varchar(100) NOT NULL,
+              `matched` tinyint(1) NOT NULL DEFAULT 0,
+              `actions_run` text DEFAULT NULL,
+              `result` enum('success','partial','failed','skipped') NOT NULL DEFAULT 'success',
+              `message` text DEFAULT NULL,
+              `context_ref` varchar(100) DEFAULT NULL,
+              `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+              PRIMARY KEY (`id`),
+              KEY `workflow_idx` (`workflow_id`),
+              KEY `tenant_created` (`tenant_id`, `date_created`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+            /* SaaS subscription tiers assignable to each tenant/company. */
+            "CREATE TABLE IF NOT EXISTS `tenant_plans` (
+              `id` int(30) NOT NULL AUTO_INCREMENT,
+              `code` varchar(50) NOT NULL,
+              `name` varchar(100) NOT NULL,
+              `description` varchar(255) DEFAULT NULL,
+              `price` decimal(12,2) NOT NULL DEFAULT 0.00,
+              `billing_cycle` enum('monthly','quarterly','yearly','one_time') NOT NULL DEFAULT 'monthly',
+              `max_users` int(11) NOT NULL DEFAULT 0,
+              `max_invoices` int(11) NOT NULL DEFAULT 0,
+              `max_api_calls` int(11) NOT NULL DEFAULT 0,
+              `features` longtext DEFAULT NULL,
+              `status` tinyint(1) NOT NULL DEFAULT 1,
+              `sort_order` int(11) NOT NULL DEFAULT 0,
+              `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+              `date_updated` datetime DEFAULT NULL ON UPDATE current_timestamp(),
+              PRIMARY KEY (`id`),
+              UNIQUE KEY `plan_code` (`code`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+        );
+
+        foreach ($queries as $sql) {
+            @$this->conn->query($sql);
+        }
+
+        // Plan assignment columns on the existing `tenants` table.
+        $tenant_cols = array(
+            'plan_id'          => "ALTER TABLE `tenants` ADD COLUMN `plan_id` int(30) DEFAULT NULL AFTER `status`",
+            'plan_started_at'  => "ALTER TABLE `tenants` ADD COLUMN `plan_started_at` date DEFAULT NULL AFTER `plan_id`",
+            'plan_expires_at'  => "ALTER TABLE `tenants` ADD COLUMN `plan_expires_at` date DEFAULT NULL AFTER `plan_started_at`",
+            'plan_status'      => "ALTER TABLE `tenants` ADD COLUMN `plan_status` enum('trial','active','past_due','suspended','cancelled') NOT NULL DEFAULT 'active' AFTER `plan_expires_at`"
+        );
+        foreach ($tenant_cols as $col => $sql) {
+            $res = @$this->conn->query("SHOW COLUMNS FROM `tenants` LIKE '{$col}'");
+            if ($res && $res->num_rows == 0) {
+                @$this->conn->query($sql);
+            }
+        }
+
+        // Seed default plans once.
+        $has_plans = @$this->conn->query("SELECT id FROM `tenant_plans` LIMIT 1");
+        if ($has_plans && $has_plans->num_rows == 0) {
+            @$this->conn->query("INSERT INTO `tenant_plans` (`code`,`name`,`description`,`price`,`billing_cycle`,`max_users`,`max_invoices`,`max_api_calls`,`features`,`sort_order`) VALUES
+              ('starter','Starter','For small businesses getting started',0.00,'monthly',3,50,1000,'[\"Invoicing\",\"Accounting\",\"1 Tenant\"]',1),
+              ('professional','Professional','Growing teams with automation needs',99.00,'monthly',15,1000,50000,'[\"Everything in Starter\",\"Webhooks\",\"Workflow Automation\",\"API Access\"]',2),
+              ('enterprise','Enterprise','Full platform with unlimited scale',299.00,'monthly',0,0,0,'[\"Everything in Professional\",\"Unlimited Users\",\"Unlimited Invoices\",\"Priority Support\"]',3)");
         }
     }
 

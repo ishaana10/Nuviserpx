@@ -3,11 +3,13 @@
 use App\Core\Container;
 use App\Services\AccountService;
 use App\Services\EmployeeService;
+use App\Services\IntegrationService;
 use App\Services\InventoryService;
 use App\Services\InvoiceService;
 use App\Services\JournalService;
 use App\Services\PartyService;
 use App\Services\PaymentService;
+use App\Services\PlanService;
 use App\Services\PayrollService;
 use App\Services\RoleService;
 use App\Services\TenantService;
@@ -1000,6 +1002,54 @@ class Master extends DBConnection
         return $this->container->make(RoleService::class)->deleteApiKey(intval($_POST['id'] ?? 0));
     }
 
+    /* Webhook Actions */
+    public function save_webhook()
+    {
+        return $this->container->make(IntegrationService::class)->saveWebhook($_POST);
+    }
+
+    public function delete_webhook()
+    {
+        return $this->container->make(IntegrationService::class)->deleteWebhook(intval($_POST['id'] ?? 0));
+    }
+
+    public function test_webhook()
+    {
+        return $this->container->make(IntegrationService::class)->testWebhook(intval($_POST['id'] ?? 0));
+    }
+
+    /* Workflow Automation Actions */
+    public function save_workflow()
+    {
+        return $this->container->make(IntegrationService::class)->saveWorkflow($_POST);
+    }
+
+    public function delete_workflow()
+    {
+        return $this->container->make(IntegrationService::class)->deleteWorkflow(intval($_POST['id'] ?? 0));
+    }
+
+    public function toggle_workflow()
+    {
+        return $this->container->make(IntegrationService::class)->toggleWorkflow(intval($_POST['id'] ?? 0));
+    }
+
+    /* Platform Plan Actions (super-admin) */
+    public function save_plan()
+    {
+        return $this->container->make(PlanService::class)->savePlan($_POST);
+    }
+
+    public function delete_plan()
+    {
+        return $this->container->make(PlanService::class)->deletePlan(intval($_POST['id'] ?? 0));
+    }
+
+    public function assign_plan()
+    {
+        return $this->container->make(PlanService::class)->assignPlan($_POST);
+    }
+
     /* Invoice Actions */
     public function save_invoice()
     {
@@ -1712,6 +1762,33 @@ switch ($action) {
         break;
     case 'delete_api_key':
         echo $Master->delete_api_key();
+        break;
+    case 'save_webhook':
+        echo $Master->save_webhook();
+        break;
+    case 'delete_webhook':
+        echo $Master->delete_webhook();
+        break;
+    case 'test_webhook':
+        echo $Master->test_webhook();
+        break;
+    case 'save_workflow':
+        echo $Master->save_workflow();
+        break;
+    case 'delete_workflow':
+        echo $Master->delete_workflow();
+        break;
+    case 'toggle_workflow':
+        echo $Master->toggle_workflow();
+        break;
+    case 'save_plan':
+        echo $Master->save_plan();
+        break;
+    case 'delete_plan':
+        echo $Master->delete_plan();
+        break;
+    case 'assign_plan':
+        echo $Master->assign_plan();
         break;
     case 'save_role':
         echo $Master->save_role();
