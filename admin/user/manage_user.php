@@ -182,6 +182,55 @@ $user_tenant_id = isset($meta['tenant_id']) ? $meta['tenant_id'] : $tenant_id;
 	$(function(){
 		$('.select2').select2({ width:'100%' });
 
+		// Remember the initially-selected role/employee (for edit mode) so a
+		// dynamic reload can keep the current assignment.
+		var initRole = $('#role_id').val() || '0';
+		var initEmp  = $('#employee_id').val() || '';
+
+		// Dynamically load the roles and employees that belong to a tenant, so
+		// the "Assigned Custom Role" list always matches the selected company.
+		function loadTenantOptions(tenantId, selRole, selEmp){
+			if(!tenantId) return;
+			$('#role_id').prop('disabled', true);
+			$('#employee_id').prop('disabled', true);
+			$.ajax({
+				url: _base_url_+'classes/Users.php?f=get_tenant_options',
+				method: 'POST', dataType: 'json',
+				data: { tenant_id: tenantId },
+				success: function(resp){
+					if(!resp || resp.status !== 'success') return;
+					var $role = $('#role_id');
+					$role.empty().append($('<option>').val('0').text('Default Staff Permissions'));
+					$.each(resp.roles, function(i, r){
+						$role.append($('<option>').val(r.id).text(r.name));
+					});
+					$role.val(selRole && $role.find('option[value="'+selRole+'"]').length ? selRole : '0').trigger('change');
+
+					var $emp = $('#employee_id');
+					$emp.empty().append($('<option>').val('').text('None (Standalone User Account)'));
+					$.each(resp.employees, function(i, e){
+						$emp.append($('<option>').val(e.id).text(e.label));
+					});
+					$emp.val(selEmp && $emp.find('option[value="'+selEmp+'"]').length ? selEmp : '').trigger('change');
+				},
+				complete: function(){
+					$('#role_id').prop('disabled', false);
+					$('#employee_id').prop('disabled', false);
+				}
+			});
+		}
+
+		// When a super administrator changes the company, refresh the lists.
+		$('#tenant_id').on('change', function(){
+			loadTenantOptions($(this).val(), '0', '');
+		});
+
+		// On load, sync the lists to the shown tenant (keeps the current
+		// assignment when editing an existing user).
+		if($('#tenant_id').is('select')){
+			loadTenantOptions($('#tenant_id').val(), initRole, initEmp);
+		}
+
 		$('#type').change(function(){
 			if($(this).val() == 1){
 				$('#role-group').slideUp();

@@ -377,6 +377,30 @@ Class Users extends DBConnection {
 		return json_encode($resp);
 	}
 
+	/**
+	 * Return the roles and employees for a tenant, for the dynamic dropdowns
+	 * on the user form. Super admins may request any tenant; everyone else is
+	 * locked to their own tenant.
+	 */
+	public function get_tenant_options(){
+		$this->settings->require_permission('users_manage');
+
+		$is_super  = $this->settings->is_super_admin();
+		$tenant_id = ($is_super && !empty($_POST['tenant_id']))
+			? (int)$_POST['tenant_id']
+			: (int)$this->settings->active_tenant_id();
+
+		$roles = [];
+		$rq = $this->conn->query("SELECT id, name FROM `roles` WHERE tenant_id = {$tenant_id} AND delete_flag = 0 AND status = 1 ORDER BY name ASC");
+		if($rq){ while($r = $rq->fetch_assoc()){ $roles[] = ['id' => (int)$r['id'], 'name' => $r['name']]; } }
+
+		$employees = [];
+		$eq = $this->conn->query("SELECT id, employee_code, firstname, lastname FROM `employee_list` WHERE tenant_id = {$tenant_id} AND delete_flag = 0 ORDER BY firstname ASC");
+		if($eq){ while($e = $eq->fetch_assoc()){ $employees[] = ['id' => (int)$e['id'], 'label' => trim($e['employee_code'].' - '.$e['firstname'].' '.$e['lastname'])]; } }
+
+		return json_encode(['status' => 'success', 'tenant_id' => $tenant_id, 'roles' => $roles, 'employees' => $employees]);
+	}
+
 	/** Activate (verify) a pending system user account. */
 	public function verify_user(){
 		$this->settings->require_permission('users_manage');
@@ -424,6 +448,9 @@ switch ($action) {
 	break;
 	case 'verify_user':
 		echo $users->verify_user();
+	break;
+	case 'get_tenant_options':
+		echo $users->get_tenant_options();
 	break;
 	default:
 		// echo $sysset->index();
