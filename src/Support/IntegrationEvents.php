@@ -29,6 +29,19 @@ final class IntegrationEvents
     // Payment lifecycle
     public const PAYMENT_RECEIVED  = 'payment.received';
 
+    // Procurement — Purchase Orders
+    public const PURCHASE_ORDER_CREATED = 'purchase_order.created';
+    public const PURCHASE_ORDER_UPDATED = 'purchase_order.updated';
+    public const PURCHASE_ORDER_DELETED = 'purchase_order.deleted';
+
+    // Procurement — Goods Receipts
+    public const GOODS_RECEIVED = 'goods_receipt.received';
+
+    // Procurement — Vendor Bills (Accounts Payable)
+    public const VENDOR_BILL_CREATED = 'vendor_bill.created';
+    public const VENDOR_BILL_UPDATED = 'vendor_bill.updated';
+    public const VENDOR_BILL_DELETED = 'vendor_bill.deleted';
+
     /**
      * @return array<string, array{group:string, label:string, description:string, fields:array<int,string>}>
      */
@@ -82,6 +95,48 @@ final class IntegrationEvents
                 'label' => 'Payment Received',
                 'description' => 'Fires when a customer payment receipt is recorded.',
                 'fields' => ['payment_id', 'payment_no', 'party_id', 'party_name', 'amount', 'method'],
+            ],
+            self::PURCHASE_ORDER_CREATED => [
+                'group' => 'Purchasing',
+                'label' => 'Purchase Order Created',
+                'description' => 'Fires when a new purchase order is saved (UI or API).',
+                'fields' => ['purchase_order_id', 'po_no', 'vendor_id', 'vendor_name', 'total', 'status', 'order_date'],
+            ],
+            self::PURCHASE_ORDER_UPDATED => [
+                'group' => 'Purchasing',
+                'label' => 'Purchase Order Updated',
+                'description' => 'Fires when an existing purchase order is edited.',
+                'fields' => ['purchase_order_id', 'po_no', 'vendor_id', 'vendor_name', 'total', 'status'],
+            ],
+            self::PURCHASE_ORDER_DELETED => [
+                'group' => 'Purchasing',
+                'label' => 'Purchase Order Deleted',
+                'description' => 'Fires when a purchase order is deleted.',
+                'fields' => ['purchase_order_id', 'po_no'],
+            ],
+            self::GOODS_RECEIVED => [
+                'group' => 'Purchasing',
+                'label' => 'Goods Received',
+                'description' => 'Fires when stock is received against a purchase order (goods receipt note).',
+                'fields' => ['goods_receipt_id', 'grn_no', 'purchase_order_id', 'po_no', 'vendor_id', 'receipt_date'],
+            ],
+            self::VENDOR_BILL_CREATED => [
+                'group' => 'Purchasing',
+                'label' => 'Vendor Bill Created',
+                'description' => 'Fires when a vendor bill is recorded (posts Accounts Payable).',
+                'fields' => ['vendor_bill_id', 'bill_no', 'vendor_id', 'vendor_name', 'total', 'balance', 'status', 'bill_date', 'due_date'],
+            ],
+            self::VENDOR_BILL_UPDATED => [
+                'group' => 'Purchasing',
+                'label' => 'Vendor Bill Updated',
+                'description' => 'Fires when an existing vendor bill is edited.',
+                'fields' => ['vendor_bill_id', 'bill_no', 'vendor_id', 'vendor_name', 'total', 'balance', 'status'],
+            ],
+            self::VENDOR_BILL_DELETED => [
+                'group' => 'Purchasing',
+                'label' => 'Vendor Bill Deleted',
+                'description' => 'Fires when a vendor bill is deleted.',
+                'fields' => ['vendor_bill_id', 'bill_no'],
             ],
         ];
     }

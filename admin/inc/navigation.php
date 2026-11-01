@@ -195,15 +195,15 @@ if($t_qry && $t_qry->num_rows > 0){
                                 </a>
                                 <ul class="nav nav-treeview">
                                     <li class="nav-item">
-                                        <a href="<?php echo base_url ?>admin/?page=invoices&type=bill" class="nav-link nav-bills tree-item">
-                                            <i class="nav-icon fas fa-file-invoice-dollar"></i>
-                                            <p>Bills & Expenses</p>
+                                        <a href="<?php echo base_url ?>admin/?page=purchases" class="nav-link nav-purchases tree-item">
+                                            <i class="nav-icon fas fa-shopping-cart"></i>
+                                            <p>Purchase Orders</p>
                                         </a>
                                     </li>
                                     <li class="nav-item">
-                                        <a href="<?php echo base_url ?>admin/?page=sales_orders&type=po" class="nav-link nav-purchase_orders tree-item">
-                                            <i class="nav-icon fas fa-shopping-cart"></i>
-                                            <p>Purchase Orders</p>
+                                        <a href="<?php echo base_url ?>admin/?page=purchases/vendor_bills" class="nav-link nav-purchases_vendor_bills tree-item">
+                                            <i class="nav-icon fas fa-file-invoice-dollar"></i>
+                                            <p>Vendor Bills (A/P)</p>
                                         </a>
                                     </li>
                                     <li class="nav-item">
