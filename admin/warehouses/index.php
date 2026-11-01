@@ -1,8 +1,11 @@
 <?php
 require_once(__DIR__ . '/../../config.php');
-$tenant_id = $_settings->active_tenant_id();
 
-$warehouses = $conn->query("SELECT * FROM `warehouses` WHERE tenant_id = '{$tenant_id}' ORDER BY name ASC");
+use App\Services\WarehouseStockService;
+
+$tenant_id = $_settings->active_tenant_id();
+$stockSvc = new WarehouseStockService($conn, $_settings);
+$wh_totals = $stockSvc->warehousesWithTotals(); // keyed by warehouse_id, includes Main (0)
 
 $transfers = $conn->query("
     SELECT wt.*, fw.name as from_wh, tw.name as to_wh, p.name as product_name, p.product_code
@@ -25,24 +28,37 @@ $transfers = $conn->query("
         </div>
     </div>
     <div class="card-body">
-        <h5 class="font-weight-bold text-dark mb-3"><i class="fas fa-building text-secondary mr-1"></i> Physical Warehouses & Locations</h5>
+        <h5 class="font-weight-bold text-dark mb-3"><i class="fas fa-building text-secondary mr-1"></i> Warehouses & Stock on Hand</h5>
         <div class="row mb-4">
-            <?php while($wh = $warehouses->fetch_assoc()): ?>
-                <div class="col-md-4">
-                    <div class="card border shadow-none">
+            <?php foreach($wh_totals as $wh):
+                $is_main = ($wh['id'] === WarehouseStockService::MAIN_WAREHOUSE_ID);
+                $qfmt = fn($n) => rtrim(rtrim(number_format((float)$n, 2), '0'), '.');
+            ?>
+                <div class="col-md-4 mb-3">
+                    <div class="card border shadow-none h-100">
                         <div class="card-body">
                             <div class="d-flex align-items-center justify-content-between mb-2">
                                 <h5 class="font-weight-bold text-dark m-0"><i class="fas fa-warehouse text-primary mr-2"></i> <?= htmlspecialchars($wh['name']) ?></h5>
-                                <span class="badge badge-<?= $wh['status'] == 1 ? 'success' : 'secondary' ?>"><?= $wh['status'] == 1 ? 'Active' : 'Inactive' ?></span>
+                                <?php if($is_main): ?>
+                                    <span class="badge badge-info">Default</span>
+                                <?php else: ?>
+                                    <a href="./?page=warehouses/stock&id=<?= (int)$wh['id'] ?>" class="btn btn-xs btn-outline-secondary">View stock</a>
+                                <?php endif; ?>
                             </div>
-                            <p class="text-muted text-xs mb-0"><i class="fas fa-map-marker-alt mr-1"></i> <?= htmlspecialchars($wh['location'] ?: 'Primary Facility') ?></p>
+                            <p class="text-muted text-xs mb-2"><i class="fas fa-map-marker-alt mr-1"></i> <?= htmlspecialchars($wh['location'] ?: ($is_main ? 'Unassigned / opening stock' : 'Primary Facility')) ?></p>
+                            <div class="d-flex justify-content-between border-top pt-2">
+                                <span class="text-xs text-muted">Products stocked</span><b><?= (int)$wh['skus'] ?></b>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span class="text-xs text-muted">Total units</span><b><?= $qfmt($wh['units']) ?></b>
+                            </div>
+                            <?php if($is_main): ?>
+                                <a href="./?page=warehouses/stock&id=0" class="btn btn-xs btn-outline-secondary btn-block mt-2">View stock</a>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
-            <?php endwhile; ?>
-            <?php if($warehouses->num_rows <= 0): ?>
-                <div class="col-md-12 text-muted py-3">No custom warehouses configured yet. Main warehouse is active.</div>
-            <?php endif; ?>
+            <?php endforeach; ?>
         </div>
 
         <h5 class="font-weight-bold text-dark border-top pt-3 mb-3"><i class="fas fa-history text-secondary mr-1"></i> Recent Inter-Warehouse Stock Transfers</h5>

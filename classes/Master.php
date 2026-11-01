@@ -449,30 +449,13 @@ class Master extends DBConnection
 
     public function transfer_stock()
     {
-        $tenant_id = $this->settings->active_tenant_id();
-        $user_id = $this->settings->userdata('id');
-        extract($_POST);
-
-        $from_wh = intval($from_warehouse_id ?? 0);
-        $to_wh = intval($to_warehouse_id ?? 0);
-        $p_id = intval($product_id ?? 0);
-        $transfer_qty = floatval($qty ?? 0);
-
-        if ($p_id <= 0 || $transfer_qty <= 0) {
-            return json_encode(['status' => 'failed', 'msg' => 'Valid Product and Quantity (> 0) are required.']);
-        }
-
-        $save = $this->conn->query("
-            INSERT INTO `warehouse_transfers`
-            (`tenant_id`, `from_warehouse_id`, `to_warehouse_id`, `product_id`, `qty`, `notes`, `created_by`)
-            VALUES ('{$tenant_id}', '{$from_wh}', '{$to_wh}', '{$p_id}', '{$transfer_qty}', '{$this->conn->real_escape_string($notes ?? '')}', '{$user_id}')
-        ");
-
-        if ($save) {
-            $this->settings->log_audit("Transferred Stock", "Warehouses", "Product ID #{$p_id}, Qty: {$transfer_qty}");
-            return json_encode(['status' => 'success', 'msg' => 'Stock transfer recorded successfully.']);
-        }
-        return json_encode(['status' => 'failed', 'msg' => 'Failed to record stock transfer.']);
+        return $this->container->make(\App\Services\WarehouseStockService::class)->transfer(
+            intval($_POST['product_id'] ?? 0),
+            intval($_POST['from_warehouse_id'] ?? 0),
+            intval($_POST['to_warehouse_id'] ?? 0),
+            floatval($_POST['qty'] ?? 0),
+            (string)($_POST['notes'] ?? '')
+        );
     }
 
     /* Dolibarr Inspired Employee Expense Claim Methods */

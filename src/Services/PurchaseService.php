@@ -240,7 +240,8 @@ class PurchaseService
 
             // Move stock in + weighted-average cost, and log it
             if (is_int($prod_id)) {
-                $this->receiveStock((int)$prod_id, $recv_qty, $unit_cost, (int)$tenant_id, (int)$user_id, $grn_no);
+                $wh = is_int($warehouse_id) ? (int)$warehouse_id : 0;
+                $this->receiveStock((int)$prod_id, $recv_qty, $unit_cost, (int)$tenant_id, (int)$user_id, $grn_no, $wh);
             }
             $any = true;
         }
@@ -268,9 +269,10 @@ class PurchaseService
     }
 
     /**
-     * Increase product stock and recompute weighted-average cost.
+     * Increase product stock and recompute weighted-average cost, landing the
+     * received quantity in the given warehouse location ($warehouse_id, 0 = Main).
      */
-    private function receiveStock(int $product_id, float $qty, float $unit_cost, int $tenant_id, int $user_id, string $reference): void
+    private function receiveStock(int $product_id, float $qty, float $unit_cost, int $tenant_id, int $user_id, string $reference, int $warehouse_id = 0): void
     {
         $p = $this->conn->query("SELECT stock_quantity, cost_price FROM `product_list` WHERE id = '{$product_id}' AND tenant_id = '{$tenant_id}'");
         if (!$p || $p->num_rows == 0) return;
@@ -289,8 +291,19 @@ class PurchaseService
 			SET `stock_quantity` = '{$new_qty}', `cost_price` = '{$new_cost}'
 			WHERE id = '{$product_id}' AND tenant_id = '{$tenant_id}'");
 
+        // Land the received quantity in the warehouse location. syncTotal = false
+        // because the product total was already updated above.
+        try {
+            \App\Core\Container::getInstance()->make(\App\Services\WarehouseStockService::class)
+                ->adjustLocation($product_id, $warehouse_id, $qty, false);
+        } catch (\Throwable $e) {
+            // location tracking must not break the receipt
+        }
+
+        $wh = max(0, $warehouse_id);
         $ref = $this->conn->real_escape_string($reference);
         $this->conn->query("INSERT INTO `inventory_logs` SET
+				`warehouse_id` = '{$wh}',
 			`tenant_id` = '{$tenant_id}',
 			`product_id` = '{$product_id}',
 			`type` = 'in',
