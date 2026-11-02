@@ -1,11 +1,11 @@
 <?php
 /**
- * Fiji Payroll Engine for Nuvis ERPX
+ * Payroll Engine for Nuvis ERPX
  * Compliant with Income Tax Act 2015, FNPF Act 2011 (2026-2027 Budget), and ERA 2007
  * Nuvis Technologies (nuvistechnologies.com.fj)
  */
 
-class FijiPayroll {
+class PayrollEngine {
 
     public static function get_periods_per_year($frequency = 'Monthly') {
         switch (strtolower($frequency)) {
@@ -119,7 +119,7 @@ class FijiPayroll {
     }
 
     /**
-     * Main Fiji Payroll Calculation Orchestrator
+     * Main Payroll Calculation Orchestrator
      */
     public static function calculate($input = []) {
         $basic          = (float)($input['basic_salary'] ?? $input['basic'] ?? 0);

@@ -442,7 +442,7 @@
                             <div class="col-md-6 form-group mb-0">
                                 <label for="vms_tin" class="form-label-custom">Taxpayer TIN Number</label>
                                 <input type="text" class="form-control form-control-modern" name="vms_tin" id="vms_tin" value="<?php echo $_settings->info('vms_tin') ?>" placeholder="e.g. 50-00000-0-0">
-                                <small class="text-muted">Assigned Fiji Revenue & Customs Service TIN</small>
+                                <small class="text-muted">Assigned Revenue & Customs Service TIN</small>
                             </div>
                         </div>
                     </div>

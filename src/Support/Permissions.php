@@ -97,6 +97,25 @@ final class Permissions
         ],
     ];
 
+    /**
+     * Special actions that are NOT implied by Create/Edit/Delete. A role must
+     * be given each one explicitly (and legacy "_manage" grants never include
+     * them), so sensitive operations stay opt-in.
+     */
+    private const SPECIAL_PERMS = [
+        'Payroll' => [
+            'payroll_process'  => 'Process payroll runs (Batch & Single Employee Run, retro pay)',
+            'payroll_export'   => 'Download compliance & bank files (BSP/ANZ/HFC/BRED, FRCS, FNPF)',
+            'payroll_view_all' => "See every employee's payroll & payslips (otherwise only their own)",
+        ],
+    ];
+
+    /** Special-action groups for the role editor. */
+    public static function specialGroups(): array
+    {
+        return self::SPECIAL_PERMS;
+    }
+
     /* ===================================================================
      * Registry construction
      * =================================================================== */
@@ -154,6 +173,11 @@ final class Permissions
             }
         }
         foreach (self::ADMIN_PERMS as $perms) {
+            foreach ($perms as $k => $_l) {
+                $keys[] = $k;
+            }
+        }
+        foreach (self::SPECIAL_PERMS as $perms) {
             foreach ($perms as $k => $_l) {
                 $keys[] = $k;
             }
@@ -248,6 +272,11 @@ final class Permissions
 
     public static function label(string $key): string
     {
+        foreach (self::SPECIAL_PERMS as $perms) {
+            if (isset($perms[$key])) {
+                return $perms[$key];
+            }
+        }
         foreach (self::navPages() as $def) {
             if ($def['key'] === $key) {
                 return 'View ' . $def['label'];
@@ -309,8 +338,20 @@ final class Permissions
         if ($stored === null || trim($stored) === '') {
             return [];
         }
-        if (trim($stored) === self::WILDCARD) {
-            return [self::WILDCARD];
+        // A tenant role can no longer carry the wildcard (full access is the
+        // developer's alone). Old roles holding it keep full BUSINESS access —
+        // every module action, special action and page — but none of the
+        // administration powers (users, settings, API keys, webhooks, workflows).
+        if (in_array(self::WILDCARD, array_map('trim', explode(',', $stored)), true)) {
+            $all = array_values(array_filter(self::keys(), static function ($k) {
+                foreach (self::ADMIN_PERMS as $perms) {
+                    if (isset($perms[$k])) {
+                        return false;
+                    }
+                }
+                return true;
+            }));
+            return $all;
         }
 
         $raw = array_values(array_filter(array_map('trim', explode(',', $stored)), static fn ($k) => $k !== ''));
@@ -425,7 +466,8 @@ final class Permissions
         'save_payroll'          => ['payroll', 'save'],
         'delete_payroll'        => ['payroll', 'delete'],
         'calculate_payroll_ajax'=> ['payroll', 'edit'],
-        'apply_retro_pay'       => ['payroll', 'edit'],
+        'apply_retro_pay'       => ['payroll_process'],
+        'save_batch_payroll'    => ['payroll_process'],
         'email_payslip'         => ['payroll', 'view'],
         'save_salary_component' => ['payroll', 'edit'],
         'delete_salary_component'=> ['payroll', 'delete'],
@@ -502,6 +544,10 @@ final class Permissions
         }
 
         [$module, $op] = $spec;
+        // Creating a payroll run IS processing payroll.
+        if ($action === 'save_payroll' && !$hasId) {
+            return 'payroll_process';
+        }
         switch ($op) {
             case 'save':   return $module . '_' . ($hasId ? 'edit' : 'create');
             case 'create': return $module . '_create';
@@ -615,7 +661,7 @@ final class Permissions
             }
             return null;
         }
-        $mod = preg_replace('/_(view|create|edit|delete|manage)$/', '', $permKey);
+        $mod = preg_replace('/_(view_all|view|create|edit|delete|manage|process|export)$/', '', $permKey);
         foreach (self::TENANT_MODULES as $key => $def) {
             if (in_array($mod, $def['perms'], true)) {
                 return $key;
@@ -670,7 +716,9 @@ final class Permissions
         if ($perm === self::SUPER_ONLY) {
             return 'Only the developer can open this.';
         }
-        if (preg_match('/(^|\/)(manage_|new_|add_)/', $page) && preg_match('/_view$/', $perm)) {
+        if ($page === 'payroll/manage_payroll' && empty($query['id'])) {
+            $perm = 'payroll_process'; // opening the run form = processing payroll
+        } elseif (preg_match('/(^|\/)(manage_|new_|add_)/', $page) && preg_match('/_view$/', $perm)) {
             $perm = preg_replace('/_view$/', !empty($query['id']) ? '_edit' : '_create', $perm);
         }
         return $settings->can_access($perm) ? null : "You don't have permission to access this.";
@@ -691,7 +739,7 @@ final class Permissions
         }
         $css = '';
         if (!$settings->can_access("{$mod}_create")) {
-            $css .= '#create_new,#create_single,#process_batch,.create_data,a[href*="manage_"]:not([href*="id="]):not(.dropdown-item){display:none!important}';
+            $css .= '#create_new,.create_data,a[href*="manage_"]:not([href*="id="]):not(.dropdown-item){display:none!important}';
         }
         if (!$settings->can_access("{$mod}_edit")) {
             $css .= '.edit_data,a[href*="manage_"][href*="id="]{display:none!important}';

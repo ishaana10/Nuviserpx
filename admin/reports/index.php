@@ -44,7 +44,7 @@ $sections = [
         ['reports/payroll_accounting', 'Payroll Accounting', 'fas fa-file-invoice-dollar', 'Gross pay, PAYE, SRT, FNPF and net pay for a month, with employer costs.'],
         ['payroll/fnpf_schedule', 'FNPF Schedule (CS3)', 'fas fa-file-contract', 'Monthly FNPF contribution schedule per employee.'],
         ['payroll/tax_rebate_report', '150% Tax Rebate', 'fas fa-percentage', 'FRCS employment tax rebate summary.'],
-        ['payroll/fiji_ems_export', 'FRCS EMS Export', 'fas fa-file-export', 'Employer monthly schedule export for FRCS.'],
+        ['payroll/ems_export', 'FRCS EMS Export', 'fas fa-file-export', 'Employer monthly schedule export for FRCS.'],
     ]],
     ['Activity', 'fas fa-history', null, [
         ['settings/audit_logs', 'Audit Log', 'fas fa-history', 'Who changed what, and when.'],
@@ -99,7 +99,8 @@ $is_admin = $_settings->userdata('type') == 1;
         <div class="rpt-sec" data-sec>
             <h2><i class="<?= $icon ?>"></i> <?= htmlspecialchars($title) ?></h2>
             <div class="rpt-grid">
-            <?php foreach ($items as $it): [$page, $name, $ic, $desc] = $it; $tag = $it[4] ?? null; ?>
+            <?php foreach ($items as $it): [$page, $name, $ic, $desc] = $it; $tag = $it[4] ?? null;
+                if (!\App\Support\MenuFilter::allowed($page, $_settings)) { continue; } ?>
                 <a class="rpt-card" href="./?page=<?= htmlspecialchars($page) ?>" data-key="<?= htmlspecialchars($page) ?>" data-text="<?= htmlspecialchars(strtolower($title . ' ' . $name . ' ' . $desc)) ?>">
                     <span class="ic"><i class="<?= $ic ?>"></i></span>
                     <span>

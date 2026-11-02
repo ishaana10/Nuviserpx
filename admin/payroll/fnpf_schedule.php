@@ -51,7 +51,7 @@ $tot_empr_fnpf = 0;
 
 <div class="card card-outline card-primary shadow-sm rounded-0">
     <div class="card-header d-flex align-items-center justify-content-between">
-        <h3 class="card-title font-weight-bold"><i class="fas fa-file-contract text-primary mr-2"></i> Fiji National Provident Fund (FNPF) Schedule CS3</h3>
+        <h3 class="card-title font-weight-bold"><i class="fas fa-file-contract text-primary mr-2"></i> National Provident Fund (FNPF) Schedule CS3</h3>
         <div class="card-tools d-flex align-items-center gap-2">
             <a href="./?page=payroll/fnpf_schedule&month=<?= urlencode($month) ?>&export_csv=1" class="btn btn-sm btn-success btn-flat font-weight-bold"><i class="fas fa-file-excel mr-1"></i> Export FNPF CS3 CSV</a>
             <button type="button" class="btn btn-sm btn-outline-secondary btn-flat" onclick="window.print()"><i class="fas fa-print mr-1"></i> Print</button>

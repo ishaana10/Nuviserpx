@@ -22,7 +22,7 @@ $payruns_qry = $conn->query("
         <h3 class="card-title font-weight-bold"><i class="fas fa-cogs text-primary mr-2"></i> PayrollEngine Execution Jobs & Retroactive Pay Adjustments</h3>
         <div class="card-tools d-flex align-items-center gap-2">
             <button type="button" class="btn btn-sm btn-outline-info btn-flat" onclick="retro_pay_modal()"><i class="fas fa-history mr-1"></i> Retroactive Pay Adjustment</button>
-            <button type="button" class="btn btn-sm btn-primary btn-flat" onclick="uni_modal('<i class=\'fa fa-users\'></i> New Fiji Batch Payrun Job', 'payroll/manage_payroll.php?batch=1', 'extra-large')"><i class="fas fa-play mr-1"></i> Launch Payrun Job</button>
+            <button type="button" class="btn btn-sm btn-primary btn-flat" onclick="uni_modal('<i class=\'fa fa-users\'></i> New Batch Payrun Job', 'payroll/manage_payroll.php?batch=1', 'extra-large')"><i class="fas fa-play mr-1"></i> Launch Payrun Job</button>
         </div>
     </div>
     <div class="card-body">

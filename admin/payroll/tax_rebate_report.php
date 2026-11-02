@@ -27,7 +27,7 @@ $tot_rebate_claim = 0;
     </div>
     <div class="card-body">
         <div class="alert alert-success border-success text-sm mb-4">
-            <i class="fas fa-percentage mr-2"></i> Under the Fiji Employment Relations Act & Income Tax Act, employers can claim a <strong>150% Corporate Income Tax Deduction</strong> on wages paid for Family Care Leave, Paternity Leave, and Voluntary Employer FNPF contributions above 8%.
+            <i class="fas fa-percentage mr-2"></i> Under the Employment Relations Act & Income Tax Act, employers can claim a <strong>150% Corporate Income Tax Deduction</strong> on wages paid for Family Care Leave, Paternity Leave, and Voluntary Employer FNPF contributions above 8%.
         </div>
 
         <!-- Year Filter -->

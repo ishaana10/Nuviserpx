@@ -22,6 +22,7 @@ $permissions_list = \App\Support\Permissions::parse(isset($permissions) ? (strin
 $permission_matrix = \App\Support\Permissions::matrix();
 $admin_groups      = \App\Support\Permissions::adminGroups();
 $action_cols       = \App\Support\Permissions::ACTIONS; // view/create/edit/delete => labels
+$special_groups    = \App\Support\Permissions::specialGroups();
 $page_groups       = \App\Support\Permissions::pageGroups(); // discovered from the sidebar
 $has = function($key) use ($permissions_list){ return in_array($key, $permissions_list, true); };
 ?>
@@ -105,6 +106,24 @@ $has = function($key) use ($permissions_list){ return in_array($key, $permission
 				</div>
 			</div>
 		</div>
+
+		<?php if(!empty($special_groups)): ?>
+		<div class="form-group">
+			<label class="control-label font-weight-bold text-navy m-0 d-block mb-1"><i class="fas fa-key"></i> Special Actions</label>
+			<small class="text-muted d-block mb-2">Sensitive actions that are <b>not</b> included by Create / Edit / Delete — grant each one deliberately. Untick to hide the matching buttons and block the action.</small>
+			<div class="card card-outline card-navy p-3">
+				<?php foreach($special_groups as $group_label => $perms): ?>
+					<div class="text-xs font-weight-bold text-uppercase text-muted mb-1"><?php echo htmlspecialchars($group_label) ?></div>
+					<?php foreach($perms as $perm_key => $perm_label): $dom_id = 'p_'.$perm_key; ?>
+						<div class="custom-control custom-checkbox mb-1">
+							<input type="checkbox" class="custom-control-input perm-check" id="<?php echo $dom_id ?>" name="permissions[]" value="<?php echo htmlspecialchars($perm_key) ?>" <?php echo $has($perm_key) ? 'checked' : '' ?>>
+							<label class="custom-control-label" for="<?php echo $dom_id ?>"><?php echo htmlspecialchars($perm_label) ?></label>
+						</div>
+					<?php endforeach; ?>
+				<?php endforeach; ?>
+			</div>
+		</div>
+		<?php endif; ?>
 
 		<?php if(!empty($admin_groups)): ?>
 		<div class="form-group">

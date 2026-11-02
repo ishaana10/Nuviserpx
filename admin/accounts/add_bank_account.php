@@ -55,7 +55,7 @@ require_once(__DIR__ . '/../../config.php');
         <div class="form-group mb-4">
             <label for="currency" class="form-label-bank">Currency</label>
             <select id="currency" name="currency" class="form-control form-control-sm rounded-0 select2" required>
-                <option value="FJD" selected>FJD Fijian Dollar</option>
+                <option value="FJD" selected>FJD Dollar</option>
                 <option value="AUD">AUD Australian Dollar</option>
                 <option value="NZD">NZD New Zealand Dollar</option>
                 <option value="USD">USD US Dollar</option>

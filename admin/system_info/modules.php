@@ -9,7 +9,7 @@ $modules = [
     ['key' => 'mod_contracts', 'name' => 'Contracts & Subscriptions', 'icon' => 'fas fa-file-contract', 'desc' => 'Service contracts, recurring billing, and MRR metrics.', 'default' => '1'],
     ['key' => 'mod_warehouses', 'name' => 'Multi-Warehouse Inventory', 'icon' => 'fas fa-warehouse', 'desc' => 'Multi-location inventory tracking and inter-warehouse transfers.', 'default' => '1'],
     ['key' => 'mod_expense_reports', 'name' => 'Employee Expense Claims', 'icon' => 'fas fa-receipt', 'desc' => 'Employee reimbursement claims with manager approval workflow.', 'default' => '1'],
-    ['key' => 'mod_payroll', 'name' => 'Payroll & HR Suite', 'icon' => 'fas fa-users', 'desc' => 'Fiji tax compliance payroll, employee profiles, and attendance.', 'default' => '1']
+    ['key' => 'mod_payroll', 'name' => 'Payroll & HR Suite', 'icon' => 'fas fa-users', 'desc' => 'Tax compliance payroll, employee profiles, and attendance.', 'default' => '1']
 ];
 ?>
 

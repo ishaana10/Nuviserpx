@@ -167,7 +167,7 @@ $status_class = [
                 <?php endif; ?>
                 <div>
                     <h3 class="font-weight-bold text-inv-label mb-1"><?= htmlspecialchars($sys['name'] ?? 'Nuvis ERPX') ?></h3>
-                    <p class="mb-0 text-muted small"><?= htmlspecialchars($sys['address'] ?? 'Fiji Islands') ?></p>
+                    <p class="mb-0 text-muted small"><?= htmlspecialchars($sys['address'] ?? '') ?></p>
                     <p class="mb-0 text-muted small">
                         <b>Email:</b> <?= htmlspecialchars($sys['email'] ?? '') ?> | <b>Phone:</b> <?= htmlspecialchars($sys['contact'] ?? '') ?>
                     </p>

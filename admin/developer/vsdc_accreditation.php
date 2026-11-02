@@ -21,7 +21,7 @@ $vault_qry = $conn->query("
 
 <div class="card card-outline card-warning shadow-sm rounded-0">
     <div class="card-header d-flex align-items-center justify-content-between">
-        <h3 class="card-title font-weight-bold"><i class="fas fa-certificate text-warning mr-2"></i> FRCS Fiji VMS v3.0 EFD Accreditation & Non-Repudiation Audit Suite</h3>
+        <h3 class="card-title font-weight-bold"><i class="fas fa-certificate text-warning mr-2"></i> FRCS VMS v3.0 EFD Accreditation & Non-Repudiation Audit Suite</h3>
         <div class="card-tools d-flex align-items-center gap-2">
             <button type="button" class="btn btn-sm btn-success btn-flat font-weight-bold" id="btn_run_accreditation"><i class="fas fa-check-circle mr-1"></i> Run Accreditation Test Suite</button>
         </div>
@@ -31,7 +31,7 @@ $vault_qry = $conn->query("
         <div class="alert alert-success border-success mb-4 d-flex align-items-center justify-content-between">
             <div>
                 <h5 class="font-weight-bold m-0"><i class="fas fa-shield-alt mr-2"></i> FRCS EFD Accreditation Compliance: ACCREDITED_COMPLIANT</h5>
-                <small>Compliant with Fiji Revenue & Customs Service VMS VSDC Request Submitter Specification v3.0.12</small>
+                <small>Compliant with Revenue & Customs Service VMS VSDC Request Submitter Specification v3.0.12</small>
             </div>
             <span class="badge badge-light text-success h6 mb-0 px-3 py-2 font-weight-bold">100% Passed</span>
         </div>

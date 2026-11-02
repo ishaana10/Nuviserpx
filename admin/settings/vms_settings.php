@@ -16,7 +16,7 @@ $config = $vmsService->getTenantVmsConfig($tenant_id);
     <div class="card-body">
         <form action="" id="tenant-vms-form">
             <div class="alert alert-warning border-warning text-sm mb-4">
-                <i class="fas fa-exclamation-triangle mr-2"></i> Configure Fiji Revenue & Customs Service (FRCS) VAT Monitoring System (VMS v3.0) SDC Smartcard parameters for fiscal invoice generation.
+                <i class="fas fa-exclamation-triangle mr-2"></i> Configure Revenue & Customs Service (FRCS) VAT Monitoring System (VMS v3.0) SDC Smartcard parameters for fiscal invoice generation.
             </div>
 
             <div class="row">

@@ -171,7 +171,7 @@ $view_order_id   = $_GET['order_id'] ?? null;
                 <?php endif; ?>
                 <div>
                   <h3 class="font-weight-bold text-navy mb-1"><?php echo htmlspecialchars($sys['name'] ?? 'Nuvis ERPX') ?></h3>
-                  <p class="mb-0 text-muted small"><?php echo htmlspecialchars($sys['address'] ?? 'Fiji Islands') ?></p>
+                  <p class="mb-0 text-muted small"><?php echo htmlspecialchars($sys['address'] ?? '') ?></p>
                   <p class="mb-0 text-muted small">
                     <b>Email:</b> <?php echo htmlspecialchars($sys['email'] ?? '') ?> | <b>Phone:</b> <?php echo htmlspecialchars($sys['contact'] ?? '') ?>
                   </p>

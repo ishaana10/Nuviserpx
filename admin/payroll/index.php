@@ -5,27 +5,29 @@
 <?php endif;?>
 <div class="card card-outline card-primary">
 	<div class="card-header">
-		<h3 class="card-title"><i class="fas fa-file-invoice-dollar text-primary"></i> Fiji Payroll Management & Processing</h3>
+		<h3 class="card-title"><i class="fas fa-file-invoice-dollar text-primary"></i> Payroll Management & Processing</h3>
 		<div class="card-tools">
-			<?php $pay_scope = $_settings->employee_scope('payroll'); $can_process = $_settings->can_access('payroll_create'); ?>
-			<?php if($can_process): ?>
+			<?php $pay_scope = $_settings->employee_scope('payroll'); $can_process = $_settings->can_access('payroll_process'); $can_export = $_settings->can_access('payroll_export'); ?>
+			<?php if($can_export): ?>
 			<div class="btn-group mr-2">
 				<button type="button" class="btn btn-flat btn-info btn-sm dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
 					<i class="fas fa-file-export"></i> Compliance & Bank Exports
 				</button>
 				<div class="dropdown-menu dropdown-menu-right">
 					<h6 class="dropdown-header">Direct Bank File Formats</h6>
-					<a class="dropdown-item" href="<?php echo base_url ?>admin/payroll/export.php?type=bsp" target="_blank"><i class="fas fa-university text-primary"></i> BSP Fiji CSV</a>
-					<a class="dropdown-item" href="<?php echo base_url ?>admin/payroll/export.php?type=anz" target="_blank"><i class="fas fa-university text-info"></i> ANZ Fiji CSV</a>
+					<a class="dropdown-item" href="<?php echo base_url ?>admin/payroll/export.php?type=bsp" target="_blank"><i class="fas fa-university text-primary"></i> BSP CSV</a>
+					<a class="dropdown-item" href="<?php echo base_url ?>admin/payroll/export.php?type=anz" target="_blank"><i class="fas fa-university text-info"></i> ANZ CSV</a>
 					<a class="dropdown-item" href="<?php echo base_url ?>admin/payroll/export.php?type=hfc" target="_blank"><i class="fas fa-university text-warning"></i> HFC Bank CSV</a>
 					<a class="dropdown-item" href="<?php echo base_url ?>admin/payroll/export.php?type=bred" target="_blank"><i class="fas fa-university text-danger"></i> BRED Bank CSV</a>
 					<a class="dropdown-item" href="<?php echo base_url ?>admin/payroll/export.php?type=generic" target="_blank"><i class="fas fa-file-csv text-secondary"></i> Generic Bank CSV</a>
 					<div class="dropdown-divider"></div>
-					<h6 class="dropdown-header">Fiji Tax & Superannuation</h6>
+					<h6 class="dropdown-header">Tax & Superannuation</h6>
 					<a class="dropdown-item" href="<?php echo base_url ?>admin/payroll/export.php?type=frcs" target="_blank"><i class="fas fa-calculator text-success"></i> FRCS TPOS PAYE Return CSV</a>
 					<a class="dropdown-item" href="<?php echo base_url ?>admin/payroll/export.php?type=fnpf" target="_blank"><i class="fas fa-shield-alt text-primary"></i> FNPF Schedule CSV</a>
 				</div>
 			</div>
+			<?php endif; ?>
+			<?php if($can_process): ?>
 			<a href="javascript:void(0)" id="process_batch" class="btn btn-flat btn-primary btn-sm"><span class="fas fa-users"></span> Process Batch Payroll</a>
 			<a href="javascript:void(0)" id="create_single" class="btn btn-flat btn-success btn-sm"><span class="fas fa-plus"></span> Single Employee Run</a>
 			<?php endif; ?>
@@ -87,7 +89,7 @@
 				                    <span class="sr-only">Toggle Dropdown</span>
 				                  </button>
 				                  <div class="dropdown-menu" role="menu">
-				                    <a class="dropdown-item view_payslip" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>"><span class="fa fa-file-invoice-dollar text-info"></span> Fiji Payslip</a>
+				                    <a class="dropdown-item view_payslip" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>"><span class="fa fa-file-invoice-dollar text-info"></span> Payslip</a>
 				                    <a class="dropdown-item email_payslip" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>"><span class="fa fa-envelope text-warning"></span> Email Payslip</a>
 				                    <?php if($_settings->can_access('payroll_edit')): ?><a class="dropdown-item edit_data" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>"><span class="fa fa-edit text-primary"></span> Edit</a><?php endif; ?>
 				                    <?php if($_settings->can_access('payroll_delete')): ?><div class="dropdown-divider"></div>
@@ -107,7 +109,7 @@
 			_conf("Are you sure to delete this payroll record? Associated journal entries will also be removed.","delete_payroll",[$(this).attr('data-id')])
 		})
 		$('#process_batch').click(function(){
-			uni_modal("<i class='fa fa-users'></i> Process Batch Fiji Payroll","payroll/manage_payroll.php?batch=1", 'extra-large')
+			uni_modal("<i class='fa fa-users'></i> Process Batch Payroll","payroll/manage_payroll.php?batch=1", 'extra-large')
 		})
 		$('#create_single').click(function(){
 			uni_modal("<i class='fa fa-plus'></i> Single Employee Payroll Run","payroll/manage_payroll.php", 'large')
@@ -116,7 +118,7 @@
 			uni_modal("<i class='fa fa-edit'></i> Edit Payroll Record","payroll/manage_payroll.php?id="+$(this).attr('data-id'), 'large')
 		})
 		$('.view_payslip').click(function(){
-			uni_modal("<i class='fa fa-file-alt'></i> Employee Fiji Payslip","payroll/view_payslip.php?id="+$(this).attr('data-id'), 'large')
+			uni_modal("<i class='fa fa-file-alt'></i> Employee Payslip","payroll/view_payslip.php?id="+$(this).attr('data-id'), 'large')
 		})
 		$('.email_payslip').click(function(){
 			var id = $(this).attr('data-id');

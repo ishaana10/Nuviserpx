@@ -74,18 +74,18 @@ class DashboardService
             // People
             'kpi_employees'        => ['title' => 'Active staff',          'category' => 'People',    'type' => 'kpi',   'icon' => 'fas fa-users',               'tone' => 'cyan',   'perm' => 'employees_view', 'size' => 'sm', 'sizes' => $kpi,  'ranged' => true,  'description' => 'Active employees, with new joiners in the period.'],
             'kpi_payroll'          => ['title' => 'Net payroll',           'category' => 'People',    'type' => 'kpi',   'icon' => 'fas fa-money-check-alt',     'tone' => 'green',  'perm' => 'payroll_view',   'size' => 'sm', 'sizes' => $kpi,  'ranged' => true,  'description' => 'Net salaries paid in the period, compared with the previous period.'],
-            'kpi_pending_leaves'   => ['title' => 'Leave awaiting review', 'category' => 'People',    'type' => 'kpi',   'icon' => 'fas fa-umbrella-beach',      'tone' => 'amber',  'perm' => 'employees_view', 'size' => 'sm', 'sizes' => $kpi,  'ranged' => false, 'description' => 'Leave requests still pending approval.'],
+            'kpi_pending_leaves'   => ['title' => 'Leave awaiting review', 'category' => 'People',    'type' => 'kpi',   'icon' => 'fas fa-umbrella-beach',      'tone' => 'amber',  'perm' => 'leaves_edit', 'size' => 'sm', 'sizes' => $kpi,  'ranged' => false, 'description' => 'Leave requests still pending approval.'],
             'chart_payroll_dept'   => ['title' => 'Salary cost by department', 'category' => 'People','type' => 'chart', 'icon' => 'fas fa-chart-pie',           'tone' => 'cyan',   'perm' => 'payroll_view',   'size' => 'md', 'sizes' => $chart,'ranged' => false, 'description' => 'Monthly base salary of active staff per department.', 'charts' => ['donut', 'bar']],
             'chart_payroll_trend'  => ['title' => 'Payroll trend',         'category' => 'People',    'type' => 'chart', 'icon' => 'fas fa-chart-line',          'tone' => 'green',  'perm' => 'payroll_view',   'size' => 'lg', 'sizes' => $chart,'ranged' => true,  'description' => 'Gross pay, net pay and FNPF by month.', 'charts' => ['line', 'area', 'bar']],
-            'chart_attendance'     => ['title' => 'Attendance',            'category' => 'People',    'type' => 'chart', 'icon' => 'fas fa-user-check',          'tone' => 'green',  'perm' => 'employees_view', 'size' => 'md', 'sizes' => $chart,'ranged' => true,  'description' => 'Present, late, half-day and absent records in the period.', 'charts' => ['donut', 'bar']],
-            'list_pending_leaves'  => ['title' => 'Leave requests',        'category' => 'People',    'type' => 'list',  'icon' => 'fas fa-calendar-check',      'tone' => 'amber',  'perm' => 'employees_view', 'size' => 'lg', 'sizes' => $list, 'ranged' => false, 'description' => 'Pending leave requests to review.'],
+            'chart_attendance'     => ['title' => 'Attendance',            'category' => 'People',    'type' => 'chart', 'icon' => 'fas fa-user-check',          'tone' => 'green',  'perm' => 'attendance_edit', 'size' => 'md', 'sizes' => $chart,'ranged' => true,  'description' => 'Present, late, half-day and absent records in the period.', 'charts' => ['donut', 'bar']],
+            'list_pending_leaves'  => ['title' => 'Leave requests',        'category' => 'People',    'type' => 'list',  'icon' => 'fas fa-calendar-check',      'tone' => 'amber',  'perm' => 'leaves_edit', 'size' => 'lg', 'sizes' => $list, 'ranged' => false, 'description' => 'Pending leave requests to review.'],
 
             // Sales & stock
-            'kpi_pipeline'         => ['title' => 'Open pipeline',         'category' => 'Sales & stock', 'type' => 'kpi', 'icon' => 'fas fa-funnel-dollar',     'tone' => 'indigo', 'perm' => 'sales_orders_view', 'size' => 'sm', 'sizes' => $kpi, 'ranged' => false, 'description' => 'Value of open CRM opportunities and the probability-weighted total.'],
+            'kpi_pipeline'         => ['title' => 'Open pipeline',         'category' => 'Sales & stock', 'type' => 'kpi', 'icon' => 'fas fa-funnel-dollar',     'tone' => 'indigo', 'perm' => 'crm_view', 'size' => 'sm', 'sizes' => $kpi, 'ranged' => false, 'description' => 'Value of open CRM opportunities and the probability-weighted total.'],
             'kpi_low_stock'        => ['title' => 'Low stock items',       'category' => 'Sales & stock', 'type' => 'kpi', 'icon' => 'fas fa-boxes',             'tone' => 'red',    'perm' => 'products_view',     'size' => 'sm', 'sizes' => $kpi, 'ranged' => false, 'description' => 'Products at or below their reorder level.'],
-            'chart_pipeline'       => ['title' => 'Pipeline by stage',     'category' => 'Sales & stock', 'type' => 'chart', 'icon' => 'fas fa-filter',           'tone' => 'indigo', 'perm' => 'sales_orders_view', 'size' => 'md', 'sizes' => $chart, 'ranged' => false, 'description' => 'Opportunity value in each CRM stage.', 'charts' => ['bar', 'donut']],
+            'chart_pipeline'       => ['title' => 'Pipeline by stage',     'category' => 'Sales & stock', 'type' => 'chart', 'icon' => 'fas fa-filter',           'tone' => 'indigo', 'perm' => 'crm_view', 'size' => 'md', 'sizes' => $chart, 'ranged' => false, 'description' => 'Opportunity value in each CRM stage.', 'charts' => ['bar', 'donut']],
             'list_low_stock'       => ['title' => 'Reorder list',          'category' => 'Sales & stock', 'type' => 'list', 'icon' => 'fas fa-truck-loading',     'tone' => 'red',    'perm' => 'products_view',     'size' => 'md', 'sizes' => $list, 'ranged' => false, 'description' => 'Products that need restocking, lowest cover first.'],
-            'kpi_open_tickets'     => ['title' => 'Open support tickets',  'category' => 'Sales & stock', 'type' => 'kpi', 'icon' => 'fas fa-life-ring',         'tone' => 'red',    'perm' => null,                'size' => 'sm', 'sizes' => $kpi, 'ranged' => false, 'description' => 'Tickets not yet resolved, with the urgent count.'],
+            'kpi_open_tickets'     => ['title' => 'Open support tickets',  'category' => 'Sales & stock', 'type' => 'kpi', 'icon' => 'fas fa-life-ring',         'tone' => 'red',    'perm' => 'tickets_view',                'size' => 'sm', 'sizes' => $kpi, 'ranged' => false, 'description' => 'Tickets not yet resolved, with the urgent count.'],
 
             // General
             'quick_actions'        => ['title' => 'Quick actions',         'category' => 'General',   'type' => 'actions', 'icon' => 'fas fa-bolt',              'tone' => 'blue',   'perm' => null, 'size' => 'md', 'sizes' => ['sm', 'md', 'lg', 'full'], 'ranged' => false, 'description' => 'Shortcuts to the forms you use most.'],
@@ -876,14 +876,14 @@ class DashboardService
     private function w_quick_actions(array $r): array
     {
         $all = [
-            ['label' => 'New invoice', 'icon' => 'fas fa-file-invoice', 'href' => './?page=invoices/manage_invoice', 'perm' => 'invoices_manage', 'tone' => 'blue'],
-            ['label' => 'Record receipt', 'icon' => 'fas fa-hand-holding-usd', 'href' => './?page=payments/manage_payment', 'perm' => 'payments_manage', 'tone' => 'green'],
-            ['label' => 'Manual journal', 'icon' => 'fas fa-book', 'href' => './?page=journals/manage_journal', 'perm' => 'journals_manage', 'tone' => 'indigo'],
-            ['label' => 'New quote', 'icon' => 'fas fa-file-signature', 'href' => './?page=sales_orders/manage_order', 'perm' => 'sales_orders_manage', 'tone' => 'amber'],
-            ['label' => 'Run payroll', 'icon' => 'fas fa-money-check-alt', 'href' => './?page=payroll/payrun_engine', 'perm' => 'payroll_manage', 'tone' => 'green'],
+            ['label' => 'New invoice', 'icon' => 'fas fa-file-invoice', 'href' => './?page=invoices/manage_invoice', 'perm' => 'invoices_create', 'tone' => 'blue'],
+            ['label' => 'Record receipt', 'icon' => 'fas fa-hand-holding-usd', 'href' => './?page=payments/manage_payment', 'perm' => 'payments_create', 'tone' => 'green'],
+            ['label' => 'Manual journal', 'icon' => 'fas fa-book', 'href' => './?page=journals/manage_journal', 'perm' => 'journals_create', 'tone' => 'indigo'],
+            ['label' => 'New quote', 'icon' => 'fas fa-file-signature', 'href' => './?page=sales_orders/manage_order', 'perm' => 'sales_orders_create', 'tone' => 'amber'],
+            ['label' => 'Run payroll', 'icon' => 'fas fa-money-check-alt', 'href' => './?page=payroll/payrun_engine', 'perm' => 'payroll_process', 'tone' => 'green'],
             ['label' => 'Employees', 'icon' => 'fas fa-users', 'href' => './?page=employees', 'perm' => 'employees_view', 'tone' => 'cyan'],
             ['label' => 'Reports', 'icon' => 'fas fa-chart-pie', 'href' => './?page=reports', 'perm' => 'reports_view', 'tone' => 'red'],
-            ['label' => 'Contacts', 'icon' => 'fas fa-address-book', 'href' => './?page=parties', 'perm' => 'invoices_view', 'tone' => 'blue'],
+            ['label' => 'Contacts', 'icon' => 'fas fa-address-book', 'href' => './?page=parties', 'perm' => 'parties_view', 'tone' => 'blue'],
         ];
         $actions = [];
         foreach ($all as $a) {

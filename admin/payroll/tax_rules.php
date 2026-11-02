@@ -14,7 +14,7 @@ $brackets = [
 
 <div class="card card-outline card-primary shadow-sm rounded-0">
     <div class="card-header d-flex align-items-center justify-content-between">
-        <h3 class="card-title font-weight-bold"><i class="fas fa-balance-scale text-primary mr-2"></i> Fiji FRCS PAYE Statutory Tax Brackets & FNPF Regulations</h3>
+        <h3 class="card-title font-weight-bold"><i class="fas fa-balance-scale text-primary mr-2"></i> FRCS PAYE Statutory Tax Brackets & FNPF Regulations</h3>
         <div class="card-tools">
             <button type="button" class="btn btn-sm btn-outline-secondary btn-flat" onclick="window.print()"><i class="fas fa-print mr-1"></i> Print Tax Schedule</button>
         </div>
@@ -54,7 +54,7 @@ $brackets = [
             </div>
         </div>
 
-        <h5 class="font-weight-bold text-dark border-bottom pb-2 mb-3"><i class="fas fa-list-ol text-secondary mr-2"></i> Fiji Primary Resident Progressive PAYE Tax Brackets</h5>
+        <h5 class="font-weight-bold text-dark border-bottom pb-2 mb-3"><i class="fas fa-list-ol text-secondary mr-2"></i> Primary Resident Progressive PAYE Tax Brackets</h5>
         <div class="table-responsive">
             <table class="table table-hover table-striped table-bordered">
                 <thead>

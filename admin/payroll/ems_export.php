@@ -78,16 +78,16 @@ $tot_srt = 0;
 
 <div class="card card-outline card-primary shadow-sm rounded-0">
     <div class="card-header d-flex align-items-center justify-content-between">
-        <h3 class="card-title font-weight-bold"><i class="fas fa-file-invoice-dollar text-primary mr-2"></i> Fiji FRCS Employer Monthly Summary (EMS) PAYE Export</h3>
+        <h3 class="card-title font-weight-bold"><i class="fas fa-file-invoice-dollar text-primary mr-2"></i> FRCS Employer Monthly Summary (EMS) PAYE Export</h3>
         <div class="card-tools d-flex align-items-center gap-2">
-            <a href="./?page=payroll/fiji_ems_export&month=<?= urlencode($month) ?>&export_csv=1" class="btn btn-sm btn-success btn-flat font-weight-bold"><i class="fas fa-file-csv mr-1"></i> Export FRCS EMS CSV</a>
+            <a href="./?page=payroll/ems_export&month=<?= urlencode($month) ?>&export_csv=1" class="btn btn-sm btn-success btn-flat font-weight-bold"><i class="fas fa-file-csv mr-1"></i> Export FRCS EMS CSV</a>
             <button type="button" class="btn btn-sm btn-outline-secondary btn-flat" onclick="window.print()"><i class="fas fa-print mr-1"></i> Print</button>
         </div>
     </div>
     <div class="card-body">
         <!-- Month Filter -->
         <form action="" method="GET" class="mb-4">
-            <input type="hidden" name="page" value="payroll/fiji_ems_export">
+            <input type="hidden" name="page" value="payroll/ems_export">
             <div class="row align-items-end">
                 <div class="col-md-4 form-group mb-0">
                     <label class="font-weight-bold text-xs text-uppercase text-muted">Payroll Month / Period</label>

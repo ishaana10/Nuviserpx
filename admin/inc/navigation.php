@@ -431,7 +431,7 @@ if($t_qry && $t_qry->num_rows > 0){
                                         </a>
                                     </li>
                                     <li class="nav-item">
-                                        <a href="<?php echo base_url ?>admin/?page=payroll/fiji_ems_export" class="nav-link nav-payroll_fiji_ems_export tree-item">
+                                        <a href="<?php echo base_url ?>admin/?page=payroll/ems_export" class="nav-link nav-payroll_ems_export tree-item">
                                             <i class="nav-icon fas fa-file-csv"></i>
                                             <p>FRCS EMS Tax Export</p>
                                         </a>

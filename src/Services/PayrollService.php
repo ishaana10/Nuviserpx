@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use Emailer;
-use FijiPayroll;
+use PayrollEngine;
 use mysqli;
 use SystemSettings;
 
@@ -18,14 +18,15 @@ class PayrollService
 
     public function calculatePayrollAjax(array $post): string
     {
-        require_once(base_app . 'classes/FijiPayroll.php');
-        $calc = FijiPayroll::calculate($post);
+        require_once(base_app . 'classes/PayrollEngine.php');
+        $calc = PayrollEngine::calculate($post);
         return json_encode(['status' => 'success', 'data' => $calc]);
     }
 
     public function savePayroll(array $post): string
     {
-        require_once(base_app . 'classes/FijiPayroll.php');
+        require_once(base_app . 'classes/PayrollEngine.php');
+        $post += ['id' => 0];
         extract($post);
         $tenant_id = $this->settings->active_tenant_id();
 
@@ -52,8 +53,8 @@ class PayrollService
         $deductions = isset($deductions) ? (float)$deductions : 0.0;
         $is_resident = isset($is_resident) ? (int)$is_resident : (int)($emp_data['is_resident'] ?? 1);
 
-        // Calculate Fiji Payroll
-        $calc = FijiPayroll::calculate([
+        // Calculate Payroll
+        $calc = PayrollEngine::calculate([
             'basic_salary' => $basic_salary,
             'overtime' => $overtime,
             'allowances' => $allowances,
@@ -103,7 +104,7 @@ class PayrollService
         $journal_date = $pay_date;
 
         $empName = $emp_data['name'] ?? '';
-        $description = $this->conn->real_escape_string("Fiji Payroll Disbursement for {$empName} ({$salary_month}) - Gross: \${$gross_salary}, Net: \${$net_salary}");
+        $description = $this->conn->real_escape_string("Payroll Disbursement for {$empName} ({$salary_month}) - Gross: \${$gross_salary}, Net: \${$net_salary}");
 
         $id = !empty($id) ? intval($id) : 0;
         if (empty($id)) {
@@ -196,7 +197,7 @@ class PayrollService
         $save = $this->conn->query($sql);
         if ($save) {
             $resp['status'] = 'success';
-            $resp['msg'] = empty($id) ? " Fiji Payroll processed and Journal Entry created successfully." : " Payroll updated successfully.";
+            $resp['msg'] = empty($id) ? " Payroll processed and Journal Entry created successfully." : " Payroll updated successfully.";
         } else {
             $resp['status'] = 'failed';
             $resp['msg'] = "An error occurred while saving payroll.";
@@ -206,6 +207,84 @@ class PayrollService
             $this->settings->set_flashdata('success', $resp['msg']);
         }
         return json_encode($resp);
+    }
+
+    /**
+     * Batch payroll: one payroll record + journal per selected employee, using
+     * the run details and each employee's earnings overrides. All-or-nothing:
+     * any failure rolls the whole run back so a run is never half-posted.
+     * Employees already paid for the same salary period are skipped, never
+     * double-paid.
+     *
+     * @param array<string,mixed> $post
+     */
+    public function savePayrollBatch(array $post): string
+    {
+        $tenant_id = (int)$this->settings->active_tenant_id();
+        $ids = array_values(array_unique(array_filter(array_map('intval', (array)($post['employee_ids'] ?? [])))));
+        if (!$ids) {
+            return json_encode(['status' => 'failed', 'msg' => 'Select at least one employee to process.']);
+        }
+
+        $run = [];
+        foreach (['payroll_run_ref', 'salary_month', 'pay_frequency', 'pay_date', 'period_start', 'period_end'] as $f) {
+            if (isset($post[$f])) {
+                $run[$f] = (string)$post[$f];
+            }
+        }
+        if (empty($run['payroll_run_ref'])) {
+            $run['payroll_run_ref'] = 'RUN-' . date('Ym') . '-' . random_int(100, 999);
+        }
+        $month = $this->conn->real_escape_string((string)($run['salary_month'] ?? date('F Y')));
+
+        $processed = 0;
+        $skipped = [];
+        $this->conn->begin_transaction();
+        try {
+            foreach ($ids as $eid) {
+                $emp = $this->conn->query("SELECT id, concat(firstname,' ',lastname) AS name FROM `employee_list` WHERE id = '{$eid}' AND tenant_id = '{$tenant_id}' AND status = 1 AND delete_flag = 0");
+                if (!$emp || $emp->num_rows === 0) {
+                    throw new \RuntimeException("Employee #{$eid} was not found in this company.");
+                }
+                $name = $emp->fetch_assoc()['name'];
+                $dup = $this->conn->query("SELECT id FROM `payroll_list` WHERE employee_id = '{$eid}' AND salary_month = '{$month}' AND tenant_id = '{$tenant_id}' LIMIT 1");
+                if ($dup && $dup->num_rows > 0) {
+                    $skipped[] = $name;
+                    continue;
+                }
+                $row = $run + [
+                    'id'             => 0,
+                    'employee_id'    => $eid,
+                    'overtime'       => (float)($post['emp_overtime'][$eid] ?? 0),
+                    'allowances'     => (float)($post['emp_allowances'][$eid] ?? 0),
+                    'other_earnings' => (float)($post['emp_other_earnings'][$eid] ?? 0),
+                    'deductions'     => (float)($post['emp_deductions'][$eid] ?? 0),
+                ];
+                if (isset($post['emp_basic'][$eid]) && $post['emp_basic'][$eid] !== '') {
+                    $row['basic_salary'] = (float)$post['emp_basic'][$eid];
+                }
+                $res = json_decode($this->savePayroll($row), true);
+                if (!is_array($res) || ($res['status'] ?? '') !== 'success') {
+                    throw new \RuntimeException("Could not process {$name}" . (!empty($res['err']) ? ': ' . $res['err'] : '.'));
+                }
+                $processed++;
+            }
+            $this->conn->commit();
+        } catch (\Throwable $e) {
+            $this->conn->rollback();
+            return json_encode(['status' => 'failed', 'msg' => 'Batch payroll was not saved. ' . $e->getMessage()]);
+        }
+
+        if ($processed === 0) {
+            return json_encode(['status' => 'failed', 'msg' => 'Nothing to process — every selected employee already has payroll for ' . ($run['salary_month'] ?? 'this period') . '.']);
+        }
+        $msg = "Batch payroll processed for {$processed} employee" . ($processed === 1 ? '' : 's') . '.';
+        if ($skipped) {
+            $msg .= ' Skipped (already paid this period): ' . implode(', ', $skipped) . '.';
+        }
+        $this->settings->log_audit('Processed Batch Payroll', 'Payroll', "{$run['payroll_run_ref']}: {$processed} employees");
+        $this->settings->set_flashdata('success', $msg);
+        return json_encode(['status' => 'success', 'msg' => $msg, 'processed' => $processed, 'skipped' => $skipped]);
     }
 
     public function deletePayroll(int $id): string
