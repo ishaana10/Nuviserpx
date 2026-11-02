@@ -54,7 +54,7 @@
 							<td><b><?php echo htmlspecialchars($row['name']) ?></b></td>
 							<td>
 								<p class="m-0 text-muted small"><?php echo htmlspecialchars($row['description'] ?? 'Custom Role') ?></p>
-								<small class="badge badge-light border text-navy"><?php echo !empty($row['permissions']) ? count(explode(',', $row['permissions'])) . ' Modules Granted' : 'No Access' ?></small>
+								<small class="badge badge-light border text-navy"><?php $pc = count(array_diff(array_filter(array_map('trim', explode(',', (string)$row['permissions']))), [\App\Support\Permissions::PAGES_SCOPED])); echo $pc > 0 ? $pc . ' Permissions Granted' : 'No Access' ?></small>
 							</td>
 							<td class="text-center">
 								<span class="badge badge-info px-2 py-1"><i class="fas fa-users"></i> <?php echo $row['user_count'] ?> Users</span>

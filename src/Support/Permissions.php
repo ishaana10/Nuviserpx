@@ -158,11 +158,101 @@ final class Permissions
                 $keys[] = $k;
             }
         }
+        foreach (self::navPages() as $def) {
+            $keys[] = $def['key'];
+        }
+        $keys[] = self::PAGES_SCOPED;
         return $keys;
+    }
+
+    /**
+     * Marker stored on every role saved from the role editor. Present = the
+     * individual page grants are authoritative; absent = a legacy role whose
+     * module grants still imply access to that module's sub-pages.
+     */
+    public const PAGES_SCOPED = 'pages_scoped';
+
+    /**
+     * Every individual page in the sidebar that needs its own grant, discovered
+     * dynamically from admin/inc/navigation.php so a new menu entry appears in
+     * the role editor automatically. Sub-pages of a module (e.g. Payroll Test
+     * Sandbox, AR Aging) and the Tax pages are listed; a module's main page is
+     * governed by the module's View/Create/Edit/Delete row instead.
+     *
+     * @return array<string,array{key:string,label:string,section:string,parent:?string}>
+     *         keyed by page path (e.g. "payroll/sandbox")
+     */
+    public static function navPages(): array
+    {
+        static $cache = null;
+        if ($cache !== null) {
+            return $cache;
+        }
+        $cache = [];
+        $file = dirname(__DIR__, 2) . '/admin/inc/navigation.php';
+        $lines = is_readable($file) ? preg_split('/\R/', (string)file_get_contents($file)) : [];
+        $section = 'Other';
+        $n = count($lines);
+        for ($i = 0; $i < $n; $i++) {
+            $l = $lines[$i];
+            if (strpos($l, 'nav-is-tree') !== false) {
+                for ($j = $i + 1; $j < min($n, $i + 8); $j++) {
+                    $t = trim($lines[$j]);
+                    if ($t !== '' && $t[0] !== '<' && strpos($t, '<') === false) {
+                        $section = html_entity_decode($t);
+                        break;
+                    }
+                }
+                continue;
+            }
+            if (!preg_match('/\?page=([A-Za-z0-9_\/]+)[^"]*"\s+class=/', $l, $m)) {
+                continue;
+            }
+            $page = $m[1];
+            $label = $page;
+            for ($j = $i; $j < min($n, $i + 5); $j++) {
+                if (preg_match('/<p>(.*?)<\/p>/', $lines[$j], $mm)) {
+                    $label = trim(html_entity_decode(strip_tags($mm[1])));
+                    break;
+                }
+            }
+            $parent = self::PAGE_MAP[$page] ?? self::PAGE_MAP[explode('/', $page)[0]] ?? false;
+            $root = explode('/', $page)[0];
+            $isTax = $root === 'tax';
+            $moduleView = is_string($parent) && preg_match('/_view$/', $parent);
+            if (!($isTax || $moduleView)) {
+                continue; // admin / developer / open pages keep their own gate
+            }
+            if (strpos($page, '/') === false && $page !== 'groups') {
+                continue; // a module's main page => the module row
+            }
+            $cache[$page] = [
+                'key'     => 'page_' . str_replace('/', '__', $page),
+                'label'   => $label,
+                'section' => $isTax ? 'Tax' : $section,
+                'parent'  => $moduleView ? $parent : null,
+            ];
+        }
+        return $cache;
+    }
+
+    /** Individual-page grants grouped by sidebar section, for the role editor. */
+    public static function pageGroups(): array
+    {
+        $groups = [];
+        foreach (self::navPages() as $page => $def) {
+            $groups[$def['section']][$page] = $def;
+        }
+        return $groups;
     }
 
     public static function label(string $key): string
     {
+        foreach (self::navPages() as $def) {
+            if ($def['key'] === $key) {
+                return 'View ' . $def['label'];
+            }
+        }
         foreach (self::ADMIN_PERMS as $perms) {
             if (isset($perms[$key])) {
                 return $perms[$key];
@@ -243,7 +333,20 @@ final class Permissions
             }
         }
 
-        return array_values(array_unique($granted));
+        $granted = array_values(array_unique($granted));
+
+        // Legacy roles (saved before per-page grants existed) keep working:
+        // a module's view grant implies its sub-pages until the role is
+        // re-saved from the editor, which stamps the PAGES_SCOPED marker.
+        if (!in_array(self::PAGES_SCOPED, $granted, true)) {
+            foreach (self::navPages() as $def) {
+                $implied = $def['parent'] ?? 'settings_manage';
+                if (in_array($implied, $granted, true)) {
+                    $granted[] = $def['key'];
+                }
+            }
+        }
+        return $granted;
     }
 
     /* ===================================================================
@@ -483,6 +586,10 @@ final class Permissions
     public static function forPage(string $page)
     {
         $page = trim($page, '/');
+        $nav = self::navPages();
+        if (isset($nav[$page])) {
+            return $nav[$page]['key'];
+        }
         if (array_key_exists($page, self::PAGE_MAP)) {
             return self::PAGE_MAP[$page];
         }
@@ -513,6 +620,14 @@ final class Permissions
     /** Tenant module key governing a permission key, or null if ungoverned. */
     public static function tenantModuleFor(string $permKey): ?string
     {
+        if (strpos($permKey, 'page_') === 0) {
+            foreach (self::navPages() as $def) {
+                if ($def['key'] === $permKey) {
+                    return $def['parent'] ? self::tenantModuleFor($def['parent']) : null;
+                }
+            }
+            return null;
+        }
         $mod = preg_replace('/_(view|create|edit|delete|manage)$/', '', $permKey);
         foreach (self::TENANT_MODULES as $key => $def) {
             if (in_array($mod, $def['perms'], true)) {
