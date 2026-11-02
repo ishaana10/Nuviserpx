@@ -78,7 +78,9 @@ $source = null;
 if ($mode === 'edit' && $journal) {
     $source = (new JournalService($conn, $_settings))->sourceDocument($load_id, $tenant_id);
 }
-$read_only = $is_cancelled || $source !== null;
+// A posted journal is part of the record: it can be viewed, copied or reversed, never edited.
+$is_posted = $mode === 'edit' && $journal && JournalService::statusKind($status) === 'posted';
+$read_only = $is_cancelled || $source !== null || $is_posted;
 
 $narration = (string)($journal['description'] ?? '');
 $date = $mode === 'edit' && $journal ? (string)$journal['journal_date'] : date('Y-m-d');
@@ -204,8 +206,8 @@ function mj_amount(?float $v): string
         <?php if ($mode === 'edit' && $journal): ?>
         <div class="d-flex" style="gap:8px">
             <a class="btn btn-default btn-sm" href="./?page=journals/manage_journal&copy=<?= $load_id ?>"><i class="far fa-clone mr-1"></i> Copy</a>
-            <?php if (!$is_cancelled && !$source && $status !== 'draft'): ?>
-            <a class="btn btn-default btn-sm" href="./?page=journals/manage_journal&reverse=<?= $load_id ?>"><i class="fas fa-exchange-alt mr-1"></i> Reverse</a>
+            <?php if ($is_posted && !$source && empty($journal['reverses_id'])): ?>
+            <button type="button" class="btn btn-default btn-sm" id="btn-reverse-linked"><i class="fas fa-exchange-alt mr-1"></i> Reverse</button>
             <?php endif; ?>
         </div>
         <?php endif; ?>
@@ -215,6 +217,8 @@ function mj_amount(?float $v): string
         <div class="mj-banner lock"><i class="fas fa-lock"></i><div>This journal was created automatically by <b><?= htmlspecialchars($source) ?></b>. To change it, edit or cancel that document — the ledger will follow.</div></div>
     <?php elseif ($is_cancelled): ?>
         <div class="mj-banner lock"><i class="fas fa-ban"></i><div>This journal is cancelled and no longer affects your reports. Use <b>Copy</b> to start a new one from it.</div></div>
+    <?php elseif ($is_posted): ?>
+        <div class="mj-banner lock"><i class="fas fa-lock"></i><div>This journal is posted, so it can no longer be edited or deleted. To undo it, use <b>Reverse</b> — a linked journal with every line on the opposite side. To correct it, reverse it and post a new one (<b>Copy</b> starts from these lines).</div></div>
     <?php elseif ($mode === 'reverse'): ?>
         <div class="mj-banner info"><i class="fas fa-exchange-alt"></i><div>Debits and credits from <b><?= htmlspecialchars($journal['code'] ?? '') ?></b> have been swapped. Pick the date the reversal should take effect, then post.</div></div>
     <?php elseif ($mode === 'new'): ?>
@@ -524,6 +528,18 @@ function mj_amount(?float $v): string
             if (!$target.find('.mj-account').val()) { $target.find('.mj-account').select2('open'); }
         });
 
+        $('#btn-reverse-linked').on('click', function () {
+            _conf('Reverse this journal? A new journal dated today is posted with every line on the opposite side. This journal stays on record.', 'nv_reverse_this_journal', []);
+        });
+        window.nv_reverse_this_journal = function () {
+            start_loader();
+            $.post(_base_url_ + 'classes/Master.php?f=reverse_journal', { id: <?= (int)$load_id ?> }, null, 'json').done(function (resp) {
+                if (resp && resp.status === 'success') { location.href = './?page=journals'; return; }
+                alert_toast((resp && resp.msg) || 'Something went wrong.', 'error');
+                end_loader();
+                $('#confirm_modal').modal('hide');
+            }).fail(function () { alert_toast('Something went wrong.', 'error'); end_loader(); });
+        };
         $('#btn-save-draft').on('click', function () { save('draft'); });
         $('#btn-post').on('click', function () { save('posted'); });
         $('#journal-form').on('submit', function (e) { e.preventDefault(); save('posted'); });

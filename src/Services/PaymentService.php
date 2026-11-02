@@ -62,6 +62,9 @@ class PaymentService
         }
         $journal_code = $prefix . $code;
         $journal_date = $payment_date;
+        if ($lockMsg = \App\Services\PeriodLockService::guardDocument($this->conn, (int)$tenant_id, $journal_date, 'payment_list', (int)$id)) {
+            return json_encode(['status' => 'failed', 'msg' => $lockMsg]);
+        }
         $partyName = $party['name'] ?? '';
         $description = $this->conn->real_escape_string("Payment Receipt {$payment_no} from {$partyName} - Amount: \${$amount}");
 
@@ -222,6 +225,9 @@ class PaymentService
     public function deletePayment(int $id): string
     {
         $tenant_id = $this->settings->active_tenant_id();
+        if ($lockMsg = \App\Services\PeriodLockService::guardDocument($this->conn, (int)$tenant_id, null, 'payment_list', $id)) {
+            return json_encode(['status' => 'failed', 'msg' => $lockMsg]);
+        }
 
         // Get affected invoices before deleting
         $old_allocs = $this->conn->query("SELECT invoice_id FROM `payment_allocations` WHERE payment_id = '{$id}'");

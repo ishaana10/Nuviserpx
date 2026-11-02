@@ -107,6 +107,9 @@ class PayrollService
         $description = $this->conn->real_escape_string("Payroll Disbursement for {$empName} ({$salary_month}) - Gross: \${$gross_salary}, Net: \${$net_salary}");
 
         $id = !empty($id) ? intval($id) : 0;
+        if ($lockMsg = \App\Services\PeriodLockService::guardDocument($this->conn, (int)$tenant_id, $journal_date, 'payroll_list', $id)) {
+            return json_encode(['status' => 'failed', 'msg' => $lockMsg]);
+        }
         if (empty($id)) {
             $j_sql = "INSERT INTO `journal_entries` (`tenant_id`, `code`, `journal_date`, `description`, `user_id`) VALUES ('{$tenant_id}', '{$journal_code}', '{$journal_date}', '{$description}', '{$user_id}')";
             $this->conn->query($j_sql);
@@ -290,6 +293,9 @@ class PayrollService
     public function deletePayroll(int $id): string
     {
         $tenant_id = $this->settings->active_tenant_id();
+        if ($lockMsg = \App\Services\PeriodLockService::guardDocument($this->conn, (int)$tenant_id, null, 'payroll_list', $id)) {
+            return json_encode(['status' => 'failed', 'msg' => $lockMsg]);
+        }
         $existing = $this->conn->query("SELECT journal_id FROM `payroll_list` WHERE id = '{$id}' and tenant_id = '{$tenant_id}'")->fetch_assoc();
         if (!empty($existing['journal_id'])) {
             $this->conn->query("DELETE FROM `journal_entries` WHERE id = '{$existing['journal_id']}' and tenant_id = '{$tenant_id}'");

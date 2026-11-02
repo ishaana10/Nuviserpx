@@ -100,6 +100,66 @@
     </div>
 </div>
 
+<?php
+$pl_tenant = (int)$_settings->active_tenant_id();
+$pl_current = \App\Services\PeriodLockService::lockDate($conn, $pl_tenant);
+$pl_history = [];
+$pl_q = @$conn->prepare("SELECT p.lock_date, p.note, p.date_created, CONCAT(u.firstname, ' ', u.lastname) who
+    FROM period_locks p LEFT JOIN users u ON u.id = p.locked_by WHERE p.tenant_id = ? ORDER BY p.id DESC LIMIT 5");
+if ($pl_q) {
+    $pl_q->bind_param('i', $pl_tenant);
+    $pl_q->execute();
+    $pl_history = $pl_q->get_result()->fetch_all(MYSQLI_ASSOC);
+}
+?>
+<div class="card card-outline card-warning shadow-sm rounded-0 mt-3">
+    <div class="card-header">
+        <h3 class="card-title font-weight-bold"><i class="fas fa-lock text-warning mr-2"></i> Close the books</h3>
+    </div>
+    <div class="card-body">
+        <p class="text-muted text-sm mb-3">
+            Nothing dated on or before the lock date can be created, changed or removed — in journals, invoices, payments, payroll, bills or through the API.
+            Currently: <b><?= $pl_current ? 'closed up to ' . date('j M Y', strtotime($pl_current)) : 'open (no lock)' ?></b>.
+        </p>
+        <form id="period-lock-form" class="form-inline" style="gap:8px">
+            <label class="font-weight-bold text-sm mr-2" for="lock_date">Close up to</label>
+            <input type="date" name="lock_date" id="lock_date" class="form-control form-control-sm rounded-0" max="<?= date('Y-m-d') ?>" value="<?= htmlspecialchars((string)$pl_current) ?>">
+            <input type="text" name="note" class="form-control form-control-sm rounded-0" maxlength="255" placeholder="Note (e.g. FY2026 audited)" style="min-width:260px">
+            <button type="submit" class="btn btn-sm btn-warning btn-flat font-weight-bold"><i class="fas fa-lock mr-1"></i> Apply</button>
+        </form>
+        <small class="text-muted d-block mt-2">Leave the date empty to reopen every period. Every change is recorded below and in the audit log.</small>
+        <?php if ($pl_history): ?>
+        <table class="table table-sm table-bordered mt-3 mb-0">
+            <thead><tr><th>Closed up to</th><th>Note</th><th>By</th><th>When</th></tr></thead>
+            <tbody>
+            <?php foreach ($pl_history as $h): ?>
+                <tr>
+                    <td><?= $h['lock_date'] ? htmlspecialchars(date('j M Y', strtotime($h['lock_date']))) : '<i class="text-muted">reopened</i>' ?></td>
+                    <td><?= htmlspecialchars((string)$h['note']) ?></td>
+                    <td><?= htmlspecialchars(trim((string)$h['who']) ?: '—') ?></td>
+                    <td><?= htmlspecialchars(date('j M Y H:i', strtotime($h['date_created']))) ?></td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+        <?php endif; ?>
+    </div>
+</div>
+
+<script>
+$(document).ready(function(){
+    $('#period-lock-form').submit(function(e){
+        e.preventDefault();
+        start_loader();
+        $.post(_base_url_ + "classes/Master.php?f=set_period_lock", $(this).serialize(), null, "json").done(function(resp){
+            if (resp && resp.status === 'success') { location.reload(); return; }
+            alert_toast((resp && resp.msg) || "Could not change the lock.", "error");
+            end_loader();
+        }).fail(function(){ alert_toast("Could not change the lock.", "error"); end_loader(); });
+    });
+});
+</script>
+
 <script>
 $(document).ready(function(){
     $('#financial-settings-form').submit(function(e){

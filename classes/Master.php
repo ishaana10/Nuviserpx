@@ -951,6 +951,16 @@ class Master extends DBConnection
         return $this->container->make(JournalService::class)->saveJournal($_POST);
     }
 
+    public function reverse_journal()
+    {
+        return $this->container->make(JournalService::class)->reverseJournal(intval($_POST['id'] ?? 0), (string)($_POST['date'] ?? ''));
+    }
+
+    public function set_period_lock()
+    {
+        return $this->container->make(\App\Services\PeriodLockService::class)->setLock((string)($_POST['lock_date'] ?? ''), (string)($_POST['note'] ?? ''));
+    }
+
     public function post_opening_balances()
     {
         return $this->container->make(JournalService::class)->postOpeningBalances($_POST);
@@ -1101,6 +1111,12 @@ class Master extends DBConnection
         $total = isset($total) ? (float)$total : 0.0;
         $notes = isset($notes) ? $this->conn->real_escape_string((string)$notes) : '';
         $status = !empty($status) ? $this->conn->real_escape_string((string)$status) : 'proforma';
+
+        // Confirming an order books its invoice and stock movement, so the order date must fall in an open period.
+        if (in_array($status, ['confirmed', 'converted_to_invoice'], true)
+            && ($lockMsg = \App\Services\PeriodLockService::guard($this->conn, (int)$tenant_id, $order_date))) {
+            return json_encode(['status' => 'failed', 'msg' => $lockMsg]);
+        }
 
         if (empty($id)) {
             $sql = "INSERT INTO `sales_order_list` SET
@@ -1809,6 +1825,12 @@ switch ($action) {
         break;
     case 'post_opening_balances':
         echo $Master->post_opening_balances();
+        break;
+    case 'reverse_journal':
+        echo $Master->reverse_journal();
+        break;
+    case 'set_period_lock':
+        echo $Master->set_period_lock();
         break;
     case 'delete_journal':
         echo $Master->delete_journal();

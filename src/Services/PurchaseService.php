@@ -392,6 +392,9 @@ class PurchaseService
         $vendorName = $vendor['name'] ?? '';
         $description = $this->conn->real_escape_string("Vendor Bill {$bill_no} from {$vendorName} - Total: \${$total}");
         $journal_date = $bill_date;
+        if ($lockMsg = \App\Services\PeriodLockService::guardDocument($this->conn, (int)$tenant_id, $journal_date, 'vendor_bill_list', (int)$id)) {
+            return json_encode(['status' => 'failed', 'msg' => $lockMsg]);
+        }
 
         if (empty($id)) {
             $journal_code = $this->nextJournalCode((int)$tenant_id);
@@ -517,6 +520,9 @@ class PurchaseService
     public function deleteVendorBill(int $id): string
     {
         $tenant_id = $this->settings->active_tenant_id();
+        if ($lockMsg = \App\Services\PeriodLockService::guardDocument($this->conn, (int)$tenant_id, null, 'vendor_bill_list', $id)) {
+            return json_encode(['status' => 'failed', 'msg' => $lockMsg]);
+        }
         $bill = $this->conn->query("SELECT bill_no, journal_id FROM `vendor_bill_list` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'");
         if (!$bill || $bill->num_rows == 0) {
             return json_encode(['status' => 'failed', 'msg' => 'Vendor bill not found.']);

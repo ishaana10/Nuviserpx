@@ -36,6 +36,14 @@ if($method === 'POST'){
     $description = isset($input['description']) ? $conn->real_escape_string($input['description']) : 'API Journal Posting';
     $code = 'JRN-'.date('Ym').'-'.rand(1000,9999);
 
+    // Books closed? Refuse before anything is written.
+    $lock_msg = \App\Services\PeriodLockService::guard($conn, (int)$api_tenant_id, $journal_date);
+    if($lock_msg){
+        http_response_code(423);
+        echo json_encode(['status' => 'failed', 'message' => $lock_msg]);
+        exit;
+    }
+
     $sql = "INSERT INTO `journal_entries` SET
         `tenant_id` = '{$api_tenant_id}',
         `code` = '{$code}',

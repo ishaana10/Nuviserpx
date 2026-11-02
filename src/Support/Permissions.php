@@ -408,6 +408,11 @@ final class Permissions
         'save_journal'          => ['journals', 'save'],
         'delete_journal'        => ['journals', 'delete'],
         'cancel_journal'        => ['journals', 'edit'],
+        // Posting a journal, whichever way it is created: needs the same right as save_journal (new).
+        'reverse_journal'       => ['journals', 'create'],
+        'post_opening_balances' => ['journals', 'create'],
+        // Closing or reopening the books changes what every other user may do: tenant-admin only.
+        'set_period_lock'       => ['settings_manage'],
         // Invoices
         'save_invoice'          => ['invoices', 'save'],
         'delete_invoice'        => ['invoices', 'delete'],
