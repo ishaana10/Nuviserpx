@@ -323,10 +323,15 @@ if(isset($meta['employee_id']) && (int)$meta['employee_id'] > 0){
 				method: 'POST',
 				type: 'POST',
 				success:function(resp){
-					if(resp == 1){
+					var code = $.trim(String(resp));
+					if(code == '1'){
 						location.href = './?page=user/list';
 					}else{
-						$('#msg').html('<div class="alert alert-danger">Failed to save user or username already exists.</div>')
+						var msg = 'Failed to save user. Please try again.';
+						if(code == '3'){ msg = 'That username is already taken. Please choose another.'; }
+						else if(code == '4'){ msg = 'Your current password is incorrect.'; }
+						else if(code == '2'){ msg = 'Could not save the user. Please check the details and try again.'; }
+						$('#msg').html('<div class="alert alert-danger">'+msg+'</div>')
 						$("html, body").animate({ scrollTop: 0 }, "fast");
 					}
 					end_loader()
