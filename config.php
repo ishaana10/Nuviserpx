@@ -55,5 +55,20 @@ function isMobileDevice(){
     //Otherwise return false..  
     return false;
 }
+
+// Central authorisation for admin view files requested directly (modal forms,
+// exports, sub-pages): the router's page gate cannot see these requests.
+(function () use (&$_settings) {
+	if (!isset($_settings) || !isset($_SESSION['userdata']) || ($_SESSION['userdata']['login_type'] ?? 1) != 1) return;
+	$script = str_replace('\\', '/', (string)($_SERVER['SCRIPT_FILENAME'] ?? ''));
+	$root = str_replace('\\', '/', rtrim(base_app, '/\\')) . '/admin/';
+	if (strpos($script, $root) !== 0 || isset($_GET['f'])) return;
+	$msg = \App\Support\Permissions::guardDirectView(substr($script, strlen($root)), $_settings, $_GET);
+	if ($msg !== null) {
+		http_response_code(403);
+		while (ob_get_level() > 0) { ob_end_clean(); }
+		die('<div class="alert alert-danger m-3"><i class="fas fa-ban mr-2"></i>' . htmlspecialchars($msg) . '</div>');
+	}
+})();
 ob_end_flush();
 ?>
