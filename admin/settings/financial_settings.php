@@ -24,7 +24,7 @@
                         <?php
                         $months = [
                             '12' => 'December (Standard Calendar Year)',
-                            '06' => 'June (Australian / Fiji Fiscal Year)',
+                            '06' => 'June (Australian Fiscal Year)',
                             '03' => 'March (UK / NZ Fiscal Year)',
                             '09' => 'September'
                         ];

@@ -238,7 +238,7 @@ if ($qry && $qry->num_rows > 0) {
                                 <img src="<?= !empty($tmpl['logo_path']) ? validate_image($tmpl['logo_path']) : validate_image($_settings->info('logo')) ?>" id="prev_logo_img" alt="Logo" style="max-height: 55px; width: auto; margin-right: 15px; object-fit: contain;">
                                 <div>
                                     <h5 class="font-weight-bold mb-0" id="prev_company_name"><?= htmlspecialchars($_settings->info('name') ?: 'Nuvis ERPX') ?></h5>
-                                    <small class="text-muted">Fiji Islands</small>
+                                    <small class="text-muted">Company address</small>
                                 </div>
                             </div>
                             <div class="text-right">

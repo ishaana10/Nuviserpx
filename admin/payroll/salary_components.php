@@ -6,14 +6,14 @@ $qry = $conn->query("SELECT * FROM `salary_components` WHERE tenant_id = '{$tena
 
 <div class="card card-outline card-primary shadow-sm rounded-0">
     <div class="card-header d-flex align-items-center justify-content-between">
-        <h3 class="card-title font-weight-bold"><i class="fas fa-sliders-h text-primary mr-2"></i> Fiji Salary Components & Payhead Builder</h3>
+        <h3 class="card-title font-weight-bold"><i class="fas fa-sliders-h text-primary mr-2"></i> Salary Components & Payhead Builder</h3>
         <div class="card-tools">
             <button type="button" class="btn btn-sm btn-primary btn-flat" onclick="add_component_modal()"><i class="fas fa-plus mr-1"></i> Add Salary Component</button>
         </div>
     </div>
     <div class="card-body">
         <div class="alert alert-info border-info text-sm mb-4">
-            <i class="fas fa-info-circle mr-2"></i> Configure custom earnings, allowances, and deductions. Set statutory flags for Fiji PAYE Tax and FNPF Provident Fund inclusion.
+            <i class="fas fa-info-circle mr-2"></i> Configure custom earnings, allowances, and deductions. Set statutory flags for PAYE Tax and FNPF Provident Fund inclusion.
         </div>
 
         <div class="table-responsive">
@@ -24,7 +24,7 @@ $qry = $conn->query("SELECT * FROM `salary_components` WHERE tenant_id = '{$tena
                         <th>Component Code</th>
                         <th>Component Name</th>
                         <th class="text-center">Category</th>
-                        <th class="text-center">Fiji PAYE Taxable</th>
+                        <th class="text-center">PAYE Taxable</th>
                         <th class="text-center">FNPF Subject</th>
                         <th class="text-right">Default Amount</th>
                         <th class="text-center" style="width: 12%;">Action</th>
@@ -118,7 +118,7 @@ $qry = $conn->query("SELECT * FROM `salary_components` WHERE tenant_id = '{$tena
                     <div class="form-group">
                         <div class="custom-control custom-checkbox mb-2">
                             <input type="checkbox" class="custom-control-input" name="is_taxable" id="comp_is_taxable" value="1" checked>
-                            <label class="custom-control-label font-weight-bold text-dark" for="comp_is_taxable">Subject to Fiji PAYE Tax</label>
+                            <label class="custom-control-label font-weight-bold text-dark" for="comp_is_taxable">Subject to PAYE Tax</label>
                         </div>
                         <div class="custom-control custom-checkbox">
                             <input type="checkbox" class="custom-control-input" name="is_fnpf_subject" id="comp_is_fnpf_subject" value="1" checked>

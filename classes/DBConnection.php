@@ -52,7 +52,7 @@ class DBConnection{
             if (!$check_tbl || $check_tbl->num_rows == 0) {
                 $this->auto_install_schema();
             } else {
-                $this->check_fiji_payroll_migrations();
+                $this->check_payroll_migrations();
                 $this->check_invoicing_migrations();
                 $this->check_stock_migrations();
                 $this->check_api_migrations();
@@ -70,7 +70,7 @@ class DBConnection{
                 $this->check_frappe_hrms_migrations();
                 $this->check_vms_v3_migrations();
                 $this->check_frcs_accreditation_migrations();
-                $this->check_fiji_2026_statutory_migrations();
+                $this->check_2026_statutory_migrations();
             }
 
             // Run versioned migrations
@@ -82,7 +82,7 @@ class DBConnection{
         
     }
 
-    public function check_fiji_2026_statutory_migrations(){
+    public function check_2026_statutory_migrations(){
         if (!$this->conn) return;
 
         // Employee List Statutory Columns
@@ -156,7 +156,7 @@ class DBConnection{
         @$this->conn->query($sql_lines);
     }
 
-    public function check_fiji_payroll_migrations(){
+    public function check_payroll_migrations(){
         if (!$this->conn) return;
 
         // Check employee_list columns

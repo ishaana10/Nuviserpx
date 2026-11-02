@@ -33,7 +33,7 @@ class FrcsVsdcModule
             return [
                 'success' => true,
                 'subject' => $parsedCert['subject']['CN'] ?? 'FRCS SDC Certificate',
-                'issuer' => $parsedCert['issuer']['O'] ?? 'Fiji Revenue & Customs Service',
+                'issuer' => $parsedCert['issuer']['O'] ?? 'Revenue & Customs Service',
                 'valid_from' => date('Y-m-d H:i:s', $parsedCert['validFrom_time_t'] ?? time()),
                 'valid_to' => date('Y-m-d H:i:s', $parsedCert['validTo_time_t'] ?? time()),
                 'serial_number' => $parsedCert['serialNumber'] ?? 'N/A'
@@ -42,8 +42,8 @@ class FrcsVsdcModule
 
         return [
             'success' => true,
-            'subject' => 'FRCS Fiji SDC Smartcard Cert (Simulation)',
-            'issuer' => 'Fiji Revenue & Customs Service',
+            'subject' => 'FRCS SDC Smartcard Cert (Simulation)',
+            'issuer' => 'Revenue & Customs Service',
             'valid_from' => date('Y-01-01 00:00:00'),
             'valid_to' => date('Y-12-31 23:59:59'),
             'serial_number' => 'FRCS-FJ-SDC-889922'
@@ -88,7 +88,7 @@ class FrcsVsdcModule
         return [
             'accreditation_status' => 'ACCREDITED_COMPLIANT',
             'overall_result' => 'ALL_TESTS_PASSED',
-            'fiji_frcs_vms_spec' => 'v3.0.12',
+            'frcs_vms_spec' => 'v3.0.12',
             'tests' => $tests
         ];
     }

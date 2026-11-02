@@ -1444,6 +1444,11 @@ class Master extends DBConnection
         return $this->container->make(PayrollService::class)->deletePayroll(intval($_POST['id'] ?? 0));
     }
 
+    public function save_batch_payroll()
+    {
+        return $this->container->make(PayrollService::class)->savePayrollBatch($_POST);
+    }
+
     public function email_payslip()
     {
         $scope = $this->settings->employee_scope('payroll');
@@ -1950,6 +1955,9 @@ switch ($action) {
         break;
     case 'email_payment_receipt':
         echo $Master->email_payment_receipt();
+        break;
+    case 'save_batch_payroll':
+        echo $Master->save_batch_payroll();
         break;
     case 'email_payslip':
         echo $Master->email_payslip();

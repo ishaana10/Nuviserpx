@@ -103,6 +103,6 @@ class ModuleManager {
 ModuleManager::register_module('accounting', 'Financial Accounting', 'General Ledger, Balance Sheet, P&L, AR Aging');
 ModuleManager::register_module('invoicing', 'Invoicing & Sales', 'Tax Invoices, Customer Payments, Customer Profiles');
 ModuleManager::register_module('inventory', 'Commercial Stock & Sales', 'Product Catalog, Stock Movements, Mobile Orders & Proforma');
-ModuleManager::register_module('payroll', 'Fiji Payroll & HR', 'PAYE Tax, FNPF, Batch Processing, Payslips, Compliance Exporters');
+ModuleManager::register_module('payroll', 'Payroll & HR', 'PAYE Tax, FNPF, Batch Processing, Payslips, Compliance Exporters');
 ModuleManager::register_module('emailer', 'Email Notifications', 'SMTP & Mail Delivery Engine for Invoices, Receipts, and OTPs');
 ModuleManager::register_module('integrations', 'Integrations & Automation', 'Webhooks, REST API, and the customisable Workflow engine');

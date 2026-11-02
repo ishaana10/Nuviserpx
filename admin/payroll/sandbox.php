@@ -1,13 +1,13 @@
 <div class="card card-outline card-primary shadow-sm rounded-0">
     <div class="card-header d-flex align-items-center justify-content-between">
-        <h3 class="card-title font-weight-bold"><i class="fas fa-calculator text-primary mr-2"></i> Interactive Fiji PAYE & FNPF Verification Sandbox</h3>
+        <h3 class="card-title font-weight-bold"><i class="fas fa-calculator text-primary mr-2"></i> Interactive PAYE & FNPF Verification Sandbox</h3>
         <div class="card-tools">
             <button type="button" class="btn btn-sm btn-outline-secondary btn-flat" onclick="reset_sandbox()"><i class="fas fa-undo mr-1"></i> Reset Calculator</button>
         </div>
     </div>
     <div class="card-body">
         <div class="alert alert-info border-info text-sm mb-4">
-            <i class="fas fa-flask mr-2"></i> Verification Sandbox for testing Nuvis ERPX Fiji payroll calculations against Income Tax Act 2015 Regulation 6 Cumulative PAYE rules and FNPF 2026–2027 rates.
+            <i class="fas fa-flask mr-2"></i> Verification Sandbox for testing Nuvis ERPX payroll calculations against Income Tax Act 2015 Regulation 6 Cumulative PAYE rules and FNPF 2026–2027 rates.
         </div>
 
         <div class="row">

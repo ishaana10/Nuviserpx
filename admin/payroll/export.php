@@ -1,6 +1,6 @@
 <?php
 require_once(__DIR__ . '/../../config.php');
-require_once(base_app . 'classes/FijiPayroll.php');
+require_once(base_app . 'classes/PayrollEngine.php');
 
 if(!$_settings->userdata('id')){
     die("Access Denied: Authentication required.");
@@ -47,13 +47,13 @@ $employerFnpfRef = $_settings->info('employer_fnpf_ref') ?: 'FNPF-0000';
 $runRef = !empty($ref) ? $ref : (!empty($month) ? str_replace(' ', '_', $month) : date('Ymd'));
 
 if ($type === 'frcs') {
-    $csv = FijiPayroll::generate_frcs_tpos_export($rows, $employerTin, $runRef);
+    $csv = PayrollEngine::generate_frcs_tpos_export($rows, $employerTin, $runRef);
     $filename = "FRCS_TPOS_PAYE_{$runRef}_" . date('Ymd_His') . ".csv";
 } elseif ($type === 'fnpf') {
-    $csv = FijiPayroll::generate_fnpf_schedule_export($rows, $employerFnpfRef, $runRef);
+    $csv = PayrollEngine::generate_fnpf_schedule_export($rows, $employerFnpfRef, $runRef);
     $filename = "FNPF_Schedule_{$runRef}_" . date('Ymd_His') . ".csv";
 } else {
-    $csv = FijiPayroll::generate_bank_export($rows, $type, $runRef);
+    $csv = PayrollEngine::generate_bank_export($rows, $type, $runRef);
     $filename = strtoupper($type) . "_Bank_Salary_{$runRef}_" . date('Ymd_His') . ".csv";
 }
 

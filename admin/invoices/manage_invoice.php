@@ -184,7 +184,7 @@ while($ac = $accounts_qry->fetch_assoc()){
                 <div class="col-md-3 form-group mb-md-0">
                     <label for="currency" class="form-label-custom">Currency</label>
                     <select name="currency" id="currency" class="form-control form-control-modern">
-                        <option value="FJD" selected>Fijian Dollar (FJD)</option>
+                        <option value="FJD" selected>Dollar (FJD)</option>
                         <option value="USD">US Dollar (USD $)</option>
                         <option value="AUD">Australian Dollar (AUD $)</option>
                         <option value="NZD">NZ Dollar (NZD $)</option>

@@ -42,7 +42,7 @@ CREATE TABLE `tenants` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 INSERT INTO `tenants` (`id`, `tenant_code`, `name`, `email`, `phone`, `address`, `status`) VALUES
-(1, 'TNT-001', 'Default Enterprise Tenant', 'info@nuvistechnologies.com.fj', '+679 123 4567', 'Suva, Fiji', 1);
+(1, 'TNT-001', 'Default Enterprise Tenant', 'info@nuvistechnologies.com.fj', '+679 123 4567', 'Suva', 1);
 
 -- --------------------------------------------------------
 

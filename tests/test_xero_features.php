@@ -51,7 +51,7 @@ if ($res['status'] === 'success') {
 // 2. Test Add Bank Account
 echo "\n[2] Testing Bank Account Creation...\n";
 $_POST = [
-    'bank_name' => 'ANZ Fiji',
+    'bank_name' => 'ANZ',
     'account_name' => 'Test Operating Account',
     'account_type' => 'Checking',
     'account_number' => '12345678',

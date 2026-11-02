@@ -201,7 +201,7 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
 			<div class="col-md-4 form-group">
 				<label for="is_resident" class="control-label">Residency Status</label>
 				<select name="is_resident" id="is_resident" class="form-control form-control-sm rounded-0 calc-trigger">
-					<option value="1" <?php echo !isset($is_resident) || $is_resident == 1 ? 'selected' : '' ?>>Resident (Fiji Progressive Tax)</option>
+					<option value="1" <?php echo !isset($is_resident) || $is_resident == 1 ? 'selected' : '' ?>>Resident (Progressive Tax)</option>
 					<option value="0" <?php echo isset($is_resident) && $is_resident == 0 ? 'selected' : '' ?>>Non-Resident (20% Flat)</option>
 				</select>
 			</div>
@@ -212,7 +212,7 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
 		</div>
 
 		<div class="card bg-light border p-3 mt-2">
-			<h6 class="font-weight-bold text-navy mb-2"><i class="fas fa-calculator"></i> Real-time Fiji Payroll Calculation Summary</h6>
+			<h6 class="font-weight-bold text-navy mb-2"><i class="fas fa-calculator"></i> Real-time Payroll Calculation Summary</h6>
 			<div class="row text-center">
 				<div class="col-md-2">
 					<small class="text-muted d-block">Gross Earnings</small>
@@ -246,7 +246,7 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
 </div>
 
 <script>
-	function calculate_fiji_live(){
+	function calculate_payroll_live(){
 		if($('#payroll-form').length == 0) return;
 
 		var basic = parseFloat($('#basic_salary').val()) || 0;
@@ -312,14 +312,14 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
 			if(res !== undefined){
 				$('#is_resident').val(res);
 			}
-			calculate_fiji_live();
+			calculate_payroll_live();
 		});
 
 		$('.calc-trigger').on('input change', function(){
-			calculate_fiji_live();
+			calculate_payroll_live();
 		});
 
-		calculate_fiji_live();
+		calculate_payroll_live();
 
 		$('#payroll-form').submit(function(e){
 			e.preventDefault();

@@ -44,7 +44,7 @@ $sections = [
         ['reports/payroll_accounting', 'Payroll Accounting', 'fas fa-file-invoice-dollar', 'Gross pay, PAYE, SRT, FNPF and net pay for a month, with employer costs.'],
         ['payroll/fnpf_schedule', 'FNPF Schedule (CS3)', 'fas fa-file-contract', 'Monthly FNPF contribution schedule per employee.'],
         ['payroll/tax_rebate_report', '150% Tax Rebate', 'fas fa-percentage', 'FRCS employment tax rebate summary.'],
-        ['payroll/fiji_ems_export', 'FRCS EMS Export', 'fas fa-file-export', 'Employer monthly schedule export for FRCS.'],
+        ['payroll/ems_export', 'FRCS EMS Export', 'fas fa-file-export', 'Employer monthly schedule export for FRCS.'],
     ]],
     ['Activity', 'fas fa-history', null, [
         ['settings/audit_logs', 'Audit Log', 'fas fa-history', 'Who changed what, and when.'],

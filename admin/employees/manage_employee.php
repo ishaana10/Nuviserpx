@@ -39,7 +39,7 @@ if(isset($_GET['id']) && $_GET['id'] > 0){
 		</div>
 
 		<hr class="my-3">
-		<h6 class="text-navy font-weight-bold"><i class="fas fa-file-invoice"></i> Fiji Tax & FNPF Information</h6>
+		<h6 class="text-navy font-weight-bold"><i class="fas fa-file-invoice"></i> Tax & FNPF Information</h6>
 
 		<div class="row">
 			<div class="col-md-6 form-group">
@@ -77,9 +77,9 @@ if(isset($_GET['id']) && $_GET['id'] > 0){
 				<label for="bank_code" class="control-label">Bank</label>
 				<select name="bank_code" id="bank_code" class="form-control form-control-sm rounded-0" required>
 					<option value="bsp" <?php echo !isset($bank_code) || $bank_code == 'bsp' ? 'selected' : '' ?>>Bank of South Pacific (BSP)</option>
-					<option value="anz" <?php echo isset($bank_code) && $bank_code == 'anz' ? 'selected' : '' ?>>ANZ Fiji</option>
-					<option value="hfc" <?php echo isset($bank_code) && $bank_code == 'hfc' ? 'selected' : '' ?>>HFC Bank (Fiji)</option>
-					<option value="bred" <?php echo isset($bank_code) && $bank_code == 'bred' ? 'selected' : '' ?>>BRED Bank (Fiji)</option>
+					<option value="anz" <?php echo isset($bank_code) && $bank_code == 'anz' ? 'selected' : '' ?>>ANZ</option>
+					<option value="hfc" <?php echo isset($bank_code) && $bank_code == 'hfc' ? 'selected' : '' ?>>HFC Bank</option>
+					<option value="bred" <?php echo isset($bank_code) && $bank_code == 'bred' ? 'selected' : '' ?>>BRED Bank</option>
 					<option value="generic" <?php echo isset($bank_code) && $bank_code == 'generic' ? 'selected' : '' ?>>Generic / Other Bank</option>
 				</select>
 			</div>

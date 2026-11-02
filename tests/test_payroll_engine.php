@@ -1,8 +1,8 @@
 <?php
 define('base_app', dirname(__DIR__) . '/');
-require_once(base_app . 'classes/FijiPayroll.php');
+require_once(base_app . 'classes/PayrollEngine.php');
 
-echo "=== TEST 1: Standard Monthly Fiji Resident Payroll Calculation ===\n";
+echo "=== TEST 1: Standard Monthly Resident Payroll Calculation ===\n";
 $input = [
     'basic_salary' => 3000,
     'overtime' => 200,
@@ -12,7 +12,7 @@ $input = [
     'pay_frequency' => 'Monthly',
     'is_resident' => true
 ];
-$res = FijiPayroll::calculate($input);
+$res = PayrollEngine::calculate($input);
 
 assert($res['gross_salary'] == 3350, "Gross salary calculation");
 assert($res['employee_fnpf'] == round(3350 * 0.08, 2), "Employee FNPF 8%");
@@ -21,11 +21,11 @@ assert($res['taxable_income'] == (3350 - 268), "Taxable Income calculation");
 
 echo "=== TEST 2: High Earner Annual Tax Breakdown (Basic + SRT) ===\n";
 $taxableHigh = 25000; // Monthly 25k = 300k annual
-$payeHigh = FijiPayroll::calculate_paye($taxableHigh, 'Monthly', true);
+$payeHigh = PayrollEngine::calculate_paye($taxableHigh, 'Monthly', true);
 assert($payeHigh['srt'] > 0, "SRT should be > 0 for high earner above FJD 270k");
 
 echo "=== TEST 3: Non-Resident 20% Flat Tax Calculation ===\n";
-$payeNonRes = FijiPayroll::calculate_paye(2000, 'Monthly', false);
+$payeNonRes = PayrollEngine::calculate_paye(2000, 'Monthly', false);
 assert($payeNonRes['paye'] == 400.00, "Non-Resident 20% tax");
 
 echo "=== TEST 4: Bank Exports (BSP, ANZ, HFC, BRED, Generic) ===\n";
@@ -50,10 +50,10 @@ $testRows = [
     ]
 ];
 
-$bspCsv = FijiPayroll::generate_bank_export($testRows, 'bsp', 'RUN-202409-001');
+$bspCsv = PayrollEngine::generate_bank_export($testRows, 'bsp', 'RUN-202409-001');
 echo "BSP Export Sample:\n" . substr($bspCsv, 0, 200) . "...\n";
 
-$anzCsv = FijiPayroll::generate_bank_export($testRows, 'anz', 'RUN-202409-001');
+$anzCsv = PayrollEngine::generate_bank_export($testRows, 'anz', 'RUN-202409-001');
 echo "ANZ Export Sample:\n" . substr($anzCsv, 0, 200) . "...\n";
 
 echo "=== TEST 5: FRCS TPOS & FNPF Schedule Exports ===\n";
@@ -78,11 +78,11 @@ $frcsRows = [
     ]
 ];
 
-$frcsCsv = FijiPayroll::generate_frcs_tpos_export($frcsRows, '00-11111-2', 'RUN-202409-001');
+$frcsCsv = PayrollEngine::generate_frcs_tpos_export($frcsRows, '00-11111-2', 'RUN-202409-001');
 echo "FRCS TPOS Sample:\n" . substr($frcsCsv, 0, 250) . "...\n";
 
-$fnpfCsv = FijiPayroll::generate_fnpf_schedule_export($frcsRows, 'FNPF-REF-100', 'RUN-202409-001');
+$fnpfCsv = PayrollEngine::generate_fnpf_schedule_export($frcsRows, 'FNPF-REF-100', 'RUN-202409-001');
 echo "FNPF Schedule Sample:\n" . substr($fnpfCsv, 0, 250) . "...\n";
 
-echo "\nALL FIJI PAYROLL UNIT TESTS PASSED SUCCESSFULLY!\n";
+echo "\nALL PAYROLL UNIT TESTS PASSED SUCCESSFULLY!\n";
 ?>
