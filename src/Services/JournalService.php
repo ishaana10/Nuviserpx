@@ -42,6 +42,13 @@ class JournalService
         }
 
         $lines = $this->collectLines($post);
+        if (array_filter($lines, fn ($l) => trim((string)($l['currency'] ?? '')) !== '')) {
+            $fx = new FxService($this->conn, $this->settings);
+            [$lines, $fxErrors] = FxService::convertLines($lines, $fx->baseCurrency(), fn ($c) => $fx->rateOn($c, $date));
+            if ($fxErrors) {
+                return $this->fail(implode(' ', $fxErrors), $fxErrors);
+            }
+        }
         $ledger = new LedgerService($this->conn, $tenant_id);
         $errors = LedgerService::validateLines($lines, $ledger->accountIds(), $status === 'posted');
         if ($errors) {
@@ -62,6 +69,14 @@ class JournalService
             }
             if ($reason = self::lockedByStatus($existing['status'] ?? '')) {
                 return $this->fail($reason);
+            }
+            // The edit form has no currency column; saving would silently turn foreign lines into base amounts.
+            $fcq = $this->conn->prepare("SELECT COUNT(*) n FROM journal_items WHERE journal_id = ? AND currency IS NOT NULL AND currency <> ''");
+            $fcq->bind_param('i', $id);
+            $fcq->execute();
+            $hasFc = (int)($fcq->get_result()->fetch_assoc()['n'] ?? 0) > 0;
+            if ($hasFc && !array_filter((array)($post['currency'] ?? []), fn ($c) => trim((string)$c) !== '')) {
+                return $this->fail('This journal has foreign-currency lines, which this form cannot edit. Reverse it and post a corrected journal.');
             }
         }
         if ($msg = PeriodLockService::guard($this->conn, $tenant_id, $date, $id ?: null)) {
@@ -105,7 +120,7 @@ class JournalService
                 $del->execute();
             }
 
-            $ins = $this->conn->prepare("INSERT INTO journal_items (journal_id, account_id, group_id, entry_side, amount, description, tax_rate) VALUES (?, ?, ?, ?, ?, ?, ?)");
+            $ins = $this->conn->prepare("INSERT INTO journal_items (journal_id, account_id, group_id, entry_side, amount, description, tax_rate, currency, fx_rate, amount_fc) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
             foreach ($lines as $l) {
                 $dr = round((float)$l['debit'], 2);
                 $cr = round((float)$l['credit'], 2);
@@ -119,7 +134,10 @@ class JournalService
                 $acc = (int)$l['account_id'];
                 $desc = mb_substr((string)$l['description'], 0, 500);
                 $tax = mb_substr((string)$l['tax_rate'], 0, 100) ?: 'No Tax (0%)';
-                $ins->bind_param('iiissss', $id, $acc, $side, $entrySide, $amount, $desc, $tax);
+                $cur = !empty($l['currency']) ? (string)$l['currency'] : null;
+                $fxRate = $cur !== null ? number_format((float)$l['fx_rate'], 8, '.', '') : null;
+                $fc = $cur !== null ? number_format((float)$l['amount_fc'], 4, '.', '') : null;
+                $ins->bind_param('iiisssssss', $id, $acc, $side, $entrySide, $amount, $desc, $tax, $cur, $fxRate, $fc);
                 if (!$ins->execute()) {
                     throw new \RuntimeException($this->conn->error);
                 }
@@ -197,6 +215,57 @@ class JournalService
             'debit' => $dr,
             'credit' => $cr,
         ]);
+    }
+
+    /**
+     * Post a foreign-currency revaluation journal. Lines arrive already in base currency, tagged with the
+     * currency they restate (amount_fc 0), so only FxService calls this; it is not reachable from a request.
+     */
+    public function postRevaluation(string $date, string $description, array $lines): string
+    {
+        $tenant_id = (int)$this->settings->active_tenant_id();
+        $errors = LedgerService::validateLines($lines, (new LedgerService($this->conn, $tenant_id))->accountIds(), true);
+        if ($errors) {
+            return $this->fail(implode(' ', $errors), $errors);
+        }
+        if ($msg = PeriodLockService::guard($this->conn, $tenant_id, $date)) {
+            return $this->fail($msg);
+        }
+        $userId = (int)$this->settings->userdata('id');
+        $this->conn->begin_transaction();
+        try {
+            $code = $this->nextCode($tenant_id);
+            $h = $this->conn->prepare("INSERT INTO journal_entries (tenant_id, code, journal_date, description, tax_mode, status, user_id) VALUES (?, ?, ?, ?, 'No Tax', 'posted', ?)");
+            $h->bind_param('isssi', $tenant_id, $code, $date, $description, $userId);
+            if (!$h->execute()) {
+                throw new \RuntimeException($this->conn->error);
+            }
+            $id = (int)$this->conn->insert_id;
+            $ins = $this->conn->prepare("INSERT INTO journal_items (journal_id, account_id, group_id, entry_side, amount, description, currency, fx_rate, amount_fc) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            foreach ($lines as $l) {
+                $dr = round((float)$l['debit'], 2);
+                $side = $dr > 0 ? 1 : 2;
+                $entry = $dr > 0 ? 'debit' : 'credit';
+                $amount = number_format($dr > 0 ? $dr : round((float)$l['credit'], 2), 4, '.', '');
+                $acc = (int)$l['account_id'];
+                $desc = mb_substr((string)$l['description'], 0, 500);
+                $cur = !empty($l['currency']) ? (string)$l['currency'] : null;
+                $rate = $cur !== null ? number_format((float)$l['fx_rate'], 8, '.', '') : null;
+                $fc = $cur !== null ? '0.0000' : null;
+                $ins->bind_param('iiissssss', $id, $acc, $side, $entry, $amount, $desc, $cur, $rate, $fc);
+                if (!$ins->execute()) {
+                    throw new \RuntimeException($this->conn->error);
+                }
+            }
+            $this->conn->commit();
+        } catch (\Throwable $e) {
+            $this->conn->rollback();
+            return $this->fail('The revaluation could not be posted. Nothing was changed.');
+        }
+        $this->settings->log_audit('Posted FX revaluation', 'Journals', "{$code} dated {$date}. Lines: " . self::describeLines($lines) . '.');
+        $msg = "Revaluation posted as journal {$code}.";
+        $this->settings->set_flashdata('success', $msg);
+        return json_encode(['status' => 'success', 'msg' => $msg, 'id' => $id, 'code' => $code]);
     }
 
     private function openingEquityAccountId(int $tenant_id): int
@@ -283,7 +352,7 @@ class JournalService
         }
 
         $side = LedgerService::SIDE_SQL;
-        $q = $this->conn->prepare("SELECT ji.account_id, ji.amount, ji.description, ji.tax_rate, {$side} side
+        $q = $this->conn->prepare("SELECT ji.account_id, ji.amount, ji.description, ji.tax_rate, ji.currency, ji.fx_rate, ji.amount_fc, {$side} side
             FROM journal_items ji LEFT JOIN group_list g ON g.id = ji.group_id WHERE ji.journal_id = ?");
         $q->bind_param('i', $id);
         $q->execute();
@@ -305,7 +374,7 @@ class JournalService
                 throw new \RuntimeException($this->conn->error);
             }
             $newId = (int)$this->conn->insert_id;
-            $ins = $this->conn->prepare("INSERT INTO journal_items (journal_id, account_id, group_id, entry_side, amount, description, tax_rate) VALUES (?, ?, ?, ?, ?, ?, ?)");
+            $ins = $this->conn->prepare("INSERT INTO journal_items (journal_id, account_id, group_id, entry_side, amount, description, tax_rate, currency, fx_rate, amount_fc) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
             foreach ($lines as $l) {
                 $groupId = (int)$l['side'];
                 $entrySide = $groupId === 1 ? 'debit' : 'credit';
@@ -313,7 +382,10 @@ class JournalService
                 $acc = (int)$l['account_id'];
                 $desc = (string)($l['description'] ?? '');
                 $tax = (string)($l['tax_rate'] ?? 'No Tax (0%)');
-                $ins->bind_param('iiissss', $newId, $acc, $groupId, $entrySide, $amount, $desc, $tax);
+                $cur = !empty($l['currency']) ? (string)$l['currency'] : null;
+                $fxRate = $cur !== null ? (string)$l['fx_rate'] : null;
+                $fc = $cur !== null ? (string)$l['amount_fc'] : null;
+                $ins->bind_param('iiisssssss', $newId, $acc, $groupId, $entrySide, $amount, $desc, $tax, $cur, $fxRate, $fc);
                 if (!$ins->execute()) {
                     throw new \RuntimeException($this->conn->error);
                 }
@@ -473,6 +545,8 @@ class JournalService
                 'credit' => $cr,
                 'description' => (string)($post['line_description'][$k] ?? ''),
                 'tax_rate' => (string)($post['tax_rate'][$k] ?? 'No Tax (0%)'),
+                'currency' => (string)($post['currency'][$k] ?? ''),
+                'fx_rate' => (string)($post['fx_rate'][$k] ?? ''),
             ];
         }
         return $lines;

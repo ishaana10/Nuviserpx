@@ -581,6 +581,12 @@ if($t_qry && $t_qry->num_rows > 0){
                                         </a>
                                     </li>
                                     <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=settings/exchange_rates" class="nav-link nav-settings_exchange_rates tree-item">
+                                            <i class="nav-icon fas fa-exchange-alt"></i>
+                                            <p>Exchange Rates & Revaluation</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=settings/vms_settings" class="nav-link nav-settings_vms_settings tree-item">
                                             <i class="nav-icon fas fa-microchip"></i>
                                             <p>FRCS VMS v3.0 Config</p>
