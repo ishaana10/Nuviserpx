@@ -40,6 +40,7 @@
                    . 'You don\'t have permission to access this page. Contact your administrator if you believe this is a mistake.'
                    . '</div>';
               } elseif(file_exists($view_file)){
+                echo \App\Support\Permissions::hideControlsCss($page, $_settings);
                 include $view_file;
               } else {
                 include '404.html';

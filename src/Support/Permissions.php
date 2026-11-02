@@ -333,20 +333,7 @@ final class Permissions
             }
         }
 
-        $granted = array_values(array_unique($granted));
-
-        // Legacy roles (saved before per-page grants existed) keep working:
-        // a module's view grant implies its sub-pages until the role is
-        // re-saved from the editor, which stamps the PAGES_SCOPED marker.
-        if (!in_array(self::PAGES_SCOPED, $granted, true)) {
-            foreach (self::navPages() as $def) {
-                $implied = $def['parent'] ?? 'settings_manage';
-                if (in_array($implied, $granted, true)) {
-                    $granted[] = $def['key'];
-                }
-            }
-        }
-        return $granted;
+        return array_values(array_unique($granted));
     }
 
     /* ===================================================================
@@ -642,5 +629,76 @@ final class Permissions
     {
         $list = is_array($list) ? $list : explode(',', (string)$list);
         return array_values(array_intersect(array_keys(self::TENANT_MODULES), array_map('trim', $list)));
+    }
+
+    /**
+     * Permission module (e.g. "payroll") a page belongs to, or null.
+     */
+    public static function moduleOfPage(string $page): ?string
+    {
+        $page = trim($page, '/');
+        $nav = self::navPages();
+        $perm = isset($nav[$page]) ? ($nav[$page]['parent'] ?? null) : self::forPage($page);
+        if (!is_string($perm) || $perm === self::SUPER_ONLY) {
+            return null;
+        }
+        return preg_replace('/_(view|create|edit|delete|manage)$/', '', $perm);
+    }
+
+    /**
+     * Central guard for admin view files hit directly (modal forms, exports):
+     * resolves the permission from the script path exactly as the router does,
+     * "manage_*" forms needing create (new) or edit (existing record).
+     * Returns null when allowed, otherwise a human message.
+     *
+     * @param object $settings SystemSettings
+     */
+    public static function guardDirectView(string $relPath, $settings, array $query): ?string
+    {
+        $page = preg_replace('/\.php$/', '', trim($relPath, '/'));
+        $page = preg_replace('/\/index$/', '', $page);
+        if ($page === '' || $page === 'index' || $page === 'login' || strpos($page, 'inc/') === 0 || $page === 'inc') {
+            return null;
+        }
+        if ($settings->is_super_admin()) {
+            return null;
+        }
+        $perm = self::forPage($page);
+        if ($perm === false || $perm === null) {
+            return null; // unlisted / explicitly open
+        }
+        if ($perm === self::SUPER_ONLY) {
+            return 'Only the developer can open this.';
+        }
+        if (preg_match('/(^|\/)(manage_|new_|add_)/', $page) && preg_match('/_view$/', $perm)) {
+            $perm = preg_replace('/_view$/', !empty($query['id']) ? '_edit' : '_create', $perm);
+        }
+        return $settings->can_access($perm) ? null : "You don't have permission to access this.";
+    }
+
+    /**
+     * CSS that hides create/edit/delete controls the user may not use on a
+     * module page. Presentation only — the server rejects the action anyway.
+     */
+    public static function hideControlsCss(string $page, $settings): string
+    {
+        if ($settings->is_super_admin()) {
+            return '';
+        }
+        $mod = self::moduleOfPage($page);
+        if ($mod === null || !isset(self::modules()[$mod])) {
+            return '';
+        }
+        $css = '';
+        if (!$settings->can_access("{$mod}_create")) {
+            $css .= '#create_new,#create_single,#process_batch,.create_data,a[href*="manage_"]:not([href*="id="]):not(.dropdown-item){display:none!important}';
+        }
+        if (!$settings->can_access("{$mod}_edit")) {
+            $css .= '.edit_data,a[href*="manage_"][href*="id="]{display:none!important}';
+        }
+        if (!$settings->can_access("{$mod}_delete")) {
+            $css .= '.delete_data{display:none!important}';
+        }
+        return $css === '' ? '' : '<style>' . $css . '</style>';
     }
 }
