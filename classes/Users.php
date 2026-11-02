@@ -138,8 +138,13 @@ Class Users extends DBConnection {
 		}
 
 		if($is_new){
-			// New accounts are always scoped to the resolved tenant.
-			$data .= " , `tenant_id` = '{$target_tenant}' ";
+			// New accounts are always scoped to the resolved tenant. For an
+			// administrator the allowed-fields loop above already wrote
+			// tenant_id, so only add it here when it is missing — writing the
+			// same column twice in an INSERT ... SET is a fatal SQL error.
+			if(strpos($data, '`tenant_id`') === false){
+				$data .= " , `tenant_id` = '{$target_tenant}' ";
+			}
 			$qry = $this->conn->query("INSERT INTO users SET {$data}");
 			if($qry){
 				$id = (int)$this->conn->insert_id;
