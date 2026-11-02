@@ -248,7 +248,7 @@ class SystemSettings extends DBConnection{
 			}
 		}
 
-		return ['name' => 'Standard Staff', 'permissions' => ['invoices_view', 'payments_view', 'products_view', 'sales_orders_view', 'payroll_view', 'leaves_view', 'leaves_create', 'attendance_view']];
+		return ['name' => 'Standard Staff', 'permissions' => ['invoices_view', 'payments_view', 'products_view', 'sales_orders_view', 'employees_view', 'payroll_view', 'leaves_view', 'leaves_create', 'attendance_view']];
 	}
 
 	/**

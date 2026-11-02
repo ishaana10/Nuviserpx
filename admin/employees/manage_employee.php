@@ -1,14 +1,39 @@
 <?php
 require_once(__DIR__ . '/../../config.php');
+
+$can_create = $_settings->can_access('employees_create');
+$can_edit   = $_settings->can_access('employees_edit');
+$scope      = $_settings->employee_scope('employees');
+
 if(isset($_GET['id']) && $_GET['id'] > 0){
     $id_clean = intval($_GET['id']);
-    $qry = $conn->query("SELECT * from `employee_list` where id = '{$id_clean}' ");
-    if($qry->num_rows > 0){
+    $tenant_id = $_settings->active_tenant_id();
+    // Standard users may only view/edit their own employee record
+    $where = "id = '{$id_clean}' AND tenant_id = '{$tenant_id}' AND delete_flag = 0";
+    if ($scope !== null) {
+        $scope_id = intval($scope);
+        $where .= " AND id = '{$scope_id}'";
+    }
+    $qry = $conn->query("SELECT * from `employee_list` where {$where}");
+    if($qry && $qry->num_rows > 0){
         foreach($qry->fetch_assoc() as $k => $v){
             $$k=$v;
         }
+    } else {
+        echo '<div class="alert alert-danger m-3"><i class="fas fa-ban mr-2"></i>You do not have permission to view this employee record.</div>';
+        return;
+    }
+} else {
+    // Creating a new employee requires employees_create
+    if(!$can_create){
+        echo '<div class="alert alert-danger m-3"><i class="fas fa-ban mr-2"></i>You do not have permission to add employees.</div>';
+        return;
     }
 }
+
+// Read-only mode for standard users viewing their own record without edit permission
+$readonly = isset($id) && !$can_edit && $scope !== null;
+?>
 ?>
 <div class="container-fluid">
 	<form action="" id="employee-form">
@@ -115,6 +140,14 @@ if(isset($_GET['id']) && $_GET['id'] > 0){
 		</div>
 	</form>
 </div>
+<?php if($readonly): ?>
+<script>
+	// Read-only mode: disable all form fields for standard users viewing their own record
+	$(document).ready(function(){
+		$('#employee-form :input').prop('disabled', true);
+	});
+</script>
+<?php else: ?>
 <script>
 	$(document).ready(function(){
 		$('#employee-form').submit(function(e){
@@ -154,4 +187,5 @@ if(isset($_GET['id']) && $_GET['id'] > 0){
 			})
 		})
 	})
+<?php endif; ?>
 </script>
