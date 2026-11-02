@@ -13,7 +13,7 @@ $own_only = $_settings->userdata('type') != 1;
 $uid = (int)$_settings->userdata('id');
 $side = LedgerService::SIDE_SQL;
 
-$sql = "SELECT j.id, j.code, j.journal_date, j.description, j.status, j.user_id,
+$sql = "SELECT j.id, j.code, j.journal_date, j.description, j.status, j.user_id, j.reverses_id,
                MAX(CONCAT(u.firstname, ' ', u.lastname)) author,
                COUNT(ji.id) line_count,
                COALESCE(SUM(CASE WHEN {$side} = 1 THEN ji.amount END), 0) debit,
@@ -130,15 +130,16 @@ $qs = fn (array $over) => './?' . http_build_query(array_merge(['page' => 'journ
                         <button type="button" class="btn btn-default btn-sm dropdown-toggle dropdown-icon" data-toggle="dropdown">Action</button>
                         <div class="dropdown-menu" role="menu">
                             <a class="dropdown-item view_data" href="javascript:void(0)" data-id="<?= (int)$r['id'] ?>" data-code="<?= htmlspecialchars($r['code']) ?>"><span class="fa fa-eye text-info"></span> View</a>
-                            <?php if ($st !== 'cancelled' && !$src): ?>
+                            <?php /* Only drafts can change. A posted journal is corrected by reversing it. */ ?>
+                            <?php if ($st === 'draft' && !$src): ?>
                             <a class="dropdown-item" href="./?page=journals/manage_journal&id=<?= (int)$r['id'] ?>"><span class="fa fa-edit text-primary"></span> Edit</a>
                             <a class="dropdown-item cancel_data" href="javascript:void(0)" data-id="<?= (int)$r['id'] ?>"><span class="fa fa-ban text-warning"></span> Cancel</a>
                             <?php endif; ?>
                             <a class="dropdown-item" href="./?page=journals/manage_journal&copy=<?= (int)$r['id'] ?>"><span class="far fa-clone text-secondary"></span> Copy</a>
-                            <?php if ($st === 'posted' && !$src): ?>
-                            <a class="dropdown-item" href="./?page=journals/manage_journal&reverse=<?= (int)$r['id'] ?>"><span class="fas fa-exchange-alt text-secondary"></span> Reverse</a>
+                            <?php if ($st === 'posted' && !$src && empty($r['reverses_id'])): ?>
+                            <a class="dropdown-item reverse_data" href="javascript:void(0)" data-id="<?= (int)$r['id'] ?>" data-code="<?= htmlspecialchars($r['code']) ?>"><span class="fas fa-exchange-alt text-secondary"></span> Reverse</a>
                             <?php endif; ?>
-                            <?php if (!$src): ?>
+                            <?php if ($st === 'draft' && !$src): ?>
                             <div class="dropdown-divider"></div>
                             <a class="dropdown-item delete_data" href="javascript:void(0)" data-id="<?= (int)$r['id'] ?>" data-code="<?= htmlspecialchars($r['code']) ?>"><span class="fa fa-trash text-danger"></span> Delete</a>
                             <?php endif; ?>
@@ -156,10 +157,13 @@ $(function () {
         uni_modal('<i class="fas fa-book"></i> Journal ' + $('<i>').text($(this).data('code')).html(), 'journals/view_details.php?id=' + $(this).data('id'), 'modal-lg');
     });
     $('#journal-list').on('click', '.cancel_data', function () {
-        _conf('Cancel this journal? It stays on record but is removed from every report.', 'nv_cancel_journal', [$(this).data('id')]);
+        _conf('Cancel this draft? It stays on record but never reaches the ledger.', 'nv_cancel_journal', [$(this).data('id')]);
     });
     $('#journal-list').on('click', '.delete_data', function () {
-        _conf('Permanently delete journal <b>' + $('<i>').text($(this).data('code')).html() + '</b>? Consider cancelling it instead to keep an audit trail.', 'nv_delete_journal', [$(this).data('id')]);
+        _conf('Delete draft <b>' + $('<i>').text($(this).data('code')).html() + '</b>? Drafts have not touched the ledger. Posted journals cannot be deleted — reverse them instead.', 'nv_delete_journal', [$(this).data('id')]);
+    });
+    $('#journal-list').on('click', '.reverse_data', function () {
+        _conf('Reverse journal <b>' + $('<i>').text($(this).data('code')).html() + '</b>? A new journal dated today is posted with every line on the opposite side. The original stays on record.', 'nv_reverse_journal', [$(this).data('id')]);
     });
     $('#journal-list').dataTable({ order: [[0, 'desc']], columnDefs: [{ orderable: false, targets: [7] }] });
 });
@@ -174,4 +178,5 @@ function nv_journal_action(action, id) {
 }
 function nv_delete_journal(id) { nv_journal_action('delete_journal', id); }
 function nv_cancel_journal(id) { nv_journal_action('cancel_journal', id); }
+function nv_reverse_journal(id) { nv_journal_action('reverse_journal', id); }
 </script>

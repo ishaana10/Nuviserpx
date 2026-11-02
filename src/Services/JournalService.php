@@ -60,7 +60,15 @@ class JournalService
             if ($source = $this->sourceDocument($id, $tenant_id)) {
                 return $this->fail("This journal was created by {$source}. Edit that document instead so the two stay in step.");
             }
+            if ($reason = self::lockedByStatus($existing['status'] ?? '')) {
+                return $this->fail($reason);
+            }
         }
+        if ($msg = PeriodLockService::guard($this->conn, $tenant_id, $date, $id ?: null)) {
+            return $this->fail($msg);
+        }
+        $beforeLines = $existing ? $this->describeStored($id) : '';
+        $journalCode = (string)($existing['code'] ?? '');
 
         $reversing = !empty($post['auto_reversing_date']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$post['auto_reversing_date'])
             ? (string)$post['auto_reversing_date'] : null;
@@ -76,6 +84,7 @@ class JournalService
         try {
             if ($id === 0) {
                 $code = $this->nextCode($tenant_id);
+                $journalCode = $code;
                 $stmt = $this->conn->prepare("INSERT INTO journal_entries
                     (tenant_id, code, journal_date, auto_reversing_date, description, default_narration, show_cash_basis, tax_mode, status, user_id)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
@@ -122,6 +131,12 @@ class JournalService
         }
 
         $msg = $existing ? 'Journal updated.' : ($status === 'draft' ? 'Journal saved as a draft.' : 'Journal posted.');
+        $after = self::describeLines($lines);
+        $this->settings->log_audit(
+            $existing ? ($status === 'posted' ? 'Posted draft journal' : 'Edited draft journal') : ($status === 'draft' ? 'Created draft journal' : 'Posted journal'),
+            'Journals',
+            "{$journalCode} dated {$date} — {$description}. " . ($existing ? "Before: {$beforeLines}. After: {$after}." : "Lines: {$after}.")
+        );
         $this->settings->set_flashdata('success', $msg);
         return json_encode(['status' => 'success', 'msg' => $msg, 'id' => $id]);
     }
@@ -199,12 +214,20 @@ class JournalService
     public function deleteJournal(int $id): string
     {
         $tenant_id = (int)$this->settings->active_tenant_id();
-        if (!$this->journalRow($id, $tenant_id)) {
+        $row = $this->journalRow($id, $tenant_id);
+        if (!$row) {
             return $this->fail('Journal not found.');
         }
         if ($source = $this->sourceDocument($id, $tenant_id)) {
             return $this->fail("This journal belongs to {$source}. Edit or cancel that document instead.");
         }
+        if ($reason = self::lockedByStatus($row['status'] ?? '', 'deleted')) {
+            return $this->fail($reason);
+        }
+        if ($msg = PeriodLockService::guard($this->conn, $tenant_id, null, $id)) {
+            return $this->fail($msg);
+        }
+        $lines = $this->describeStored($id);
         $this->conn->begin_transaction();
         $a = $this->conn->prepare("DELETE FROM journal_items WHERE journal_id = ?");
         $a->bind_param('i', $id);
@@ -212,30 +235,204 @@ class JournalService
         $b->bind_param('ii', $id, $tenant_id);
         if ($a->execute() && $b->execute()) {
             $this->conn->commit();
-            $this->settings->set_flashdata('success', 'Journal deleted.');
+            $this->settings->log_audit('Deleted draft journal', 'Journals', "{$row['code']} dated {$row['journal_date']} — {$row['description']}. Lines: {$lines}.");
+            $this->settings->set_flashdata('success', 'Draft journal deleted.');
             return json_encode(['status' => 'success']);
         }
         $this->conn->rollback();
         return $this->fail('The journal could not be deleted.');
     }
 
+    /**
+     * Reverse a posted journal: post a new journal, dated $date (default today), with every line on the
+     * opposite side, linked to the original. The original is never touched, so the ledger keeps the full
+     * story — what was booked, and that it was undone, by whom and when.
+     */
+    public function reverseJournal(int $id, ?string $date = null): string
+    {
+        $tenant_id = (int)$this->settings->active_tenant_id();
+        $orig = $this->journalRow($id, $tenant_id);
+        if (!$orig) {
+            return $this->fail('Journal not found.');
+        }
+        if ($source = $this->sourceDocument($id, $tenant_id)) {
+            return $this->fail("This journal belongs to {$source}. Cancel or credit that document instead.");
+        }
+        if (self::statusKind($orig['status'] ?? '') !== 'posted') {
+            return $this->fail('Only posted journals can be reversed. A draft can simply be deleted.');
+        }
+        if (!empty($orig['reverses_id'])) {
+            return $this->fail('This journal is itself a reversal. Post a new journal if it needs correcting.');
+        }
+        $stmt = $this->conn->prepare("SELECT code FROM journal_entries WHERE reverses_id = ? AND tenant_id = ? LIMIT 1");
+        $stmt->bind_param('ii', $id, $tenant_id);
+        $stmt->execute();
+        if ($done = $stmt->get_result()->fetch_assoc()) {
+            return $this->fail("This journal has already been reversed by {$done['code']}.");
+        }
+
+        $date = trim((string)$date) === '' ? date('Y-m-d') : trim((string)$date);
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) || !strtotime($date)) {
+            return $this->fail('Enter a valid reversal date.');
+        }
+        if ($date < (string)$orig['journal_date']) {
+            return $this->fail('A reversal cannot be dated before the journal it reverses (' . $orig['journal_date'] . ').');
+        }
+        if ($msg = PeriodLockService::guard($this->conn, $tenant_id, $date)) {
+            return $this->fail($msg);
+        }
+
+        $side = LedgerService::SIDE_SQL;
+        $q = $this->conn->prepare("SELECT ji.account_id, ji.amount, ji.description, ji.tax_rate, {$side} side
+            FROM journal_items ji LEFT JOIN group_list g ON g.id = ji.group_id WHERE ji.journal_id = ?");
+        $q->bind_param('i', $id);
+        $q->execute();
+        $lines = self::reverseLines($q->get_result()->fetch_all(MYSQLI_ASSOC));
+        if (!$lines) {
+            return $this->fail('This journal has no lines to reverse.');
+        }
+
+        $userId = (int)$this->settings->userdata('id');
+        $description = mb_substr('Reversal of ' . $orig['code'] . ' — ' . $orig['description'], 0, 1000);
+        $taxMode = (string)($orig['tax_mode'] ?? 'No Tax');
+        $this->conn->begin_transaction();
+        try {
+            $code = $this->nextCode($tenant_id);
+            $h = $this->conn->prepare("INSERT INTO journal_entries (tenant_id, code, journal_date, description, tax_mode, status, reverses_id, user_id)
+                VALUES (?, ?, ?, ?, ?, 'posted', ?, ?)");
+            $h->bind_param('issssii', $tenant_id, $code, $date, $description, $taxMode, $id, $userId);
+            if (!$h->execute()) {
+                throw new \RuntimeException($this->conn->error);
+            }
+            $newId = (int)$this->conn->insert_id;
+            $ins = $this->conn->prepare("INSERT INTO journal_items (journal_id, account_id, group_id, entry_side, amount, description, tax_rate) VALUES (?, ?, ?, ?, ?, ?, ?)");
+            foreach ($lines as $l) {
+                $groupId = (int)$l['side'];
+                $entrySide = $groupId === 1 ? 'debit' : 'credit';
+                $amount = is_numeric($l['amount']) ? (string)$l['amount'] : '0'; // exact DECIMAL string, never via float
+                $acc = (int)$l['account_id'];
+                $desc = (string)($l['description'] ?? '');
+                $tax = (string)($l['tax_rate'] ?? 'No Tax (0%)');
+                $ins->bind_param('iiissss', $newId, $acc, $groupId, $entrySide, $amount, $desc, $tax);
+                if (!$ins->execute()) {
+                    throw new \RuntimeException($this->conn->error);
+                }
+            }
+            $this->conn->commit();
+        } catch (\Throwable $e) {
+            $this->conn->rollback();
+            return $this->fail('The reversal could not be posted. Nothing was changed.');
+        }
+
+        $this->settings->log_audit('Reversed journal', 'Journals', "{$orig['code']} reversed by {$code} dated {$date}. Lines: " . self::describeLines($lines) . '.');
+        $msg = "Journal {$orig['code']} reversed by {$code}.";
+        $this->settings->set_flashdata('success', $msg);
+        return json_encode(['status' => 'success', 'msg' => $msg, 'id' => $newId, 'code' => $code]);
+    }
+
     /** Cancel (void) a journal: it stays on record but no longer affects any report. */
     public function cancelJournal(int $id): string
     {
         $tenant_id = (int)$this->settings->active_tenant_id();
-        if (!$this->journalRow($id, $tenant_id)) {
+        $row = $this->journalRow($id, $tenant_id);
+        if (!$row) {
             return $this->fail('Journal not found.');
         }
         if ($source = $this->sourceDocument($id, $tenant_id)) {
             return $this->fail("This journal belongs to {$source}. Cancel that document instead.");
         }
+        if ($reason = self::lockedByStatus($row['status'] ?? '', 'cancelled')) {
+            return $this->fail($reason);
+        }
+        if ($msg = PeriodLockService::guard($this->conn, $tenant_id, null, $id)) {
+            return $this->fail($msg);
+        }
         $stmt = $this->conn->prepare("UPDATE journal_entries SET status = 'cancelled' WHERE id = ? AND tenant_id = ?");
         $stmt->bind_param('ii', $id, $tenant_id);
         if ($stmt->execute()) {
-            $this->settings->set_flashdata('success', 'Journal cancelled. It no longer affects your reports.');
+            $this->settings->log_audit('Cancelled draft journal', 'Journals', "{$row['code']} dated {$row['journal_date']} — {$row['description']}.");
+            $this->settings->set_flashdata('success', 'Draft journal cancelled.');
             return json_encode(['status' => 'success']);
         }
         return $this->fail('The journal could not be cancelled.');
+    }
+
+    /* ------------------------------------------------------------------
+     * Pure rules (unit-tested without a database)
+     * ------------------------------------------------------------------ */
+
+    /** 'draft', 'cancelled' or 'posted' — legacy rows with no status count as posted. */
+    public static function statusKind(?string $status): string
+    {
+        $s = strtolower(trim((string)$status));
+        if ($s === 'draft') {
+            return 'draft';
+        }
+        return in_array($s, ['cancelled', 'canceled', 'void', '2', '3'], true) ? 'cancelled' : 'posted';
+    }
+
+    /**
+     * Why a journal in this state cannot be edited / deleted / cancelled, or null when it can.
+     * Only drafts may change: a posted journal is part of the record and is corrected by reversing it.
+     */
+    public static function lockedByStatus(?string $status, string $verb = 'changed'): ?string
+    {
+        return match (self::statusKind($status)) {
+            'draft' => null,
+            'cancelled' => "A cancelled journal is kept on record and cannot be {$verb}.",
+            default => "A posted journal cannot be {$verb}. Reverse it to cancel its effect, then post a corrected journal.",
+        };
+    }
+
+    /**
+     * The lines of a reversing journal: every line on the opposite side, same account and amount.
+     * Lines are [account_id, side (1 debit / 2 credit), amount, description, tax_rate].
+     */
+    public static function reverseLines(array $lines): array
+    {
+        $out = [];
+        foreach ($lines as $l) {
+            if ((int)($l['account_id'] ?? 0) === 0 || (float)($l['amount'] ?? 0) == 0.0) {
+                continue;
+            }
+            $l['side'] = (int)$l['side'] === 1 ? 2 : 1;
+            $out[] = $l;
+        }
+        return $out;
+    }
+
+    /**
+     * One-line summary for the audit log: "Dr #12 100.00; Cr #40 100.00". Accepts form lines
+     * ([account_id, debit, credit]) or stored lines ([account_id, side, amount]).
+     */
+    public static function describeLines(array $lines): string
+    {
+        $parts = [];
+        foreach ($lines as $l) {
+            if (isset($l['side'])) {
+                $dr = (int)$l['side'] === 1;
+                $amt = (float)$l['amount'];
+            } else {
+                $dr = (float)($l['debit'] ?? 0) > 0;
+                $amt = $dr ? (float)$l['debit'] : (float)($l['credit'] ?? 0);
+            }
+            if ((int)($l['account_id'] ?? 0) === 0 || $amt == 0.0) {
+                continue;
+            }
+            $parts[] = ($dr ? 'Dr' : 'Cr') . ' #' . (int)$l['account_id'] . ' ' . number_format($amt, 2, '.', '');
+        }
+        return $parts ? implode('; ', $parts) : 'no lines';
+    }
+
+    /** The saved lines of a journal, as describeLines() prints them. */
+    private function describeStored(int $journalId): string
+    {
+        $side = LedgerService::SIDE_SQL;
+        $stmt = $this->conn->prepare("SELECT ji.account_id, ji.amount, {$side} side
+            FROM journal_items ji LEFT JOIN group_list g ON g.id = ji.group_id WHERE ji.journal_id = ? ORDER BY ji.account_id");
+        $stmt->bind_param('i', $journalId);
+        $stmt->execute();
+        return self::describeLines($stmt->get_result()->fetch_all(MYSQLI_ASSOC));
     }
 
     /** "invoice INV-0012" etc. when the journal was generated by another document. */

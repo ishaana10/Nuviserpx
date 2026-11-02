@@ -64,6 +64,7 @@ class DBConnection{
                 $this->check_fixed_assets_migrations();
                 $this->check_journal_options_migrations();
                 $this->check_ledger_precision_migrations();
+                $this->check_ledger_controls_migrations();
                 $this->check_dolibarr_crm_migrations();
                 $this->check_dolibarr_extended_migrations();
                 $this->check_extrafields_migrations();
@@ -723,6 +724,89 @@ class DBConnection{
              FROM `tenants` t
              WHERE NOT EXISTS (SELECT 1 FROM `account_list` a WHERE a.tenant_id = t.id AND a.name = 'Opening Balance Equity' AND a.delete_flag = 0)"
         );
+    }
+
+    /**
+     * Ledger controls:
+     *  - audit_logs: the table log_audit() writes to. It was never created by any schema or migration,
+     *    so on a fresh install every audit entry was silently dropped. Append-only (triggers refuse
+     *    UPDATE and DELETE, best effort).
+     *  - period_locks: "books closed up to <date>" history; the newest row per company is the lock.
+     *  - journal_entries.reverses_id: links a reversing journal to the journal it reverses.
+     *  - triggers: refuse any journal write dated on or before the lock, whatever code path made it.
+     * Everything is guarded, so re-running is a no-op. Trigger creation needs the TRIGGER privilege; without
+     * it the application-level checks (PeriodLockService::guard) still apply.
+     */
+    public function check_ledger_controls_migrations(){
+        if (!$this->conn) return;
+
+        @$this->conn->query("CREATE TABLE IF NOT EXISTS `audit_logs` (
+          `id` bigint(20) NOT NULL AUTO_INCREMENT,
+          `tenant_id` int(30) NOT NULL DEFAULT 1,
+          `user_id` int(50) DEFAULT NULL,
+          `action` varchar(150) NOT NULL,
+          `module` varchar(100) NOT NULL,
+          `details` text DEFAULT NULL,
+          `ip_address` varchar(64) DEFAULT NULL,
+          `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+          PRIMARY KEY (`id`),
+          KEY `tenant_created` (`tenant_id`, `date_created`),
+          KEY `module_idx` (`module`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        @$this->conn->query("CREATE TABLE IF NOT EXISTS `period_locks` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `tenant_id` int(30) NOT NULL DEFAULT 1,
+          `lock_date` date DEFAULT NULL,
+          `note` varchar(255) DEFAULT NULL,
+          `locked_by` int(50) DEFAULT NULL,
+          `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+          PRIMARY KEY (`id`),
+          KEY `tenant_latest` (`tenant_id`, `id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        $res = @$this->conn->query("SHOW COLUMNS FROM `journal_entries` LIKE 'reverses_id'");
+        if ($res && $res->num_rows == 0) {
+            @$this->conn->query("ALTER TABLE `journal_entries` ADD COLUMN `reverses_id` int(30) DEFAULT NULL AFTER `status`");
+            @$this->conn->query("ALTER TABLE `journal_entries` ADD INDEX `reverses_id` (`reverses_id`)");
+        }
+
+        // Newest lock row for a company (NULL when none or fully reopened).
+        $lk = fn(string $tenantExpr) => "(SELECT p.lock_date FROM period_locks p WHERE p.tenant_id = {$tenantExpr} ORDER BY p.id DESC LIMIT 1)";
+        $deny = "SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'The books are closed for this date'";
+        $jd = "(SELECT je.journal_date FROM journal_entries je WHERE je.id = %s.journal_id)";
+        $jt = "(SELECT je.tenant_id FROM journal_entries je WHERE je.id = %s.journal_id)";
+
+        $triggers = array(
+            'journal_entries_lock_bi' => array('BEFORE INSERT', 'journal_entries',
+                "BEGIN DECLARE lk DATE; SET lk = " . $lk('NEW.tenant_id') . ";
+                 IF lk IS NOT NULL AND NEW.journal_date <= lk THEN {$deny}; END IF; END"),
+            'journal_entries_lock_bu' => array('BEFORE UPDATE', 'journal_entries',
+                "BEGIN DECLARE lk DATE; SET lk = " . $lk('OLD.tenant_id') . ";
+                 IF lk IS NOT NULL AND (OLD.journal_date <= lk OR NEW.journal_date <= lk) THEN {$deny}; END IF; END"),
+            'journal_entries_lock_bd' => array('BEFORE DELETE', 'journal_entries',
+                "BEGIN DECLARE lk DATE; SET lk = " . $lk('OLD.tenant_id') . ";
+                 IF lk IS NOT NULL AND OLD.journal_date <= lk THEN {$deny}; END IF; END"),
+        );
+        foreach (array('INSERT' => 'NEW', 'UPDATE' => 'OLD', 'DELETE' => 'OLD') as $event => $row) {
+            $triggers['journal_items_lock_b' . strtolower($event[0])] = array("BEFORE {$event}", 'journal_items',
+                "BEGIN DECLARE jd DATE; DECLARE lk DATE;
+                 SET jd = " . sprintf($jd, $row) . ";
+                 SET lk = " . $lk(sprintf($jt, $row)) . ";
+                 IF lk IS NOT NULL AND jd IS NOT NULL AND jd <= lk THEN {$deny}; END IF; END");
+        }
+        // The audit trail can be added to, never rewritten.
+        $triggers['audit_logs_no_update'] = array('BEFORE UPDATE', 'audit_logs',
+            "SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'The audit log cannot be changed'");
+        $triggers['audit_logs_no_delete'] = array('BEFORE DELETE', 'audit_logs',
+            "SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'The audit log cannot be changed'");
+
+        foreach ($triggers as $name => [$when, $table, $body]) {
+            $t = @$this->conn->query("SHOW TRIGGERS WHERE `Trigger` = '{$name}'");
+            if ($t && $t->num_rows == 0) {
+                @$this->conn->query("CREATE TRIGGER `{$name}` {$when} ON `{$table}` FOR EACH ROW {$body}");
+            }
+        }
     }
 
     public function check_invoice_template_migrations(){

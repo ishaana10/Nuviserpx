@@ -74,6 +74,9 @@ class InvoiceService
         }
         $journal_code = $prefix . $code;
         $journal_date = $invoice_date;
+        if ($lockMsg = \App\Services\PeriodLockService::guardDocument($this->conn, (int)$tenant_id, $journal_date, 'invoice_list', (int)$id)) {
+            return json_encode(['status' => 'failed', 'msg' => $lockMsg]);
+        }
         $partyName = $party['name'] ?? '';
         $description = $this->conn->real_escape_string("Sales Invoice {$invoice_no} to {$partyName} - Total: \${$total}");
 
@@ -226,6 +229,9 @@ class InvoiceService
     public function deleteInvoice(int $id): string
     {
         $tenant_id = $this->settings->active_tenant_id();
+        if ($lockMsg = \App\Services\PeriodLockService::guardDocument($this->conn, (int)$tenant_id, null, 'invoice_list', $id)) {
+            return json_encode(['status' => 'failed', 'msg' => $lockMsg]);
+        }
 
         $inv = $this->conn->query("SELECT invoice_no, journal_id FROM `invoice_list` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'")->fetch_assoc();
         if (!empty($inv['journal_id'])) {
