@@ -17,6 +17,22 @@ if(isset($_GET['id']) && $_GET['id'] > 0){
 <div class="container-fluid">
 	<form action="" id="leave-form">
 		<input type="hidden" name="id" value="<?php echo isset($id) ? $id : '' ?>">
+		<?php $__scope = $_settings->employee_scope('leaves'); ?>
+		<?php if($__scope !== null): ?>
+		<div class="form-group">
+			<label class="control-label">Employee</label>
+			<?php
+			$__e = $__scope > 0 ? $conn->query("SELECT employee_code, concat(firstname,' ',lastname) as name FROM `employee_list` WHERE id = '".(int)$__scope."'") : false;
+			$__emp = ($__e && $__e->num_rows) ? $__e->fetch_assoc() : null;
+			?>
+			<?php if($__emp): ?>
+			<input type="hidden" name="employee_id" value="<?php echo (int)$__scope ?>">
+			<input type="text" class="form-control form-control-sm rounded-0 bg-light" value="<?php echo htmlspecialchars($__emp['employee_code'].' - '.$__emp['name']) ?>" readonly>
+			<?php else: ?>
+			<div class="alert alert-warning mb-0">Your account isn't linked to an employee profile, so you can't submit this. Please ask your administrator.</div>
+			<?php endif; ?>
+		</div>
+		<?php else: ?>
 		<div class="form-group">
 			<label for="employee_id" class="control-label">Employee</label>
 			<select name="employee_id" id="employee_id" class="form-control form-control-sm rounded-0 select2" required>
@@ -30,6 +46,7 @@ if(isset($_GET['id']) && $_GET['id'] > 0){
 				<?php endwhile; ?>
 			</select>
 		</div>
+		<?php endif; ?>
 		<div class="form-group">
 			<label for="leave_type" class="control-label">Leave Type</label>
 			<select name="leave_type" id="leave_type" class="form-control form-control-sm rounded-0" required>

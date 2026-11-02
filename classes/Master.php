@@ -1446,6 +1446,14 @@ class Master extends DBConnection
 
     public function email_payslip()
     {
+        $scope = $this->settings->employee_scope('payroll');
+        if ($scope !== null) {
+            $pid = intval($_POST['id'] ?? 0);
+            $own = $scope > 0 ? $this->conn->query("SELECT id FROM `payroll_list` WHERE id = '{$pid}' AND employee_id = '{$scope}'") : false;
+            if (!$own || $own->num_rows === 0) {
+                return json_encode(['status' => 'failed', 'msg' => 'You can only email your own payslips.']);
+            }
+        }
         return $this->container->make(PayrollService::class)->emailPayslip(intval($_POST['id'] ?? 0), $_POST['custom_email'] ?? null);
     }
 

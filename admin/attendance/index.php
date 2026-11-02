@@ -37,7 +37,9 @@
 					<?php
 					$i = 1;
 						$tenant_id = $_settings->active_tenant_id();
-						$qry = $conn->query("SELECT a.*, concat(e.firstname, ' ', e.lastname) as emp_name, e.employee_code from `attendance_list` a inner join `employee_list` e on a.employee_id = e.id where a.tenant_id = '{$tenant_id}' order by a.attendance_date desc, a.id desc ");
+						$scope = $_settings->employee_scope('attendance');
+						$own_filter = $scope === null ? '' : " AND a.employee_id = '".(int)$scope."' ";
+						$qry = $conn->query("SELECT a.*, concat(e.firstname, ' ', e.lastname) as emp_name, e.employee_code from `attendance_list` a inner join `employee_list` e on a.employee_id = e.id where a.tenant_id = '{$tenant_id}'{$own_filter} order by a.attendance_date desc, a.id desc ");
 						while($row = $qry->fetch_assoc()):
 					?>
 						<tr>
