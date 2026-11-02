@@ -131,6 +131,7 @@ if($t_qry && $t_qry->num_rows > 0){
 
                     <!-- Xero-inspired Nav Menu Structure -->
                     <nav class="mt-2">
+<?php ob_start(); ?>
                         <ul class="nav nav-pills nav-sidebar flex-column text-sm <?= $sidenav_compact ?> nav-flat nav-child-indent" data-widget="treeview" role="menu" data-accordion="<?= $sidenav_mode == 'accordion' ? 'true' : 'false' ?>">
 
                             <!-- 1. Home -->
@@ -689,6 +690,7 @@ if($t_qry && $t_qry->num_rows > 0){
                             <?php endif; ?>
 
                         </ul>
+                    <?php echo \App\Support\MenuFilter::filter((string)ob_get_clean(), $_settings); ?>
                     </nav>
                 </div>
             </div>

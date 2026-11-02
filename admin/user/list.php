@@ -45,9 +45,12 @@
 							$tenant_id = $_settings->active_tenant_id();
 							$is_superadmin = $_settings->userdata('type') == 1;
 
-							$where_clause = " WHERE u.id != '1' ";
+							// Always scoped to the active tenant — developers see another
+							// tenant's users only by switching into it. Non-developers also
+							// never see super-administrator accounts.
+							$where_clause = " WHERE u.id != '1' AND u.tenant_id = '".(int)$tenant_id."' ";
 							if (!$is_superadmin) {
-								$where_clause .= " AND u.tenant_id = '{$tenant_id}' ";
+								$where_clause .= " AND u.type != 1 ";
 							}
 
 							$qry = $conn->query("SELECT u.*, concat(u.firstname,' ',u.lastname) as name, r.name as role_name, t.name as tenant_name,

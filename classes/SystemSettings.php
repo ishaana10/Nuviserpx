@@ -251,9 +251,35 @@ class SystemSettings extends DBConnection{
 		return ['name' => 'Standard Staff', 'permissions' => ['journals_view', 'invoices_view', 'payments_view', 'products_view', 'sales_orders_view', 'employees_view', 'payroll_view', 'reports_view']];
 	}
 
+	/**
+	 * Is a tenant module (e.g. mod_payroll) enabled for the active tenant?
+	 * The developer assigns modules per tenant (tenants.modules, CSV; NULL means
+	 * "not restricted yet"). A system-wide switch-off (system_info mod_*=0) also
+	 * disables it. Super administrators are never blocked.
+	 */
+	function module_enabled($module_key){
+		if($this->userdata('type') == 1) return true;
+		if(!isset(\App\Support\Permissions::TENANT_MODULES[$module_key])) return true;
+		if($this->info($module_key) === '0') return false;
+		static $cache = [];
+		$tid = (int)$this->active_tenant_id();
+		if(!array_key_exists($tid, $cache)){
+			$cache[$tid] = null;
+			$q = @$this->conn->query("SELECT `modules` FROM `tenants` WHERE id = '{$tid}'");
+			if($q && ($row = $q->fetch_assoc()) && $row['modules'] !== null){
+				$cache[$tid] = \App\Support\Permissions::sanitizeTenantModules($row['modules']);
+			}
+		}
+		return $cache[$tid] === null || in_array($module_key, $cache[$tid], true);
+	}
+
 	function can_access($permission_key){
 		$user_type = $this->userdata('type');
 		if($user_type == 1) return true;
+
+		// Modules the developer has not assigned to this tenant are off-limits.
+		$tenant_module = \App\Support\Permissions::tenantModuleFor((string)$permission_key);
+		if($tenant_module !== null && !$this->module_enabled($tenant_module)) return false;
 
 		$role = $this->get_user_role();
 		$perms = $role['permissions'];
