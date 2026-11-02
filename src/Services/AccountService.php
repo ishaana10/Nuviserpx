@@ -84,8 +84,22 @@ class AccountService
         if ($fields['code'] !== '' && $this->exists('account_list', 'code', $fields['code'], $tenant_id, $id)) {
             return $this->fail("Code {$fields['code']} is already used by another account.");
         }
+
+        // Type must be one the chart of accounts offers (an unchanged legacy type on an existing account is allowed).
+        $existing = $id ? $this->accountRow($id, $tenant_id) : null;
+        if (!isset($fields['type']) || $fields['type'] === '') {
+            $fields['type'] = $existing['type'] ?? 'Expense';
+        }
+        $unchangedLegacy = $existing && strcasecmp((string)$existing['type'], (string)$fields['type']) === 0;
+        if (!$unchangedLegacy && !LedgerService::isRecognisedType($fields['type'])) {
+            return $this->fail("“{$fields['type']}” is not an account type. Choose one from the list.");
+        }
+        $class = LedgerService::classify($fields['type'])['class'];
+        $fields['normal_balance'] = LedgerService::classify($fields['type'])['normal'];
+
+        // Every account gets a structured code; when none is typed, take the next free number in its class band.
         if ($fields['code'] === '') {
-            $fields['code'] = null;
+            $fields['code'] = $existing['code'] ?? '' ?: $this->nextCode($class, $tenant_id);
         }
 
         // Changing the type of an account with history moves its balance between statements.
@@ -155,6 +169,20 @@ class AccountService
             . ($kept ? ' Kept ' . implode(', ', $kept) . ' because they have transactions — archive them instead.' : '');
         $this->settings->set_flashdata('success', $msg);
         return json_encode(['status' => 'success', 'msg' => $msg]);
+    }
+
+    /** Next free code in the class's band (assets 1xxx, liabilities 2xxx, equity 3xxx, income 4xxx, expenses 5xxx), stepping by 10. */
+    private function nextCode(string $class, int $tenant_id): string
+    {
+        $base = LedgerService::CODE_BANDS[$class] ?? 5000;
+        $top = $base + 998; // 3999 is reserved for Opening Balance Equity
+        $stmt = $this->conn->prepare("SELECT MAX(CAST(code AS UNSIGNED)) m FROM account_list
+            WHERE tenant_id = ? AND delete_flag = 0 AND code REGEXP '^[0-9]+$' AND CAST(code AS UNSIGNED) BETWEEN ? AND ?");
+        $stmt->bind_param('iii', $tenant_id, $base, $top);
+        $stmt->execute();
+        $max = (int)($stmt->get_result()->fetch_assoc()['m'] ?? 0);
+        $next = $max >= $base ? $max + 10 : $base + 10;
+        return (string)min($next, $top);
     }
 
     public function transactionCount(int $accountId): int

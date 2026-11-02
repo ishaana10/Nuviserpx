@@ -219,4 +219,29 @@ check($ar['customers'][0]['name'] === 'B' && near($ar['customers'][0]['d30'], 50
 check(near($ar['customers'][1]['current'], 100) && near($ar['customers'][1]['older'], 50) && $ar['customers'][1]['oldest'] === 117, 'A split across current and over-90');
 check(near($ar['totals']['total'], 650) && count($ar['customers'][0]['invoices']) === 1, 'fully paid invoices ignored; totals add up');
 
+echo "\n=== Classification regressions ===\n";
+check(L::classify('Cost of Sales')['section'] === 'direct_costs' && L::classify('Cost of Sales')['normal'] === 'debit', '“Cost of Sales” is a cost, not revenue');
+check(L::classify('Income Tax Expense')['section'] === 'expense' && L::classify('Income Tax Expense')['normal'] === 'debit', '“Income Tax Expense” is an expense, not revenue');
+check(L::classify('Sales')['section'] === 'revenue' && L::classify('Other Income')['section'] === 'other_income', 'sales and other income are unchanged');
+
+echo "\n=== Strict account types ===\n";
+check(L::isRecognisedType('Fixed Asset') && L::isRecognisedType('  bank ') && L::isRecognisedType('Direct Costs'), 'offered types are recognised (case/space-insensitive)');
+check(!L::isRecognisedType('Goodwill') && !L::isRecognisedType('') && !L::isRecognisedType(null), 'unknown, empty and null types are not recognised');
+check(!L::isRecognisedType('Accounts Receivable'), 'legacy free-text types are not offered for new writes');
+check(L::classifyStrict('Revenue')['class'] === 'income', 'classifyStrict agrees with classify for known types');
+$threw = false;
+try { L::classifyStrict('Goodwill'); } catch (\InvalidArgumentException $e) { $threw = str_contains($e->getMessage(), 'Goodwill'); }
+check($threw, 'classifyStrict fails loudly on an unknown type');
+check(L::classify('Goodwill')['class'] === 'expense', 'classify() keeps its tolerant fallback so old data still reports');
+foreach (\App\Services\AccountService::ACCOUNT_TYPES as $group => $types) {
+    foreach ($types as $t) {
+        check(L::isRecognisedType($t) && in_array(L::classify($t)['normal'], ['debit', 'credit'], true), "every offered type “{$t}” classifies with a normal side");
+    }
+}
+
+echo "\n=== Code bands & entry side ===\n";
+check(L::CODE_BANDS === ['asset' => 1000, 'liability' => 2000, 'equity' => 3000, 'income' => 4000, 'expense' => 5000], 'one numbering band per class');
+check(str_contains(L::SIDE_SQL, "ji.entry_side = 'debit'") && str_contains(L::SIDE_SQL, 'ji.group_id IN (1,2)'), 'side SQL prefers entry_side and falls back to the legacy group_id');
+check(str_starts_with(L::SIDE_SQL, "(CASE WHEN ji.entry_side"), 'entry_side is checked before group_id');
+
 echo "\nAll {$passed} ledger checks passed.\n";
