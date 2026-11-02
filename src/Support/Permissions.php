@@ -570,6 +570,7 @@ final class Permissions
         // self-service / always available
         'home'              => null,
         'user/index'        => null,   // "My Account" self-profile
+        'user/change_password' => null, // Change own password
         // business modules (view permission)
         'invoices'          => 'invoices_view',
         'parties'           => 'parties_view',

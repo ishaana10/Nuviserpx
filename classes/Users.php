@@ -401,6 +401,49 @@ Class Users extends DBConnection {
 		return json_encode(['status' => 'success', 'tenant_id' => $tenant_id, 'roles' => $roles, 'employees' => $employees]);
 	}
 
+	/**
+	 * Change the current user's own password.
+	 * Requires the current (old) password for verification.
+	 * No special permission needed — any logged-in user can change their own password.
+	 */
+	public function change_password(){
+		$this->settings->require_login();
+
+		$user_id = (int)$this->settings->userdata('id');
+		$current = $_POST['current_password'] ?? '';
+		$new     = $_POST['new_password'] ?? '';
+		$confirm = $_POST['confirm_password'] ?? '';
+
+		if(empty($current) || empty($new) || empty($confirm)){
+			return json_encode(['status' => 'failed', 'msg' => 'All fields are required.']);
+		}
+		if($new !== $confirm){
+			return json_encode(['status' => 'failed', 'msg' => 'New password and confirmation do not match.']);
+		}
+		if(strlen($new) < 6){
+			return json_encode(['status' => 'failed', 'msg' => 'Password must be at least 6 characters.']);
+		}
+
+		// Verify current password
+		$qry = $this->conn->query("SELECT `password` FROM `users` WHERE id = '{$user_id}'");
+		if(!$qry || $qry->num_rows === 0){
+			return json_encode(['status' => 'failed', 'msg' => 'User not found.']);
+		}
+		$row = $qry->fetch_assoc();
+		if(!password_verify($current, $row['password']) && md5($current) !== $row['password']){
+			return json_encode(['status' => 'failed', 'msg' => 'Current password is incorrect.']);
+		}
+
+		// Update password
+		$hashed = password_hash($new, PASSWORD_DEFAULT);
+		$update = $this->conn->query("UPDATE `users` SET `password` = '{$hashed}' WHERE id = '{$user_id}'");
+		if($update){
+			$this->settings->log_audit('Change Password', 'User Management', "User #{$user_id} changed their own password.");
+			return json_encode(['status' => 'success', 'msg' => 'Password updated successfully.']);
+		}
+		return json_encode(['status' => 'failed', 'msg' => 'Failed to update password.']);
+	}
+
 	/** Activate (verify) a pending system user account. */
 	public function verify_user(){
 		$this->settings->require_permission('users_manage');
@@ -448,6 +491,9 @@ switch ($action) {
 	break;
 	case 'verify_user':
 		echo $users->verify_user();
+	break;
+	case 'change_password':
+		echo $users->change_password();
 	break;
 	case 'get_tenant_options':
 		echo $users->get_tenant_options();
