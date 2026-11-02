@@ -10,6 +10,10 @@ $sections = [
         ['reports/income_statement', 'Profit and Loss', 'fas fa-chart-line', 'Income, cost of sales and expenses for a period, with gross and net margin. Compare with the previous period or last year.'],
         ['reports/balance_sheet', 'Balance Sheet', 'fas fa-landmark', 'Assets, liabilities and equity at a date, including retained and current-year earnings.'],
         ['reports/cash_summary', 'Cash Summary', 'fas fa-money-bill-wave', 'Bank balances at the start and end of a period, and where the money came from and went.'],
+        ['reports/cash_flow', 'Statement of Cash Flows', 'fas fa-water', 'Profit adjusted for non-cash items and working capital, then investing and financing, reconciled to your bank accounts.'],
+        ['reports/equity_changes', 'Changes in Equity', 'fas fa-layer-group', 'Opening equity, profit, capital introduced or drawn, and closing equity for the period.'],
+        ['reports/budget_vs_actual', 'Budget vs Actual', 'fas fa-bullseye', 'Income and expenses against your monthly budget, with favourable and unfavourable variances.'],
+        ['budgets', 'Budgets', 'fas fa-edit', 'Set the monthly budget for every income and expense account.', 'Tool'],
     ]],
     ['Accounting', 'fas fa-book', 'reports_view', [
         ['reports/trial_balance', 'Trial Balance', 'fas fa-balance-scale', 'Every account’s balance at a date in debit and credit columns, with a balance check.'],

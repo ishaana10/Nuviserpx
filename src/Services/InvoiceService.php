@@ -85,10 +85,7 @@ class InvoiceService
             $this->conn->query($j_sql);
             $journal_id = $this->conn->insert_id;
 
-            $j_items = "INSERT INTO `journal_items` (`journal_id`, `account_id`, `group_id`, `amount`) VALUES
-				('{$journal_id}', '{$ar_acc_id}', '1', '{$total}'),
-				('{$journal_id}', '{$rev_acc_id}', '2', '{$total}')";
-            $this->conn->query($j_items);
+            $this->postLines((int)$journal_id, (int)$ar_acc_id, (int)$rev_acc_id, (float)$total, (float)$tax_amount);
 
             $sql = "INSERT INTO `invoice_list` SET
 				`tenant_id` = '{$tenant_id}',
@@ -114,10 +111,7 @@ class InvoiceService
             if ($journal_id) {
                 $this->conn->query("UPDATE `journal_entries` SET `description` = '{$description}', `journal_date` = '{$journal_date}' WHERE id = '{$journal_id}'");
                 $this->conn->query("DELETE FROM `journal_items` WHERE journal_id = '{$journal_id}'");
-                $j_items = "INSERT INTO `journal_items` (`journal_id`, `account_id`, `group_id`, `amount`) VALUES
-					('{$journal_id}', '{$ar_acc_id}', '1', '{$total}'),
-					('{$journal_id}', '{$rev_acc_id}', '2', '{$total}')";
-                $this->conn->query($j_items);
+                $this->postLines((int)$journal_id, (int)$ar_acc_id, (int)$rev_acc_id, (float)$total, (float)$tax_amount);
             }
 
             $sql = "UPDATE `invoice_list` SET
@@ -294,6 +288,19 @@ class InvoiceService
             return json_encode(['status' => 'success', 'msg' => "Invoice #{$invoice['invoice_no']} sent successfully to {$email_to}."]);
         } else {
             return json_encode(['status' => 'failed', 'msg' => 'Failed to send invoice email. Please check SMTP settings.']);
+        }
+    }
+
+    /** Receivable Dr gross; Revenue Cr net; VAT Output Cr tax (see TaxService::postingLines). */
+    private function postLines(int $journalId, int $arAcc, int $revAcc, float $total, float $tax): void
+    {
+        $taxSvc = new TaxService($this->conn, $this->settings);
+        $taxAcc = $tax > 0 ? $taxSvc->controlAccount('output') : 0;
+        $lines = TaxService::postingLines('sale', $total, $tax, $revAcc, $taxAcc, $arAcc);
+        if (!$taxSvc->writeLines($journalId, $lines)) {
+            // Never leave a half-posted journal: fall back to a single unsplit pair.
+            $this->conn->query("DELETE FROM `journal_items` WHERE journal_id = " . (int)$journalId);
+            $taxSvc->writeLines($journalId, TaxService::postingLines('sale', $total, 0.0, $revAcc, 0, $arAcc));
         }
     }
 }

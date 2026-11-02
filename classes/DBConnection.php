@@ -65,6 +65,9 @@ class DBConnection{
                 $this->check_journal_options_migrations();
                 $this->check_ledger_precision_migrations();
                 $this->check_ledger_controls_migrations();
+                $this->check_budget_migrations();
+                $this->check_tax_migrations();
+                $this->check_fx_migrations();
                 $this->check_dolibarr_crm_migrations();
                 $this->check_dolibarr_extended_migrations();
                 $this->check_extrafields_migrations();
@@ -805,6 +808,69 @@ class DBConnection{
             $t = @$this->conn->query("SHOW TRIGGERS WHERE `Trigger` = '{$name}'");
             if ($t && $t->num_rows == 0) {
                 @$this->conn->query("CREATE TRIGGER `{$name}` {$when} ON `{$table}` FOR EACH ROW {$body}");
+            }
+        }
+    }
+
+    /** Budgets: one row per profit-and-loss account per month (natural sign, see BudgetService). */
+    public function check_budget_migrations(){
+        if (!$this->conn) return;
+
+        @$this->conn->query("CREATE TABLE IF NOT EXISTS `budget_lines` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `tenant_id` int(30) NOT NULL DEFAULT 1,
+          `account_id` int(30) NOT NULL,
+          `month_start` date NOT NULL,
+          `amount` decimal(18,4) NOT NULL DEFAULT 0.0000,
+          `updated_by` int(50) DEFAULT NULL,
+          `date_updated` datetime DEFAULT NULL ON UPDATE current_timestamp(),
+          PRIMARY KEY (`id`),
+          UNIQUE KEY `budget_cell` (`tenant_id`, `account_id`, `month_start`),
+          KEY `budget_month` (`tenant_id`, `month_start`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    }
+
+    public function check_tax_migrations(){
+        if (!$this->conn) return;
+
+        @$this->conn->query("CREATE TABLE IF NOT EXISTS `tax_codes` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `tenant_id` int(30) NOT NULL DEFAULT 1,
+          `name` varchar(150) NOT NULL,
+          `rate` decimal(7,4) NOT NULL DEFAULT 0.0000,
+          `applies_to` enum('sale','purchase','both') NOT NULL DEFAULT 'both',
+          `is_default` tinyint(1) NOT NULL DEFAULT 0,
+          `delete_flag` tinyint(1) NOT NULL DEFAULT 0,
+          `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+          PRIMARY KEY (`id`),
+          KEY `tax_tenant` (`tenant_id`, `delete_flag`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    }
+
+    public function check_fx_migrations(){
+        if (!$this->conn) return;
+
+        @$this->conn->query("CREATE TABLE IF NOT EXISTS `exchange_rates` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `tenant_id` int(30) NOT NULL DEFAULT 1,
+          `currency_code` varchar(10) NOT NULL,
+          `rate_date` date NOT NULL,
+          `rate` decimal(18,8) NOT NULL,
+          `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+          PRIMARY KEY (`id`),
+          UNIQUE KEY `rate_day` (`tenant_id`, `currency_code`, `rate_date`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        // A journal line may be in a foreign currency: the original amount is kept beside the base-currency amount.
+        $cols = array(
+            'currency'  => "ALTER TABLE `journal_items` ADD COLUMN `currency` varchar(10) DEFAULT NULL",
+            'fx_rate'   => "ALTER TABLE `journal_items` ADD COLUMN `fx_rate` decimal(18,8) DEFAULT NULL",
+            'amount_fc' => "ALTER TABLE `journal_items` ADD COLUMN `amount_fc` decimal(18,4) DEFAULT NULL",
+        );
+        foreach ($cols as $col => $sql) {
+            $res = @$this->conn->query("SHOW COLUMNS FROM `journal_items` LIKE '{$col}'");
+            if ($res && $res->num_rows == 0) {
+                @$this->conn->query($sql);
             }
         }
     }

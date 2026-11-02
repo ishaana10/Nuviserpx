@@ -411,6 +411,12 @@ final class Permissions
         // Posting a journal, whichever way it is created: needs the same right as save_journal (new).
         'reverse_journal'       => ['journals', 'create'],
         'post_opening_balances' => ['journals', 'create'],
+        // Budgets are a plan against the chart of accounts, so they follow its edit right.
+        'save_budget'           => ['accounts', 'edit'],
+        'save_exchange_rate'    => ['settings_manage'],
+        'post_fx_revaluation'   => ['journals', 'create'],
+        'save_tax_code'         => ['settings_manage'],
+        'delete_tax_code'       => ['settings_manage'],
         // Closing or reopening the books changes what every other user may do: tenant-admin only.
         'set_period_lock'       => ['settings_manage'],
         // Invoices
@@ -599,6 +605,7 @@ final class Permissions
         'journals'          => 'journals_view',
         'accounts'          => 'accounts_view',
         'groups'            => 'accounts_view',
+        'budgets'           => 'accounts_view',
         'bank_reconciliation' => 'bank_reconciliation_view',
         'assets'            => 'assets_view',
         'expense_reports'   => 'expenses_view',

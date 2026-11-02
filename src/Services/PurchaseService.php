@@ -403,9 +403,7 @@ class PurchaseService
             $journal_id = $this->conn->insert_id;
 
             // group_id mirrors the chart-of-accounts group used in InvoiceService (expense=5-ish / liability=3).
-            $this->conn->query("INSERT INTO `journal_items` (`journal_id`, `account_id`, `group_id`, `amount`) VALUES
-				('{$journal_id}', '{$exp_acc_id}', '5', '{$total}'),
-				('{$journal_id}', '{$ap_acc_id}', '3', '{$total}')");
+            $this->postBillLines((int)$journal_id, (int)$ap_acc_id, (int)$exp_acc_id, (float)$total, (float)$tax_amount);
 
             $sql = "INSERT INTO `vendor_bill_list` SET
 				`tenant_id` = '{$tenant_id}',
@@ -433,9 +431,7 @@ class PurchaseService
             if ($journal_id) {
                 $this->conn->query("UPDATE `journal_entries` SET `description` = '{$description}', `journal_date` = '{$journal_date}' WHERE id = '{$journal_id}'");
                 $this->conn->query("DELETE FROM `journal_items` WHERE journal_id = '{$journal_id}'");
-                $this->conn->query("INSERT INTO `journal_items` (`journal_id`, `account_id`, `group_id`, `amount`) VALUES
-					('{$journal_id}', '{$exp_acc_id}', '5', '{$total}'),
-					('{$journal_id}', '{$ap_acc_id}', '3', '{$total}')");
+                $this->postBillLines((int)$journal_id, (int)$ap_acc_id, (int)$exp_acc_id, (float)$total, (float)$tax_amount);
             }
 
             $sql = "UPDATE `vendor_bill_list` SET
@@ -618,6 +614,19 @@ class PurchaseService
             } catch (\Throwable $e) {
                 // swallow — integration layer must not surface to core
             }
+        }
+    }
+
+    /** Expense Dr net; VAT Input Dr tax; Payables Cr gross (see TaxService::postingLines). */
+    private function postBillLines(int $journalId, int $apAcc, int $expAcc, float $total, float $tax): void
+    {
+        $taxSvc = new TaxService($this->conn, $this->settings);
+        $taxAcc = $tax > 0 ? $taxSvc->controlAccount('input') : 0;
+        $lines = TaxService::postingLines('purchase', $total, $tax, $expAcc, $taxAcc, $apAcc);
+        if (!$taxSvc->writeLines($journalId, $lines)) {
+            // Never leave a half-posted journal: fall back to a single unsplit pair.
+            $this->conn->query("DELETE FROM `journal_items` WHERE journal_id = " . (int)$journalId);
+            $taxSvc->writeLines($journalId, TaxService::postingLines('purchase', $total, 0.0, $expAcc, 0, $apAcc));
         }
     }
 }

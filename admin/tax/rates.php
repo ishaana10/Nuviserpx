@@ -1,234 +1,105 @@
 <?php
-require_once(__DIR__ . '/../../config.php');
+/**
+ * Tax rates. Each rate is a named percentage; the default rate pre-fills new invoice and bill lines.
+ * VAT collected and paid is posted to the VAT Output and VAT Input accounts automatically.
+ */
+require_once __DIR__ . '/../../config.php';
 
-$tenant_id = $_settings->active_tenant_id();
-
-// Default tax rates list
-$default_tax_rates = [
-    ['id' => 1, 'name' => 'Sales Tax on Imports', 'rate' => 0.00, 'accounts_count' => 0],
-    ['id' => 2, 'name' => 'Tax Exempt', 'rate' => 0.00, 'accounts_count' => 33],
-    ['id' => 3, 'name' => 'Tax on Purchases', 'rate' => 15.00, 'accounts_count' => 19],
-    ['id' => 4, 'name' => 'Tax on Sales (FRCS VAT)', 'rate' => 15.00, 'accounts_count' => 24],
-    ['id' => 5, 'name' => 'Zero Rated (0%)', 'rate' => 0.00, 'accounts_count' => 5],
-];
+$taxSvc = new \App\Services\TaxService($conn, $_settings);
+$codes = $taxSvc->codes();
+$appliesLabel = ['both' => 'Sales and purchases', 'sale' => 'Sales only', 'purchase' => 'Purchases only'];
 ?>
-
-<style>
-.tax-banner {
-    background-color: #22c55e;
-    color: #ffffff;
-    padding: 10px 16px;
-    border-radius: 6px 6px 0 0;
-    font-weight: 700;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-
-.tax-banner-body {
-    background-color: #f0fdf4;
-    border: 1px solid #bbf7d0;
-    border-top: none;
-    padding: 16px;
-    border-radius: 0 0 6px 6px;
-    color: #166534;
-    font-size: 0.88rem;
-    margin-bottom: 20px;
-}
-
-.tax-table th {
-    background-color: #f8fafc;
-    color: #334155;
-    font-size: 0.85rem;
-    font-weight: 700;
-    padding: 10px 12px;
-    border-bottom: 2px solid #cbd5e1;
-}
-
-.tax-table td {
-    padding: 10px 12px;
-    vertical-align: middle;
-    font-size: 0.9rem;
-}
-</style>
-
 <div class="container-fluid py-3">
-    <!-- Breadcrumb -->
-    <div class="text-xs text-muted mb-1">
-        <span>Settings</span> &gt; <strong class="text-dark">Tax rates</strong>
-    </div>
-    <h3 class="font-weight-bold text-navy mb-3">Tax rates</h3>
+    <div class="text-xs text-muted mb-1"><span>Settings</span> &gt; <strong class="text-dark">Tax rates</strong></div>
+    <h3 class="font-weight-bold text-navy mb-1">Tax rates</h3>
+    <p class="text-muted text-sm mb-3">
+        VAT on invoices is posted to <b>VAT Output</b> (owed to the tax authority) and VAT on bills to <b>VAT Input</b> (reclaimable).
+        The default rate fills new invoice and bill lines. Documents already posted keep the tax they were saved with.
+    </p>
 
-    <!-- Getting Started Guide Banner -->
-    <div id="guide-banner">
-        <div class="tax-banner">
-            <span>Getting Started with Tax Rates</span>
-            <button type="button" class="btn btn-xs text-white p-0" onclick="$('#guide-banner').fadeOut()">
-                Hide Getting Started <i class="fas fa-times ml-1"></i>
-            </button>
-        </div>
-        <div class="tax-banner-body">
-            <p class="mb-2">
-                Every transaction line item you enter into Nuvis ERP needs a Tax Rate. The Tax Rates you use will depend on the location of your organisation. Tax Rates can have multiple Tax Components. For instance, you can have an item that is charged a Tax Rate called "City Import Tax (8%)" that has two components: a city tax of 5% and an import tax of 3%.
-            </p>
-            <p class="mb-2">
-                You can generate reports on any Tax Rate and Tax Components. If you need to report on income separately to expenses, or capital purchases separately to expenses, then you should create a separate Tax Rate for each.
-            </p>
-            <a href="javascript:void(0)" class="font-weight-bold text-success text-decoration-underline" onclick="alert('Tax Rates allow automated VAT output/input logging on invoices and bills according to FRCS regulations.')">
-                • View more help for Tax Rates
-            </a>
-        </div>
+    <div class="mb-3">
+        <button type="button" class="btn btn-sm btn-primary font-weight-bold" id="btn_new_tax_rate"><i class="fas fa-plus mr-1"></i> New tax rate</button>
     </div>
 
-    <!-- Action Toolbar -->
-    <div class="d-flex align-items-center gap-2 mb-3">
-        <button type="button" class="btn btn-sm btn-primary bg-gradient-primary font-weight-bold shadow-sm" id="btn_new_tax_rate">
-            <i class="fas fa-plus mr-1"></i> New Tax Rate
-        </button>
-        <button type="button" class="btn btn-sm btn-outline-danger font-weight-bold" id="btn_delete_selected" disabled>
-            Delete
-        </button>
-        <span class="text-muted text-xs ml-2" id="selected_count_label">No items selected</span>
-    </div>
-
-    <!-- Tax Rates Listing Table -->
     <div class="card border shadow-sm rounded-lg overflow-hidden">
         <div class="table-responsive">
-            <table class="table table-hover tax-table mb-0">
-                <thead>
-                    <tr>
-                        <th width="4%" class="text-center">
-                            <input type="checkbox" id="check_all_tax">
-                        </th>
-                        <th>Name <i class="fas fa-caret-up text-primary ml-1"></i></th>
-                        <th width="15%">Tax Rate</th>
-                        <th width="25%">Accounts using this Tax Rate</th>
-                        <th width="10%" class="text-center">Action</th>
-                    </tr>
-                </thead>
+            <table class="table table-hover mb-0">
+                <thead><tr><th>Name</th><th width="12%" class="text-right">Rate</th><th width="22%">Used on</th><th width="12%">Default</th><th width="14%" class="text-center">Action</th></tr></thead>
                 <tbody>
-                    <?php foreach($default_tax_rates as $tr): ?>
+                <?php foreach ($codes as $c): ?>
                     <tr>
+                        <td class="font-weight-bold"><?= htmlspecialchars($c['name']) ?></td>
+                        <td class="text-right"><?= rtrim(rtrim(number_format((float)$c['rate'], 4), '0'), '.') ?>%</td>
+                        <td><?= $appliesLabel[$c['applies_to']] ?? '' ?></td>
+                        <td><?= (int)$c['is_default'] ? '<span class="badge badge-success">Default</span>' : '' ?></td>
                         <td class="text-center">
-                            <input type="checkbox" class="tax-row-check">
-                        </td>
-                        <td>
-                            <a href="javascript:void(0)" class="font-weight-bold text-primary edit-rate-trigger" data-id="<?= $tr['id'] ?>" data-name="<?= htmlspecialchars($tr['name']) ?>" data-rate="<?= $tr['rate'] ?>">
-                                <i class="fas fa-lock text-muted mr-2 text-xs"></i> <?= htmlspecialchars($tr['name']) ?>
-                            </a>
-                        </td>
-                        <td class="font-weight-bold text-navy"><?= number_format($tr['rate'], 0) ?>%</td>
-                        <td>
-                            <a href="./?page=accounts" class="text-info font-weight-semibold">
-                                <?= $tr['accounts_count'] ?> accounts
-                            </a>
-                        </td>
-                        <td class="text-center">
-                            <button type="button" class="btn btn-xs btn-outline-primary edit-rate-trigger" data-id="<?= $tr['id'] ?>" data-name="<?= htmlspecialchars($tr['name']) ?>" data-rate="<?= $tr['rate'] ?>">
-                                <i class="fas fa-edit"></i>
-                            </button>
+                            <button type="button" class="btn btn-xs btn-outline-primary edit-rate" data-id="<?= (int)$c['id'] ?>" data-name="<?= htmlspecialchars($c['name'], ENT_QUOTES) ?>" data-rate="<?= htmlspecialchars((string)(float)$c['rate'], ENT_QUOTES) ?>" data-applies="<?= htmlspecialchars($c['applies_to'], ENT_QUOTES) ?>" data-default="<?= (int)$c['is_default'] ?>"><i class="fas fa-edit"></i></button>
+                            <button type="button" class="btn btn-xs btn-outline-danger delete-rate" data-id="<?= (int)$c['id'] ?>" data-name="<?= htmlspecialchars($c['name'], ENT_QUOTES) ?>"><i class="fas fa-trash"></i></button>
                         </td>
                     </tr>
-                    <?php endforeach; ?>
+                <?php endforeach; ?>
+                <?php if (!$codes): ?><tr><td colspan="5" class="text-muted text-center py-4">No tax rates yet.</td></tr><?php endif; ?>
                 </tbody>
             </table>
         </div>
     </div>
 </div>
 
-<!-- MODAL: EDIT / NEW TAX RATE -->
-<div class="modal fade" id="modal_edit_tax_rate" tabindex="-1" role="dialog" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-md" role="document">
-        <div class="modal-content border-0 shadow-lg" style="border-radius: 10px;">
-            <div class="modal-header bg-white border-bottom py-3">
-                <h5 class="modal-title font-weight-bold text-dark m-0" id="taxModalTitle">Edit Tax Rate</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
+<div class="modal fade" id="modal_tax_rate" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header"><h5 class="modal-title font-weight-bold" id="taxModalTitle">Tax rate</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button></div>
             <form id="form_tax_rate">
-                <div class="modal-body p-4">
-                    <div class="form-group mb-3">
-                        <label class="font-weight-bold text-dark text-sm mb-1">Tax Rate Display Name</label>
-                        <input type="text" name="tax_name" id="tax_name" class="form-control" style="border-radius: 6px;" value="Sales Tax on Imports" required>
+                <input type="hidden" name="id" id="tax_id" value="0">
+                <div class="modal-body">
+                    <div class="form-group"><label class="font-weight-bold">Name</label>
+                        <input type="text" name="name" id="tax_name" class="form-control" required maxlength="150"></div>
+                    <div class="form-row">
+                        <div class="form-group col-5"><label class="font-weight-bold">Rate (%)</label>
+                            <input type="number" name="rate" id="tax_rate" class="form-control text-right" step="any" min="0" max="100" required></div>
+                        <div class="form-group col-7"><label class="font-weight-bold">Used on</label>
+                            <select name="applies_to" id="tax_applies" class="form-control">
+                                <option value="both">Sales and purchases</option><option value="sale">Sales only</option><option value="purchase">Purchases only</option>
+                            </select></div>
                     </div>
-
-                    <label class="font-weight-bold text-dark text-sm mb-2">Tax Components</label>
-                    <div class="row align-items-center mb-3">
-                        <div class="col-8">
-                            <input type="text" name="component_name" id="component_name" class="form-control" style="border-radius: 6px;" value="VAT / TAX" required>
-                        </div>
-                        <div class="col-4 d-flex align-items-center">
-                            <input type="number" step="any" name="component_rate" id="component_rate" class="form-control text-right mr-1" style="border-radius: 6px;" value="15.00" required>
-                            <span class="font-weight-bold text-muted">%</span>
-                        </div>
-                    </div>
-
-                    <div class="d-flex justify-content-between align-items-center pt-3 border-top mt-4">
-                        <h6 class="font-weight-bold text-dark m-0">Total tax rate:</h6>
-                        <h4 class="font-weight-bold text-navy m-0" id="lbl_total_tax_rate">15.00%</h4>
+                    <div class="custom-control custom-checkbox">
+                        <input type="checkbox" class="custom-control-input" name="is_default" id="tax_default" value="1">
+                        <label class="custom-control-label" for="tax_default">Use as the default for new invoice and bill lines</label>
                     </div>
                 </div>
-                <div class="modal-footer bg-light py-2 px-4 d-flex justify-content-end">
-                    <button type="button" class="btn btn-sm btn-secondary mr-2" data-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-sm btn-info bg-gradient-info font-weight-bold px-4">OK</button>
-                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-sm btn-secondary" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-sm btn-primary font-weight-bold px-4">Save</button></div>
             </form>
         </div>
     </div>
 </div>
 
 <script>
-$(document).ready(function(){
-    // Checkbox selection toggle
-    $('#check_all_tax').change(function(){
-        $('.tax-row-check').prop('checked', this.checked);
-        updateSelectionState();
+$(function () {
+    var post = function (f, data) {
+        start_loader();
+        $.ajax({ url: _base_url_ + 'classes/Master.php?f=' + f, method: 'POST', data: data, dataType: 'json',
+            error: function () { alert_toast('An error occurred.', 'error'); end_loader(); },
+            success: function (r) {
+                if (r && r.status === 'success') { location.reload(); }
+                else { alert_toast((r && r.msg) || 'An error occurred.', 'error'); end_loader(); }
+            } });
+    };
+    $('#btn_new_tax_rate').on('click', function () {
+        $('#taxModalTitle').text('New tax rate'); $('#tax_id').val(0); $('#tax_name').val(''); $('#tax_rate').val('');
+        $('#tax_applies').val('both'); $('#tax_default').prop('checked', false); $('#modal_tax_rate').modal('show');
     });
-
-    $(document).on('change', '.tax-row-check', function(){
-        updateSelectionState();
+    $('.edit-rate').on('click', function () {
+        var d = $(this).data();
+        $('#taxModalTitle').text('Edit tax rate'); $('#tax_id').val(d.id); $('#tax_name').val(d.name); $('#tax_rate').val(d.rate);
+        $('#tax_applies').val(d.applies); $('#tax_default').prop('checked', Number(d['default']) === 1); $('#modal_tax_rate').modal('show');
     });
-
-    function updateSelectionState(){
-        var count = $('.tax-row-check:checked').length;
-        if(count > 0){
-            $('#btn_delete_selected').prop('disabled', false);
-            $('#selected_count_label').text(count + ' item(s) selected');
-        } else {
-            $('#btn_delete_selected').prop('disabled', true);
-            $('#selected_count_label').text('No items selected');
-        }
-    }
-
-    // Modal Trigger
-    $('#btn_new_tax_rate').click(function(){
-        $('#taxModalTitle').text('Create New Tax Rate');
-        $('#tax_name').val('');
-        $('#component_rate').val('15.00');
-        $('#lbl_total_tax_rate').text('15.00%');
-        $('#modal_edit_tax_rate').modal('show');
+    $('#form_tax_rate').on('submit', function (e) { e.preventDefault(); post('save_tax_code', $(this).serialize()); });
+    $('.delete-rate').on('click', function () {
+        var d = $(this).data();
+        _conf('Delete the tax rate “' + d.name + '”? Documents already saved are not changed.', 'delete_rate', [d.id]);
     });
-
-    $(document).on('click', '.edit-rate-trigger', function(){
-        var name = $(this).data('name');
-        var rate = parseFloat($(this).data('rate')) || 0;
-        $('#taxModalTitle').text('Edit Tax Rate - ' + name);
-        $('#tax_name').val(name);
-        $('#component_rate').val(rate.toFixed(2));
-        $('#lbl_total_tax_rate').text(rate.toFixed(2) + '%');
-        $('#modal_edit_tax_rate').modal('show');
-    });
-
-    $('#component_rate').on('input change', function(){
-        var val = parseFloat($(this).val()) || 0;
-        $('#lbl_total_tax_rate').text(val.toFixed(2) + '%');
-    });
-
-    $('#form_tax_rate').submit(function(e){
-        e.preventDefault();
-        alert_toast("Tax rate saved successfully.", 'success');
-        $('#modal_edit_tax_rate').modal('hide');
-    });
+    window.delete_rate = function (id) { post('delete_tax_code', { id: id }); };
 });
 </script>
