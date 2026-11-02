@@ -951,6 +951,11 @@ class Master extends DBConnection
         return $this->container->make(JournalService::class)->saveJournal($_POST);
     }
 
+    public function post_opening_balances()
+    {
+        return $this->container->make(JournalService::class)->postOpeningBalances($_POST);
+    }
+
     public function delete_journal()
     {
         return $this->container->make(JournalService::class)->deleteJournal(intval($_POST['id'] ?? 0));
@@ -1801,6 +1806,9 @@ switch ($action) {
         break;
     case 'save_journal':
         echo $Master->save_journal();
+        break;
+    case 'post_opening_balances':
+        echo $Master->post_opening_balances();
         break;
     case 'delete_journal':
         echo $Master->delete_journal();

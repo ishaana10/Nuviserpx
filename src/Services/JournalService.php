@@ -96,19 +96,21 @@ class JournalService
                 $del->execute();
             }
 
-            $ins = $this->conn->prepare("INSERT INTO journal_items (journal_id, account_id, group_id, amount, description, tax_rate) VALUES (?, ?, ?, ?, ?, ?)");
+            $ins = $this->conn->prepare("INSERT INTO journal_items (journal_id, account_id, group_id, entry_side, amount, description, tax_rate) VALUES (?, ?, ?, ?, ?, ?, ?)");
             foreach ($lines as $l) {
                 $dr = round((float)$l['debit'], 2);
                 $cr = round((float)$l['credit'], 2);
                 if ((int)$l['account_id'] === 0 || ($dr == 0.0 && $cr == 0.0)) {
                     continue;
                 }
-                $side = $dr > 0 ? 1 : 2;              // 1 = debit, 2 = credit
-                $amount = $dr > 0 ? $dr : $cr;
+                $side = $dr > 0 ? 1 : 2;              // legacy group_id encoding: 1 = debit, 2 = credit
+                $entrySide = $dr > 0 ? 'debit' : 'credit';
+                // Bound as a decimal string so the value never passes through a binary float on the way to DECIMAL(18,4).
+                $amount = number_format($dr > 0 ? $dr : $cr, 4, '.', '');
                 $acc = (int)$l['account_id'];
                 $desc = mb_substr((string)$l['description'], 0, 500);
                 $tax = mb_substr((string)$l['tax_rate'], 0, 100) ?: 'No Tax (0%)';
-                $ins->bind_param('iiidss', $id, $acc, $side, $amount, $desc, $tax);
+                $ins->bind_param('iiissss', $id, $acc, $side, $entrySide, $amount, $desc, $tax);
                 if (!$ins->execute()) {
                     throw new \RuntimeException($this->conn->error);
                 }
@@ -122,6 +124,72 @@ class JournalService
         $msg = $existing ? 'Journal updated.' : ($status === 'draft' ? 'Journal saved as a draft.' : 'Journal posted.');
         $this->settings->set_flashdata('success', $msg);
         return json_encode(['status' => 'success', 'msg' => $msg, 'id' => $id]);
+    }
+
+    /**
+     * Post opening balances as ONE dated journal.
+     *
+     * $post: as_at (Y-m-d), account_id[], debit[], credit[]. Whatever the lines leave unbalanced is
+     * taken to the tenant's "Opening Balance Equity" account, so the journal always balances and the
+     * trial balance opens correctly. Use the day before the first transaction as the date.
+     */
+    public function postOpeningBalances(array $post): string
+    {
+        $tenant_id = (int)$this->settings->active_tenant_id();
+        $asAt = trim((string)($post['as_at'] ?? ''));
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $asAt) || !strtotime($asAt)) {
+            return $this->fail('Enter the date the opening balances are as at.');
+        }
+
+        $obe = $this->openingEquityAccountId($tenant_id);
+        if ($obe === 0) {
+            return $this->fail('The “Opening Balance Equity” account is missing. Reload the app to recreate it.');
+        }
+
+        $acc = $dr = $cr = [];
+        $totalDr = $totalCr = 0.0;
+        foreach ((array)($post['account_id'] ?? []) as $k => $accountId) {
+            $d = round((float)($post['debit'][$k] ?? 0), 2);
+            $c = round((float)($post['credit'][$k] ?? 0), 2);
+            if ((int)$accountId === 0 || ($d == 0.0 && $c == 0.0)) {
+                continue;
+            }
+            if ((int)$accountId === $obe) {
+                return $this->fail('Opening Balance Equity is filled in automatically. Leave it out of the list.');
+            }
+            $acc[] = (int)$accountId;
+            $dr[] = $d;
+            $cr[] = $c;
+            $totalDr += $d;
+            $totalCr += $c;
+        }
+        if (!$acc) {
+            return $this->fail('Enter at least one opening balance.');
+        }
+
+        $diff = round($totalDr - $totalCr, 2);
+        if ($diff != 0.0) {
+            $acc[] = $obe;
+            $dr[] = $diff < 0 ? -$diff : 0.0;
+            $cr[] = $diff > 0 ? $diff : 0.0;
+        }
+
+        return $this->saveJournal([
+            'journal_date' => $asAt,
+            'description' => 'Opening balances as at ' . $asAt,
+            'status' => 'posted',
+            'account_id' => $acc,
+            'debit' => $dr,
+            'credit' => $cr,
+        ]);
+    }
+
+    private function openingEquityAccountId(int $tenant_id): int
+    {
+        $stmt = $this->conn->prepare("SELECT id FROM account_list WHERE tenant_id = ? AND name = 'Opening Balance Equity' AND delete_flag = 0 LIMIT 1");
+        $stmt->bind_param('i', $tenant_id);
+        $stmt->execute();
+        return (int)($stmt->get_result()->fetch_assoc()['id'] ?? 0);
     }
 
     /**

@@ -63,6 +63,7 @@ class DBConnection{
                 $this->check_customer_portal_migrations();
                 $this->check_fixed_assets_migrations();
                 $this->check_journal_options_migrations();
+                $this->check_ledger_precision_migrations();
                 $this->check_dolibarr_crm_migrations();
                 $this->check_dolibarr_extended_migrations();
                 $this->check_extrafields_migrations();
@@ -622,6 +623,106 @@ class DBConnection{
                 @$this->conn->query($sql);
             }
         }
+    }
+
+    /**
+     * Ledger data-model & precision hardening:
+     *  1. journal_items.amount  float -> DECIMAL(18,4)   (stored 4dp; the app displays 2dp)
+     *  2. journal_items.entry_side ENUM('debit','credit') — an explicit side, no longer
+     *     riding on group_id; backfilled from the legacy group_id encoding.
+     *  3. account_list.normal_balance ENUM('debit','credit') — the account's natural side,
+     *     set from its type (classify() still governs the statements at runtime).
+     *  4. Backfill any missing account codes with a class-banded number.
+     *  5. Seed one "Opening Balance Equity" account per tenant (contra for opening journals).
+     * Every step is guarded so re-running is a no-op.
+     */
+    public function check_ledger_precision_migrations(){
+        if (!$this->conn) return;
+
+        // 1. Money precision.
+        $res = @$this->conn->query("SHOW COLUMNS FROM `journal_items` LIKE 'amount'");
+        $row = $res ? $res->fetch_assoc() : null;
+        if ($row && stripos((string)($row['Type'] ?? ''), 'decimal(18,4)') === false) {
+            @$this->conn->query("ALTER TABLE `journal_items` MODIFY `amount` decimal(18,4) NOT NULL DEFAULT 0");
+        }
+
+        // 2. Explicit debit/credit side.
+        $res = @$this->conn->query("SHOW COLUMNS FROM `journal_items` LIKE 'entry_side'");
+        if ($res && $res->num_rows == 0) {
+            @$this->conn->query("ALTER TABLE `journal_items` ADD COLUMN `entry_side` enum('debit','credit') DEFAULT NULL AFTER `group_id`");
+            @$this->conn->query(
+                "UPDATE `journal_items` ji LEFT JOIN `group_list` g ON g.id = ji.group_id
+                 SET ji.entry_side = CASE
+                        WHEN ji.group_id = 1 THEN 'debit'
+                        WHEN ji.group_id = 2 THEN 'credit'
+                        WHEN COALESCE(g.type, 1) = 2 THEN 'credit'
+                        ELSE 'debit' END
+                 WHERE ji.entry_side IS NULL"
+            );
+            @$this->conn->query("ALTER TABLE `journal_items` ADD INDEX `entry_side` (`entry_side`)");
+        }
+
+        // Rows written by older code paths (invoices, payments, payroll, purchases, API) only set group_id.
+        // Best effort: fill entry_side for them. If the DB user lacks TRIGGER privilege this is skipped and
+        // LedgerService::SIDE_SQL falls back to group_id, so balances stay correct either way.
+        $trg = @$this->conn->query("SHOW TRIGGERS WHERE `Trigger` = 'journal_items_entry_side_bi'");
+        if ($trg && $trg->num_rows == 0) {
+            @$this->conn->query(
+                "CREATE TRIGGER `journal_items_entry_side_bi` BEFORE INSERT ON `journal_items` FOR EACH ROW
+                 SET NEW.entry_side = COALESCE(NEW.entry_side,
+                     CASE WHEN NEW.group_id = 1 THEN 'debit'
+                          WHEN NEW.group_id = 2 THEN 'credit'
+                          WHEN (SELECT g.type FROM group_list g WHERE g.id = NEW.group_id) = 2 THEN 'credit'
+                          ELSE 'debit' END)"
+            );
+        }
+
+        // 3. Stored normal balance side on each account.
+        $res = @$this->conn->query("SHOW COLUMNS FROM `account_list` LIKE 'normal_balance'");
+        if ($res && $res->num_rows == 0) {
+            @$this->conn->query("ALTER TABLE `account_list` ADD COLUMN `normal_balance` enum('debit','credit') NOT NULL DEFAULT 'debit' AFTER `type`");
+            // Assets & expenses are debit-normal; liabilities, equity and income are credit-normal.
+            @$this->conn->query(
+                "UPDATE `account_list`
+                 SET normal_balance = CASE
+                        WHEN LOWER(type) REGEXP 'liabilit|payable|equity|capital|retain|draw|revenue|sales|income'
+                             AND LOWER(type) NOT REGEXP 'asset|expense|cost|purchase|bank|cash|receivable|inventory|prepay|depreciat|overhead'
+                        THEN 'credit' ELSE 'debit' END"
+            );
+        }
+
+        // 4. Backfill missing account codes with a class-banded number.
+        if (class_exists('App\\Services\\LedgerService')) {
+            $bands = array('asset' => 1000, 'liability' => 2000, 'equity' => 3000, 'income' => 4000, 'expense' => 5000);
+            $res = @$this->conn->query("SELECT id, tenant_id, type FROM `account_list` WHERE code IS NULL OR code = ''");
+            if ($res && $res->num_rows > 0) {
+                $next = array();
+                while ($a = $res->fetch_assoc()) {
+                    $tid = (int)$a['tenant_id'];
+                    $class = \App\Services\LedgerService::classify($a['type'] ?? '')['class'];
+                    $base = $bands[$class] ?? 5000;
+                    $key = $tid . ':' . $base;
+                    if (!isset($next[$key])) {
+                        $top = $base + 998; // 3999 is reserved for Opening Balance Equity
+                        $mx = @$this->conn->query("SELECT MAX(CAST(code AS UNSIGNED)) m FROM `account_list` WHERE tenant_id = {$tid} AND CAST(code AS UNSIGNED) BETWEEN {$base} AND {$top}");
+                        $cur = $mx ? (int)($mx->fetch_assoc()['m'] ?? 0) : 0;
+                        $next[$key] = $cur >= $base ? $cur : $base - 10;
+                    }
+                    $next[$key] += 10;
+                    $code = (string)$next[$key];
+                    $id = (int)$a['id'];
+                    @$this->conn->query("UPDATE `account_list` SET code = '{$code}' WHERE id = {$id} AND (code IS NULL OR code = '')");
+                }
+            }
+        }
+
+        // 5. Seed an Opening Balance Equity account per tenant (code 3999 avoids the +10 band sequence).
+        @$this->conn->query(
+            "INSERT INTO `account_list` (tenant_id, code, name, description, type, normal_balance, status, delete_flag)
+             SELECT t.id, '3999', 'Opening Balance Equity', 'Opening Balance Equity', 'Equity', 'credit', 1, 0
+             FROM `tenants` t
+             WHERE NOT EXISTS (SELECT 1 FROM `account_list` a WHERE a.tenant_id = t.id AND a.name = 'Opening Balance Equity' AND a.delete_flag = 0)"
+        );
     }
 
     public function check_invoice_template_migrations(){

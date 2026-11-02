@@ -20,7 +20,7 @@ use mysqli;
  */
 class LedgerService
 {
-    public const SIDE_SQL = "(CASE WHEN ji.group_id IN (1,2) THEN ji.group_id ELSE COALESCE(g.type, 1) END)";
+    public const SIDE_SQL = "(CASE WHEN ji.entry_side = 'debit' THEN 1 WHEN ji.entry_side = 'credit' THEN 2 WHEN ji.group_id IN (1,2) THEN ji.group_id ELSE COALESCE(g.type, 1) END)";
     public const POSTED_SQL = "(j.status IS NULL OR LOWER(j.status) NOT IN ('draft','cancelled','canceled','void','2','3'))";
 
     /** Statement sections in display order, with the class they belong to. */
@@ -76,10 +76,14 @@ class LedgerService
             $section = 'equity';
         } elseif (str_contains($t, 'other income')) {
             $section = 'other_income';
+        } elseif (str_contains($t, 'direct cost') || str_contains($t, 'cost of') || str_contains($t, 'cogs') || str_contains($t, 'purchases')) {
+            // Before the revenue test: "Cost of Sales" contains "sales" but is a cost.
+            $section = 'direct_costs';
+        } elseif (str_contains($t, 'expense')) {
+            // Before the revenue test: "Income Tax Expense" contains "income" but is an expense.
+            $section = 'expense';
         } elseif (str_contains($t, 'revenue') || str_contains($t, 'sales') || str_contains($t, 'income')) {
             $section = 'revenue';
-        } elseif (str_contains($t, 'direct cost') || str_contains($t, 'cost of') || str_contains($t, 'cogs') || str_contains($t, 'purchases')) {
-            $section = 'direct_costs';
         }
 
         $class = self::SECTIONS[$section]['class'];
@@ -88,6 +92,35 @@ class LedgerService
             'section' => $section,
             'normal' => in_array($class, ['asset', 'expense'], true) ? 'debit' : 'credit',
         ];
+    }
+
+    /** Class → first code of its numbering band (used to auto-assign account codes). */
+    public const CODE_BANDS = ['asset' => 1000, 'liability' => 2000, 'equity' => 3000, 'income' => 4000, 'expense' => 5000];
+
+    /**
+     * True when $type is one of the chart-of-accounts types the app offers.
+     * classify() stays forgiving so old data still reports; this is the gate for new writes.
+     */
+    public static function isRecognisedType(?string $type): bool
+    {
+        $t = strtolower(trim((string)$type));
+        foreach (AccountService::ACCOUNT_TYPES as $types) {
+            foreach ($types as $known) {
+                if (strtolower($known) === $t) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** Like classify(), but throws on a type that is not recognised instead of defaulting to expense. */
+    public static function classifyStrict(?string $type): array
+    {
+        if (!self::isRecognisedType($type)) {
+            throw new \InvalidArgumentException('Unknown account type “' . trim((string)$type) . '”.');
+        }
+        return self::classify($type);
     }
 
     /** Balance in the account's natural sign (assets/expenses Dr−Cr, others Cr−Dr). */
