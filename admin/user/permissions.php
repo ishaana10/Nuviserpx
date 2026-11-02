@@ -31,6 +31,12 @@ foreach(\App\Support\Permissions::matrix() as $section => $modules){
         }
     }
 }
+foreach(\App\Support\Permissions::pageGroups() as $section => $pages){
+    $rows[] = ['type' => 'section', 'label' => $section.' — individual pages'];
+    foreach($pages as $def){
+        $rows[] = ['type' => 'perm', 'label' => $def['label'], 'key' => $def['key']];
+    }
+}
 foreach(\App\Support\Permissions::adminGroups() as $section => $perms){
     $rows[] = ['type' => 'section', 'label' => $section];
     foreach($perms as $key => $label){

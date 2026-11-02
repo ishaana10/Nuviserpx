@@ -22,6 +22,7 @@ $permissions_list = \App\Support\Permissions::parse(isset($permissions) ? (strin
 $permission_matrix = \App\Support\Permissions::matrix();
 $admin_groups      = \App\Support\Permissions::adminGroups();
 $action_cols       = \App\Support\Permissions::ACTIONS; // view/create/edit/delete => labels
+$page_groups       = \App\Support\Permissions::pageGroups(); // discovered from the sidebar
 $has = function($key) use ($permissions_list){ return in_array($key, $permissions_list, true); };
 ?>
 
@@ -151,8 +152,8 @@ $has = function($key) use ($permissions_list){ return in_array($key, $permission
 				$(this).prop('checked', boxes.length > 0 && boxes.filter(':checked').length === boxes.length);
 			});
 		}
-		$('#perm-select-all').on('click', function(){ $('.perm-check').prop('checked', true); syncToggles(); });
-		$('#perm-clear-all').on('click', function(){ $('.perm-check').prop('checked', false); syncToggles(); });
+		$('#perm-select-all').on('click', function(){ $('.perm-check').prop('checked', true); syncToggles(); syncSections(); });
+		$('#perm-clear-all').on('click', function(){ $('.perm-check').prop('checked', false); syncToggles(); syncSections(); });
 		$('.col-toggle').on('change', function(){
 			var act = $(this).data('action'), on = $(this).is(':checked');
 			$('.perm-check[data-action="'+act+'"]').prop('checked', on);
