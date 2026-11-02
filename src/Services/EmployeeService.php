@@ -22,6 +22,12 @@ class EmployeeService
         $dataStr = "";
         foreach ($post as $k => $v) {
             if (!in_array($k, ['id'])) {
+                // Nullable foreign keys: store NULL when left blank rather than ''
+                if ($k === 'approver_id' && ($v === '' || $v === null)) {
+                    if (!empty($dataStr)) $dataStr .= ",";
+                    $dataStr .= " `approver_id`=NULL ";
+                    continue;
+                }
                 if (!is_numeric($v)) {
                     $v = $this->conn->real_escape_string((string)$v);
                 }
@@ -144,9 +150,14 @@ class EmployeeService
             $post['employee_id'] = $scope;
             unset($post['status']);
             if ($id > 0) {
-                $own = $this->conn->query("SELECT id FROM `leave_list` WHERE id = '{$id}' AND employee_id = '{$scope}' AND tenant_id = '{$tenant_id}'");
+                $own = $this->conn->query("SELECT status FROM `leave_list` WHERE id = '{$id}' AND employee_id = '{$scope}' AND tenant_id = '{$tenant_id}'");
                 if (!$own || $own->num_rows === 0) {
                     return json_encode(['status' => 'failed', 'msg' => 'You can only change your own leave requests.']);
+                }
+                // Once a request is approved/rejected/cancelled it can no longer be edited by the employee.
+                $existing = $own->fetch_assoc();
+                if (strtolower($existing['status']) !== 'pending') {
+                    return json_encode(['status' => 'failed', 'msg' => 'This leave request has already been processed and can no longer be edited.']);
                 }
             }
         } elseif (!empty($post['employee_id'])) {
@@ -167,7 +178,9 @@ class EmployeeService
             }
         }
         if (empty($id)) {
-            $sql = "INSERT INTO `leave_list` set `tenant_id`='{$tenant_id}', {$dataStr} ";
+            // New requests always start pending unless an administrator set a status explicitly.
+            $statusCol = isset($post['status']) ? '' : " `status`='pending', ";
+            $sql = "INSERT INTO `leave_list` set `tenant_id`='{$tenant_id}', {$statusCol} {$dataStr} ";
         } else {
             $sql = "UPDATE `leave_list` set {$dataStr} where id = '{$id}' and tenant_id = '{$tenant_id}' ";
         }
@@ -186,19 +199,79 @@ class EmployeeService
         return json_encode($resp);
     }
 
+    /**
+     * Approve or reject a leave request.
+     * Only the employee's assigned approver (employee_list.approver_id) or a
+     * super administrator may do this, and only while the request is pending.
+     */
     public function updateLeaveStatus(int $id, string $status): string
     {
-        $idEsc = $this->conn->real_escape_string((string)$id);
-        $statusEsc = $this->conn->real_escape_string($status);
-        $update = $this->conn->query("UPDATE `leave_list` set `status` = '{$statusEsc}' where id = '{$idEsc}'");
-        if ($update) {
-            $resp['status'] = 'success';
-            $this->settings->set_flashdata('success', " Leave status updated successfully.");
-        } else {
-            $resp['status'] = 'failed';
-            $resp['error'] = $this->conn->error;
+        $tenant_id = (int)$this->settings->active_tenant_id();
+        $status = strtolower(trim($status));
+        if (!in_array($status, ['approved', 'rejected'], true)) {
+            return json_encode(['status' => 'failed', 'msg' => 'Invalid status.']);
         }
-        return json_encode($resp);
+
+        $q = $this->conn->query("SELECT l.id, l.status, l.employee_id, e.approver_id FROM `leave_list` l INNER JOIN `employee_list` e ON l.employee_id = e.id WHERE l.id = '{$id}' AND l.tenant_id = '{$tenant_id}'");
+        if (!$q || $q->num_rows === 0) {
+            return json_encode(['status' => 'failed', 'msg' => 'Leave request not found.']);
+        }
+        $leave = $q->fetch_assoc();
+
+        $my_emp   = (int)$this->settings->own_employee_id();
+        $is_super = $this->settings->is_super_admin();
+        $is_approver = $is_super || ($my_emp > 0 && (int)$leave['approver_id'] === $my_emp);
+
+        if (!$is_approver) {
+            return json_encode(['status' => 'failed', 'msg' => 'Only the assigned approver can approve or reject this leave request.']);
+        }
+        // Nobody approves their own request.
+        if (!$is_super && $my_emp > 0 && (int)$leave['employee_id'] === $my_emp) {
+            return json_encode(['status' => 'failed', 'msg' => 'You cannot approve or reject your own leave request.']);
+        }
+        if (strtolower($leave['status']) !== 'pending') {
+            return json_encode(['status' => 'failed', 'msg' => 'This leave request has already been processed.']);
+        }
+
+        $update = $this->conn->query("UPDATE `leave_list` set `status` = '{$status}' where id = '{$id}' and tenant_id = '{$tenant_id}'");
+        if ($update) {
+            $this->settings->set_flashdata('success', " Leave request has been {$status}.");
+            return json_encode(['status' => 'success']);
+        }
+        return json_encode(['status' => 'failed', 'msg' => 'An error occurred.', 'error' => $this->conn->error]);
+    }
+
+    /**
+     * Cancel (withdraw) a leave request.
+     * The owner may cancel their own request while it is still pending; a super
+     * administrator may cancel any pending request.
+     */
+    public function cancelLeave(int $id): string
+    {
+        $tenant_id = (int)$this->settings->active_tenant_id();
+        $q = $this->conn->query("SELECT id, status, employee_id FROM `leave_list` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'");
+        if (!$q || $q->num_rows === 0) {
+            return json_encode(['status' => 'failed', 'msg' => 'Leave request not found.']);
+        }
+        $leave = $q->fetch_assoc();
+
+        $my_emp   = (int)$this->settings->own_employee_id();
+        $is_super = $this->settings->is_super_admin();
+        $is_owner = ($my_emp > 0 && (int)$leave['employee_id'] === $my_emp);
+
+        if (!$is_owner && !$is_super) {
+            return json_encode(['status' => 'failed', 'msg' => 'You can only cancel your own leave request.']);
+        }
+        if (strtolower($leave['status']) !== 'pending') {
+            return json_encode(['status' => 'failed', 'msg' => 'Only a pending leave request can be cancelled.']);
+        }
+
+        $update = $this->conn->query("UPDATE `leave_list` set `status` = 'cancelled' where id = '{$id}' and tenant_id = '{$tenant_id}'");
+        if ($update) {
+            $this->settings->set_flashdata('success', " Leave request has been cancelled.");
+            return json_encode(['status' => 'success']);
+        }
+        return json_encode(['status' => 'failed', 'msg' => 'An error occurred.', 'error' => $this->conn->error]);
     }
 
     public function deleteLeave(int $id): string

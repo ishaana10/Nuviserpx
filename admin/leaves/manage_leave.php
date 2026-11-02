@@ -70,14 +70,17 @@ if(isset($_GET['id']) && $_GET['id'] > 0){
 			<label for="reason" class="control-label">Reason</label>
 			<textarea name="reason" id="reason" rows="3" class="form-control form-control-sm rounded-0" required><?php echo isset($reason) ? $reason : ''; ?></textarea>
 		</div>
-		<?php if(isset($id)): ?>
+		<?php if(isset($id) && isset($status)): ?>
 		<div class="form-group">
-			<label for="status" class="control-label">Status</label>
-			<select name="status" id="status" class="form-control form-control-sm rounded-0" required>
-				<option value="pending" <?php echo isset($status) && $status == 'pending' ? 'selected' : '' ?>>Pending</option>
-				<option value="approved" <?php echo isset($status) && $status == 'approved' ? 'selected' : '' ?>>Approved</option>
-				<option value="rejected" <?php echo isset($status) && $status == 'rejected' ? 'selected' : '' ?>>Rejected</option>
-			</select>
+			<label class="control-label">Current Status</label>
+			<div>
+				<?php
+				$__st = strtolower($status);
+				$__badge = $__st === 'approved' ? 'success' : ($__st === 'pending' ? 'warning' : ($__st === 'cancelled' ? 'secondary' : 'danger'));
+				?>
+				<span class="badge badge-<?php echo $__badge ?> px-3 py-2 text-capitalize"><?php echo htmlspecialchars($status) ?></span>
+				<small class="text-muted d-block mt-1"><i>Approval or rejection is done by the assigned approver from the Leave Applications list.</i></small>
+			</div>
 		</div>
 		<?php endif; ?>
 	</form>

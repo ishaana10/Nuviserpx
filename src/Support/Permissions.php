@@ -461,7 +461,11 @@ final class Permissions
         'delete_attendance'     => ['attendance', 'delete'],
         'save_leave'            => ['leaves', 'save'],
         'delete_leave'          => ['leaves', 'delete'],
-        'update_leave_status'   => ['leaves', 'edit'],
+        // Approve/reject and cancel are gated at view-level here; the real
+        // authorization (assigned approver / owner + pending) is enforced in
+        // EmployeeService, because an assigned approver may only hold leaves_view.
+        'update_leave_status'   => ['leaves', 'view'],
+        'cancel_leave'          => ['leaves', 'view'],
         // Payroll
         'save_payroll'          => ['payroll', 'save'],
         'delete_payroll'        => ['payroll', 'delete'],
@@ -547,6 +551,13 @@ final class Permissions
         // Creating a payroll run IS processing payroll.
         if ($action === 'save_payroll' && !$hasId) {
             return 'payroll_process';
+        }
+        // Applying for leave and amending one's own request are the same
+        // self-service capability, so editing is gated at create-level too.
+        // EmployeeService still restricts a self-service user to their own
+        // pending request.
+        if ($action === 'save_leave') {
+            return 'leaves_create';
         }
         switch ($op) {
             case 'save':   return $module . '_' . ($hasId ? 'edit' : 'create');

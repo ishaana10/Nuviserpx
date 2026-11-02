@@ -34,7 +34,6 @@ if(isset($_GET['id']) && $_GET['id'] > 0){
 // Read-only mode for standard users viewing their own record without edit permission
 $readonly = isset($id) && !$can_edit && $scope !== null;
 ?>
-?>
 <div class="container-fluid">
 	<form action="" id="employee-form">
 		<input type="hidden" name="id" value="<?php echo isset($id) ? $id : '' ?>">
@@ -129,6 +128,24 @@ $readonly = isset($id) && !$can_edit && $scope !== null;
 				<label for="date_of_joining" class="control-label">Date of Joining</label>
 				<input type="date" name="date_of_joining" id="date_of_joining" class="form-control form-control-sm rounded-0" value="<?php echo isset($date_of_joining) ? $date_of_joining : date('Y-m-d'); ?>" />
 			</div>
+		</div>
+
+		<hr class="my-3">
+		<h6 class="text-navy font-weight-bold"><i class="fas fa-user-check"></i> Leave Approval</h6>
+		<div class="form-group">
+			<label for="approver_id" class="control-label">Assigned Leave Approver</label>
+			<select name="approver_id" id="approver_id" class="form-control form-control-sm rounded-0">
+				<option value="">None (Super Administrator approves)</option>
+				<?php
+				$__apr_tenant = $_settings->active_tenant_id();
+				$__self = isset($id) ? (int)$id : 0;
+				$__apr_qry = $conn->query("SELECT id, employee_code, concat(firstname,' ',lastname) as name FROM `employee_list` WHERE tenant_id = '{$__apr_tenant}' AND delete_flag = 0 " . ($__self > 0 ? " AND id != '{$__self}'" : "") . " ORDER BY firstname ASC");
+				if($__apr_qry): while($__apr = $__apr_qry->fetch_assoc()):
+				?>
+				<option value="<?php echo $__apr['id'] ?>" <?php echo isset($approver_id) && $approver_id == $__apr['id'] ? 'selected' : '' ?>><?php echo htmlspecialchars($__apr['employee_code'].' - '.$__apr['name']) ?></option>
+				<?php endwhile; endif; ?>
+			</select>
+			<small class="text-muted"><i>This employee's leave requests are approved or rejected by the person selected here.</i></small>
 		</div>
 
 		<div class="form-group">

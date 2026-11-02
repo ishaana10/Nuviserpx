@@ -1493,6 +1493,11 @@ class Master extends DBConnection
         return $this->container->make(EmployeeService::class)->updateLeaveStatus(intval($_POST['id'] ?? 0), $_POST['status'] ?? 'Pending');
     }
 
+    public function cancel_leave()
+    {
+        return $this->container->make(EmployeeService::class)->cancelLeave(intval($_POST['id'] ?? 0));
+    }
+
     public function delete_leave()
     {
         return $this->container->make(EmployeeService::class)->deleteLeave(intval($_POST['id'] ?? 0));
@@ -1820,6 +1825,9 @@ switch ($action) {
         break;
     case 'update_leave_status':
         echo $Master->update_leave_status();
+        break;
+    case 'cancel_leave':
+        echo $Master->cancel_leave();
         break;
     case 'delete_leave':
         echo $Master->delete_leave();
