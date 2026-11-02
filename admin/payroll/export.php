@@ -6,9 +6,9 @@ if(!$_settings->userdata('id')){
     die("Access Denied: Authentication required.");
 }
 
-if(!$_settings->can_access('payroll_create')){
+if(!$_settings->can_access('payroll_export')){
     http_response_code(403);
-    die("Access Denied: payroll exports require payroll processing permission.");
+    die("Access Denied: payroll exports require the export permission.");
 }
 
 $type = isset($_GET['type']) ? strtolower($_GET['type']) : 'generic';

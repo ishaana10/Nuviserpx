@@ -99,7 +99,8 @@ $is_admin = $_settings->userdata('type') == 1;
         <div class="rpt-sec" data-sec>
             <h2><i class="<?= $icon ?>"></i> <?= htmlspecialchars($title) ?></h2>
             <div class="rpt-grid">
-            <?php foreach ($items as $it): [$page, $name, $ic, $desc] = $it; $tag = $it[4] ?? null; ?>
+            <?php foreach ($items as $it): [$page, $name, $ic, $desc] = $it; $tag = $it[4] ?? null;
+                if (!\App\Support\MenuFilter::allowed($page, $_settings)) { continue; } ?>
                 <a class="rpt-card" href="./?page=<?= htmlspecialchars($page) ?>" data-key="<?= htmlspecialchars($page) ?>" data-text="<?= htmlspecialchars(strtolower($title . ' ' . $name . ' ' . $desc)) ?>">
                     <span class="ic"><i class="<?= $ic ?>"></i></span>
                     <span>

@@ -294,7 +294,7 @@ class SystemSettings extends DBConnection{
 	function employee_scope($module){
 		if($this->userdata('type') == 1) return null;
 		$manager = $module === 'payroll'
-			? ($this->can_access('payroll_create') || $this->can_access('payroll_edit'))
+			? $this->can_access('payroll_view_all')
 			: $this->can_access($module.'_edit');
 		return $manager ? null : $this->own_employee_id();
 	}

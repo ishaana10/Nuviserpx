@@ -7,8 +7,8 @@
 	<div class="card-header">
 		<h3 class="card-title"><i class="fas fa-file-invoice-dollar text-primary"></i> Fiji Payroll Management & Processing</h3>
 		<div class="card-tools">
-			<?php $pay_scope = $_settings->employee_scope('payroll'); $can_process = $_settings->can_access('payroll_create'); ?>
-			<?php if($can_process): ?>
+			<?php $pay_scope = $_settings->employee_scope('payroll'); $can_process = $_settings->can_access('payroll_process'); $can_export = $_settings->can_access('payroll_export'); ?>
+			<?php if($can_export): ?>
 			<div class="btn-group mr-2">
 				<button type="button" class="btn btn-flat btn-info btn-sm dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
 					<i class="fas fa-file-export"></i> Compliance & Bank Exports
@@ -26,6 +26,8 @@
 					<a class="dropdown-item" href="<?php echo base_url ?>admin/payroll/export.php?type=fnpf" target="_blank"><i class="fas fa-shield-alt text-primary"></i> FNPF Schedule CSV</a>
 				</div>
 			</div>
+			<?php endif; ?>
+			<?php if($can_process): ?>
 			<a href="javascript:void(0)" id="process_batch" class="btn btn-flat btn-primary btn-sm"><span class="fas fa-users"></span> Process Batch Payroll</a>
 			<a href="javascript:void(0)" id="create_single" class="btn btn-flat btn-success btn-sm"><span class="fas fa-plus"></span> Single Employee Run</a>
 			<?php endif; ?>
