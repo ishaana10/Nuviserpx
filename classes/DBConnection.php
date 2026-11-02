@@ -65,6 +65,7 @@ class DBConnection{
                 $this->check_journal_options_migrations();
                 $this->check_ledger_precision_migrations();
                 $this->check_ledger_controls_migrations();
+                $this->check_budget_migrations();
                 $this->check_dolibarr_crm_migrations();
                 $this->check_dolibarr_extended_migrations();
                 $this->check_extrafields_migrations();
@@ -807,6 +808,24 @@ class DBConnection{
                 @$this->conn->query("CREATE TRIGGER `{$name}` {$when} ON `{$table}` FOR EACH ROW {$body}");
             }
         }
+    }
+
+    /** Budgets: one row per profit-and-loss account per month (natural sign, see BudgetService). */
+    public function check_budget_migrations(){
+        if (!$this->conn) return;
+
+        @$this->conn->query("CREATE TABLE IF NOT EXISTS `budget_lines` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `tenant_id` int(30) NOT NULL DEFAULT 1,
+          `account_id` int(30) NOT NULL,
+          `month_start` date NOT NULL,
+          `amount` decimal(18,4) NOT NULL DEFAULT 0.0000,
+          `updated_by` int(50) DEFAULT NULL,
+          `date_updated` datetime DEFAULT NULL ON UPDATE current_timestamp(),
+          PRIMARY KEY (`id`),
+          UNIQUE KEY `budget_cell` (`tenant_id`, `account_id`, `month_start`),
+          KEY `budget_month` (`tenant_id`, `month_start`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     }
 
     public function check_invoice_template_migrations(){

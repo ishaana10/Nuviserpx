@@ -795,6 +795,208 @@ class LedgerService
     }
 
     /* ==================================================================
+     * Cash flow, changes in equity, budget vs actual (pure, over balances())
+     * ================================================================== */
+
+    /** True for expense accounts that are depreciation or amortisation (non-cash). */
+    public static function isNonCashExpense(array $b): bool
+    {
+        return $b['class'] === 'expense'
+            && (bool)preg_match('/deprec|amorti[sz]/i', $b['type'] . ' ' . $b['name']);
+    }
+
+    /**
+     * Statement of cash flows, indirect method, for the period part of the balances.
+     *
+     * Every journal balances, so the change in bank balances equals minus the net debit movement of
+     * every other account. The statement is that identity, grouped the way a reader expects:
+     *   operating  = profit, + depreciation/amortisation, − increase in receivables/stock/prepayments,
+     *                + increase in payables;
+     *   investing  = − increase in fixed and non-current assets (before depreciation already added back);
+     *   financing  = + increase in non-current liabilities and equity contributed (− drawings).
+     * `difference` compares the total with the actual movement of the bank accounts; it is zero
+     * unless an account's type puts it in a section that does not match how it is used.
+     */
+    public static function cashFlow(array $balances): array
+    {
+        $net = fn (array $b): float => round($b['dr'] - $b['cr'], 2);   // period net debit
+        $profit = $depr = 0.0;
+        $groups = ['working_assets' => [], 'working_liabs' => [], 'investing' => [], 'financing' => []];
+        $openCash = $closeCash = 0.0;
+        $deprByAcc = [];
+
+        foreach ($balances as $b) {
+            $n = $net($b);
+            switch ($b['class']) {
+                case 'income':
+                case 'expense':
+                    $profit -= $n;
+                    if (self::isNonCashExpense($b) && $n > 0) {
+                        $depr += $n;
+                        $deprByAcc[] = ['id' => $b['id'], 'name' => $b['name'], 'amount' => $n];
+                    }
+                    break;
+                case 'asset':
+                    if ($b['section'] === 'bank') {
+                        $openCash += $b['open_dr'] - $b['open_cr'];
+                        $closeCash += $b['open_dr'] - $b['open_cr'] + $b['dr'] - $b['cr'];
+                    } elseif ($b['section'] === 'current_asset') {
+                        $groups['working_assets'][] = ['id' => $b['id'], 'name' => $b['name'], 'amount' => -$n];
+                    } else {
+                        $groups['investing'][] = ['id' => $b['id'], 'name' => $b['name'], 'amount' => -$n];
+                    }
+                    break;
+                case 'liability':
+                    $bucket = $b['section'] === 'current_liability' ? 'working_liabs' : 'financing';
+                    $groups[$bucket][] = ['id' => $b['id'], 'name' => $b['name'], 'amount' => -$n];
+                    break;
+                case 'equity':
+                    $groups['financing'][] = ['id' => $b['id'], 'name' => $b['name'], 'amount' => -$n];
+                    break;
+            }
+        }
+
+        // Depreciation was added back above, so take the same amount out of investing (it is the
+        // credit side of that expense, sitting in the fixed-asset section as accumulated depreciation).
+        if ($depr > 0) {
+            $groups['investing'][] = ['id' => null, 'name' => 'Depreciation charged to fixed assets (added back in operating)', 'amount' => -$depr, 'computed' => true];
+        }
+
+        $clean = function (array $lines): array {
+            $out = [];
+            foreach ($lines as $l) {
+                $l['amount'] = round($l['amount'], 2);
+                if ($l['amount'] != 0.0) {
+                    $out[] = $l;
+                }
+            }
+            return $out;
+        };
+        $sum = fn (array $lines): float => round(array_sum(array_column($lines, 'amount')), 2);
+
+        $wa = $clean($groups['working_assets']);
+        $wl = $clean($groups['working_liabs']);
+        $inv = $clean($groups['investing']);
+        $fin = $clean($groups['financing']);
+        $deprLines = $clean($deprByAcc);
+
+        $profit = round($profit, 2);
+        $operating = round($profit + $sum($deprLines) + $sum($wa) + $sum($wl), 2);
+        $investing = $sum($inv);
+        $financing = $sum($fin);
+        $netChange = round($operating + $investing + $financing, 2);
+        $openCash = round($openCash, 2);
+        $closeCash = round($closeCash, 2);
+        $actual = round($closeCash - $openCash, 2);
+
+        return [
+            'profit' => $profit,
+            'non_cash' => $deprLines,
+            'working_assets' => $wa,
+            'working_liabilities' => $wl,
+            'operating' => $operating,
+            'investing_lines' => $inv,
+            'investing' => $investing,
+            'financing_lines' => $fin,
+            'financing' => $financing,
+            'net_change' => $netChange,
+            'opening_cash' => $openCash,
+            'closing_cash' => $closeCash,
+            'difference' => round($netChange - $actual, 2),
+            'reconciled' => abs($netChange - $actual) < 0.005,
+        ];
+    }
+
+    /**
+     * Statement of changes in equity for the period part of the balances.
+     *
+     * One row per equity account (opening, contributed/(drawn) in the period, closing) plus retained
+     * earnings (profit of earlier years, which is not a real account) and profit for the period.
+     * The closing total equals the balance sheet's total equity at the end of the window.
+     */
+    public static function equityStatement(array $balances): array
+    {
+        $rows = [];
+        $retained = $profit = 0.0;
+        foreach ($balances as $b) {
+            if (in_array($b['class'], ['income', 'expense'], true)) {
+                $retained += $b['open_cr'] - $b['open_dr'];
+                $profit += $b['cr'] - $b['dr'];
+                continue;
+            }
+            if ($b['class'] !== 'equity') {
+                continue;
+            }
+            $open = round($b['open_cr'] - $b['open_dr'], 2);
+            $move = round($b['cr'] - $b['dr'], 2);
+            if ($open == 0.0 && $move == 0.0) {
+                continue;
+            }
+            $rows[] = ['id' => $b['id'], 'name' => $b['name'], 'opening' => $open, 'profit' => 0.0, 'movement' => $move, 'closing' => round($open + $move, 2)];
+        }
+        $retained = round($retained, 2);
+        $profit = round($profit, 2);
+        if ($retained != 0.0 || $profit != 0.0) {
+            $rows[] = ['id' => null, 'name' => 'Retained earnings', 'computed' => true, 'opening' => $retained, 'profit' => $profit, 'movement' => 0.0, 'closing' => round($retained + $profit, 2)];
+        }
+        $tot = ['opening' => 0.0, 'profit' => 0.0, 'movement' => 0.0, 'closing' => 0.0];
+        foreach ($rows as $r) {
+            foreach ($tot as $k => $_) {
+                $tot[$k] += $r[$k];
+            }
+        }
+        return ['rows' => $rows, 'totals' => array_map(fn ($v) => round($v, 2), $tot)];
+    }
+
+    /**
+     * Budget against actual for income and expense accounts.
+     *
+     * $actuals: id => [name, class, section, dr, cr] (a balances() row works). $budget: account id => budgeted
+     * amount in the account's natural sign (income as a positive credit, expense as a positive debit).
+     * Variance is favourable when income beats budget or an expense comes in under it.
+     */
+    public static function budgetVsActual(array $actuals, array $budget): array
+    {
+        $ids = array_unique(array_merge(array_keys($budget), array_keys($actuals)));
+        $sections = [];
+        foreach (['revenue', 'other_income', 'direct_costs', 'expense'] as $s) {
+            $sections[$s] = ['label' => self::SECTIONS[$s]['label'], 'lines' => [], 'actual' => 0.0, 'budget' => 0.0];
+        }
+        foreach ($ids as $id) {
+            $a = $actuals[$id] ?? null;
+            if ($a === null || !in_array($a['class'], ['income', 'expense'], true)) {
+                continue; // budgets only apply to profit and loss accounts
+            }
+            $actual = round(self::natural($a['class'], (float)$a['dr'], (float)$a['cr']), 2);
+            $bud = round((float)($budget[$id] ?? 0), 2);
+            if ($actual == 0.0 && $bud == 0.0) {
+                continue;
+            }
+            $var = round($actual - $bud, 2);
+            $fav = $a['class'] === 'income' ? $var >= 0 : $var <= 0;
+            $sections[$a['section']]['lines'][] = [
+                'id' => $id, 'code' => (string)($a['code'] ?? ''), 'name' => (string)$a['name'],
+                'actual' => $actual, 'budget' => $bud, 'variance' => $var,
+                'variance_pct' => $bud != 0.0 ? round($var / abs($bud) * 100, 1) : null,
+                'favourable' => $fav,
+            ];
+            $sections[$a['section']]['actual'] += $actual;
+            $sections[$a['section']]['budget'] += $bud;
+        }
+        foreach ($sections as &$s) {
+            $s['actual'] = round($s['actual'], 2);
+            $s['budget'] = round($s['budget'], 2);
+        }
+        unset($s);
+        $profit = fn (string $k): float => round(
+            $sections['revenue'][$k] + $sections['other_income'][$k] - $sections['direct_costs'][$k] - $sections['expense'][$k], 2
+        );
+        $pa = $profit('actual');
+        $pb = $profit('budget');
+        return ['sections' => $sections, 'profit' => ['actual' => $pa, 'budget' => $pb, 'variance' => round($pa - $pb, 2), 'favourable' => $pa >= $pb]];
+    }
+
+    /* ==================================================================
      * Helpers
      * ================================================================== */
 

@@ -257,6 +257,30 @@ if($t_qry && $t_qry->num_rows > 0){
                                         </a>
                                     </li>
                                     <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=reports/cash_flow" class="nav-link nav-reports_cash_flow tree-item">
+                                            <i class="nav-icon fas fa-water"></i>
+                                            <p>Cash Flow</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=reports/equity_changes" class="nav-link nav-reports_equity_changes tree-item">
+                                            <i class="nav-icon fas fa-layer-group"></i>
+                                            <p>Changes in Equity</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=reports/budget_vs_actual" class="nav-link nav-reports_budget_vs_actual tree-item">
+                                            <i class="nav-icon fas fa-bullseye"></i>
+                                            <p>Budget vs Actual</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=budgets" class="nav-link nav-budgets tree-item">
+                                            <i class="nav-icon fas fa-edit"></i>
+                                            <p>Budgets</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=reports/ar_aging" class="nav-link nav-reports_ar_aging tree-item">
                                             <i class="nav-icon fas fa-history"></i>
                                             <p>AR Aging</p>
