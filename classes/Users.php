@@ -170,6 +170,25 @@ Class Users extends DBConnection {
 			}
 		}
 
+		// Persist the leave approver onto this user's linked employee record.
+		// Only user administrators may set it, and only when a linked employee
+		// exists. Blank = administrator approves by default (NULL).
+		if($can_admin_fields && (isset($resp['status']) && $resp['status'] == 1)){
+			$linked_emp = isset($_POST['employee_id']) ? (int)$_POST['employee_id'] : 0;
+			if($linked_emp > 0){
+				$approver = isset($_POST['approver_id']) ? (int)$_POST['approver_id'] : 0;
+				// An employee cannot be their own approver, and the approver must
+				// belong to the same tenant.
+				if($approver > 0 && $approver !== $linked_emp){
+					$a_ok = $this->conn->query("SELECT id FROM `employee_list` WHERE id = {$approver} AND tenant_id = {$target_tenant} AND delete_flag = 0");
+					$approver_sql = ($a_ok && $a_ok->num_rows) ? "'{$approver}'" : "NULL";
+				}else{
+					$approver_sql = "NULL";
+				}
+				$this->conn->query("UPDATE `employee_list` SET `approver_id` = {$approver_sql} WHERE id = {$linked_emp} AND tenant_id = {$target_tenant}");
+			}
+		}
+
 		if(isset($_FILES['img']) && $_FILES['img']['tmp_name'] != ''){
 			$fname = 'uploads/avatar-'.$id.'.png';
 			$dir_path =base_app. $fname;

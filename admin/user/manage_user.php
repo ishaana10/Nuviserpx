@@ -20,6 +20,13 @@ if(isset($_GET['id']) && $_GET['id'] > 0){
 }
 
 $user_tenant_id = isset($meta['tenant_id']) ? $meta['tenant_id'] : $tenant_id;
+
+// Current leave approver of this user's linked employee (if any)
+$current_approver_id = '';
+if(isset($meta['employee_id']) && (int)$meta['employee_id'] > 0){
+    $__ap = $conn->query("SELECT approver_id FROM `employee_list` WHERE id = '".(int)$meta['employee_id']."'");
+    if($__ap && $__ap->num_rows){ $__apr = $__ap->fetch_assoc(); $current_approver_id = $__apr['approver_id'] !== null ? (int)$__apr['approver_id'] : ''; }
+}
 ?>
 <?php if($_settings->chk_flashdata('success')): ?>
 <script>
@@ -148,6 +155,25 @@ $user_tenant_id = isset($meta['tenant_id']) ? $meta['tenant_id'] : $tenant_id;
 					</div>
 				</div>
 
+				<div class="row">
+					<!-- Leave Approver for this user's linked employee -->
+					<div class="form-group col-md-6 col-12">
+						<label for="approver_id" class="control-label font-weight-bold text-navy">Leave Approver</label>
+						<select name="approver_id" id="approver_id" class="form-control form-control-sm rounded-0 select2">
+							<option value="">Administrator (System Default)</option>
+							<?php
+							$approver_qry = $conn->query("SELECT * FROM `employee_list` WHERE tenant_id = '{$user_tenant_id}' AND delete_flag = 0 ORDER BY firstname ASC");
+							while($ap = $approver_qry->fetch_assoc()):
+							?>
+							<option value="<?php echo $ap['id'] ?>" <?php echo $current_approver_id !== '' && $current_approver_id == $ap['id'] ? 'selected' : '' ?>>
+								<?php echo htmlspecialchars($ap['employee_code'] . ' - ' . $ap['firstname'] . ' ' . $ap['lastname']) ?>
+							</option>
+							<?php endwhile; ?>
+						</select>
+						<small class="text-muted"><i>Who approves this user's leave requests. If no other employee is available, the administrator approves by default.</i></small>
+					</div>
+				</div>
+
 				<div class="row align-items-center mt-3">
 					<div class="form-group col-md-6 col-12">
 						<label for="customFile" class="control-label font-weight-bold text-navy">User Avatar Photo</label>
@@ -183,17 +209,37 @@ $user_tenant_id = isset($meta['tenant_id']) ? $meta['tenant_id'] : $tenant_id;
 	$(function(){
 		$('.select2').select2({ width:'100%' });
 
-		// Remember the initially-selected role/employee (for edit mode) so a
-		// dynamic reload can keep the current assignment.
+		// Remember the initially-selected role/employee/approver (for edit mode)
+		// so a dynamic reload can keep the current assignment.
 		var initRole = $('#role_id').val() || '0';
 		var initEmp  = $('#employee_id').val() || '';
+		var initApprover = <?php echo $current_approver_id === '' ? "''" : (int)$current_approver_id ?>;
+
+		// Rebuild the approver list from the tenant's employees, excluding the
+		// employee this user is linked to (nobody approves their own leave).
+		function rebuildApprovers(employees, selApprover){
+			var linkedEmp = $('#employee_id').val();
+			var $ap = $('#approver_id');
+			var prev = selApprover !== undefined ? selApprover : $ap.val();
+			$ap.empty().append($('<option>').val('').text('Administrator (System Default)'));
+			$.each(employees, function(i, e){
+				if(String(e.id) === String(linkedEmp)) return; // can't approve own leave
+				$ap.append($('<option>').val(e.id).text(e.label));
+			});
+			$ap.val(prev && $ap.find('option[value="'+prev+'"]').length ? prev : '').trigger('change');
+		}
+
+		// Cache the latest employee list so the approver list can be rebuilt when
+		// the linked employee changes.
+		var lastEmployees = [];
 
 		// Dynamically load the roles and employees that belong to a tenant, so
 		// the "Assigned Custom Role" list always matches the selected company.
-		function loadTenantOptions(tenantId, selRole, selEmp){
+		function loadTenantOptions(tenantId, selRole, selEmp, selApprover){
 			if(!tenantId) return;
 			$('#role_id').prop('disabled', true);
 			$('#employee_id').prop('disabled', true);
+			$('#approver_id').prop('disabled', true);
 			$.ajax({
 				url: _base_url_+'classes/Users.php?f=get_tenant_options',
 				method: 'POST', dataType: 'json',
@@ -213,23 +259,35 @@ $user_tenant_id = isset($meta['tenant_id']) ? $meta['tenant_id'] : $tenant_id;
 						$emp.append($('<option>').val(e.id).text(e.label));
 					});
 					$emp.val(selEmp && $emp.find('option[value="'+selEmp+'"]').length ? selEmp : '').trigger('change');
+
+					lastEmployees = resp.employees || [];
+					rebuildApprovers(lastEmployees, selApprover);
 				},
 				complete: function(){
 					$('#role_id').prop('disabled', false);
 					$('#employee_id').prop('disabled', false);
+					$('#approver_id').prop('disabled', false);
 				}
 			});
 		}
 
 		// When a super administrator changes the company, refresh the lists.
 		$('#tenant_id').on('change', function(){
-			loadTenantOptions($(this).val(), '0', '');
+			loadTenantOptions($(this).val(), '0', '', '');
+		});
+
+		// When the linked employee changes, keep them out of their own approver list.
+		$('#employee_id').on('change', function(){
+			if(lastEmployees.length){ rebuildApprovers(lastEmployees); }
 		});
 
 		// On load, sync the lists to the shown tenant (keeps the current
 		// assignment when editing an existing user).
 		if($('#tenant_id').is('select')){
-			loadTenantOptions($('#tenant_id').val(), initRole, initEmp);
+			loadTenantOptions($('#tenant_id').val(), initRole, initEmp, initApprover);
+		} else {
+			// Non-super admin: tenant is fixed, employees already server-rendered.
+			$('#employee_id').on('change', function(){});
 		}
 
 		$('#type').change(function(){
