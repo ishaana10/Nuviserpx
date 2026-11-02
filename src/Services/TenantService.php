@@ -16,24 +16,30 @@ class TenantService
 
     public function saveTenant(array $post): string
     {
-        extract($post);
-        $dataStr = "";
-        foreach ($post as $k => $v) {
-            if (!in_array($k, ['id'])) {
-                if (!is_numeric($v)) {
-                    $v = $this->conn->real_escape_string((string)$v);
-                }
-                if (!empty($dataStr)) $dataStr .= ",";
-                $dataStr .= " `{$k}`='{$v}' ";
-            }
+        if (!$this->settings->is_super_admin()) {
+            return json_encode(['status' => 'failed', 'msg' => 'Only the developer can manage tenants.']);
         }
-        $id = isset($id) ? intval($id) : 0;
+        // Whitelist columns (never trust arbitrary POST keys as column names).
+        $cols = ['tenant_code', 'name', 'email', 'phone', 'address', 'status'];
+        $dataStr = "";
+        foreach ($cols as $k) {
+            if (!array_key_exists($k, $post)) continue;
+            $v = $this->conn->real_escape_string((string)$post[$k]);
+            $dataStr .= ($dataStr !== "" ? "," : "") . " `{$k}`='{$v}' ";
+        }
+        // Module assignment: only touched when the form submitted it.
+        if (isset($post['modules_submitted'])) {
+            $mods = $this->conn->real_escape_string(implode(',', \App\Support\Permissions::sanitizeTenantModules($post['modules'] ?? [])));
+            $dataStr .= ($dataStr !== "" ? "," : "") . " `modules`='{$mods}' ";
+        }
+        $tenant_code = $post['tenant_code'] ?? '';
+        $id = intval($post['id'] ?? 0);
         if (empty($id)) {
             $sql = "INSERT INTO `tenants` set {$dataStr} ";
         } else {
             $sql = "UPDATE `tenants` set {$dataStr} where id = '{$id}' ";
         }
-        $tenantCode = isset($tenant_code) ? $this->conn->real_escape_string((string)$tenant_code) : '';
+        $tenantCode = $this->conn->real_escape_string((string)$tenant_code);
         $check = $this->conn->query("SELECT * FROM `tenants` where `tenant_code` = '{$tenantCode}' and delete_flag = 0 " . ($id > 0 ? " and id != '{$id}'" : ""))->num_rows;
         if ($check > 0) {
             $resp['status'] = 'failed';

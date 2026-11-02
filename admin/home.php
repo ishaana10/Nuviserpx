@@ -41,7 +41,7 @@ $asset_v = class_exists('AppVersion') ? urlencode(AppVersion::get('commit')) : '
             </div>
             <button type="button" class="btn btn-default" id="nvRefresh" title="Refresh data"><i class="fas fa-sync-alt"></i></button>
             <button type="button" class="btn btn-default nv-view-btn" id="nvEditBtn"><i class="fas fa-th-large"></i> Customize</button>
-            <?php if ($_settings->can_access('invoices_manage')): ?>
+            <?php if ($_settings->can_access('invoices_create')): ?>
             <a href="./?page=invoices/manage_invoice" class="btn btn-primary nv-view-btn"><i class="fas fa-plus"></i> New invoice</a>
             <?php endif; ?>
         </div>

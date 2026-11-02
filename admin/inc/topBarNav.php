@@ -19,6 +19,7 @@
             <a class="nav-link" data-widget="pushmenu" href="#" role="button"><i class="fas fa-bars"></i></a>
           </li>
 
+<?php ob_start(); ?>
           <!-- Quick "Create New" (+) Dropdown Menu (Inspired by Xero / Nuvis ERP) -->
           <li class="nav-item dropdown mr-2">
             <a class="btn btn-primary btn-sm font-weight-bold dropdown-toggle shadow-sm d-flex align-items-center" href="#" id="createNewDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" style="border-radius: 6px; padding: 5px 12px;">
@@ -69,13 +70,18 @@
             </div>
           </li>
 
+<?php
+$__create_html = \App\Support\MenuFilter::filter((string)ob_get_clean(), $_settings, true);
+if(preg_match_all('/class="dropdown-item[^"]*"/', $__create_html) > 0) echo $__create_html;
+?>
           <li class="nav-item d-none d-sm-inline-block">
             <a href="<?php echo base_url ?>" class="nav-link"><b><?php echo (!isMobileDevice()) ? $_settings->info('name'):$_settings->info('short_name'); ?> - Admin</b></a>
           </li>
         </ul>
         <!-- Right navbar links -->
         <ul class="navbar-nav ml-auto align-items-center">
-          <!-- Tenant Switcher Dropdown -->
+          <!-- Tenant Switcher Dropdown (developer / super administrator only) -->
+          <?php if($_settings->is_super_admin()): ?>
           <li class="nav-item mr-2">
             <div class="input-group input-group-sm">
               <div class="input-group-prepend">
@@ -92,6 +98,7 @@
               </select>
             </div>
           </li>
+          <?php endif; ?>
           <!-- <li class="nav-item">
             <a class="nav-link" data-widget="navbar-search" href="#" role="button">
             <i class="fas fa-search"></i>
@@ -144,41 +151,14 @@
           $(document).on('keydown', function(e){
             if(e.altKey && !e.ctrlKey && !e.shiftKey){
               var key = e.key ? e.key.toLowerCase() : '';
-              var baseUrl = _base_url_ + 'admin/?page=';
-              switch(key){
-                case 'i':
-                  e.preventDefault();
-                  window.location.href = baseUrl + 'invoices/manage_invoice';
-                  break;
-                case 'b':
-                  e.preventDefault();
-                  window.location.href = baseUrl + 'invoices/manage_invoice&type=bill';
-                  break;
-                case 'c':
-                  e.preventDefault();
-                  window.location.href = baseUrl + 'parties';
-                  break;
-                case 'q':
-                  e.preventDefault();
-                  window.location.href = baseUrl + 'sales_orders/manage_order';
-                  break;
-                case 'o':
-                  e.preventDefault();
-                  window.location.href = baseUrl + 'sales_orders/manage_order&type=po';
-                  break;
-                case 'j':
-                  e.preventDefault();
-                  window.location.href = baseUrl + 'journals/manage_journal';
-                  break;
-                case 's':
-                case 'r':
-                  e.preventDefault();
-                  window.location.href = baseUrl + 'payments/manage_payment';
-                  break;
-                case 't':
-                  e.preventDefault();
-                  window.location.href = baseUrl + 'journals/manage_journal';
-                  break;
+              if(key === 'r') key = 's'; // legacy alias for "Spend / Receive money"
+              // Only shortcuts whose menu entry is visible (role + tenant modules).
+              var $item = $('#createNewDropdown').next('.dropdown-menu').find('.dropdown-item').filter(function(){
+                return $(this).find('kbd').text().trim().toLowerCase() === 'alt ' + key;
+              }).first();
+              if($item.length){
+                e.preventDefault();
+                window.location.href = $item.attr('href');
               }
             }
           });

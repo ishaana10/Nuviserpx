@@ -1,11 +1,19 @@
 <?php
 require_once(__DIR__ . '/../../config.php');
+if(!$_settings->is_super_admin()){
+    echo '<div class="alert alert-danger m-3">Only the developer can manage tenants.</div>';
+    return;
+}
+$assigned_modules = null; // null = no restriction recorded yet (all modules on)
 if(isset($_GET['id']) && is_numeric($_GET['id'])){
     $id_clean = intval($_GET['id']);
     $qry = $conn->query("SELECT * from `tenants` where id = '{$id_clean}' ");
     if($qry->num_rows > 0){
         foreach($qry->fetch_assoc() as $k => $v){
             $$k=$v;
+        }
+        if(array_key_exists('modules', $qry_row = $conn->query("SELECT * FROM `tenants` WHERE id = '{$id_clean}'")->fetch_assoc() ?: []) && $qry_row['modules'] !== null){
+            $assigned_modules = \App\Support\Permissions::sanitizeTenantModules($qry_row['modules']);
         }
     }
 }
@@ -41,6 +49,21 @@ if(isset($_GET['id']) && is_numeric($_GET['id'])){
 				<option value="1" <?php echo isset($status) && $status == 1 ? 'selected' : '' ?>>Active</option>
 				<option value="0" <?php echo isset($status) && $status == 0 ? 'selected' : '' ?>>Inactive</option>
 			</select>
+		</div>
+		<div class="form-group">
+			<label class="control-label font-weight-bold"><i class="fas fa-puzzle-piece mr-1"></i> Modules assigned to this tenant</label>
+			<small class="text-muted d-block mb-1">Only ticked modules appear for this tenant's users and can be used, regardless of their role.</small>
+			<input type="hidden" name="modules_submitted" value="1">
+			<div class="row">
+			<?php foreach(\App\Support\Permissions::TENANT_MODULES as $mk => $mdef): ?>
+				<div class="col-md-6">
+					<div class="custom-control custom-checkbox mb-1">
+						<input type="checkbox" class="custom-control-input" id="tm_<?php echo $mk ?>" name="modules[]" value="<?php echo $mk ?>" <?php echo ($assigned_modules === null || in_array($mk, $assigned_modules, true)) ? 'checked' : '' ?>>
+						<label class="custom-control-label" for="tm_<?php echo $mk ?>"><?php echo htmlspecialchars($mdef['label']) ?></label>
+					</div>
+				</div>
+			<?php endforeach; ?>
+			</div>
 		</div>
 	</form>
 </div>

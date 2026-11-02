@@ -445,6 +445,7 @@ final class Permissions
         'purchases'         => 'purchases_view',
         'journals'          => 'journals_view',
         'accounts'          => 'accounts_view',
+        'groups'            => 'accounts_view',
         'bank_reconciliation' => 'bank_reconciliation_view',
         'assets'            => 'assets_view',
         'expense_reports'   => 'expenses_view',
@@ -490,5 +491,41 @@ final class Permissions
             return self::PAGE_MAP[$root];
         }
         return false;
+    }
+
+    /**
+     * Tenant-assignable modules (the developer switches these on/off per
+     * tenant). Maps each module key to the permission modules it governs.
+     * A tenant without the module cannot reach those pages/actions no matter
+     * what a role grants.
+     */
+    public const TENANT_MODULES = [
+        'mod_accounting'      => ['label' => 'Accounting & Chart of Accounts', 'perms' => ['journals', 'accounts', 'bank_reconciliation']],
+        'mod_fixed_assets'    => ['label' => 'Fixed Assets Management',        'perms' => ['assets']],
+        'mod_sales_crm'       => ['label' => 'Sales & CRM Opportunities',      'perms' => ['crm']],
+        'mod_tickets'         => ['label' => 'Helpdesk & Support Tickets',     'perms' => ['tickets']],
+        'mod_contracts'       => ['label' => 'Contracts & Subscriptions',      'perms' => ['contracts']],
+        'mod_warehouses'      => ['label' => 'Multi-Warehouse Inventory',      'perms' => ['warehouses']],
+        'mod_expense_reports' => ['label' => 'Employee Expense Claims',        'perms' => ['expenses']],
+        'mod_payroll'         => ['label' => 'Payroll & HR Suite',             'perms' => ['employees', 'attendance', 'leaves', 'payroll']],
+    ];
+
+    /** Tenant module key governing a permission key, or null if ungoverned. */
+    public static function tenantModuleFor(string $permKey): ?string
+    {
+        $mod = preg_replace('/_(view|create|edit|delete|manage)$/', '', $permKey);
+        foreach (self::TENANT_MODULES as $key => $def) {
+            if (in_array($mod, $def['perms'], true)) {
+                return $key;
+            }
+        }
+        return null;
+    }
+
+    /** Sanitise a submitted list of tenant module keys. */
+    public static function sanitizeTenantModules($list): array
+    {
+        $list = is_array($list) ? $list : explode(',', (string)$list);
+        return array_values(array_intersect(array_keys(self::TENANT_MODULES), array_map('trim', $list)));
     }
 }

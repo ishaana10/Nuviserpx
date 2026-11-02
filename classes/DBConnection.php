@@ -869,6 +869,7 @@ class DBConnection{
             'plan_id'          => "ALTER TABLE `tenants` ADD COLUMN `plan_id` int(30) DEFAULT NULL AFTER `status`",
             'plan_started_at'  => "ALTER TABLE `tenants` ADD COLUMN `plan_started_at` date DEFAULT NULL AFTER `plan_id`",
             'plan_expires_at'  => "ALTER TABLE `tenants` ADD COLUMN `plan_expires_at` date DEFAULT NULL AFTER `plan_started_at`",
+            'modules'          => "ALTER TABLE `tenants` ADD COLUMN `modules` text DEFAULT NULL AFTER `status`",
             'plan_status'      => "ALTER TABLE `tenants` ADD COLUMN `plan_status` enum('trial','active','past_due','suspended','cancelled') NOT NULL DEFAULT 'active' AFTER `plan_expires_at`"
         );
         foreach ($tenant_cols as $col => $sql) {

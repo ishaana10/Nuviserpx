@@ -10,7 +10,8 @@ $tenant_id = $_settings->active_tenant_id();
 
 if(isset($_GET['id']) && $_GET['id'] > 0){
     $user_id_clean = intval($_GET['id']);
-    $user = $conn->query("SELECT * FROM users WHERE id ='{$user_id_clean}'");
+    $scope = $_settings->is_super_admin() ? '' : " AND tenant_id = '".(int)$tenant_id."' AND type != 1";
+    $user = $conn->query("SELECT * FROM users WHERE id ='{$user_id_clean}'{$scope}");
     if($user && $user->num_rows > 0){
         foreach($user->fetch_array() as $k => $v){
             $meta[$k] = $v;
