@@ -2,6 +2,7 @@
 require_once(__DIR__ . '/../../config.php');
 
 $tenant_id = $_settings->active_tenant_id();
+$default_tax_rate = number_format((new \App\Services\TaxService($conn, $_settings))->defaultRate('sale'), 2, '.', '');
 
 if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
     $inv_id_clean = intval($_GET['id']);
@@ -299,7 +300,7 @@ while($ac = $accounts_qry->fetch_assoc()){
                                     <?php endforeach; ?>
                                 </select>
                             </td>
-                            <td><input type="number" step="any" name="item_tax_rate[]" class="form-control form-control-modern text-center calc-item tax_rate" value="15.00"></td>
+                            <td><input type="number" step="any" name="item_tax_rate[]" class="form-control form-control-modern text-center calc-item tax_rate" value="<?= $default_tax_rate ?>"></td>
                             <td><input type="number" step="any" name="item_amount[]" class="form-control form-control-modern text-right amount bg-light font-weight-bold" value="0.00" readonly></td>
                             <td class="text-center align-middle"><button type="button" class="btn btn-xs btn-outline-danger remove_row"><i class="fas fa-trash"></i></button></td>
                         </tr>
@@ -475,8 +476,9 @@ while($ac = $accounts_qry->fetch_assoc()){
                             <div class="col-md-4 form-group">
                                 <label class="form-label-custom">Tax rate</label>
                                 <select name="tax_rate_value" id="item_modal_tax" class="form-control form-control-modern">
-                                    <option value="15.00" selected>15% VAT on Income</option>
-                                    <option value="0.00">0% VAT Exempt</option>
+                                    <?php foreach ((new \App\Services\TaxService($conn, $_settings))->codes('sale') as $tc): ?>
+                                    <option value="<?= htmlspecialchars(number_format((float)$tc['rate'], 2, '.', '')) ?>"<?= (int)$tc['is_default'] ? ' selected' : '' ?>><?= htmlspecialchars($tc['name']) ?> (<?= rtrim(rtrim(number_format((float)$tc['rate'], 2), '0'), '.') ?>%)</option>
+                                    <?php endforeach; ?>
                                 </select>
                             </div>
                         </div>
@@ -662,7 +664,7 @@ while($ac = $accounts_qry->fetch_assoc()){
                         <?php endforeach; ?>
                     </select>
                 </td>
-                <td><input type="number" step="any" name="item_tax_rate[]" class="form-control form-control-modern text-center calc-item tax_rate" value="15.00"></td>
+                <td><input type="number" step="any" name="item_tax_rate[]" class="form-control form-control-modern text-center calc-item tax_rate" value="<?= $default_tax_rate ?>"></td>
                 <td><input type="number" step="any" name="item_amount[]" class="form-control form-control-modern text-right amount bg-light font-weight-bold" value="0.00" readonly></td>
                 <td class="text-center align-middle"><button type="button" class="btn btn-xs btn-outline-danger remove_row"><i class="fas fa-trash"></i></button></td>
             </tr>`;

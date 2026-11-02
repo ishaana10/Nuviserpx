@@ -1,6 +1,7 @@
 <?php
 require_once(__DIR__ . '/../../config.php');
 $tenant_id = $_settings->active_tenant_id();
+$default_tax_rate = number_format((new \App\Services\TaxService($conn, $_settings))->defaultRate('purchase'), 2, '.', '');
 
 $prefill_items = [];
 $purchase_order_id = '';
@@ -41,7 +42,7 @@ elseif(isset($_GET['po_id']) && is_numeric($_GET['po_id']) && $_GET['po_id'] > 0
 
 if (!isset($bill_no) || empty($bill_no)) { $bill_no = 'BILL-' . date('Ym') . '-' . rand(1000, 9999); }
 if (empty($prefill_items)) {
-    $prefill_items[] = ['product_id'=>null,'item_name'=>'','description'=>'','qty'=>1,'unit_price'=>'0.00','tax_rate'=>'15.00','amount'=>'0.00'];
+    $prefill_items[] = ['product_id'=>null,'item_name'=>'','description'=>'','qty'=>1,'unit_price'=>'0.00','tax_rate'=>$default_tax_rate,'amount'=>'0.00'];
 }
 
 $products_qry = $conn->query("SELECT * FROM `product_list` WHERE tenant_id = '{$tenant_id}' AND delete_flag = 0 AND status = 1 ORDER BY name ASC");
@@ -197,7 +198,7 @@ while($p = $products_qry->fetch_assoc()){ $products_data[$p['id']] = $p; }
 				<input type="hidden" name="item_desc[]" class="item-desc" value=""></td>
 				<td><input type="number" step="any" name="item_qty[]" class="form-control form-control-sm rounded-0 text-center calc-item qty" value="1" required></td>
 				<td><input type="number" step="any" name="item_price[]" class="form-control form-control-sm rounded-0 text-right calc-item price" value="0.00" required></td>
-				<td><input type="number" step="any" name="item_tax_rate[]" class="form-control form-control-sm rounded-0 text-center calc-item tax_rate" value="15.00"></td>
+				<td><input type="number" step="any" name="item_tax_rate[]" class="form-control form-control-sm rounded-0 text-center calc-item tax_rate" value="<?= $default_tax_rate ?>"></td>
 				<td><input type="number" step="any" name="item_amount[]" class="form-control form-control-sm rounded-0 text-right amount bg-light" value="0.00" readonly></td>
 				<td class="text-center align-middle"><button type="button" class="btn btn-xs btn-danger remove_row"><i class="fas fa-trash"></i></button></td></tr>`);
 		});

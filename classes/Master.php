@@ -956,6 +956,16 @@ class Master extends DBConnection
         return $this->container->make(\App\Services\BudgetService::class)->saveBudget($_POST);
     }
 
+    public function save_tax_code()
+    {
+        return $this->container->make(\App\Services\TaxService::class)->saveCode($_POST);
+    }
+
+    public function delete_tax_code()
+    {
+        return $this->container->make(\App\Services\TaxService::class)->deleteCode(intval($_POST['id'] ?? 0));
+    }
+
     public function reverse_journal()
     {
         return $this->container->make(JournalService::class)->reverseJournal(intval($_POST['id'] ?? 0), (string)($_POST['date'] ?? ''));
@@ -1836,6 +1846,12 @@ switch ($action) {
         break;
     case 'save_budget':
         echo $Master->save_budget();
+        break;
+    case 'save_tax_code':
+        echo $Master->save_tax_code();
+        break;
+    case 'delete_tax_code':
+        echo $Master->delete_tax_code();
         break;
     case 'set_period_lock':
         echo $Master->set_period_lock();

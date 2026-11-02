@@ -66,6 +66,7 @@ class DBConnection{
                 $this->check_ledger_precision_migrations();
                 $this->check_ledger_controls_migrations();
                 $this->check_budget_migrations();
+                $this->check_tax_migrations();
                 $this->check_dolibarr_crm_migrations();
                 $this->check_dolibarr_extended_migrations();
                 $this->check_extrafields_migrations();
@@ -825,6 +826,23 @@ class DBConnection{
           PRIMARY KEY (`id`),
           UNIQUE KEY `budget_cell` (`tenant_id`, `account_id`, `month_start`),
           KEY `budget_month` (`tenant_id`, `month_start`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    }
+
+    public function check_tax_migrations(){
+        if (!$this->conn) return;
+
+        @$this->conn->query("CREATE TABLE IF NOT EXISTS `tax_codes` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `tenant_id` int(30) NOT NULL DEFAULT 1,
+          `name` varchar(150) NOT NULL,
+          `rate` decimal(7,4) NOT NULL DEFAULT 0.0000,
+          `applies_to` enum('sale','purchase','both') NOT NULL DEFAULT 'both',
+          `is_default` tinyint(1) NOT NULL DEFAULT 0,
+          `delete_flag` tinyint(1) NOT NULL DEFAULT 0,
+          `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+          PRIMARY KEY (`id`),
+          KEY `tax_tenant` (`tenant_id`, `delete_flag`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     }
 
