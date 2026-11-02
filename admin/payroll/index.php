@@ -7,6 +7,8 @@
 	<div class="card-header">
 		<h3 class="card-title"><i class="fas fa-file-invoice-dollar text-primary"></i> Fiji Payroll Management & Processing</h3>
 		<div class="card-tools">
+			<?php $pay_scope = $_settings->employee_scope('payroll'); $can_process = $_settings->can_access('payroll_create'); ?>
+			<?php if($can_process): ?>
 			<div class="btn-group mr-2">
 				<button type="button" class="btn btn-flat btn-info btn-sm dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
 					<i class="fas fa-file-export"></i> Compliance & Bank Exports
@@ -26,6 +28,7 @@
 			</div>
 			<a href="javascript:void(0)" id="process_batch" class="btn btn-flat btn-primary btn-sm"><span class="fas fa-users"></span> Process Batch Payroll</a>
 			<a href="javascript:void(0)" id="create_single" class="btn btn-flat btn-success btn-sm"><span class="fas fa-plus"></span> Single Employee Run</a>
+			<?php endif; ?>
 		</div>
 	</div>
 	<div class="card-body">
@@ -59,7 +62,8 @@
 					<?php
 					$i = 1;
 						$tenant_id = $_settings->active_tenant_id();
-						$qry = $conn->query("SELECT p.*, concat(e.firstname, ' ', e.lastname) as emp_name, e.employee_code from `payroll_list` p inner join `employee_list` e on p.employee_id = e.id where p.tenant_id = '{$tenant_id}' order by p.id desc ");
+						$own_filter = $pay_scope === null ? '' : " AND p.employee_id = '".(int)$pay_scope."' ";
+						$qry = $conn->query("SELECT p.*, concat(e.firstname, ' ', e.lastname) as emp_name, e.employee_code from `payroll_list` p inner join `employee_list` e on p.employee_id = e.id where p.tenant_id = '{$tenant_id}'{$own_filter} order by p.id desc ");
 						while($row = $qry->fetch_assoc()):
 					?>
 						<tr>
@@ -85,9 +89,9 @@
 				                  <div class="dropdown-menu" role="menu">
 				                    <a class="dropdown-item view_payslip" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>"><span class="fa fa-file-invoice-dollar text-info"></span> Fiji Payslip</a>
 				                    <a class="dropdown-item email_payslip" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>"><span class="fa fa-envelope text-warning"></span> Email Payslip</a>
-				                    <a class="dropdown-item edit_data" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>"><span class="fa fa-edit text-primary"></span> Edit</a>
-				                    <div class="dropdown-divider"></div>
-				                    <a class="dropdown-item delete_data" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>"><span class="fa fa-trash text-danger"></span> Delete</a>
+				                    <?php if($_settings->can_access('payroll_edit')): ?><a class="dropdown-item edit_data" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>"><span class="fa fa-edit text-primary"></span> Edit</a><?php endif; ?>
+				                    <?php if($_settings->can_access('payroll_delete')): ?><div class="dropdown-divider"></div>
+				                    <a class="dropdown-item delete_data" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>"><span class="fa fa-trash text-danger"></span> Delete</a><?php endif; ?>
 				                  </div>
 							</td>
 						</tr>

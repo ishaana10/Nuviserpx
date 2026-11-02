@@ -37,7 +37,9 @@
 					<?php
 					$i = 1;
 						$tenant_id = $_settings->active_tenant_id();
-						$qry = $conn->query("SELECT l.*, concat(e.firstname, ' ', e.lastname) as emp_name, e.employee_code from `leave_list` l inner join `employee_list` e on l.employee_id = e.id where l.tenant_id = '{$tenant_id}' order by l.id desc ");
+						$scope = $_settings->employee_scope('leaves');
+						$own_filter = $scope === null ? '' : " AND l.employee_id = '".(int)$scope."' ";
+						$qry = $conn->query("SELECT l.*, concat(e.firstname, ' ', e.lastname) as emp_name, e.employee_code from `leave_list` l inner join `employee_list` e on l.employee_id = e.id where l.tenant_id = '{$tenant_id}'{$own_filter} order by l.id desc ");
 						while($row = $qry->fetch_assoc()):
 					?>
 						<tr>

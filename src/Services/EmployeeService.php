@@ -72,6 +72,13 @@ class EmployeeService
 
     public function saveAttendance(array $post): string
     {
+        $scope = $this->settings->employee_scope('attendance');
+        if ($scope !== null) {
+            if ($scope <= 0) {
+                return json_encode(['status' => 'failed', 'msg' => 'Your account is not linked to an employee profile. Ask your administrator.']);
+            }
+            $post['employee_id'] = $scope;
+        }
         extract($post);
         $tenant_id = $this->settings->active_tenant_id();
         $id = isset($id) ? intval($id) : 0;
@@ -124,9 +131,31 @@ class EmployeeService
 
     public function saveLeave(array $post): string
     {
-        extract($post);
         $tenant_id = $this->settings->active_tenant_id();
-        $id = isset($id) ? intval($id) : 0;
+        $id = isset($post['id']) ? intval($post['id']) : 0;
+        // Whitelist columns (no arbitrary POST keys as column names).
+        $post = array_intersect_key($post, array_flip(['employee_id', 'leave_type', 'start_date', 'end_date', 'reason', 'status']));
+        $scope = $this->settings->employee_scope('leaves');
+        if ($scope !== null) {
+            // Self-service: own employee only, always starts pending.
+            if ($scope <= 0) {
+                return json_encode(['status' => 'failed', 'msg' => 'Your account is not linked to an employee profile. Ask your administrator.']);
+            }
+            $post['employee_id'] = $scope;
+            unset($post['status']);
+            if ($id > 0) {
+                $own = $this->conn->query("SELECT id FROM `leave_list` WHERE id = '{$id}' AND employee_id = '{$scope}' AND tenant_id = '{$tenant_id}'");
+                if (!$own || $own->num_rows === 0) {
+                    return json_encode(['status' => 'failed', 'msg' => 'You can only change your own leave requests.']);
+                }
+            }
+        } elseif (!empty($post['employee_id'])) {
+            $eid = (int)$post['employee_id'];
+            $chk = $this->conn->query("SELECT id FROM `employee_list` WHERE id = '{$eid}' AND tenant_id = '{$tenant_id}'");
+            if (!$chk || $chk->num_rows === 0) {
+                return json_encode(['status' => 'failed', 'msg' => 'Invalid employee.']);
+            }
+        }
         $dataStr = "";
         foreach ($post as $k => $v) {
             if (!in_array($k, ['id'])) {

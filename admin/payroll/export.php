@@ -6,6 +6,11 @@ if(!$_settings->userdata('id')){
     die("Access Denied: Authentication required.");
 }
 
+if(!$_settings->can_access('payroll_create')){
+    http_response_code(403);
+    die("Access Denied: payroll exports require payroll processing permission.");
+}
+
 $type = isset($_GET['type']) ? strtolower($_GET['type']) : 'generic';
 $ref = isset($_GET['ref']) ? $_GET['ref'] : '';
 $month = isset($_GET['month']) ? $_GET['month'] : '';

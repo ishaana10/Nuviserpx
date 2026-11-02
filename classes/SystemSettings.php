@@ -248,7 +248,7 @@ class SystemSettings extends DBConnection{
 			}
 		}
 
-		return ['name' => 'Standard Staff', 'permissions' => ['journals_view', 'invoices_view', 'payments_view', 'products_view', 'sales_orders_view', 'employees_view', 'payroll_view', 'reports_view']];
+		return ['name' => 'Standard Staff', 'permissions' => ['invoices_view', 'payments_view', 'products_view', 'sales_orders_view', 'payroll_view', 'leaves_view', 'leaves_create', 'attendance_view']];
 	}
 
 	/**
@@ -271,6 +271,32 @@ class SystemSettings extends DBConnection{
 			}
 		}
 		return $cache[$tid] === null || in_array($module_key, $cache[$tid], true);
+	}
+
+	/** The employee profile linked to the logged-in user (0 = none). Read live so re-linking applies at once. */
+	function own_employee_id(){
+		static $cache = [];
+		$uid = (int)$this->userdata('id');
+		if($uid <= 0) return 0;
+		if(!array_key_exists($uid, $cache)){
+			$q = @$this->conn->query("SELECT employee_id FROM `users` WHERE id = '{$uid}'");
+			$cache[$uid] = ($q && ($r = $q->fetch_assoc())) ? (int)$r['employee_id'] : 0;
+		}
+		return $cache[$uid];
+	}
+
+	/**
+	 * Whose employee records may this user see/submit for a module?
+	 * null  = everyone's (super admin or an HR/payroll manager),
+	 * int   = only that employee id (0 = account isn't linked to an employee).
+	 * Managers hold the module's Edit permission (Payroll: Create or Edit).
+	 */
+	function employee_scope($module){
+		if($this->userdata('type') == 1) return null;
+		$manager = $module === 'payroll'
+			? ($this->can_access('payroll_create') || $this->can_access('payroll_edit'))
+			: $this->can_access($module.'_edit');
+		return $manager ? null : $this->own_employee_id();
 	}
 
 	function can_access($permission_key){
