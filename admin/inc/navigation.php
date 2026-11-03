@@ -214,6 +214,12 @@ if($t_qry && $t_qry->num_rows > 0){
                                         </a>
                                     </li>
                                     <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=purchases/bill_payments" class="nav-link nav-purchases_bill_payments tree-item">
+                                            <i class="nav-icon fas fa-money-check-alt"></i>
+                                            <p>Supplier Payments</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=stock_adjustments" class="nav-link nav-stock_adjustments tree-item">
                                             <i class="nav-icon fas fa-cubes"></i>
                                             <p>Stock Movements</p>

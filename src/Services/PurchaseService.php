@@ -379,6 +379,9 @@ class PurchaseService
             }
         }
         $credited_amount = $credited_amount ?? 0.0;
+        if (!empty($id) && $status !== 'cancelled' && $status !== 'draft' && $total + 0.005 < $paid_amount + $credited_amount) {
+            return json_encode(['status' => 'failed', 'msg' => 'This bill has already had ' . number_format($paid_amount + $credited_amount, 2) . ' paid or credited, so its total cannot be lowered below that. Void the payment first.']);
+        }
         // Debit notes count towards settling the bill just as payments do.
         $balance = CreditNoteService::outstanding($total, $paid_amount, $credited_amount);
         if ($status !== 'cancelled' && $status !== 'draft') {
@@ -565,6 +568,10 @@ class PurchaseService
             return json_encode(['status' => 'failed', 'msg' => 'Vendor bill not found.']);
         }
         $b = $bill->fetch_assoc();
+        $pay = $this->conn->query("SELECT 1 FROM bill_payment_allocations a INNER JOIN bill_payments p ON p.id = a.payment_id AND p.status = 'posted' WHERE a.bill_id = '{$id}' LIMIT 1");
+        if ($pay && $pay->num_rows > 0) {
+            return json_encode(['status' => 'failed', 'msg' => 'This bill has payments against it. Void the payments before deleting the bill.']);
+        }
         if (!empty($b['journal_id'])) {
             $this->conn->query("DELETE FROM `journal_entries` WHERE id = '{$b['journal_id']}'");
         }
