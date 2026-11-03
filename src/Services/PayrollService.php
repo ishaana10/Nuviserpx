@@ -125,8 +125,21 @@ class PayrollService
         $deductions = isset($deductions) ? (float)$deductions : 0.0;
         $is_resident = isset($is_resident) ? (int)$is_resident : (int)($emp_data['is_resident'] ?? 1);
 
+        // Retroactive pay: a new payroll picks up the employee's pending adjustments; an edit keeps what it already paid.
+        $adjustments = new PayrollAdjustmentService($this->conn, $this->settings);
+        $editId = !empty($id) ? (int)$id : 0;
+        $pendingAdj = [];
+        if ($editId > 0) {
+            $q = $this->conn->query("SELECT retro_pay FROM `payroll_list` WHERE id = '{$editId}' AND tenant_id = '{$tenant_id}'");
+            $retro_pay = $q ? (float)($q->fetch_assoc()['retro_pay'] ?? 0) : 0.0;
+        } else {
+            $pendingAdj = $adjustments->pending((int)$employee_id, $period_end);
+            $retro_pay = PayrollAdjustmentService::total($pendingAdj);
+        }
+
         // Calculate Payroll
         $calc = PayrollEngine::calculate([
+            'lump_sum_payments' => $retro_pay,
             'basic_salary' => $basic_salary,
             'overtime' => $overtime,
             'allowances' => $allowances,
@@ -175,6 +188,12 @@ class PayrollService
         }
         try {
         $posting = new PayrollPostingService($this->conn, $this->settings);
+        if (empty($id) && $pendingAdj) {
+            $locked = $adjustments->pending((int)$employee_id, $period_end, true);
+            if (array_column($locked, 'id') != array_column($pendingAdj, 'id') || PayrollAdjustmentService::total($locked) !== $retro_pay) {
+                throw new \RuntimeException('The retroactive pay adjustments changed while processing. Please try again.');
+            }
+        }
         if (empty($id)) {
             $j_sql = "INSERT INTO `journal_entries` (`tenant_id`, `code`, `journal_date`, `description`, `user_id`) VALUES ('{$tenant_id}', '{$journal_code}', '{$journal_date}', '{$description}', '{$user_id}')";
             $this->conn->query($j_sql);
@@ -198,6 +217,7 @@ class PayrollService
 				`overtime` = '{$overtime}',
 				`allowances` = '{$allowances}',
 				`other_earnings` = '{$other_earnings}',
+				`retro_pay` = '{$retro_pay}',
 				`gross_salary` = '{$gross_salary}',
 				`fnpf_base` = '{$fnpf_base}',
 				`employee_fnpf` = '{$employee_fnpf}',
@@ -263,6 +283,9 @@ class PayrollService
         $save = $this->conn->query($sql);
         if (!$save) {
             throw new \RuntimeException('save failed');
+        }
+        if (empty($id) && $pendingAdj) {
+            $adjustments->markApplied(array_column($pendingAdj, 'id'), (int)$this->conn->insert_id);
         }
         if ($ownTx) {
             $this->conn->commit();
@@ -383,6 +406,7 @@ class PayrollService
         if (!empty($existing['journal_id'])) {
             $this->conn->query("DELETE FROM `journal_entries` WHERE id = '{$existing['journal_id']}' and tenant_id = '{$tenant_id}'");
         }
+        (new PayrollAdjustmentService($this->conn, $this->settings))->release($id);
         $del = $this->conn->query("DELETE FROM `payroll_list` WHERE id = '{$id}' and tenant_id = '{$tenant_id}'");
         if ($del) {
             $resp['status'] = 'success';

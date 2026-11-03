@@ -844,18 +844,22 @@ class Master extends DBConnection
 
     public function apply_retro_pay()
     {
-        $tenant_id = $this->settings->active_tenant_id();
-        extract($_POST);
+        return $this->container->make(\App\Services\PayrollAdjustmentService::class)->create($_POST);
+    }
 
-        $emp_id = intval($employee_id ?? 0);
-        $adj_amount = floatval($amount ?? 0);
+    public function remit_payroll_liability()
+    {
+        return $this->container->make(\App\Services\PayrollRemittanceService::class)->remit($_POST);
+    }
 
-        if ($emp_id <= 0 || $adj_amount <= 0 || empty($effective_date)) {
-            return json_encode(['status' => 'failed', 'msg' => 'Valid Employee, Amount (> 0), and Effective Date are required.']);
-        }
+    public function reverse_payroll_remittance()
+    {
+        return $this->container->make(\App\Services\PayrollRemittanceService::class)->reverse(intval($_POST['id'] ?? 0));
+    }
 
-        $this->settings->log_audit("Applied Retroactive Pay", "Payroll Engine", "Employee ID #{$emp_id}, Amount: {$adj_amount}, Effective: {$effective_date}");
-        return json_encode(['status' => 'success', 'msg' => 'Retroactive salary adjustment successfully queued for next payrun job.']);
+    public function cancel_retro_pay()
+    {
+        return $this->container->make(\App\Services\PayrollAdjustmentService::class)->cancel(intval($_POST['id'] ?? 0));
     }
 
     public function save_tenant_vms_settings()
@@ -2327,6 +2331,15 @@ switch ($action) {
         break;
     case 'terminate_session':
         echo $Master->terminate_session();
+        break;
+    case 'remit_payroll_liability':
+        echo $Master->remit_payroll_liability();
+        break;
+    case 'reverse_payroll_remittance':
+        echo $Master->reverse_payroll_remittance();
+        break;
+    case 'cancel_retro_pay':
+        echo $Master->cancel_retro_pay();
         break;
     case 'apply_retro_pay':
         echo $Master->apply_retro_pay();

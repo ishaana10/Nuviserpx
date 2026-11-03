@@ -77,6 +77,7 @@ class DBConnection{
                 $this->check_journal_trail_migrations();
                 $this->check_bill_payment_migrations();
                 $this->check_bill_payment_approval_migrations();
+                $this->check_payroll_adjustment_migrations();
                 $this->check_dolibarr_crm_migrations();
                 $this->check_dolibarr_extended_migrations();
                 $this->check_extrafields_migrations();
@@ -1063,6 +1064,52 @@ class DBConnection{
           KEY `payment` (`payment_id`),
           KEY `bill` (`bill_id`),
           CONSTRAINT `bpa_payment_fk` FOREIGN KEY (`payment_id`) REFERENCES `bill_payments` (`id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    }
+
+    public function check_payroll_adjustment_migrations(){
+        if (!$this->conn) return;
+
+        // Back-pay waiting to be paid in an employee's next payroll
+        @$this->conn->query("CREATE TABLE IF NOT EXISTS `payroll_adjustments` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `tenant_id` int(30) NOT NULL DEFAULT 1,
+          `employee_id` int(30) NOT NULL,
+          `effective_date` date NOT NULL,
+          `amount` decimal(12,2) NOT NULL DEFAULT 0.00,
+          `reason` varchar(500) DEFAULT NULL,
+          `status` enum('pending','applied','cancelled') NOT NULL DEFAULT 'pending',
+          `created_by` int(30) DEFAULT NULL,
+          `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+          `applied_payroll_id` int(30) DEFAULT NULL,
+          `applied_at` datetime DEFAULT NULL,
+          PRIMARY KEY (`id`),
+          KEY `tenant_employee_status` (`tenant_id`,`employee_id`,`status`),
+          KEY `applied_payroll_id` (`applied_payroll_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        $r = @$this->conn->query("SHOW COLUMNS FROM `payroll_list` LIKE 'retro_pay'");
+        if ($r && $r->num_rows == 0) {
+            @$this->conn->query("ALTER TABLE `payroll_list` ADD COLUMN `retro_pay` decimal(12,2) NOT NULL DEFAULT 0.00 AFTER `other_earnings`");
+        }
+
+        // Payments of pension, tax and levy liabilities to the fund / authority
+        @$this->conn->query("CREATE TABLE IF NOT EXISTS `payroll_remittances` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `tenant_id` int(30) NOT NULL DEFAULT 1,
+          `liability` varchar(20) NOT NULL,
+          `remit_date` date NOT NULL,
+          `amount` decimal(12,2) NOT NULL DEFAULT 0.00,
+          `bank_account_id` int(30) NOT NULL,
+          `reference` varchar(100) DEFAULT NULL,
+          `note` varchar(500) DEFAULT NULL,
+          `journal_id` int(30) DEFAULT NULL,
+          `status` enum('posted','reversed') NOT NULL DEFAULT 'posted',
+          `created_by` int(30) DEFAULT NULL,
+          `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+          PRIMARY KEY (`id`),
+          KEY `tenant_id` (`tenant_id`,`liability`),
+          KEY `journal_id` (`journal_id`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     }
 

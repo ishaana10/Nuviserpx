@@ -110,6 +110,7 @@ final class Permissions
         ],
         'Payroll' => [
             'payroll_process'  => 'Process payroll runs (Batch & Single Employee Run, retro pay)',
+            'payroll_remit'    => 'Pay pension, tax and levy amounts owed from payroll',
             'payroll_export'   => 'Download compliance & bank files (bank, tax return, pension schedule)',
             'payroll_view_all' => "See every employee's payroll & payslips (otherwise only their own)",
         ],
@@ -506,6 +507,9 @@ final class Permissions
         'delete_payroll'        => ['payroll', 'delete'],
         'calculate_payroll_ajax'=> ['payroll', 'edit'],
         'apply_retro_pay'       => ['payroll_process'],
+        'cancel_retro_pay'      => ['payroll_process'],
+        'remit_payroll_liability' => ['payroll_remit'],
+        'reverse_payroll_remittance' => ['payroll_remit'],
         'save_batch_payroll'    => ['payroll_process'],
         'email_payslip'         => ['payroll', 'view'],
         'save_salary_component' => ['payroll', 'edit'],
@@ -766,6 +770,8 @@ final class Permissions
         }
         if ($page === 'payroll/rules_settings') {
             $perm = 'settings_manage';
+        } elseif ($page === 'payroll/remittances') {
+            $perm = 'payroll_remit';
         } elseif ($page === 'payroll/manage_payroll' && empty($query['id'])) {
             $perm = 'payroll_process'; // opening the run form = processing payroll
         } elseif (preg_match('/(^|\/)(manage_|new_|add_)/', $page) && preg_match('/_view$/', $perm)) {

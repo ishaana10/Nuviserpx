@@ -15,6 +15,15 @@ $payruns_qry = $conn->query("
     GROUP BY payroll_run_ref
     ORDER BY created_at DESC
 ");
+
+$adj_qry = $conn->query("
+    SELECT a.*, CONCAT(e.firstname, ' ', e.lastname) AS emp_name, p.payroll_run_ref AS applied_ref
+    FROM `payroll_adjustments` a
+    LEFT JOIN `employee_list` e ON e.id = a.employee_id
+    LEFT JOIN `payroll_list` p ON p.id = a.applied_payroll_id
+    WHERE a.tenant_id = '{$tenant_id}'
+    ORDER BY (a.status = 'pending') DESC, a.id DESC LIMIT 100
+");
 ?>
 
 <div class="card card-outline card-primary shadow-sm rounded-0">
@@ -40,8 +49,8 @@ $payruns_qry = $conn->query("
                         <th>Frequency</th>
                         <th class="text-center">Staff Count</th>
                         <th class="text-right">Total Gross</th>
-                        <th class="text-right">FNPF (16%)</th>
-                        <th class="text-right">PAYE Tax</th>
+                        <th class="text-right">Pension (total)</th>
+                        <th class="text-right">Income Tax</th>
                         <th class="text-right">Total Net Pay</th>
                         <th class="text-center">Engine Stage</th>
                         <th class="text-center" style="width: 10%;">Action</th>
@@ -85,6 +94,32 @@ $payruns_qry = $conn->query("
     </div>
 </div>
 
+<div class="card card-outline card-info shadow-sm rounded-0 mt-3">
+    <div class="card-header"><h3 class="card-title font-weight-bold"><i class="fas fa-history text-info mr-2"></i> Retroactive Pay Adjustments</h3></div>
+    <div class="card-body">
+        <p class="text-sm text-muted">A pending adjustment is paid with the employee's next payroll, as taxable and pensionable pay. Deleting that payroll puts it back to pending.</p>
+        <table class="table table-sm table-bordered">
+            <thead><tr class="bg-light"><th>Employee</th><th>Effective from</th><th class="text-right">Amount</th><th>Reason</th><th>Status</th><th style="width:90px"></th></tr></thead>
+            <tbody>
+            <?php if ($adj_qry && $adj_qry->num_rows): while ($a = $adj_qry->fetch_assoc()): ?>
+                <tr>
+                    <td><?= htmlspecialchars((string)$a['emp_name']) ?></td>
+                    <td><?= htmlspecialchars($a['effective_date']) ?></td>
+                    <td class="text-right"><?= number_format((float)$a['amount'], 2) ?></td>
+                    <td><?= htmlspecialchars((string)$a['reason']) ?></td>
+                    <td><?php if ($a['status'] === 'pending'): ?><span class="badge badge-warning">Pending</span>
+                        <?php elseif ($a['status'] === 'applied'): ?><span class="badge badge-success">Paid</span> <small><?= htmlspecialchars((string)$a['applied_ref']) ?></small>
+                        <?php else: ?><span class="badge badge-secondary">Cancelled</span><?php endif; ?></td>
+                    <td><?php if ($a['status'] === 'pending'): ?><button type="button" class="btn btn-xs btn-outline-danger cancel-adj" data-id="<?= (int)$a['id'] ?>">Cancel</button><?php endif; ?></td>
+                </tr>
+            <?php endwhile; else: ?>
+                <tr><td colspan="6" class="text-center text-muted">No adjustments recorded.</td></tr>
+            <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+</div>
+
 <!-- Retroactive Pay Adjustment Modal -->
 <div class="modal fade" id="retroPayModal" tabindex="-1" role="dialog">
     <div class="modal-dialog modal-dialog-centered" role="document">
@@ -114,7 +149,7 @@ $payruns_qry = $conn->query("
                             <input type="date" name="effective_date" id="retro_effective_date" class="form-control form-control-sm" value="<?= date('Y-m-01') ?>" required>
                         </div>
                         <div class="col-md-6 form-group">
-                            <label for="retro_amount" class="font-weight-bold text-dark text-sm">Adjustment Amount ($) <span class="text-danger">*</span></label>
+                            <label for="retro_amount" class="font-weight-bold text-dark text-sm">Adjustment Amount<?= $_settings->currency_tag() ?> <span class="text-danger">*</span></label>
                             <input type="number" step="0.01" name="amount" id="retro_amount" class="form-control form-control-sm text-right" placeholder="0.00" required>
                         </div>
                     </div>
@@ -140,6 +175,15 @@ function retro_pay_modal(){
 
 $(document).ready(function(){
     $('#payruns-table').dataTable();
+    $('.cancel-adj').on('click', function(){
+        if (!confirm('Cancel this adjustment? It will not be paid.')) return;
+        var id = $(this).data('id');
+        start_loader();
+        $.post(_base_url_ + 'classes/Master.php?f=cancel_retro_pay', {id: id}, function(r){
+            end_loader();
+            if (r && r.status === 'success') { location.reload(); } else { alert_toast((r && r.msg) || 'Failed', 'error'); }
+        }, 'json').fail(function(){ end_loader(); alert_toast('An error occurred.', 'error'); });
+    });
 
     $('#retro-pay-form').submit(function(e){
         e.preventDefault();
@@ -158,7 +202,7 @@ $(document).ready(function(){
                 if(resp.status == 'success'){
                     alert_toast(resp.msg, "success");
                     $('#retroPayModal').modal('hide');
-                    end_loader();
+                    setTimeout(function(){ location.reload(); }, 700);
                 } else {
                     alert_toast(resp.msg || "Failed to apply retro adjustment.", "error");
                     end_loader();

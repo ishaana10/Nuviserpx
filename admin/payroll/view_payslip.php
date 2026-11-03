@@ -83,6 +83,12 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
                                     <td>Allowances</td>
                                     <td class="text-right"><?php echo number_format($allowances, 2) ?></td>
                                 </tr>
+                                <?php if (!empty($retro_pay) && (float)$retro_pay != 0): ?>
+                                <tr>
+                                    <td>Retroactive Pay</td>
+                                    <td class="text-right"><?php echo number_format($retro_pay, 2) ?></td>
+                                </tr>
+                                <?php endif; ?>
                                 <tr>
                                     <td>Other Earnings</td>
                                     <td class="text-right"><?php echo number_format($other_earnings, 2) ?></td>
