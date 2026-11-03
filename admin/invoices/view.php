@@ -28,6 +28,20 @@ $invoice = $qry->fetch_assoc();
 
 $items = $conn->query("SELECT * FROM `invoice_items` WHERE invoice_id = '{$id}' ORDER BY id ASC");
 
+// A foreign-currency invoice is shown in its own currency; the books hold the base-currency equivalent.
+$is_fc = !empty($invoice['currency']);
+$fx_base = (new \App\Services\FxService($conn, $_settings))->baseCurrency();
+if($is_fc){
+    $fcq = $conn->query("SELECT COALESCE(SUM(qty*unit_price),0) s, COALESCE(SUM(tax_amount),0) t FROM `invoice_items` WHERE invoice_id = '{$id}'")->fetch_assoc();
+    $fc_total = (float)$invoice['total_fc'];
+    $fc_sub = round((float)$fcq['s'], 2);
+    $fc_tax = round((float)$fcq['t'], 2);
+    $fc_disc = max(0, round($fc_sub + $fc_tax - $fc_total, 2));
+    $fc_paid = (float)$invoice['paid_fc'];
+    $fc_bal = max(0, round($fc_total - $fc_paid, 2));
+    $cc = htmlspecialchars($invoice['currency']) . ' ';
+}
+
 // Get payment history / allocations for this invoice
 $payments = $conn->query("
     SELECT pa.amount AS allocated_amount, p.payment_no, p.payment_date, p.method, p.reference
@@ -283,30 +297,33 @@ $status_class = [
                 <div class="card border shadow-none bg-light p-3">
                     <div class="d-flex justify-content-between mb-2">
                         <span class="text-muted">Subtotal:</span>
-                        <strong class="text-dark">$<?= number_format($invoice['subtotal'], 2) ?></strong>
+                        <strong class="text-dark"><?= $is_fc ? $cc.number_format($fc_sub, 2) : '$'.number_format($invoice['subtotal'], 2) ?></strong>
                     </div>
                     <div class="d-flex justify-content-between mb-2">
                         <span class="text-muted">Tax / VAT Amount:</span>
-                        <strong class="text-dark">$<?= number_format($invoice['tax_amount'], 2) ?></strong>
+                        <strong class="text-dark"><?= $is_fc ? $cc.number_format($fc_tax, 2) : '$'.number_format($invoice['tax_amount'], 2) ?></strong>
                     </div>
                     <?php if($invoice['discount'] > 0): ?>
                     <div class="d-flex justify-content-between mb-2">
                         <span class="text-muted">Discount:</span>
-                        <strong class="text-danger">-$<?= number_format($invoice['discount'], 2) ?></strong>
+                        <strong class="text-danger">-<?= $is_fc ? $cc.number_format($fc_disc, 2) : '$'.number_format($invoice['discount'], 2) ?></strong>
                     </div>
                     <?php endif; ?>
                     <hr class="my-2">
                     <div class="d-flex justify-content-between mb-2">
                         <span class="font-weight-bold h6">Grand Total:</span>
-                        <strong class="font-weight-bold h5 text-inv-label">$<?= number_format($invoice['total'], 2) ?></strong>
+                        <strong class="font-weight-bold h5 text-inv-label"><?= $is_fc ? $cc.number_format($fc_total, 2) : '$'.number_format($invoice['total'], 2) ?></strong>
                     </div>
                     <div class="d-flex justify-content-between mb-2">
                         <span class="text-muted">Amount Paid:</span>
-                        <strong class="text-success">$<?= number_format($invoice['paid_amount'], 2) ?></strong>
+                        <strong class="text-success"><?= $is_fc ? $cc.number_format($fc_paid, 2) : '$'.number_format($invoice['paid_amount'], 2) ?></strong>
                     </div>
+                    <?php if($is_fc): ?>
+                    <div class="text-muted small text-right mb-2">Recorded at <?= rtrim(rtrim(number_format((float)$invoice['fx_rate'], 8, '.', ''), '0'), '.') ?> = <?= htmlspecialchars($fx_base) ?> <?= number_format($invoice['total'], 2) ?> (balance <?= number_format($invoice['balance'], 2) ?>)</div>
+                    <?php endif; ?>
                     <div class="d-flex justify-content-between pt-2 border-top">
                         <span class="font-weight-bold h6 text-danger">Balance Due:</span>
-                        <strong class="font-weight-bold h5 text-danger">$<?= number_format($invoice['balance'], 2) ?></strong>
+                        <strong class="font-weight-bold h5 text-danger"><?= $is_fc ? $cc.number_format($fc_bal, 2) : '$'.number_format($invoice['balance'], 2) ?></strong>
                     </div>
                 </div>
             </div>

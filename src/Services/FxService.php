@@ -25,6 +25,7 @@ use SystemSettings;
 class FxService
 {
     public const FX_ACCOUNT = 'Unrealised FX Gain/Loss';
+    public const REALISED_ACCOUNT = 'Realised FX Gain/Loss';
 
     public function __construct(
         private readonly mysqli $conn,
@@ -80,6 +81,42 @@ class FxService
         }
         unset($l);
         return [$lines, $errors];
+    }
+
+    /**
+     * Base-currency value to take off a foreign-currency invoice for an allocation of $allocFc. It is carried
+     * at the invoice's own rate; the allocation that clears the last foreign unit takes the whole remaining base
+     * value, so a fully settled invoice never leaves a rounding cent behind.
+     */
+    public static function allocationBase(float $allocFc, float $remainingFc, float $remainingBase, float $docRate): float
+    {
+        $remainingBase = round($remainingBase, 2);
+        if ($allocFc >= round($remainingFc, 2) - 0.005) {
+            return $remainingBase;
+        }
+        return min($remainingBase, self::toBase($allocFc, $docRate));
+    }
+
+    /**
+     * Journal for a foreign-currency receipt: cash at the receipt-date rate, receivables relieved at the carried
+     * (invoice) value, the difference to realised gain/loss. Lines are [account, side, base amount, fx tag?].
+     * The receivable line carries the foreign amount so revaluation sees the balance fall.
+     */
+    public static function receiptLines(int $cashAcc, int $arAcc, int $fxAcc, float $cashBase, float $arBase, string $currency, float $rate, float $arFc): array
+    {
+        $cashBase = round($cashBase, 2);
+        $arBase = round($arBase, 2);
+        $lines = [
+            [$cashAcc, TaxService::DEBIT, $cashBase],
+            [$arAcc, TaxService::CREDIT, $arBase, ['currency' => $currency, 'fx_rate' => $rate, 'amount_fc' => round($arFc, 2)]],
+        ];
+        $gain = round($cashBase - $arBase, 2);
+        if ($gain > 0) {
+            $lines[] = [$fxAcc, TaxService::CREDIT, $gain];
+        } elseif ($gain < 0) {
+            $lines[] = [$fxAcc, TaxService::DEBIT, abs($gain)];
+        }
+        return $lines;
     }
 
     /**
@@ -269,6 +306,44 @@ class FxService
         }
         unset($r);
         return $res;
+    }
+
+    /** The rate for a document: the one typed on it if valid, else the latest on or before its date. Null if neither. */
+    public function documentRate(string $currency, string $date, mixed $typed): ?float
+    {
+        $r = ($typed !== null && $typed !== '') ? self::cleanRate($typed) : null;
+        return $r ?? $this->rateOn(strtoupper($currency), $date);
+    }
+
+    public function isForeign(?string $currency): bool
+    {
+        $c = strtoupper(trim((string)$currency));
+        return $c !== '' && $c !== $this->baseCurrency();
+    }
+
+    /** The realised gain/loss account, created on first use. */
+    public function realisedAccount(): int
+    {
+        return $this->ensureAccount(self::REALISED_ACCOUNT, 'Exchange differences made real when a foreign-currency invoice is paid');
+    }
+
+    private function ensureAccount(string $name, string $description): int
+    {
+        $t = $this->tenantId();
+        $find = $this->conn->prepare("SELECT id FROM account_list WHERE tenant_id = ? AND delete_flag = 0 AND name = ? LIMIT 1");
+        $find->bind_param('is', $t, $name);
+        $find->execute();
+        if ($row = $find->get_result()->fetch_assoc()) {
+            return (int)$row['id'];
+        }
+        $res = json_decode((new AccountService($this->conn, $this->settings))->saveAccount([
+            'name' => $name, 'type' => 'Other Income', 'description' => $description, 'status' => 1,
+        ]), true);
+        if (($res['status'] ?? '') !== 'success') {
+            return 0;
+        }
+        $find->execute();
+        return (int)($find->get_result()->fetch_assoc()['id'] ?? 0);
     }
 
     /** The company's unrealised FX account, created on first use. */

@@ -56,6 +56,13 @@ if($method === 'POST'){
         // Auto allocate across customer unpaid invoices
         if(isset($input['invoice_id']) && is_numeric($input['invoice_id'])){
             $inv_id = intval($input['invoice_id']);
+            $fcRow = $conn->query("SELECT currency FROM `invoice_list` WHERE id = '{$inv_id}'")->fetch_assoc();
+            if (!empty($fcRow['currency'])) {
+                $conn->query("DELETE FROM `payment_list` WHERE id = '{$pay_id}'");
+                http_response_code(422);
+                echo json_encode(['status' => 'failed', 'message' => 'That invoice is in ' . $fcRow['currency'] . '. Record the receipt in the application so the exchange difference is booked.']);
+                exit;
+            }
             $conn->query("INSERT INTO `payment_allocations` SET `payment_id` = '{$pay_id}', `invoice_id` = '{$inv_id}', `amount` = '{$amount}'");
             $conn->query("UPDATE `invoice_list` SET `paid_amount` = `paid_amount` + {$amount}, `balance` = GREATEST(0, `total` - (`paid_amount` + {$amount}) - `credited_amount`), `status` = IF((`paid_amount` + {$amount} + `credited_amount`) >= `total`, 'paid', 'partially_paid') WHERE id = '{$inv_id}'");
         }

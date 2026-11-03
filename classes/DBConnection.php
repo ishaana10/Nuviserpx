@@ -73,6 +73,7 @@ class DBConnection{
                 $this->check_asset_depreciation_migrations();
                 $this->check_bill_approval_migrations();
                 $this->check_credit_note_migrations();
+                $this->check_fx_document_migrations();
                 $this->check_dolibarr_crm_migrations();
                 $this->check_dolibarr_extended_migrations();
                 $this->check_extrafields_migrations();
@@ -1023,6 +1024,35 @@ class DBConnection{
             $res = @$this->conn->query("SHOW COLUMNS FROM `fixed_assets` LIKE '{$col}'");
             if ($res && $res->num_rows == 0) {
                 @$this->conn->query($sql);
+            }
+        }
+    }
+
+    public function check_fx_document_migrations(){
+        if (!$this->conn) return;
+
+        // A foreign-currency invoice keeps its own currency, rate and amounts; the usual columns stay in base currency.
+        $cols = array(
+            'invoice_list' => array(
+                'currency' => "ALTER TABLE `invoice_list` ADD COLUMN `currency` varchar(10) DEFAULT NULL",
+                'fx_rate'  => "ALTER TABLE `invoice_list` ADD COLUMN `fx_rate` decimal(18,8) DEFAULT NULL",
+                'total_fc' => "ALTER TABLE `invoice_list` ADD COLUMN `total_fc` decimal(18,4) DEFAULT NULL",
+                'paid_fc'  => "ALTER TABLE `invoice_list` ADD COLUMN `paid_fc` decimal(18,4) NOT NULL DEFAULT 0.0000",
+            ),
+            'payment_list' => array(
+                'fx_rate'   => "ALTER TABLE `payment_list` ADD COLUMN `fx_rate` decimal(18,8) DEFAULT NULL",
+                'amount_fc' => "ALTER TABLE `payment_list` ADD COLUMN `amount_fc` decimal(18,4) DEFAULT NULL",
+            ),
+            'payment_allocations' => array(
+                'amount_fc' => "ALTER TABLE `payment_allocations` ADD COLUMN `amount_fc` decimal(18,4) DEFAULT NULL",
+            ),
+        );
+        foreach ($cols as $tbl => $defs) {
+            foreach ($defs as $c => $sql) {
+                $res = @$this->conn->query("SHOW COLUMNS FROM `{$tbl}` LIKE '{$c}'");
+                if ($res && $res->num_rows == 0) {
+                    @$this->conn->query($sql);
+                }
             }
         }
     }

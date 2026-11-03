@@ -41,6 +41,42 @@ class InvoiceService
         }
         $party = $party_qry->fetch_assoc();
 
+        // Foreign currency: the form's amounts are in the invoice currency; the ledger and every total are kept in base.
+        $fx = new FxService($this->conn, $this->settings);
+        $docCurrency = strtoupper(trim((string)($currency ?? '')));
+        $isForeign = $fx->isForeign($docCurrency);
+        $docRate = null;
+        $total_fc = null;
+        if (!empty($id)) {
+            $cur = $this->conn->query("SELECT currency, fx_rate, total_fc, paid_amount, credited_amount FROM `invoice_list` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'")->fetch_assoc() ?: [];
+            $wasForeign = !empty($cur['currency']);
+            $hasSettlement = (float)($cur['paid_amount'] ?? 0) + (float)($cur['credited_amount'] ?? 0) > 0;
+            if ($hasSettlement && ($wasForeign !== $isForeign || ($wasForeign && $docCurrency !== strtoupper((string)$cur['currency'])))) {
+                return json_encode(['status' => 'failed', 'msg' => 'This invoice already has receipts or credits, so its currency cannot be changed.']);
+            }
+            if ($wasForeign && $hasSettlement && abs((float)$cur['total_fc'] - $total) > 0.005) {
+                return json_encode(['status' => 'failed', 'msg' => 'This invoice has receipts against it, so its amount cannot be changed. Reverse the receipts first, or raise a new invoice.']);
+            }
+        }
+        if ($isForeign) {
+            $typedRate = $post['fx_rate'] ?? null;
+            if (isset($cur) && !empty($cur['currency']) && $hasSettlement) {
+                $typedRate = $cur['fx_rate']; // the rate is fixed once money has been settled against the invoice
+            }
+            $docRate = $fx->documentRate($docCurrency, $invoice_date, $typedRate);
+            if ($docRate === null) {
+                return json_encode(['status' => 'failed', 'msg' => "No exchange rate for {$docCurrency} on {$invoice_date}. Add one under Exchange rates, or type the rate on the invoice."]);
+            }
+            $total_fc = round($total, 2);
+            $subtotal = FxService::toBase($subtotal, $docRate);
+            $tax_amount = FxService::toBase($tax_amount, $docRate);
+            $discount = FxService::toBase($discount, $docRate);
+            $total = FxService::toBase($total, $docRate);
+        }
+        $fxSql = $isForeign
+            ? "`currency` = '" . $this->conn->real_escape_string($docCurrency) . "', `fx_rate` = '" . number_format($docRate, 8, '.', '') . "', `total_fc` = '" . number_format((float)$total_fc, 4, '.', '') . "',"
+            : "`currency` = NULL, `fx_rate` = NULL, `total_fc` = NULL,";
+
         // Calculate paid_amount and balance
         $paid_amount = 0.0;
         if (!empty($id)) {
@@ -71,14 +107,15 @@ class InvoiceService
             return json_encode(['status' => 'failed', 'msg' => $lockMsg]);
         }
         $partyName = $party['name'] ?? '';
-        $description = $this->conn->real_escape_string("Sales Invoice {$invoice_no} to {$partyName} - Total: \${$total}");
+        $description = $this->conn->real_escape_string("Sales Invoice {$invoice_no} to {$partyName} - Total: " . ($isForeign ? "{$docCurrency} " . number_format((float)$total_fc, 2) . " @ {$docRate}" : "\${$total}"));
+        $arFx = $isForeign ? ['currency' => $docCurrency, 'fx_rate' => $docRate, 'amount_fc' => (float)$total_fc] : null;
 
         if (empty($id)) {
             $j_sql = "INSERT INTO `journal_entries` (`tenant_id`, `code`, `journal_date`, `description`, `user_id`) VALUES ('{$tenant_id}', '{$journal_code}', '{$journal_date}', '{$description}', '{$user_id}')";
             $this->conn->query($j_sql);
             $journal_id = $this->conn->insert_id;
 
-            $this->postLines((int)$journal_id, (int)$ar_acc_id, (int)$rev_acc_id, (float)$total, (float)$tax_amount);
+            $this->postLines((int)$journal_id, (int)$ar_acc_id, (int)$rev_acc_id, (float)$total, (float)$tax_amount, $arFx);
 
             $sql = "INSERT INTO `invoice_list` SET
 				`tenant_id` = '{$tenant_id}',
@@ -93,6 +130,7 @@ class InvoiceService
 				`paid_amount` = '{$paid_amount}',
 				`balance` = '{$balance}',
 				`status` = '{$status}',
+				{$fxSql}
 				`notes` = '{$notes}',
 				`journal_id` = '{$journal_id}',
 				`created_by` = '{$user_id}'";
@@ -104,7 +142,7 @@ class InvoiceService
             if ($journal_id) {
                 $this->conn->query("UPDATE `journal_entries` SET `description` = '{$description}', `journal_date` = '{$journal_date}' WHERE id = '{$journal_id}'");
                 $this->conn->query("DELETE FROM `journal_items` WHERE journal_id = '{$journal_id}'");
-                $this->postLines((int)$journal_id, (int)$ar_acc_id, (int)$rev_acc_id, (float)$total, (float)$tax_amount);
+                $this->postLines((int)$journal_id, (int)$ar_acc_id, (int)$rev_acc_id, (float)$total, (float)$tax_amount, $arFx);
             }
 
             $sql = "UPDATE `invoice_list` SET
@@ -119,6 +157,7 @@ class InvoiceService
 				`paid_amount` = '{$paid_amount}',
 				`balance` = '{$balance}',
 				`status` = '{$status}',
+				{$fxSql}
 				`notes` = '{$notes}'
 				WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'";
             $save = $this->conn->query($sql);
@@ -285,15 +324,27 @@ class InvoiceService
     }
 
     /** Receivable Dr gross; Revenue Cr net; VAT Output Cr tax (see TaxService::postingLines). */
-    private function postLines(int $journalId, int $arAcc, int $revAcc, float $total, float $tax): void
+    private function postLines(int $journalId, int $arAcc, int $revAcc, float $total, float $tax, ?array $arFx = null): void
     {
         $taxSvc = new TaxService($this->conn, $this->settings);
         $taxAcc = $tax > 0 ? $taxSvc->controlAccount('output') : 0;
         $lines = TaxService::postingLines('sale', $total, $tax, $revAcc, $taxAcc, $arAcc);
+        if ($arFx) {
+            foreach ($lines as &$ln) {
+                if ($ln[0] === $arAcc && $ln[1] === TaxService::DEBIT) {
+                    $ln[3] = $arFx;
+                }
+            }
+            unset($ln);
+        }
         if (!$taxSvc->writeLines($journalId, $lines)) {
             // Never leave a half-posted journal: fall back to a single unsplit pair.
             $this->conn->query("DELETE FROM `journal_items` WHERE journal_id = " . (int)$journalId);
-            $taxSvc->writeLines($journalId, TaxService::postingLines('sale', $total, 0.0, $revAcc, 0, $arAcc));
+            $plain = TaxService::postingLines('sale', $total, 0.0, $revAcc, 0, $arAcc);
+            if ($arFx) {
+                $plain[0][3] = $arFx;
+            }
+            $taxSvc->writeLines($journalId, $plain);
         }
     }
 }

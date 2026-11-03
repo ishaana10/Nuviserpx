@@ -13,6 +13,16 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
     }
 }
 
+$fx_svc = new \App\Services\FxService($conn, $_settings);
+$fx_base = $fx_svc->baseCurrency();
+$fx_currencies = $fx_svc->foreignCurrencies();
+$pay_currency = (isset($amount_fc) && $amount_fc !== null && !empty($currency)) ? strtoupper($currency) : $fx_base;
+$preset_inv_currency = '';
+if(isset($_GET['invoice_id']) && (int)$_GET['invoice_id'] > 0 && !isset($id)){
+    $ic = $conn->query("SELECT currency FROM `invoice_list` WHERE id = '".(int)$_GET['invoice_id']."' AND tenant_id = '{$tenant_id}'")->fetch_assoc();
+    if(!empty($ic['currency'])) $pay_currency = strtoupper($ic['currency']);
+}
+
 $preset_party_id = isset($_GET['party_id']) ? (int)$_GET['party_id'] : (isset($party_id) ? $party_id : 0);
 $preset_invoice_id = isset($_GET['invoice_id']) ? (int)$_GET['invoice_id'] : 0;
 ?>
@@ -50,8 +60,25 @@ $preset_invoice_id = isset($_GET['invoice_id']) ? (int)$_GET['invoice_id'] : 0;
 					<input type="date" name="payment_date" id="payment_date" class="form-control form-control-sm rounded-0" value="<?php echo isset($payment_date) ? $payment_date : date('Y-m-d'); ?>" required/>
 				</div>
 				<div class="col-md-3 form-group">
-					<label for="amount" class="control-label">Amount Received (FJD)</label>
-					<input type="number" step="any" name="amount" id="amount" class="form-control form-control-sm rounded-0 font-weight-bold text-success" value="<?php echo isset($amount) ? $amount : '0.00'; ?>" required/>
+					<label for="amount" class="control-label">Amount Received (<span class="pay-cur"><?php echo htmlspecialchars($pay_currency) ?></span>)</label>
+					<input type="number" step="any" name="amount" id="amount" class="form-control form-control-sm rounded-0 font-weight-bold text-success" value="<?php echo isset($amount_fc) && $amount_fc !== null ? rtrim(rtrim((string)$amount_fc, '0'), '.') : (isset($amount) ? $amount : '0.00'); ?>" required/>
+				</div>
+			</div>
+
+			<div class="row">
+				<div class="col-md-3 form-group">
+					<label for="currency" class="control-label">Currency</label>
+					<select name="currency" id="currency" class="form-control form-control-sm rounded-0">
+						<option value="<?php echo htmlspecialchars($fx_base) ?>"><?php echo htmlspecialchars($fx_base) ?> (company currency)</option>
+						<?php foreach($fx_currencies as $fc): ?>
+						<option value="<?php echo htmlspecialchars($fc['code']) ?>" <?php echo $pay_currency === strtoupper($fc['code']) ? 'selected' : '' ?>><?php echo htmlspecialchars($fc['code'] . ' - ' . $fc['name']) ?></option>
+						<?php endforeach; ?>
+					</select>
+				</div>
+				<div class="col-md-3 form-group" id="fx_rate_box" style="display:none">
+					<label for="fx_rate" class="control-label">Rate on receipt date</label>
+					<input type="number" step="any" min="0" name="fx_rate" id="fx_rate" class="form-control form-control-sm rounded-0" placeholder="Blank = rate on the date" value="<?php echo !empty($fx_rate) ? htmlspecialchars(rtrim(rtrim((string)$fx_rate, '0'), '.')) : '' ?>">
+					<small class="text-muted">1 <span class="pay-cur"></span> = ? <?php echo htmlspecialchars($fx_base) ?>. Any difference from the invoice rate is booked as realised exchange gain or loss.</small>
 				</div>
 			</div>
 
@@ -114,6 +141,7 @@ $preset_invoice_id = isset($_GET['invoice_id']) ? (int)$_GET['invoice_id'] : 0;
 </div>
 
 <script>
+	var fx_base = <?php echo json_encode($fx_base) ?>;
 	function load_party_invoices(party_id, payment_id, preset_inv_id){
 		if(!party_id) return;
 
@@ -122,7 +150,7 @@ $preset_invoice_id = isset($_GET['invoice_id']) ? (int)$_GET['invoice_id'] : 0;
 		$.ajax({
 			url: _base_url_ + "admin/payments/get_unpaid_invoices.php",
 			method: "POST",
-			data: { party_id: party_id, payment_id: payment_id, preset_invoice_id: preset_inv_id },
+			data: { party_id: party_id, payment_id: payment_id, preset_invoice_id: preset_inv_id, currency: $('#currency').val() },
 			success: function(html){
 				$('#unpaid-invoices-container').html(html);
 			}
@@ -137,6 +165,17 @@ $preset_invoice_id = isset($_GET['invoice_id']) ? (int)$_GET['invoice_id'] : 0;
 
 		var payment_id = '<?php echo isset($id) ? $id : 0 ?>';
 		var preset_inv_id = '<?php echo $preset_invoice_id ?>';
+
+		function sync_pay_currency(){
+			var c = $('#currency').val();
+			$('.pay-cur').text(c);
+			$('#fx_rate_box').toggle(c !== fx_base);
+		}
+		$('#currency').on('change', function(){
+			sync_pay_currency();
+			load_party_invoices($('#party_id').val(), payment_id, preset_inv_id);
+		});
+		sync_pay_currency();
 
 		$('#party_id').change(function(){
 			load_party_invoices($(this).val(), payment_id, preset_inv_id);
