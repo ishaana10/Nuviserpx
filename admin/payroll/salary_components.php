@@ -122,7 +122,7 @@ $qry = $conn->query("SELECT * FROM `salary_components` WHERE tenant_id = '{$tena
                         </div>
                         <div class="custom-control custom-checkbox">
                             <input type="checkbox" class="custom-control-input" name="is_fnpf_subject" id="comp_is_fnpf_subject" value="1" checked>
-                            <label class="custom-control-label font-weight-bold text-dark" for="comp_is_fnpf_subject">Included in FNPF 8%/8% Calculation</label>
+                            <label class="custom-control-label font-weight-bold text-dark" for="comp_is_fnpf_subject">Included in pension contribution calculation</label>
                         </div>
                     </div>
                 </div>

@@ -19,15 +19,19 @@ class PayrollService
     public function calculatePayrollAjax(array $post): string
     {
         require_once(base_app . 'classes/PayrollEngine.php');
-        $post['rules'] = PayrollEngine::load_rules($this->settings);
+        $post['rules'] = PayrollEngine::load_rules($this->settings, (string)($post['pay_date'] ?? ''));
         $calc = PayrollEngine::calculate($post);
         return json_encode(['status' => 'success', 'data' => $calc]);
     }
 
-    /** Save the company payroll rules (JSON in `payroll_rules`). */
+    /** Save the rules that apply from `effective_from` (a new version, or replace that date's version). */
     public function saveRules(array $post): string
     {
         require_once(base_app . 'classes/PayrollEngine.php');
+        $from = trim((string)($post['effective_from'] ?? ''));
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $from) || !strtotime($from)) {
+            return json_encode(['status' => 'failed', 'msg' => 'Enter the date these rules take effect from.']);
+        }
         $rules = json_decode((string)($post['rules_json'] ?? ''), true);
         $errors = PayrollEngine::validate_rules($rules);
         if ($errors) {
@@ -38,14 +42,32 @@ class PayrollService
             $l['key'] = (string)($l['key'] ?? '');
         }
         unset($l);
+        foreach ($rules['overtime']['tiers'] as &$t) {
+            $t['label'] = trim(preg_replace('/[&<>"\'\\\\\x00-\x1f]/', '', (string)$t['label']));
+        }
+        unset($t);
         $normalized = PayrollEngine::normalize_rules($rules);
-        $json = json_encode($normalized);
-        $this->putSetting('payroll_rules', $json);
-        $this->settings->log_audit('Updated Payroll Rules', 'Payroll', 'Payroll pension, tax band and levy rules changed.');
-        return json_encode(['status' => 'success', 'msg' => 'Payroll rules saved. New payroll runs use them straight away; processed payslips are unchanged.']);
+        $setting = PayrollEngine::with_version(PayrollEngine::decode_setting($this->settings->info('payroll_rules')), $from, $normalized);
+        $this->putSetting('payroll_rules', json_encode($setting));
+        $this->settings->log_audit('Updated Payroll Rules', 'Payroll', "Payroll rules effective {$from} saved.");
+        return json_encode(['status' => 'success', 'msg' => "Payroll rules saved, effective {$from}. Runs paid before that date keep the earlier rules."]);
     }
 
-    /** Remove the company rules so payroll uses the starting preset again. */
+    /** Remove one dated version of the rules. */
+    public function deleteRulesVersion(string $from): string
+    {
+        require_once(base_app . 'classes/PayrollEngine.php');
+        $setting = PayrollEngine::without_version(PayrollEngine::decode_setting($this->settings->info('payroll_rules')), $from);
+        if ($setting['versions']) {
+            $this->putSetting('payroll_rules', json_encode($setting));
+        } else {
+            return $this->resetRules();
+        }
+        $this->settings->log_audit('Deleted Payroll Rules Version', 'Payroll', "Payroll rules effective {$from} removed.");
+        return json_encode(['status' => 'success', 'msg' => "Rules effective {$from} removed."]);
+    }
+
+    /** Remove all company rules so payroll uses the starting preset again. */
     public function resetRules(): string
     {
         $stmt = $this->conn->prepare("DELETE FROM `system_info` WHERE `meta_field` = 'payroll_rules'");
@@ -110,8 +132,11 @@ class PayrollService
             'deductions' => $deductions,
             'is_resident' => $is_resident,
             'pay_frequency' => $pay_frequency,
-            'rules' => PayrollEngine::load_rules($this->settings)
+            'overtime_1_5_hours' => (float)($overtime_1_5_hours ?? 0),
+            'overtime_2_0_hours' => (float)($overtime_2_0_hours ?? 0),
+            'rules' => PayrollEngine::load_rules($this->settings, $pay_date)
         ]);
+        $overtime = (float)$calc['overtime']; // typed amount plus hours-based tiers
 
         $gross_salary = $calc['gross_salary'];
         $fnpf_base = $calc['fnpf_base'];
@@ -301,6 +326,8 @@ class PayrollService
                     'id'             => 0,
                     'employee_id'    => $eid,
                     'overtime'       => (float)($post['emp_overtime'][$eid] ?? 0),
+                    'overtime_1_5_hours' => (float)($post['emp_ot1_hours'][$eid] ?? 0),
+                    'overtime_2_0_hours' => (float)($post['emp_ot2_hours'][$eid] ?? 0),
                     'allowances'     => (float)($post['emp_allowances'][$eid] ?? 0),
                     'other_earnings' => (float)($post['emp_other_earnings'][$eid] ?? 0),
                     'deductions'     => (float)($post['emp_deductions'][$eid] ?? 0),

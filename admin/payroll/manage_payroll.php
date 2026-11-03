@@ -3,6 +3,10 @@ require_once(__DIR__ . '/../../config.php');
 
 $is_batch = isset($_GET['batch']) && $_GET['batch'] == 1;
 $tenant_id = $_settings->active_tenant_id();
+require_once(base_app . 'classes/PayrollEngine.php');
+$pay_rules = PayrollEngine::load_rules($_settings);
+$ot_tiers = $pay_rules['overtime']['tiers'];
+$ot_label = function ($t) { return htmlspecialchars($t['label']) . ' (' . rtrim(rtrim(number_format($t['multiplier'], 2), '0'), '.') . 'x) hrs'; };
 
 if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
     $payroll_id_clean = intval($_GET['id']);
@@ -76,7 +80,9 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
 							<th class="text-center" width="40"><input type="checkbox" id="check_master"></th>
 							<th>Employee</th>
 							<th width="120">Basic Salary</th>
-							<th width="110">Overtime</th>
+							<th width="110">Overtime Amount</th>
+							<th width="100"><?php echo $ot_label($ot_tiers[0]) ?></th>
+							<th width="100"><?php echo $ot_label($ot_tiers[1]) ?></th>
 							<th width="110">Allowances</th>
 							<th width="110">Other Earnings</th>
 							<th width="110">Deductions</th>
@@ -101,6 +107,12 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
 							</td>
 							<td>
 								<input type="number" step="any" name="emp_overtime[<?php echo $eid ?>]" class="form-control form-control-sm text-right rounded-0" value="0">
+							</td>
+							<td>
+								<input type="number" step="any" min="0" name="emp_ot1_hours[<?php echo $eid ?>]" class="form-control form-control-sm text-right rounded-0" value="0">
+							</td>
+							<td>
+								<input type="number" step="any" min="0" name="emp_ot2_hours[<?php echo $eid ?>]" class="form-control form-control-sm text-right rounded-0" value="0">
 							</td>
 							<td>
 								<input type="number" step="any" name="emp_allowances[<?php echo $eid ?>]" class="form-control form-control-sm text-right rounded-0" value="0">
@@ -180,7 +192,7 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
 				<input type="number" step="any" name="basic_salary" id="basic_salary" class="form-control form-control-sm rounded-0 text-right calc-trigger" value="<?php echo isset($basic_salary) ? $basic_salary : 0; ?>" required/>
 			</div>
 			<div class="col-md-3 form-group">
-				<label for="overtime" class="control-label">Overtime</label>
+				<label for="overtime" class="control-label">Overtime Amount</label>
 				<input type="number" step="any" name="overtime" id="overtime" class="form-control form-control-sm rounded-0 text-right calc-trigger" value="<?php echo isset($overtime) ? $overtime : 0; ?>" />
 			</div>
 			<div class="col-md-3 form-group">
@@ -194,6 +206,18 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
 		</div>
 
 		<div class="row">
+			<div class="col-md-3 form-group">
+				<label for="overtime_1_5_hours" class="control-label"><?php echo $ot_label($ot_tiers[0]) ?></label>
+				<input type="number" step="any" min="0" name="overtime_1_5_hours" id="overtime_1_5_hours" class="form-control form-control-sm rounded-0 text-right calc-trigger" value="0" />
+			</div>
+			<div class="col-md-3 form-group">
+				<label for="overtime_2_0_hours" class="control-label"><?php echo $ot_label($ot_tiers[1]) ?></label>
+				<input type="number" step="any" min="0" name="overtime_2_0_hours" id="overtime_2_0_hours" class="form-control form-control-sm rounded-0 text-right calc-trigger" value="0" />
+			</div>
+			<div class="col-md-6 form-group"><small class="text-muted d-block mt-4">Overtime hours are paid at the company's standard hourly rate (basic salary &divide; standard hours) times each tier's multiplier, and are added to any overtime amount typed above.</small></div>
+		</div>
+
+		<div class="row">
 			<div class="col-md-4 form-group">
 				<label for="deductions" class="control-label">Other Deductions</label>
 				<input type="number" step="any" name="deductions" id="deductions" class="form-control form-control-sm rounded-0 text-right calc-trigger" value="<?php echo isset($deductions) ? $deductions : 0; ?>" />
@@ -201,8 +225,8 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
 			<div class="col-md-4 form-group">
 				<label for="is_resident" class="control-label">Residency Status</label>
 				<select name="is_resident" id="is_resident" class="form-control form-control-sm rounded-0 calc-trigger">
-					<option value="1" <?php echo !isset($is_resident) || $is_resident == 1 ? 'selected' : '' ?>>Resident (Progressive Tax)</option>
-					<option value="0" <?php echo isset($is_resident) && $is_resident == 0 ? 'selected' : '' ?>>Non-Resident (20% Flat)</option>
+					<option value="1" <?php echo !isset($is_resident) || $is_resident == 1 ? 'selected' : '' ?>>Resident</option>
+					<option value="0" <?php echo isset($is_resident) && $is_resident == 0 ? 'selected' : '' ?>>Non-Resident</option>
 				</select>
 			</div>
 			<div class="col-md-4 form-group">
@@ -219,11 +243,11 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
 					<span class="font-weight-bold text-dark" id="lbl_gross">0.00</span> <?php echo htmlspecialchars($_settings->base_currency()) ?>
 				</div>
 				<div class="col-md-2">
-					<small class="text-muted d-block">Employee FNPF (8%)</small>
+					<small class="text-muted d-block">Employee Pension</small>
 					<span class="font-weight-bold text-info" id="lbl_emp_fnpf">0.00</span> <?php echo htmlspecialchars($_settings->base_currency()) ?>
 				</div>
 				<div class="col-md-2">
-					<small class="text-muted d-block">PAYE Tax + SRT</small>
+					<small class="text-muted d-block">Income Tax</small>
 					<span class="font-weight-bold text-warning" id="lbl_paye">0.00</span> <?php echo htmlspecialchars($_settings->base_currency()) ?>
 				</div>
 				<div class="col-md-2">
@@ -235,7 +259,7 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
 					<span class="font-weight-bold text-success h6 mb-0" id="lbl_net">0.00</span> <?php echo htmlspecialchars($_settings->base_currency()) ?>
 				</div>
 				<div class="col-md-2">
-					<small class="text-muted d-block">Employer FNPF (8%)</small>
+					<small class="text-muted d-block">Employer Pension</small>
 					<span class="font-weight-bold text-primary" id="lbl_empr_fnpf">0.00</span> <?php echo htmlspecialchars($_settings->base_currency()) ?>
 				</div>
 			</div>
@@ -263,6 +287,9 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
 			data: {
 				basic_salary: basic,
 				overtime: overtime,
+				overtime_1_5_hours: parseFloat($('#overtime_1_5_hours').val()) || 0,
+				overtime_2_0_hours: parseFloat($('#overtime_2_0_hours').val()) || 0,
+				pay_date: $('#pay_date').val() || '',
 				allowances: allowances,
 				other_earnings: other,
 				deductions: deductions,

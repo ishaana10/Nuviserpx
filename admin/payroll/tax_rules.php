@@ -29,7 +29,7 @@ $tables = [
     <div class="card-body">
         <div class="alert alert-info text-sm">
             These are the rules payroll uses to calculate income tax, pension contributions and employer levies.
-            They come from the <code>payroll_rules</code> company setting (JSON); when it is not set, the starting preset is used.
+            These are the rules in force today. Rules are dated and can be changed under Payroll Rules Settings; when none are saved, the starting preset is used.
             Annual bands are marginal: each rate applies only to the slice of income inside its band.
         </div>
 
@@ -73,6 +73,10 @@ $tables = [
             </table>
         </div>
         <?php endforeach; ?>
+
+        <h5 class="font-weight-bold text-dark border-bottom pb-2 mb-3"><i class="fas fa-clock text-secondary mr-2"></i> Overtime</h5>
+        <p class="text-sm">Standard week: <b><?= rtrim(rtrim(number_format($rules['overtime']['weekly_hours'], 2), '0'), '.') ?> hours</b>, <b><?= rtrim(rtrim(number_format($rules['overtime']['weeks_per_year'], 2), '0'), '.') ?> weeks</b> a year.
+        <?php foreach ($rules['overtime']['tiers'] as $t): ?><br><?= htmlspecialchars($t['label']) ?>: <b><?= rtrim(rtrim(number_format($t['multiplier'], 2), '0'), '.') ?>x</b> the hourly rate<?php endforeach; ?></p>
 
         <h5 class="font-weight-bold text-dark border-bottom pb-2 mb-3"><i class="fas fa-building text-secondary mr-2"></i> Employer levies (on gross pay)</h5>
         <table class="table table-bordered table-striped" style="max-width:520px">

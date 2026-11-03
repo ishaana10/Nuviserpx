@@ -1,21 +1,51 @@
 <?php
 require_once(base_app . 'classes/PayrollEngine.php');
-$rules = PayrollEngine::load_rules($_settings);
-$custom = (bool)$_settings->info('payroll_rules');
+$setting = PayrollEngine::decode_setting($_settings->info('payroll_rules'));
+$versions = $setting['versions'];
+$custom = (bool)$versions;
+// Edit the version named in ?from=, else the one in force today (or the preset for a first save).
+$edit_from = isset($_GET['from']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['from']) ? $_GET['from'] : '';
+$rules = $edit_from ? PayrollEngine::rules_on($setting, $edit_from) : PayrollEngine::load_rules($_settings);
+$today = date('Y-m-d');
+$in_force = null;
+foreach ($versions as $v) { if ($v['effective_from'] <= $today) $in_force = $v['effective_from']; }
 ?>
 <div class="card card-outline card-primary shadow-sm rounded-0">
     <div class="card-header d-flex align-items-center justify-content-between">
         <h3 class="card-title font-weight-bold"><i class="fas fa-sliders-h text-primary mr-2"></i> Payroll Rules Settings</h3>
         <div class="card-tools">
             <a href="./?page=payroll/tax_rules" class="btn btn-sm btn-outline-secondary btn-flat"><i class="fas fa-eye mr-1"></i> View rules</a>
-            <?php if ($custom): ?><button type="button" id="reset-rules" class="btn btn-sm btn-outline-danger btn-flat"><i class="fas fa-undo mr-1"></i> Reset to starting preset</button><?php endif; ?>
+            <?php if ($custom): ?><button type="button" id="reset-rules" class="btn btn-sm btn-outline-danger btn-flat"><i class="fas fa-undo mr-1"></i> Remove all and use the starting preset</button><?php endif; ?>
         </div>
     </div>
     <div class="card-body">
         <div class="alert alert-info text-sm">
             <?= $custom ? 'This company uses its own payroll rules.' : 'No custom rules saved: payroll uses the starting preset.' ?>
-            Changes apply to new payroll runs and the sandbox. Payslips already processed are not recalculated.
+            Rules are dated: each version applies to pay dates on or after its <b>effective from</b> date, so a rate that changes
+            each year is added as a new version and earlier runs keep the rates they were paid under.
+            Payslips already processed are not recalculated.
             Percentages are entered as percentages (8 means 8%). Bands are marginal and annual; the last band has no upper limit.
+        </div>
+
+        <?php if ($versions): ?>
+        <table class="table table-sm table-bordered" style="max-width:640px">
+            <thead><tr class="bg-light"><th>Effective from</th><th>Employee / employer pension</th><th style="width:170px"></th></tr></thead>
+            <tbody>
+            <?php foreach ($versions as $v): $vr = PayrollEngine::normalize_rules($v['rules']); ?>
+                <tr<?= $v['effective_from'] === $in_force ? ' class="table-success"' : '' ?>>
+                    <td><?= $v['effective_from'] === '0001-01-01' ? 'The beginning' : htmlspecialchars($v['effective_from']) ?><?= $v['effective_from'] === $in_force ? ' <span class="badge badge-success">in force</span>' : '' ?></td>
+                    <td><?= rtrim(rtrim(number_format($vr['pension']['employee_rate'] * 100, 2), '0'), '.') ?>% / <?= rtrim(rtrim(number_format($vr['pension']['employer_rate'] * 100, 2), '0'), '.') ?>%</td>
+                    <td><a class="btn btn-xs btn-outline-primary" href="./?page=payroll/rules_settings&from=<?= urlencode($v['effective_from']) ?>">Edit</a>
+                        <button type="button" class="btn btn-xs btn-outline-danger del-version" data-from="<?= htmlspecialchars($v['effective_from']) ?>">Remove</button></td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+        <?php endif; ?>
+
+        <div class="row">
+            <div class="col-md-3 form-group"><label class="font-weight-bold">Effective from</label>
+                <input type="date" class="form-control" id="r-from" value="<?= htmlspecialchars($edit_from && $edit_from !== '0001-01-01' ? $edit_from : $today) ?>"></div>
         </div>
 
         <div class="row">
@@ -34,6 +64,17 @@ $custom = (bool)$_settings->info('payroll_rules');
         </table>
         <button type="button" class="btn btn-sm btn-outline-primary btn-flat add-band" data-t="<?= $k ?>"><i class="fas fa-plus"></i> Add band</button>
         <?php endforeach; ?>
+
+        <h5 class="font-weight-bold border-bottom pb-2 mt-4">Overtime</h5>
+        <div class="row">
+            <div class="col-md-3 form-group"><label class="font-weight-bold">Standard hours per week</label><input type="number" step="0.01" min="1" max="168" class="form-control" id="r-wh"></div>
+            <div class="col-md-3 form-group"><label class="font-weight-bold">Weeks per year</label><input type="number" step="0.01" min="1" max="53" class="form-control" id="r-wk"></div>
+        </div>
+        <table class="table table-sm table-bordered" style="max-width:560px" id="ot-tiers">
+            <thead><tr class="bg-light"><th>Tier name</th><th>Multiplier (x hourly rate)</th></tr></thead>
+            <tbody></tbody>
+        </table>
+        <small class="text-muted d-block mb-2">Hourly rate = basic salary &times; pay periods per year &divide; (weeks per year &times; standard weekly hours).</small>
 
         <h5 class="font-weight-bold border-bottom pb-2 mt-4">Employer levies (on gross pay)</h5>
         <table class="table table-sm table-bordered" style="max-width:760px" id="levies">
@@ -83,6 +124,13 @@ $custom = (bool)$_settings->info('payroll_rules');
     $('#r-red-rate').val(pct(rules.redundancy.rate));
     renderBands('resident', rules.resident_bands);
     renderBands('non_resident', rules.non_resident_bands);
+    $('#r-wh').val(rules.overtime.weekly_hours);
+    $('#r-wk').val(rules.overtime.weeks_per_year);
+    rules.overtime.tiers.forEach(function(t){
+        $('#ot-tiers tbody').append($('<tr>')
+            .append($('<td>').append($('<input type="text" maxlength="40" class="form-control form-control-sm tl">').val(t.label)))
+            .append($('<td>').append($('<input type="number" step="0.01" min="1" max="10" class="form-control form-control-sm tm">').val(t.multiplier))));
+    });
     rules.employer_levies.forEach(function(l){ $('#levies tbody').append(levyRow(l)); });
 
     $(document).on('click', '.rm', function(){ $(this).closest('tr').remove(); });
@@ -109,6 +157,10 @@ $custom = (bool)$_settings->info('payroll_rules');
             redundancy: {exempt_up_to: parseFloat($('#r-red-cap').val()), rate: frac($('#r-red-rate').val())},
             resident_bands: readBands('resident'),
             non_resident_bands: readBands('non_resident'),
+            overtime: {
+                weekly_hours: parseFloat($('#r-wh').val()), weeks_per_year: parseFloat($('#r-wk').val()),
+                tiers: $('#ot-tiers tbody tr').map(function(){ return {label: $(this).find('.tl').val(), multiplier: parseFloat($(this).find('.tm').val())}; }).get()
+            },
             employer_levies: $('#levies tbody tr').map(function(){
                 return {label: $(this).find('.lbl').val(), rate: frac($(this).find('.rate').val()), key: $(this).find('.key').val()};
             }).get()
@@ -126,7 +178,11 @@ $custom = (bool)$_settings->info('payroll_rules');
     }
     $('#save-rules').on('click', function(){
         // NaN is not valid JSON: send it as null so the server reports the bad band
-        post('save_payroll_rules', {rules_json: JSON.stringify(collect(), function(k, v){ return (typeof v === 'number' && isNaN(v)) ? null : v; })});
+        post('save_payroll_rules', {effective_from: $('#r-from').val(), rules_json: JSON.stringify(collect(), function(k, v){ return (typeof v === 'number' && isNaN(v)) ? null : v; })});
+    });
+    $('.del-version').on('click', function(){
+        var f = $(this).data('from');
+        if (confirm('Remove the rules effective ' + f + '? Payroll after that date will use the previous version.')) post('delete_payroll_rules_version', {effective_from: f});
     });
     $('#reset-rules').on('click', function(){
         if (confirm('Reset payroll rules to the starting preset?')) post('reset_payroll_rules', {});

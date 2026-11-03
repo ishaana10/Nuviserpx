@@ -37,6 +37,14 @@ class PayrollEngine {
             'non_resident_bands' => $bands(0.20),
             'secondary_income_rate' => 0.20,
             'redundancy' => ['exempt_up_to' => 15000, 'rate' => 0.15],
+            'overtime' => [
+                'weekly_hours' => 45,
+                'weeks_per_year' => 52,
+                'tiers' => [
+                    ['key' => 'ot_1_5', 'label' => 'Time and a half', 'multiplier' => 1.5],
+                    ['key' => 'ot_2_0', 'label' => 'Double time', 'multiplier' => 2.0],
+                ],
+            ],
             'employer_levies' => [
                 ['key' => 'workcare_levy', 'label' => 'Employer levy 1', 'rate' => 0.01],
                 ['key' => 'training_levy', 'label' => 'Employer levy 2', 'rate' => 0.01],
@@ -91,6 +99,23 @@ class PayrollEngine {
                 $rules['redundancy']['rate'] = (float)$custom['redundancy']['rate'];
             }
         }
+        if (isset($custom['overtime']) && is_array($custom['overtime'])) {
+            $o = $custom['overtime'];
+            if (isset($o['weekly_hours']) && is_numeric($o['weekly_hours']) && $o['weekly_hours'] > 0 && $o['weekly_hours'] <= 168) {
+                $rules['overtime']['weekly_hours'] = (float)$o['weekly_hours'];
+            }
+            if (isset($o['weeks_per_year']) && is_numeric($o['weeks_per_year']) && $o['weeks_per_year'] >= 1 && $o['weeks_per_year'] <= 53) {
+                $rules['overtime']['weeks_per_year'] = (float)$o['weeks_per_year'];
+            }
+            foreach (array_values((array)($o['tiers'] ?? [])) as $i => $t) {
+                if ($i > 1 || !is_array($t)) break;
+                if (isset($t['multiplier']) && is_numeric($t['multiplier']) && $t['multiplier'] >= 1 && $t['multiplier'] <= 10) {
+                    $rules['overtime']['tiers'][$i]['multiplier'] = (float)$t['multiplier'];
+                }
+                $label = trim((string)($t['label'] ?? ''));
+                if ($label !== '') $rules['overtime']['tiers'][$i]['label'] = $label;
+            }
+        }
         if (isset($custom['employer_levies']) && is_array($custom['employer_levies'])) {
             $levies = [];
             foreach ($custom['employer_levies'] as $l) {
@@ -142,6 +167,17 @@ class PayrollEngine {
         if (!isset($red['exempt_up_to']) || !is_numeric($red['exempt_up_to']) || $red['exempt_up_to'] < 0) $err[] = 'Redundancy exemption must be zero or more.';
         if (!isset($red['rate']) || !$rate($red['rate'])) $err[] = 'Redundancy rate must be between 0% and 100%.';
 
+        $o = $r['overtime'] ?? [];
+        if (!isset($o['weekly_hours']) || !is_numeric($o['weekly_hours']) || $o['weekly_hours'] <= 0 || $o['weekly_hours'] > 168) $err[] = 'Standard weekly hours must be between 1 and 168.';
+        if (!isset($o['weeks_per_year']) || !is_numeric($o['weeks_per_year']) || $o['weeks_per_year'] < 1 || $o['weeks_per_year'] > 53) $err[] = 'Weeks per year must be between 1 and 53.';
+        $tiers = array_values((array)($o['tiers'] ?? []));
+        if (count($tiers) !== 2) $err[] = 'Overtime needs two rate tiers.';
+        foreach ($tiers as $i => $t) {
+            $row = $i + 1;
+            if (trim((string)($t['label'] ?? '')) === '') $err[] = "Overtime tier $row: enter a name.";
+            if (!isset($t['multiplier']) || !is_numeric($t['multiplier']) || $t['multiplier'] < 1 || $t['multiplier'] > 10) $err[] = "Overtime tier $row: multiplier must be between 1 and 10.";
+        }
+
         $seen = [];
         foreach (($r['employer_levies'] ?? []) as $i => $l) {
             $row = $i + 1;
@@ -157,11 +193,59 @@ class PayrollEngine {
         return $err;
     }
 
-    /** Load a tenant's rules (JSON in the `payroll_rules` setting) or the preset. */
-    public static function load_rules($settings = null) {
-        $raw = ($settings && method_exists($settings, 'info')) ? $settings->info('payroll_rules') : '';
+    /**
+     * The stored setting is either one rules object (legacy) or
+     * {"versions":[{"effective_from":"Y-m-d","rules":{...}}, ...]} so rates can
+     * change from a given date (e.g. each year) without touching past payroll.
+     */
+    public static function decode_setting($raw) {
         $decoded = $raw ? json_decode(html_entity_decode((string)$raw, ENT_QUOTES), true) : null;
-        return self::normalize_rules($decoded);
+        if (!is_array($decoded)) return ['versions' => []];
+        if (isset($decoded['versions']) && is_array($decoded['versions'])) {
+            $v = [];
+            foreach ($decoded['versions'] as $x) {
+                if (is_array($x) && !empty($x['effective_from']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$x['effective_from']) && is_array($x['rules'] ?? null)) {
+                    $v[(string)$x['effective_from']] = $x['rules'];
+                }
+            }
+            ksort($v);
+            return ['versions' => array_map(function ($d, $r) { return ['effective_from' => $d, 'rules' => $r]; }, array_keys($v), array_values($v))];
+        }
+        // legacy single object: applies from the beginning
+        return ['versions' => [['effective_from' => '0001-01-01', 'rules' => $decoded]]];
+    }
+
+    /** Rules in force on $asAt (Y-m-d). Before the first version, the earliest version applies. */
+    public static function rules_on($setting, $asAt = null) {
+        $asAt = ($asAt && preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$asAt)) ? (string)$asAt : date('Y-m-d');
+        $versions = $setting['versions'] ?? [];
+        if (!$versions) return self::default_rules();
+        $pick = $versions[0];
+        foreach ($versions as $v) {
+            if ($v['effective_from'] <= $asAt) $pick = $v;
+        }
+        return self::normalize_rules($pick['rules']);
+    }
+
+    /** Add or replace the version starting on $from; returns the new setting structure. */
+    public static function with_version($setting, $from, $rules) {
+        $v = [];
+        foreach (($setting['versions'] ?? []) as $x) $v[$x['effective_from']] = $x['rules'];
+        $v[$from] = $rules;
+        ksort($v);
+        return ['versions' => array_map(function ($d, $r) { return ['effective_from' => $d, 'rules' => $r]; }, array_keys($v), array_values($v))];
+    }
+
+    public static function without_version($setting, $from) {
+        $out = [];
+        foreach (($setting['versions'] ?? []) as $x) if ($x['effective_from'] !== $from) $out[] = $x;
+        return ['versions' => $out];
+    }
+
+    /** Load the company's rules in force on $asAt (default today), or the preset. */
+    public static function load_rules($settings = null, $asAt = null) {
+        $raw = ($settings && method_exists($settings, 'info')) ? $settings->info('payroll_rules') : '';
+        return self::rules_on(self::decode_setting($raw), $asAt);
     }
 
     public static function get_periods_per_year($frequency = 'Monthly') {
@@ -278,18 +362,21 @@ class PayrollEngine {
         $rules = self::normalize_rules($input['rules'] ?? null);
 
         $basic          = (float)($input['basic_salary'] ?? $input['basic'] ?? 0);
-        $ot15Hours      = (float)($input['overtime_1_5_hours'] ?? 0);
-        $ot20Hours      = (float)($input['overtime_2_0_hours'] ?? 0);
+        $ot = $rules['overtime'];
+        $ot15Hours      = (float)($input['overtime_1_5_hours'] ?? 0);   // tier 1 hours
+        $ot20Hours      = (float)($input['overtime_2_0_hours'] ?? 0);   // tier 2 hours
         $hourlyRate     = (float)($input['hourly_rate'] ?? 0);
 
         if ($hourlyRate <= 0 && $basic > 0) {
-            $weeklyHours = (float)($input['weekly_hours'] ?? 45);
-            $hourlyRate = round(($basic * self::get_periods_per_year($input['pay_frequency'] ?? 'Monthly')) / (52 * $weeklyHours), 4);
+            $weeklyHours = (float)($input['weekly_hours'] ?? $ot['weekly_hours']);
+            if ($weeklyHours <= 0) $weeklyHours = (float)$ot['weekly_hours'];
+            $hourlyRate = round(($basic * self::get_periods_per_year($input['pay_frequency'] ?? 'Monthly')) / ($ot['weeks_per_year'] * $weeklyHours), 4);
         }
 
-        $ot15Amount     = round($ot15Hours * $hourlyRate * 1.5, 2);
-        $ot20Amount     = round($ot20Hours * $hourlyRate * 2.0, 2);
-        $overtime       = (float)($input['overtime'] ?? ($ot15Amount + $ot20Amount));
+        $ot15Amount     = round($ot15Hours * $hourlyRate * $ot['tiers'][0]['multiplier'], 2);
+        $ot20Amount     = round($ot20Hours * $hourlyRate * $ot['tiers'][1]['multiplier'], 2);
+        // A typed overtime amount and the hours-based tiers add together.
+        $overtime       = round((float)($input['overtime'] ?? 0) + $ot15Amount + $ot20Amount, 2);
 
         $allowances     = (float)($input['allowances'] ?? 0);
         $otherEarnings  = (float)($input['other_earnings'] ?? 0);
@@ -352,6 +439,7 @@ class PayrollEngine {
             'overtime'        => $overtime,
             'overtime_1_5'    => $ot15Amount,
             'overtime_2_0'    => $ot20Amount,
+            'overtime_hourly_rate' => $hourlyRate,
             'allowances'      => $allowances,
             'other_earnings'  => $otherEarnings,
             'lump_sum_payments'=> $lumpSum,
