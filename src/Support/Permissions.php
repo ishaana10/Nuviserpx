@@ -506,6 +506,7 @@ final class Permissions
         'delete_payroll'        => ['payroll', 'delete'],
         'calculate_payroll_ajax'=> ['payroll', 'edit'],
         'apply_retro_pay'       => ['payroll_process'],
+        'cancel_retro_pay'      => ['payroll_process'],
         'save_batch_payroll'    => ['payroll_process'],
         'email_payslip'         => ['payroll', 'view'],
         'save_salary_component' => ['payroll', 'edit'],
