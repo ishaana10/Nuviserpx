@@ -65,7 +65,7 @@ require_once(__DIR__ . '/../../config.php');
         </div>
 
         <div class="text-center my-3">
-            <a href="https://nuvistechnologies.com.fj" target="_blank" class="text-primary font-weight-bold" style="font-size: 0.88rem;">
+            <a href="https://nuvistechnologies.com.fj/ERPX" target="_blank" class="text-primary font-weight-bold" style="font-size: 0.88rem;">
                 Learn about adding accounts <i class="fas fa-external-link-alt text-xs ml-1"></i>
             </a>
         </div>

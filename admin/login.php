@@ -144,7 +144,7 @@
       </div>
 
       <div class="text-center border-top border-secondary pt-3 mt-3">
-        <small class="text-muted-custom">&copy; <?php echo date('Y') ?> Nuvis ERPX &bull; A Property of <a href="https://nuvistechnologies.com.fj" target="_blank" class="link-custom">Nuvis Technologies</a></small>
+        <small class="text-muted-custom">&copy; <?php echo date('Y') ?> Nuvis ERPX &bull; A Property of <a href="https://nuvistechnologies.com.fj/ERPX" target="_blank" class="link-custom">Nuvis Technologies</a></small>
       </div>
 
     </div>

@@ -173,7 +173,7 @@ foreach ($all_accounts as $a) {
                     </h5>
                     <p class="mb-0 text-muted">
                         Financial reports draw on each account to show how your business is performing.
-                        <a href="https://nuvistechnologies.com.fj" target="_blank" class="text-primary font-weight-bold ml-1">Learn more</a> about customizing the chart of accounts.
+                        <a href="https://nuvistechnologies.com.fj/ERPX" target="_blank" class="text-primary font-weight-bold ml-1">Learn more</a> about customizing the chart of accounts.
                     </p>
                 </div>
             </div>

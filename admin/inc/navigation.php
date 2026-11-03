@@ -457,7 +457,7 @@ if($t_qry && $t_qry->num_rows > 0){
                                     <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=payroll/tax_rules" class="nav-link nav-payroll_tax_rules tree-item">
                                             <i class="nav-icon fas fa-balance-scale"></i>
-                                            <p>FRCS Tax Regulations</p>
+                                            <p>Payroll Tax Rules</p>
                                         </a>
                                     </li>
                                     <li class="nav-item">
@@ -476,12 +476,6 @@ if($t_qry && $t_qry->num_rows > 0){
                                         <a href="<?php echo base_url ?>admin/?page=payroll/ems_export" class="nav-link nav-payroll_ems_export tree-item">
                                             <i class="nav-icon fas fa-file-csv"></i>
                                             <p>FRCS EMS Tax Export</p>
-                                        </a>
-                                    </li>
-                                    <li class="nav-item">
-                                        <a href="<?php echo base_url ?>admin/?page=payroll/tax_rebate_report" class="nav-link nav-payroll_tax_rebate_report tree-item">
-                                            <i class="nav-icon fas fa-hand-holding-usd text-success"></i>
-                                            <p>150% Tax Rebate Report</p>
                                         </a>
                                     </li>
                                     <li class="nav-item">
@@ -719,12 +713,6 @@ if($t_qry && $t_qry->num_rows > 0){
                                         <a href="<?php echo base_url ?>admin/?page=developer/vms_inspector" class="nav-link nav-developer_vms_inspector tree-item">
                                             <i class="nav-icon fas fa-microchip text-warning"></i>
                                             <p>VMS v3.0 SDC Inspector</p>
-                                        </a>
-                                    </li>
-                                    <li class="nav-item">
-                                        <a href="<?php echo base_url ?>admin/?page=developer/vsdc_accreditation" class="nav-link nav-developer_vsdc_accreditation tree-item">
-                                            <i class="nav-icon fas fa-certificate text-danger"></i>
-                                            <p>FRCS EFD Accreditation</p>
                                         </a>
                                     </li>
                                     <li class="nav-item">

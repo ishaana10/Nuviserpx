@@ -109,15 +109,15 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
                         <table class="table table-sm table-striped m-0">
                             <tbody>
                                 <tr>
-                                    <td>FNPF Employee Contribution (8%)</td>
+                                    <td>Pension Contribution (Employee)</td>
                                     <td class="text-right text-info"><?php echo number_format($employee_fnpf, 2) ?></td>
                                 </tr>
                                 <tr>
-                                    <td>PAYE Income Tax</td>
+                                    <td>Income Tax</td>
                                     <td class="text-right text-warning"><?php echo number_format($paye_tax, 2) ?></td>
                                 </tr>
                                 <tr>
-                                    <td>Social Responsibility Tax (SRT)</td>
+                                    <td>Additional Tax</td>
                                     <td class="text-right text-warning"><?php echo number_format($srt_tax, 2) ?></td>
                                 </tr>
                                 <tr>
@@ -155,10 +155,10 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
             <h6 class="font-weight-bold text-secondary mb-2"><i class="fas fa-building"></i> Employer Statutory Contributions Summary</h6>
             <div class="row small">
                 <div class="col-md-4">
-                    <span><b>FNPF Employer Contribution (8%):</b> $<?php echo number_format($employer_fnpf, 2) ?></span>
+                    <span><b>Pension Contribution (Employer):</b> $<?php echo number_format($employer_fnpf, 2) ?></span>
                 </div>
                 <div class="col-md-4">
-                    <span><b>Workcare Levy (1%):</b> $<?php echo number_format($workcare_levy, 2) ?></span>
+                    <span><b>Employer Levy 1:</b> $<?php echo number_format($workcare_levy, 2) ?></span>
                 </div>
                 <div class="col-md-4 text-right">
                     <span><b>Total Employer Cost:</b> $<?php echo number_format($employer_cost > 0 ? $employer_cost : ($gross_salary + $employer_fnpf + $workcare_levy), 2) ?></span>

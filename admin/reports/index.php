@@ -42,12 +42,11 @@ $sections = [
         ['products', 'Products', 'fas fa-box', 'The product catalogue with cost, price and stock on hand.', 'List'],
     ]],
     ['Tax', 'fas fa-receipt', 'reports_view', [
-        ['tax/report', 'VAT Return', 'fas fa-receipt', 'Output VAT on sales and input VAT on purchases for a period, and the net payable to FRCS.'],
+        ['tax/report', 'VAT Return', 'fas fa-receipt', 'Output VAT on sales and input VAT on purchases for a period, and the net payable to the tax authority.'],
     ]],
     ['Payroll', 'fas fa-users-cog', 'payroll_view', [
-        ['reports/payroll_accounting', 'Payroll Accounting', 'fas fa-file-invoice-dollar', 'Gross pay, PAYE, SRT, FNPF and net pay for a month, with employer costs.'],
+        ['reports/payroll_accounting', 'Payroll Accounting', 'fas fa-file-invoice-dollar', 'Gross pay, income tax, pension contributions and net pay for a month, with employer costs.'],
         ['payroll/fnpf_schedule', 'FNPF Schedule (CS3)', 'fas fa-file-contract', 'Monthly FNPF contribution schedule per employee.'],
-        ['payroll/tax_rebate_report', '150% Tax Rebate', 'fas fa-percentage', 'FRCS employment tax rebate summary.'],
         ['payroll/ems_export', 'FRCS EMS Export', 'fas fa-file-export', 'Employer monthly schedule export for FRCS.'],
     ]],
     ['Activity', 'fas fa-history', null, [

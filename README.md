@@ -1,6 +1,6 @@
 # Nuvis ERPX — Enterprise Resource Planning & Accounting System
 
-**Nuvis ERPX** is a complete, multi-tenant Enterprise Resource Planning (ERP), Accounting Journal Management, and HR/Payroll system developed by **Nuvis Technologies** ([nuvistechnologies.com.fj](https://nuvistechnologies.com.fj)).
+**Nuvis ERPX** is a complete, multi-tenant Enterprise Resource Planning (ERP), Accounting Journal Management, and HR/Payroll system developed by **Nuvis Technologies** ([nuvistechnologies.com.fj/ERPX](https://nuvistechnologies.com.fj/ERPX)).
 
 ---
 
@@ -143,4 +143,4 @@ Check your web server error logs for detailed PHP stack traces:
 
 ## License & Branding
 
-**Nuvis ERPX** is a property of **Nuvis Technologies** ([nuvistechnologies.com.fj](https://nuvistechnologies.com.fj)). All rights reserved.
+**Nuvis ERPX** is a property of **Nuvis Technologies** ([nuvistechnologies.com.fj/ERPX](https://nuvistechnologies.com.fj/ERPX)). All rights reserved.

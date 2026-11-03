@@ -22,7 +22,7 @@
 					<a class="dropdown-item" href="<?php echo base_url ?>admin/payroll/export.php?type=generic" target="_blank"><i class="fas fa-file-csv text-secondary"></i> Generic Bank CSV</a>
 					<div class="dropdown-divider"></div>
 					<h6 class="dropdown-header">Tax & Superannuation</h6>
-					<a class="dropdown-item" href="<?php echo base_url ?>admin/payroll/export.php?type=frcs" target="_blank"><i class="fas fa-calculator text-success"></i> FRCS TPOS PAYE Return CSV</a>
+					<a class="dropdown-item" href="<?php echo base_url ?>admin/payroll/export.php?type=frcs" target="_blank"><i class="fas fa-calculator text-success"></i> Income Tax Return CSV</a>
 					<a class="dropdown-item" href="<?php echo base_url ?>admin/payroll/export.php?type=fnpf" target="_blank"><i class="fas fa-shield-alt text-primary"></i> FNPF Schedule CSV</a>
 				</div>
 			</div>
@@ -53,8 +53,8 @@
 						<th>Run Ref / Month</th>
 						<th>Employee</th>
 						<th>Gross Earnings</th>
-						<th>FNPF (8%)</th>
-						<th>PAYE Tax</th>
+						<th>Pension (Employee)</th>
+						<th>Income Tax</th>
 						<th>Deductions</th>
 						<th>Net Salary</th>
 						<th>Action</th>

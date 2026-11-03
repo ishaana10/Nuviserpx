@@ -83,11 +83,11 @@ while($r = $qry->fetch_assoc()){
 					<th>#</th>
 					<th>Employee</th>
 					<th>Gross Salary</th>
-					<th>FNPF Employee (8%)</th>
-					<th>PAYE Tax</th>
+					<th>Pension (Employee)</th>
+					<th>Income Tax</th>
 					<th>Net Salary</th>
-					<th>FNPF Employer (8%)</th>
-					<th>Workcare Levy (1%)</th>
+					<th>Pension (Employer)</th>
+					<th>Employer Levy 1</th>
 					<th>Total Employer Cost</th>
 				</tr>
 			</thead>
@@ -139,11 +139,11 @@ while($r = $qry->fetch_assoc()){
 		</div>
 		<div class="col-md-6">
 			<div class="card border p-3 bg-light">
-				<h6 class="font-weight-bold text-navy mb-2"><i class="fas fa-calculator"></i> FRCS Tax Remittance Summary</h6>
-				<p class="m-0 small">PAYE Income Tax Withheld: <b>$<?= format_num($tot_paye) ?></b></p>
-				<p class="m-0 small">Social Responsibility Tax (SRT): <b>$<?= format_num($tot_srt) ?></b></p>
+				<h6 class="font-weight-bold text-navy mb-2"><i class="fas fa-calculator"></i> Tax Remittance Summary</h6>
+				<p class="m-0 small">Income Tax Withheld: <b>$<?= format_num($tot_paye) ?></b></p>
+				<p class="m-0 small">Additional Tax: <b>$<?= format_num($tot_srt) ?></b></p>
 				<hr class="my-1">
-				<p class="m-0 font-weight-bold text-warning">Total PAYE Tax Payable to FRCS: $<?= format_num($tot_paye + $tot_srt) ?></p>
+				<p class="m-0 font-weight-bold text-warning">Total Tax Payable to the Tax Authority: $<?= format_num($tot_paye + $tot_srt) ?></p>
 			</div>
 		</div>
             </div>

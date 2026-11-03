@@ -19,6 +19,7 @@ class PayrollService
     public function calculatePayrollAjax(array $post): string
     {
         require_once(base_app . 'classes/PayrollEngine.php');
+        $post['rules'] = PayrollEngine::load_rules($this->settings);
         $calc = PayrollEngine::calculate($post);
         return json_encode(['status' => 'success', 'data' => $calc]);
     }
@@ -61,7 +62,8 @@ class PayrollService
             'other_earnings' => $other_earnings,
             'deductions' => $deductions,
             'is_resident' => $is_resident,
-            'pay_frequency' => $pay_frequency
+            'pay_frequency' => $pay_frequency,
+            'rules' => PayrollEngine::load_rules($this->settings)
         ]);
 
         $gross_salary = $calc['gross_salary'];
