@@ -103,7 +103,7 @@ class CreditNoteService
         } else {
             $sql = "SELECT d.id, d.bill_no doc_no, d.bill_date doc_date, d.total, d.tax_amount, d.paid_amount, d.credited_amount, p.name party
                     FROM vendor_bill_list d LEFT JOIN party_list p ON p.id = d.vendor_id
-                    WHERE d.tenant_id = ? AND d.status NOT IN ('draft','cancelled') ORDER BY d.bill_date DESC, d.id DESC LIMIT 300";
+                    WHERE d.tenant_id = ? AND d.status NOT IN ('draft','pending_approval','cancelled') ORDER BY d.bill_date DESC, d.id DESC LIMIT 300";
         }
         $stmt = $this->conn->prepare($sql);
         $stmt->bind_param('i', $t);
@@ -164,7 +164,7 @@ class CreditNoteService
         $stmt->bind_param('ii', $docId, $t);
         $stmt->execute();
         $doc = $stmt->get_result()->fetch_assoc();
-        if (!$doc || in_array($doc['status'], ['draft', 'cancelled'], true)) {
+        if (!$doc || in_array($doc['status'], ['draft', 'pending_approval', 'cancelled'], true)) {
             return $this->fail('Choose an issued ' . ($kind === self::CREDIT ? 'invoice' : 'bill') . ' to raise the note against.');
         }
         if ($date < $doc['doc_date']) {
