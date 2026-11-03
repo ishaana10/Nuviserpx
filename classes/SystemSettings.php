@@ -247,6 +247,25 @@ class SystemSettings extends DBConnection{
 			return false;
 		}
 	}
+	/**
+	 * The payroll rules setting (JSON) for the active company. Each company keeps its own in payroll_rule_sets;
+	 * a company that has never saved any uses the installation-wide `payroll_rules` setting if there is one.
+	 * Returns [json string, true when the company has its own].
+	 */
+	function payroll_rules_for_tenant($tenantId = null){
+		$t = $tenantId === null ? (int)$this->active_tenant_id() : (int)$tenantId;
+		if($this->conn){
+			$q = @$this->conn->query("SELECT setting FROM payroll_rule_sets WHERE tenant_id = {$t} LIMIT 1");
+			if($q && ($row = $q->fetch_assoc())){
+				return [(string)$row['setting'], true];
+			}
+		}
+		$global = $this->info('payroll_rules');
+		return [$global === false ? '' : (string)$global, false];
+	}
+	function payroll_rules_raw($tenantId = null){
+		return $this->payroll_rules_for_tenant($tenantId)[0];
+	}
 	function set_info($field='',$value=''){
 		if(!empty($field) && !empty($value)){
 			$_SESSION['system_info'][$field] = $value;

@@ -1,6 +1,7 @@
 <?php
 require_once(base_app . 'classes/PayrollEngine.php');
-$setting = PayrollEngine::decode_setting($_settings->info('payroll_rules'));
+[$raw_rules, $own_rules] = $_settings->payroll_rules_for_tenant();
+$setting = PayrollEngine::decode_setting($raw_rules);
 $versions = $setting['versions'];
 $custom = (bool)$versions;
 // Edit the version named in ?from=, else the one in force today (or the preset for a first save).
@@ -20,7 +21,8 @@ foreach ($versions as $v) { if ($v['effective_from'] <= $today) $in_force = $v['
     </div>
     <div class="card-body">
         <div class="alert alert-info text-sm">
-            <?= $custom ? 'This company uses its own payroll rules.' : 'No custom rules saved: payroll uses the starting preset.' ?>
+            <?php if (!$own_rules && $custom): ?>This company has not saved its own rules yet, so it is using the installation-wide default. Saving creates this company's own rules; other companies are not affected.
+            <?php else: ?><?= $custom ? 'This company uses its own payroll rules.' : 'No custom rules saved: payroll uses the starting preset.' ?><?php endif; ?>
             Rules are dated: each version applies to pay dates on or after its <b>effective from</b> date, so a rate that changes
             each year is added as a new version and earlier runs keep the rates they were paid under.
             Payslips already processed are not recalculated.
