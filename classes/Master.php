@@ -1004,6 +1004,16 @@ class Master extends DBConnection
         return json_encode(['status' => $n ? 'success' : 'failed', 'msg' => $msg]);
     }
 
+    public function approve_bill()
+    {
+        return $this->container->make(\App\Services\ApprovalService::class)->approveBill(intval($_POST['id'] ?? 0));
+    }
+
+    public function reject_bill()
+    {
+        return $this->container->make(\App\Services\ApprovalService::class)->rejectBill(intval($_POST['id'] ?? 0), (string)($_POST['note'] ?? ''));
+    }
+
     public function approve_journal()
     {
         return $this->container->make(\App\Services\ApprovalService::class)->approve(intval($_POST['id'] ?? 0));
@@ -1914,6 +1924,12 @@ switch ($action) {
         break;
     case 'run_auto_reversals':
         echo $Master->run_auto_reversals();
+        break;
+    case 'approve_bill':
+        echo $Master->approve_bill();
+        break;
+    case 'reject_bill':
+        echo $Master->reject_bill();
         break;
     case 'approve_journal':
         echo $Master->approve_journal();

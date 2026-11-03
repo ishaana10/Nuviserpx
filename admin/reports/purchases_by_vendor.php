@@ -20,7 +20,7 @@ $stmt = $conn->prepare("SELECT p.id, p.name, p.party_code,
         SUM(b.paid_amount) paid, SUM(b.balance) balance,
         SUM(CASE WHEN b.balance > 0 AND b.due_date IS NOT NULL AND b.due_date < CURDATE() THEN b.balance ELSE 0 END) overdue
     FROM vendor_bill_list b INNER JOIN party_list p ON p.id = b.vendor_id
-    WHERE b.tenant_id = ? AND b.status NOT IN ('draft','cancelled') AND b.bill_date BETWEEN ? AND ?
+    WHERE b.tenant_id = ? AND b.status NOT IN ('draft','pending_approval','cancelled') AND b.bill_date BETWEEN ? AND ?
     GROUP BY p.id, p.name, p.party_code
     ORDER BY total DESC");
 if ($stmt) {

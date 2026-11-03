@@ -104,6 +104,7 @@ final class Permissions
      */
     private const SPECIAL_PERMS = [
         'Accounting' => [
+            'bills_approve'    => 'Approve vendor bills that are waiting for approval (never your own, unless self-approval is allowed)',
             'journals_approve' => 'Approve manual journals that are waiting for approval (never your own, unless self-approval is allowed)',
         ],
         'Payroll' => [
@@ -421,6 +422,8 @@ final class Permissions
         'run_depreciation'      => ['assets', 'edit'],
         'dispose_asset'         => ['assets', 'edit'],
         'run_auto_reversals'    => ['journals', 'create'],
+        'approve_bill'          => ['bills_approve'],
+        'reject_bill'           => ['bills_approve'],
         'approve_journal'       => ['journals_approve'],
         'reject_journal'        => ['journals_approve'],
         'save_approval_policy'  => ['settings_manage'],
