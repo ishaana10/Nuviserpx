@@ -38,11 +38,11 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
 				<input type="text" name="unit" id="unit" class="form-control form-control-sm rounded-0" value="<?php echo isset($unit) ? $unit : 'pcs'; ?>" placeholder="e.g. pcs, kg, box, hrs" required/>
 			</div>
 			<div class="col-md-4 form-group">
-				<label for="cost_price" class="control-label">Cost Price (FJD)</label>
+				<label for="cost_price" class="control-label">Cost Price<?php echo $_settings->currency_tag() ?></label>
 				<input type="number" step="any" name="cost_price" id="cost_price" class="form-control form-control-sm rounded-0 text-right" value="<?php echo isset($cost_price) ? $cost_price : '0.00'; ?>" required/>
 			</div>
 			<div class="col-md-4 form-group">
-				<label for="selling_price" class="control-label">Selling Price (FJD)</label>
+				<label for="selling_price" class="control-label">Selling Price<?php echo $_settings->currency_tag() ?></label>
 				<input type="number" step="any" name="selling_price" id="selling_price" class="form-control form-control-sm rounded-0 text-right font-weight-bold" value="<?php echo isset($selling_price) ? $selling_price : '0.00'; ?>" required/>
 			</div>
 		</div>

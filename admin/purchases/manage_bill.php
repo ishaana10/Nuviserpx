@@ -150,7 +150,7 @@ while($p = $products_qry->fetch_assoc()){ $products_data[$p['id']] = $p; }
 						<div class="d-flex justify-content-between mb-2"><span class="font-weight-bold">Tax / VAT:</span><input type="number" step="any" name="tax_amount" id="tax_amount" class="form-control form-control-sm text-right bg-white rounded-0 border-0 font-weight-bold" style="width:140px;" value="<?php echo isset($tax_amount) ? $tax_amount : '0.00' ?>" readonly></div>
 						<div class="d-flex justify-content-between mb-2 align-items-center"><span class="font-weight-bold">Discount:</span><input type="number" step="any" name="discount" id="discount" class="form-control form-control-sm text-right rounded-0 calc-totals" style="width:140px;" value="<?php echo isset($discount) ? $discount : '0.00' ?>"></div>
 						<hr class="my-2">
-						<div class="d-flex justify-content-between align-items-center"><h5 class="font-weight-bold text-navy m-0">Total (FJD):</h5><input type="number" step="any" name="total" id="total" class="form-control form-control-lg text-right bg-white rounded-0 border-0 font-weight-bold text-primary" style="width:160px; font-size:1.4rem;" value="<?php echo isset($total) ? $total : '0.00' ?>" readonly></div>
+						<div class="d-flex justify-content-between align-items-center"><h5 class="font-weight-bold text-navy m-0">Total<?php echo $_settings->currency_tag() ?>:</h5><input type="number" step="any" name="total" id="total" class="form-control form-control-lg text-right bg-white rounded-0 border-0 font-weight-bold text-primary" style="width:160px; font-size:1.4rem;" value="<?php echo isset($total) ? $total : '0.00' ?>" readonly></div>
 					</div>
 				</div>
 			</div>

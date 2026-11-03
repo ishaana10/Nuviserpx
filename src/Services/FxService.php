@@ -11,7 +11,7 @@ use SystemSettings;
  * Exchange rates and foreign-currency revaluation.
  *
  * Rates are stored as base-currency units per ONE unit of the foreign currency, dated, so history is kept
- * (1 USD = 2.2500 FJD on a given day). A journal line may carry a currency: it is then entered in that
+ * (1 USD = 2.2500 in the company currency on a given day). A journal line may carry a currency: it is then entered in that
  * currency, converted at the rate, and stored in the base currency with the original amount kept beside
  * it (currency, fx_rate, amount_fc). Every report keeps working in base currency.
  *
@@ -222,10 +222,7 @@ class FxService
 
     public function baseCurrency(): string
     {
-        $t = $this->tenantId();
-        $r = @$this->conn->query("SELECT code FROM currencies WHERE tenant_id = {$t} AND is_default = 1 AND status = 1 LIMIT 1");
-        $row = $r ? $r->fetch_assoc() : null;
-        return strtoupper((string)($row['code'] ?? 'FJD'));
+        return $this->settings->base_currency($this->tenantId());
     }
 
     /** Foreign currencies the company has set up (everything but the base). */

@@ -57,7 +57,7 @@ $readonly = isset($id) && !$can_edit && $scope !== null;
 				<input type="text" name="phone" id="phone" class="form-control form-control-sm rounded-0" value="<?php echo isset($phone) ? $phone : ''; ?>" />
 			</div>
 			<div class="col-md-6 form-group">
-				<label for="salary" class="control-label">Basic Monthly Salary (FJD)</label>
+				<label for="salary" class="control-label">Basic Monthly Salary<?php echo $_settings->currency_tag() ?></label>
 				<input type="number" step="any" name="salary" id="salary" class="form-control form-control-sm rounded-0 text-right" value="<?php echo isset($salary) ? $salary : 0; ?>" required/>
 			</div>
 		</div>

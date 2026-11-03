@@ -37,7 +37,7 @@
                 </div>
                 <div class="col-md-4 form-group">
                     <label for="currency_code" class="font-weight-bold text-dark text-sm">Base Operating Currency</label>
-                    <input type="text" name="currency_code" id="currency_code" class="form-control form-control-sm rounded-0 text-uppercase" value="<?= htmlspecialchars($_settings->info('currency_code') ?: 'FJD') ?>" placeholder="e.g. FJD, AUD, USD" required>
+                    <input type="text" name="currency_code" id="currency_code" class="form-control form-control-sm rounded-0 text-uppercase" value="<?= htmlspecialchars($_settings->info('currency_code') ?: '') ?>" placeholder="e.g. USD, AUD, EUR" required>
                 </div>
                 <div class="col-md-4 form-group">
                     <label for="currency_symbol" class="font-weight-bold text-dark text-sm">Currency Symbol</label>

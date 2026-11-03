@@ -216,27 +216,27 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
 			<div class="row text-center">
 				<div class="col-md-2">
 					<small class="text-muted d-block">Gross Earnings</small>
-					<span class="font-weight-bold text-dark" id="lbl_gross">0.00</span> FJD
+					<span class="font-weight-bold text-dark" id="lbl_gross">0.00</span> <?php echo htmlspecialchars($_settings->base_currency()) ?>
 				</div>
 				<div class="col-md-2">
 					<small class="text-muted d-block">Employee FNPF (8%)</small>
-					<span class="font-weight-bold text-info" id="lbl_emp_fnpf">0.00</span> FJD
+					<span class="font-weight-bold text-info" id="lbl_emp_fnpf">0.00</span> <?php echo htmlspecialchars($_settings->base_currency()) ?>
 				</div>
 				<div class="col-md-2">
 					<small class="text-muted d-block">PAYE Tax + SRT</small>
-					<span class="font-weight-bold text-warning" id="lbl_paye">0.00</span> FJD
+					<span class="font-weight-bold text-warning" id="lbl_paye">0.00</span> <?php echo htmlspecialchars($_settings->base_currency()) ?>
 				</div>
 				<div class="col-md-2">
 					<small class="text-muted d-block">Total Deductions</small>
-					<span class="font-weight-bold text-danger" id="lbl_deductions">0.00</span> FJD
+					<span class="font-weight-bold text-danger" id="lbl_deductions">0.00</span> <?php echo htmlspecialchars($_settings->base_currency()) ?>
 				</div>
 				<div class="col-md-2">
 					<small class="text-muted d-block">Net Salary Payable</small>
-					<span class="font-weight-bold text-success h6 mb-0" id="lbl_net">0.00</span> FJD
+					<span class="font-weight-bold text-success h6 mb-0" id="lbl_net">0.00</span> <?php echo htmlspecialchars($_settings->base_currency()) ?>
 				</div>
 				<div class="col-md-2">
 					<small class="text-muted d-block">Employer FNPF (8%)</small>
-					<span class="font-weight-bold text-primary" id="lbl_empr_fnpf">0.00</span> FJD
+					<span class="font-weight-bold text-primary" id="lbl_empr_fnpf">0.00</span> <?php echo htmlspecialchars($_settings->base_currency()) ?>
 				</div>
 			</div>
 		</div>

@@ -22,7 +22,7 @@
 						<th>Vendor</th>
 						<th>Bill Date</th>
 						<th>Due Date</th>
-						<th>Total (FJD)</th>
+						<th>Total<?php echo $_settings->currency_tag() ?></th>
 						<th>Balance</th>
 						<th>Status</th>
 						<th>Action</th>

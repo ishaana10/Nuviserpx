@@ -83,7 +83,7 @@ $bills = $conn->query("SELECT * FROM `vendor_bill_list` WHERE purchase_order_id 
 				<tr><th colspan="6" class="text-right">Subtotal</th><th class="text-right">$<?php echo number_format((float)$po['subtotal'],2) ?></th></tr>
 				<tr><th colspan="6" class="text-right">Tax / VAT</th><th class="text-right">$<?php echo number_format((float)$po['tax_amount'],2) ?></th></tr>
 				<tr><th colspan="6" class="text-right">Discount</th><th class="text-right">-$<?php echo number_format((float)$po['discount'],2) ?></th></tr>
-				<tr class="bg-light"><th colspan="6" class="text-right">TOTAL (FJD)</th><th class="text-right text-primary">$<?php echo number_format((float)$po['total'],2) ?></th></tr>
+				<tr class="bg-light"><th colspan="6" class="text-right">TOTAL<?php echo $_settings->currency_tag() ?></th><th class="text-right text-primary">$<?php echo number_format((float)$po['total'],2) ?></th></tr>
 			</tfoot>
 		</table>
 

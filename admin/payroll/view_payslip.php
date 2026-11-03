@@ -66,7 +66,7 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
             <div class="col-md-6">
                 <div class="card card-outline card-success mb-3">
                     <div class="card-header py-1 bg-success text-white">
-                        <h6 class="card-title m-0 font-weight-bold">Earnings (FJD)</h6>
+                        <h6 class="card-title m-0 font-weight-bold">Earnings<?php echo $_settings->currency_tag() ?></h6>
                     </div>
                     <div class="card-body p-0">
                         <table class="table table-sm table-striped m-0">
@@ -103,7 +103,7 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
             <div class="col-md-6">
                 <div class="card card-outline card-danger mb-3">
                     <div class="card-header py-1 bg-danger text-white">
-                        <h6 class="card-title m-0 font-weight-bold">Deductions & Taxes (FJD)</h6>
+                        <h6 class="card-title m-0 font-weight-bold">Deductions & Taxes<?php echo $_settings->currency_tag() ?></h6>
                     </div>
                     <div class="card-body p-0">
                         <table class="table table-sm table-striped m-0">
@@ -142,7 +142,7 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
             <div class="row align-items-center">
                 <div class="col-8">
                     <h5 class="m-0 font-weight-bold text-uppercase"><i class="fas fa-coins text-warning"></i> Net Salary Payable</h5>
-                    <small class="text-light">Direct credit to employee account (FJD)</small>
+                    <small class="text-light">Direct credit to employee account<?php echo $_settings->currency_tag() ?></small>
                 </div>
                 <div class="col-4 text-right">
                     <h3 class="m-0 font-weight-bold text-warning">$<?php echo number_format($net_salary, 2) ?></h3>

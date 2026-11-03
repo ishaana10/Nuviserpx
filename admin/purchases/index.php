@@ -29,7 +29,7 @@
 						<th>PO No</th>
 						<th>Vendor / Supplier</th>
 						<th>Order Date</th>
-						<th>Total (FJD)</th>
+						<th>Total<?php echo $_settings->currency_tag() ?></th>
 						<th>Status</th>
 						<th>Action</th>
 					</tr>
