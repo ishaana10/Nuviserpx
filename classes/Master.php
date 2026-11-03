@@ -1561,6 +1561,16 @@ class Master extends DBConnection
         return $this->container->make(PayrollService::class)->calculatePayrollAjax($_POST);
     }
 
+    public function save_payroll_rules()
+    {
+        return $this->container->make(PayrollService::class)->saveRules($_POST);
+    }
+
+    public function reset_payroll_rules()
+    {
+        return $this->container->make(PayrollService::class)->resetRules();
+    }
+
     public function save_payroll()
     {
         return $this->container->make(PayrollService::class)->savePayroll($_POST);
@@ -2027,6 +2037,12 @@ switch ($action) {
         break;
     case 'calculate_payroll_ajax':
         echo $Master->calculate_payroll_ajax();
+        break;
+    case 'save_payroll_rules':
+        echo $Master->save_payroll_rules();
+        break;
+    case 'reset_payroll_rules':
+        echo $Master->reset_payroll_rules();
         break;
     case 'save_payroll':
         echo $Master->save_payroll();

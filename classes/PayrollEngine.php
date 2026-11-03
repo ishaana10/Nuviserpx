@@ -106,6 +106,57 @@ class PayrollEngine {
         return $rules;
     }
 
+    /**
+     * Strict validation for the settings screen. Returns a list of error
+     * messages (empty = valid). normalize_rules() stays lenient for reads.
+     */
+    public static function validate_rules($r) {
+        $err = [];
+        if (!is_array($r)) return ['Rules must be an object.'];
+        $rate = function ($v) { return is_numeric($v) && $v >= 0 && $v <= 1; };
+
+        foreach (['employee_rate' => 'Employee pension rate', 'employer_rate' => 'Employer pension rate'] as $k => $lbl) {
+            if (!isset($r['pension'][$k]) || !$rate($r['pension'][$k])) $err[] = "$lbl must be between 0% and 100%.";
+        }
+        if (!isset($r['secondary_income_rate']) || !$rate($r['secondary_income_rate'])) {
+            $err[] = 'Secondary income rate must be between 0% and 100%.';
+        }
+        foreach (['resident_bands' => 'Resident', 'non_resident_bands' => 'Non-resident'] as $k => $lbl) {
+            $bands = $r[$k] ?? null;
+            if (!is_array($bands) || !$bands) { $err[] = "$lbl bands: add at least one band."; continue; }
+            $bands = array_values($bands); $prev = 0.0; $n = count($bands);
+            foreach ($bands as $i => $b) {
+                $row = $i + 1;
+                if (!isset($b['rate']) || !$rate($b['rate'])) { $err[] = "$lbl band $row: rate must be between 0% and 100%."; }
+                $up = $b['up_to'] ?? null;
+                if ($i === $n - 1) {
+                    if ($up !== null && $up !== '') $err[] = "$lbl bands: the last band must have no upper limit.";
+                } elseif (!is_numeric($up) || (float)$up <= $prev) {
+                    $err[] = "$lbl band $row: upper limit must be a number above the previous band.";
+                } else {
+                    $prev = (float)$up;
+                }
+            }
+        }
+        $red = $r['redundancy'] ?? [];
+        if (!isset($red['exempt_up_to']) || !is_numeric($red['exempt_up_to']) || $red['exempt_up_to'] < 0) $err[] = 'Redundancy exemption must be zero or more.';
+        if (!isset($red['rate']) || !$rate($red['rate'])) $err[] = 'Redundancy rate must be between 0% and 100%.';
+
+        $seen = [];
+        foreach (($r['employer_levies'] ?? []) as $i => $l) {
+            $row = $i + 1;
+            if (!is_array($l) || trim((string)($l['label'] ?? '')) === '') { $err[] = "Levy $row: enter a name."; continue; }
+            if (!isset($l['rate']) || !$rate($l['rate'])) $err[] = "Levy $row: rate must be between 0% and 100%.";
+            $key = (string)($l['key'] ?? '');
+            if ($key !== '') {
+                if (!in_array($key, ['workcare_levy', 'training_levy'], true)) $err[] = "Levy $row: unknown payslip field.";
+                elseif (isset($seen[$key])) $err[] = "Levy $row: payslip field already used by another levy.";
+                $seen[$key] = true;
+            }
+        }
+        return $err;
+    }
+
     /** Load a tenant's rules (JSON in the `payroll_rules` setting) or the preset. */
     public static function load_rules($settings = null) {
         $raw = ($settings && method_exists($settings, 'info')) ? $settings->info('payroll_rules') : '';
