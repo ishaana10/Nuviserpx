@@ -90,8 +90,10 @@ class PayrollService
         }
         unset($t);
         $normalized = PayrollEngine::normalize_rules($rules);
-        $setting = PayrollEngine::with_version(PayrollEngine::decode_setting($this->settings->info('payroll_rules')), $from, $normalized);
-        $this->putSetting('payroll_rules', json_encode($setting));
+        $setting = PayrollEngine::with_version(PayrollEngine::decode_setting($this->settings->payroll_rules_raw()), $from, $normalized);
+        if (!$this->putRules(json_encode($setting))) {
+            return json_encode(['status' => 'failed', 'msg' => 'The payroll rules could not be saved.']);
+        }
         $this->settings->log_audit('Updated Payroll Rules', 'Payroll', "Payroll rules effective {$from} saved.");
         return json_encode(['status' => 'success', 'msg' => "Payroll rules saved, effective {$from}. Runs paid before that date keep the earlier rules."]);
     }
@@ -100,9 +102,11 @@ class PayrollService
     public function deleteRulesVersion(string $from): string
     {
         require_once(base_app . 'classes/PayrollEngine.php');
-        $setting = PayrollEngine::without_version(PayrollEngine::decode_setting($this->settings->info('payroll_rules')), $from);
+        $setting = PayrollEngine::without_version(PayrollEngine::decode_setting($this->settings->payroll_rules_raw()), $from);
         if ($setting['versions']) {
-            $this->putSetting('payroll_rules', json_encode($setting));
+            if (!$this->putRules(json_encode($setting))) {
+                return json_encode(['status' => 'failed', 'msg' => 'The payroll rules could not be saved.']);
+            }
         } else {
             return $this->resetRules();
         }
@@ -113,27 +117,23 @@ class PayrollService
     /** Remove all company rules so payroll uses the starting preset again. */
     public function resetRules(): string
     {
-        $stmt = $this->conn->prepare("DELETE FROM `system_info` WHERE `meta_field` = 'payroll_rules'");
-        $stmt->execute();
-        unset($_SESSION['system_info']['payroll_rules']);
+        // An empty company setting (not a missing row) so the installation-wide default is not picked up again.
+        if (!$this->putRules(json_encode(['versions' => []]))) {
+            return json_encode(['status' => 'failed', 'msg' => 'The payroll rules could not be reset.']);
+        }
         $this->settings->log_audit('Reset Payroll Rules', 'Payroll', 'Payroll rules reset to the starting preset.');
         return json_encode(['status' => 'success', 'msg' => 'Payroll rules reset to the starting preset.']);
     }
 
-    private function putSetting(string $field, string $value): void
+    /** Save this company's rules (one row per company). */
+    private function putRules(string $value): bool
     {
-        $stmt = $this->conn->prepare("SELECT id FROM `system_info` WHERE `meta_field` = ?");
-        $stmt->bind_param('s', $field);
-        $stmt->execute();
-        $exists = $stmt->get_result()->num_rows > 0;
-        if ($exists) {
-            $up = $this->conn->prepare("UPDATE `system_info` SET `meta_value` = ? WHERE `meta_field` = ?");
-        } else {
-            $up = $this->conn->prepare("INSERT INTO `system_info` (`meta_value`, `meta_field`) VALUES (?, ?)");
-        }
-        $up->bind_param('ss', $value, $field);
-        $up->execute();
-        $_SESSION['system_info'][$field] = $value;
+        $t = (int)$this->settings->active_tenant_id();
+        $by = (int)$this->settings->userdata('id');
+        $up = $this->conn->prepare("INSERT INTO `payroll_rule_sets` (`tenant_id`, `setting`, `updated_by`) VALUES (?, ?, ?)
+                                    ON DUPLICATE KEY UPDATE `setting` = VALUES(`setting`), `updated_by` = VALUES(`updated_by`)");
+        $up->bind_param('isi', $t, $value, $by);
+        return $up->execute();
     }
 
     public function savePayroll(array $post): string

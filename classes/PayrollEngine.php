@@ -251,7 +251,9 @@ class PayrollEngine {
 
     /** Load the company's rules in force on $asAt (default today), or the preset. */
     public static function load_rules($settings = null, $asAt = null) {
-        $raw = ($settings && method_exists($settings, 'info')) ? $settings->info('payroll_rules') : '';
+        $raw = '';
+        if ($settings && method_exists($settings, 'payroll_rules_raw')) $raw = $settings->payroll_rules_raw();
+        elseif ($settings && method_exists($settings, 'info')) $raw = $settings->info('payroll_rules');
         return self::rules_on(self::decode_setting($raw), $asAt);
     }
 

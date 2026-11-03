@@ -1109,6 +1109,15 @@ class DBConnection{
             }
         }
 
+        // Payroll rules belong to each company, not the installation.
+        @$this->conn->query("CREATE TABLE IF NOT EXISTS `payroll_rule_sets` (
+          `tenant_id` int(30) NOT NULL,
+          `setting` mediumtext NOT NULL,
+          `updated_by` int(30) DEFAULT NULL,
+          `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+          PRIMARY KEY (`tenant_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
         // Net pay is paid as a separate step. Rows that existed before this were posted straight to the bank, so they
         // count as paid; new payroll starts as 'unpaid' (set explicitly on insert).
         $pp = array(
