@@ -131,8 +131,9 @@ if ($method === 'POST') {
         $sum = $conn->query("SELECT SUM(amount) AS paid FROM `payment_allocations` WHERE invoice_id = '{$id}'")->fetch_assoc();
         $tot_paid = (float)($sum['paid'] ?? 0);
         $inv_total = (float)$inv['total'];
-        $new_bal = max(0.0, $inv_total - $tot_paid);
-        $new_status = $tot_paid >= $inv_total && $inv_total > 0 ? 'paid' : ($tot_paid > 0 ? 'partially_paid' : 'unpaid');
+        $inv_credit = (float)($conn->query("SELECT credited_amount FROM `invoice_list` WHERE id = '{$id}'")->fetch_assoc()['credited_amount'] ?? 0);
+        $new_bal = \App\Services\CreditNoteService::outstanding($inv_total, $tot_paid, $inv_credit);
+        $new_status = $tot_paid + $inv_credit >= $inv_total && $inv_total > 0 ? 'paid' : ($tot_paid + $inv_credit > 0 ? 'partially_paid' : 'unpaid');
         $conn->query("UPDATE `invoice_list` SET `paid_amount` = '{$tot_paid}', `balance` = '{$new_bal}', `status` = '{$new_status}' WHERE id = '{$id}'");
 
         api_emit(IntegrationEvents::PAYMENT_RECEIVED, [
@@ -251,7 +252,8 @@ if ($method === 'PUT' || $method === 'PATCH') {
     if (array_key_exists('total', $input)) {
         $new_total = (float)$input['total'];
         $paid = (float)$inv['paid_amount'];
-        $fields[] = "`balance` = '" . max(0.0, $new_total - $paid) . "'";
+        $cr = (float)($conn->query("SELECT credited_amount FROM `invoice_list` WHERE id = '" . (int)$inv['id'] . "'")->fetch_assoc()['credited_amount'] ?? 0);
+        $fields[] = "`balance` = '" . \App\Services\CreditNoteService::outstanding($new_total, $paid, $cr) . "'";
     }
 
     $conn->query("UPDATE `invoice_list` SET " . implode(', ', $fields) . " WHERE id = '{$id}' AND tenant_id = '{$api_tenant_id}'");

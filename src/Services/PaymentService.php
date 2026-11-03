@@ -152,14 +152,15 @@ class PaymentService
                 $sum_alloc = $this->conn->query("SELECT SUM(amount) as total_paid FROM `payment_allocations` WHERE invoice_id = '{$inv_id}'")->fetch_assoc();
                 $tot_paid = isset($sum_alloc['total_paid']) ? (float)$sum_alloc['total_paid'] : 0.0;
 
-                $inv_data = $this->conn->query("SELECT total FROM `invoice_list` WHERE id = '{$inv_id}'")->fetch_assoc();
+                $inv_data = $this->conn->query("SELECT total, credited_amount FROM `invoice_list` WHERE id = '{$inv_id}'")->fetch_assoc();
+                $inv_credit = isset($inv_data['credited_amount']) ? (float)$inv_data['credited_amount'] : 0.0;
                 $inv_total = isset($inv_data['total']) ? (float)$inv_data['total'] : 0.0;
 
-                $new_bal = max(0.0, $inv_total - $tot_paid);
+                $new_bal = CreditNoteService::outstanding($inv_total, $tot_paid, $inv_credit);
                 $new_status = 'unpaid';
-                if ($tot_paid >= $inv_total && $inv_total > 0) {
+                if ($tot_paid + $inv_credit >= $inv_total && $inv_total > 0) {
                     $new_status = 'paid';
-                } elseif ($tot_paid > 0 && $tot_paid < $inv_total) {
+                } elseif ($tot_paid + $inv_credit > 0 && $tot_paid + $inv_credit < $inv_total) {
                     $new_status = 'partially_paid';
                 }
 
@@ -240,14 +241,15 @@ class PaymentService
                 $sum_alloc = $this->conn->query("SELECT SUM(amount) as total_paid FROM `payment_allocations` WHERE invoice_id = '{$inv_id}'")->fetch_assoc();
                 $tot_paid = isset($sum_alloc['total_paid']) ? (float)$sum_alloc['total_paid'] : 0.0;
 
-                $inv_data = $this->conn->query("SELECT total FROM `invoice_list` WHERE id = '{$inv_id}'")->fetch_assoc();
+                $inv_data = $this->conn->query("SELECT total, credited_amount FROM `invoice_list` WHERE id = '{$inv_id}'")->fetch_assoc();
+                $inv_credit = isset($inv_data['credited_amount']) ? (float)$inv_data['credited_amount'] : 0.0;
                 $inv_total = isset($inv_data['total']) ? (float)$inv_data['total'] : 0.0;
 
-                $new_bal = max(0.0, $inv_total - $tot_paid);
+                $new_bal = CreditNoteService::outstanding($inv_total, $tot_paid, $inv_credit);
                 $new_status = 'unpaid';
-                if ($tot_paid >= $inv_total && $inv_total > 0) {
+                if ($tot_paid + $inv_credit >= $inv_total && $inv_total > 0) {
                     $new_status = 'paid';
-                } elseif ($tot_paid > 0 && $tot_paid < $inv_total) {
+                } elseif ($tot_paid + $inv_credit > 0 && $tot_paid + $inv_credit < $inv_total) {
                     $new_status = 'partially_paid';
                 }
 

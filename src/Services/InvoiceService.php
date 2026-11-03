@@ -44,13 +44,16 @@ class InvoiceService
         // Calculate paid_amount and balance
         $paid_amount = 0.0;
         if (!empty($id)) {
-            $curr_inv = $this->conn->query("SELECT paid_amount FROM `invoice_list` WHERE id = '{$id}'")->fetch_assoc();
+            $curr_inv = $this->conn->query("SELECT paid_amount, credited_amount FROM `invoice_list` WHERE id = '{$id}'")->fetch_assoc();
             $paid_amount = isset($curr_inv['paid_amount']) ? (float)$curr_inv['paid_amount'] : 0.0;
+            $credited_amount = isset($curr_inv['credited_amount']) ? (float)$curr_inv['credited_amount'] : 0.0;
         }
-        $balance = max(0.0, $total - $paid_amount);
-        if ($paid_amount >= $total && $total > 0) {
+        $credited_amount = $credited_amount ?? 0.0;
+        // Credit notes count towards settling the invoice just as payments do.
+        $balance = CreditNoteService::outstanding($total, $paid_amount, $credited_amount);
+        if ($paid_amount + $credited_amount >= $total && $total > 0) {
             $status = InvoiceStatus::PAID->value;
-        } elseif ($paid_amount > 0 && $paid_amount < $total) {
+        } elseif ($paid_amount + $credited_amount > 0 && $paid_amount + $credited_amount < $total) {
             $status = InvoiceStatus::PARTIALLY_PAID->value;
         }
 

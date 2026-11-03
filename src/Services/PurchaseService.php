@@ -371,14 +371,20 @@ class PurchaseService
         // Preserve paid_amount on edit; recompute balance + status.
         $paid_amount = 0.0;
         if (!empty($id)) {
-            $cur = $this->conn->query("SELECT paid_amount FROM `vendor_bill_list` WHERE id = '{$id}'");
-            if ($cur && $cur->num_rows) $paid_amount = (float)$cur->fetch_assoc()['paid_amount'];
+            $cur = $this->conn->query("SELECT paid_amount, credited_amount FROM `vendor_bill_list` WHERE id = '{$id}'");
+            if ($cur && $cur->num_rows) {
+                $row = $cur->fetch_assoc();
+                $paid_amount = (float)$row['paid_amount'];
+                $credited_amount = (float)$row['credited_amount'];
+            }
         }
-        $balance = max(0.0, $total - $paid_amount);
+        $credited_amount = $credited_amount ?? 0.0;
+        // Debit notes count towards settling the bill just as payments do.
+        $balance = CreditNoteService::outstanding($total, $paid_amount, $credited_amount);
         if ($status !== 'cancelled' && $status !== 'draft') {
-            if ($paid_amount >= $total && $total > 0) {
+            if ($paid_amount + $credited_amount >= $total && $total > 0) {
                 $status = 'paid';
-            } elseif ($paid_amount > 0) {
+            } elseif ($paid_amount + $credited_amount > 0) {
                 $status = 'partially_paid';
             } else {
                 $status = 'unpaid';
