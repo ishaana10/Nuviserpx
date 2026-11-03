@@ -30,7 +30,7 @@
 						<th>Payment Date</th>
 						<th>Customer / Party</th>
 						<th>Method</th>
-						<th>Amount (FJD)</th>
+						<th>Amount<?php echo $_settings->currency_tag() ?></th>
 						<th>Status</th>
 						<th>Action</th>
 					</tr>

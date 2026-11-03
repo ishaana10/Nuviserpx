@@ -241,7 +241,7 @@ while($ac = $accounts_qry->fetch_assoc()){
                             <th width="8%" class="text-center">Disc (%)</th>
                             <th width="14%">Account</th>
                             <th width="8%" class="text-center">Tax Rate</th>
-                            <th width="10%" class="text-right">Amount (FJD)</th>
+                            <th width="10%" class="text-right">Amount<?php echo $_settings->currency_tag() ?></th>
                             <th width="4%" class="text-center"><i class="fas fa-cog"></i></th>
                         </tr>
                     </thead>
@@ -353,7 +353,7 @@ while($ac = $accounts_qry->fetch_assoc()){
                         </div>
                         <hr class="my-2">
                         <div class="d-flex justify-content-between align-items-center">
-                            <h5 class="font-weight-bold text-navy m-0">Total (FJD):</h5>
+                            <h5 class="font-weight-bold text-navy m-0">Total<?php echo $_settings->currency_tag() ?>:</h5>
                             <input type="number" step="any" name="total" id="total" class="form-control form-control-lg text-right bg-transparent border-0 font-weight-bold text-success" style="width: 200px; font-size: 1.6rem;" value="<?php echo isset($total) ? $total : '0.00'; ?>" readonly>
                         </div>
                     </div>
@@ -469,7 +469,7 @@ while($ac = $accounts_qry->fetch_assoc()){
 
                         <div class="row ml-3 pt-2" id="sell_options_container">
                             <div class="col-md-4 form-group">
-                                <label class="form-label-custom">Sale price (FJD)</label>
+                                <label class="form-label-custom">Sale price<?php echo $_settings->currency_tag() ?></label>
                                 <input type="number" step="any" name="selling_price" id="item_modal_price" class="form-control form-control-modern" value="0.00" required>
                             </div>
                             <div class="col-md-4 form-group">

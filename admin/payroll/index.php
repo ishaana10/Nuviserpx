@@ -82,7 +82,7 @@
 							<td class="text-right text-info">-<?php echo number_format($row['employee_fnpf'], 2) ?></td>
 							<td class="text-right text-warning">-<?php echo number_format($row['paye_tax'], 2) ?></td>
 							<td class="text-right text-danger">-<?php echo number_format($row['deductions'], 2) ?></td>
-							<td class="text-right font-weight-bold text-success"><?php echo number_format($row['net_salary'], 2) ?> FJD</td>
+							<td class="text-right font-weight-bold text-success"><?php echo number_format($row['net_salary'], 2) ?> <?php echo htmlspecialchars($_settings->base_currency()) ?></td>
 							<td align="center">
 								 <button type="button" class="btn btn-flat p-1 btn-default btn-sm dropdown-toggle dropdown-icon" data-toggle="dropdown">
 							Action

@@ -39,7 +39,7 @@ $preset_product_id = isset($_GET['product_id']) ? intval($_GET['product_id']) : 
 
 		<div class="row">
 			<div class="col-md-6 form-group">
-				<label for="unit_cost" class="control-label">Unit Cost Price (FJD)</label>
+				<label for="unit_cost" class="control-label">Unit Cost Price<?php echo $_settings->currency_tag() ?></label>
 				<input type="number" step="any" name="unit_cost" id="unit_cost" class="form-control form-control-sm rounded-0 text-right" value="0.00"/>
 			</div>
 			<div class="col-md-6 form-group">

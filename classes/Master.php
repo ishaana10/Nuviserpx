@@ -253,7 +253,7 @@ class Master extends DBConnection
         $full_name = $this->conn->real_escape_string($account_name . ' (' . $bank_name . ')');
         $b_name = $this->conn->real_escape_string($bank_name);
         $acc_num = $this->conn->real_escape_string($account_number ?? '');
-        $curr = $this->conn->real_escape_string($currency ?? 'FJD');
+        $curr = $this->conn->real_escape_string($currency ?? $this->settings->base_currency());
         $a_type = 'Bank';
 
         $data = " `tenant_id` = '{$tenant_id}' ";

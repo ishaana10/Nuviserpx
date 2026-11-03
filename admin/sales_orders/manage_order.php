@@ -132,7 +132,7 @@ while($p = $products_qry->fetch_assoc()){
 						<tr>
 							<th width="30%">Product / Item</th>
 							<th width="10%">Qty</th>
-							<th width="15%">Price (FJD)</th>
+							<th width="15%">Price<?php echo $_settings->currency_tag() ?></th>
 							<th width="10%">Tax (%)</th>
 							<th width="15%" class="text-right">Amount</th>
 							<th width="5%" class="text-center">Action</th>
@@ -223,7 +223,7 @@ while($p = $products_qry->fetch_assoc()){
 						</div>
 						<hr class="my-2">
 						<div class="d-flex justify-content-between align-items-center">
-							<h5 class="font-weight-bold text-navy m-0">Total Amount (FJD):</h5>
+							<h5 class="font-weight-bold text-navy m-0">Total Amount<?php echo $_settings->currency_tag() ?>:</h5>
 							<input type="number" step="any" name="total" id="total" class="form-control form-control-lg text-right bg-white rounded-0 border-0 font-weight-bold text-primary" style="width: 160px; font-size: 1.4rem;" value="<?php echo isset($total) ? $total : '0.00'; ?>" readonly>
 						</div>
 					</div>
@@ -296,7 +296,7 @@ while($p = $products_qry->fetch_assoc()){
 
                         <div class="row ml-3 pt-2" id="sell_options_container">
                             <div class="col-md-6 form-group">
-                                <label class="control-label font-weight-bold text-xs">Sale price (FJD)</label>
+                                <label class="control-label font-weight-bold text-xs">Sale price<?php echo $_settings->currency_tag() ?></label>
                                 <input type="number" step="any" name="selling_price" id="item_modal_price" class="form-control form-control-sm rounded-0" value="0.00" required>
                             </div>
                             <div class="col-md-6 form-group">

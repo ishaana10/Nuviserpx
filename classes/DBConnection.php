@@ -303,7 +303,7 @@ class DBConnection{
               `reference` varchar(100) DEFAULT NULL,
               `notes` text DEFAULT NULL,
               `status` enum('draft','posted','cancelled') NOT NULL DEFAULT 'posted',
-              `currency` varchar(10) NOT NULL DEFAULT 'FJD',
+              `currency` varchar(10) NOT NULL DEFAULT '',
               `journal_id` int(30) DEFAULT NULL,
               `created_by` int(30) DEFAULT NULL,
               `date_created` datetime NOT NULL DEFAULT current_timestamp(),
@@ -383,7 +383,7 @@ class DBConnection{
             'is_archived' => "ALTER TABLE `account_list` ADD COLUMN `is_archived` tinyint(1) NOT NULL DEFAULT 0 AFTER `status`",
             'bank_name' => "ALTER TABLE `account_list` ADD COLUMN `bank_name` varchar(150) DEFAULT NULL AFTER `tax_rate`",
             'account_number' => "ALTER TABLE `account_list` ADD COLUMN `account_number` varchar(100) DEFAULT NULL AFTER `bank_name`",
-            'currency' => "ALTER TABLE `account_list` ADD COLUMN `currency` varchar(10) NOT NULL DEFAULT 'FJD' AFTER `account_number`"
+            'currency' => "ALTER TABLE `account_list` ADD COLUMN `currency` varchar(10) NOT NULL DEFAULT '' AFTER `account_number`"
         );
 
         foreach ($acc_cols as $col => $sql) {

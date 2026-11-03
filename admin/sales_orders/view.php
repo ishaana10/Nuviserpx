@@ -128,7 +128,7 @@ $title_label = $order['type'] === 'proforma' ? 'PROFORMA INVOICE' : 'SALES ORDER
                         <th class="text-center" width="80">Qty</th>
                         <th class="text-right" width="120">Unit Price</th>
                         <th class="text-center" width="90">Tax Rate</th>
-                        <th class="text-right" width="130">Total (FJD)</th>
+                        <th class="text-right" width="130">Total<?php echo $_settings->currency_tag() ?></th>
                     </tr>
                 </thead>
                 <tbody>

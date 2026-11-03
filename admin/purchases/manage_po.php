@@ -106,7 +106,7 @@ if($wh_q){
 						<tr>
 							<th width="35%">Product / Item</th>
 							<th width="10%">Qty</th>
-							<th width="15%">Unit Cost (FJD)</th>
+							<th width="15%">Unit Cost<?php echo $_settings->currency_tag() ?></th>
 							<th width="10%">Tax (%)</th>
 							<th width="15%" class="text-right">Amount</th>
 							<th width="5%" class="text-center">Action</th>
@@ -173,7 +173,7 @@ if($wh_q){
 						</div>
 						<hr class="my-2">
 						<div class="d-flex justify-content-between align-items-center">
-							<h5 class="font-weight-bold text-navy m-0">Total (FJD):</h5>
+							<h5 class="font-weight-bold text-navy m-0">Total<?php echo $_settings->currency_tag() ?>:</h5>
 							<input type="number" step="any" name="total" id="total" class="form-control form-control-lg text-right bg-white rounded-0 border-0 font-weight-bold text-primary" style="width: 160px; font-size: 1.4rem;" value="<?php echo isset($total) ? $total : '0.00'; ?>" readonly>
 						</div>
 					</div>

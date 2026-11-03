@@ -70,7 +70,7 @@ if ($scope !== null) {
 								<p class="m-0"><?php echo $row['department'] ?></p>
 								<small class="text-muted"><?php echo $row['designation'] ?></small>
 							</td>
-							<td class="text-right font-weight-bold"><?php echo number_format($row['salary'], 2) ?> FJD</td>
+							<td class="text-right font-weight-bold"><?php echo number_format($row['salary'], 2) ?> <?php echo htmlspecialchars($_settings->base_currency()) ?></td>
 							<td class="text-center">
                                 <?php if($row['status'] == 1): ?>
                                     <span class="badge badge-success px-3 rounded-pill">Active</span>

@@ -106,7 +106,7 @@ $status_class = [
             <th class="text-center" style="width: 90px;">QTY</th>
             <th class="text-right" style="width: 130px;">UNIT PRICE</th>
             <th class="text-center" style="width: 100px;">TAX RATE</th>
-            <th class="text-right" style="width: 140px;">TOTAL (FJD)</th>
+            <th class="text-right" style="width: 140px;">TOTAL<?php echo $_settings->currency_tag((int)($inv['tenant_id'] ?? 0) ?: null) ?></th>
           </tr>
         </thead>
         <tbody>

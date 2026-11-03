@@ -198,7 +198,7 @@ class Emailer {
             <p style='margin: 4px 0;'><b>Invoice Number:</b> #" . htmlspecialchars($invoice['invoice_no']) . "</p>
             <p style='margin: 4px 0;'><b>Invoice Date:</b> " . date('d M Y', strtotime($invoice['invoice_date'])) . "</p>
             <p style='margin: 4px 0;'><b>Due Date:</b> " . ($invoice['due_date'] ? date('d M Y', strtotime($invoice['due_date'])) : '—') . "</p>
-            <p style='margin: 4px 0; color: #dc2626;'><b>Balance Due:</b> $" . number_format($invoice['balance'], 2) . " FJD</p>
+            <p style='margin: 4px 0; color: #dc2626;'><b>Balance Due:</b> $" . number_format($invoice['balance'], 2) . " " . htmlspecialchars($sys_info['currency_code'] ?? '') . "</p>
         </div>
 
         <table>
@@ -218,7 +218,7 @@ class Emailer {
         <div style='text-align: right; margin-top: 15px;'>
             <p style='margin: 4px 0;'>Subtotal: <b>$" . number_format($invoice['subtotal'], 2) . "</b></p>
             <p style='margin: 4px 0;'>Tax / VAT: <b>$" . number_format($invoice['tax_amount'], 2) . "</b></p>
-            <h3 style='margin: 8px 0; color: #1e3a8a;'>Total Amount: $" . number_format($invoice['total'], 2) . " FJD</h3>
+            <h3 style='margin: 8px 0; color: #1e3a8a;'>Total Amount: $" . number_format($invoice['total'], 2) . " " . htmlspecialchars($sys_info['currency_code'] ?? '') . "</h3>
         </div>
         <p>Please arrange payment by the due date. If you have any questions, feel free to contact us.</p>";
 
@@ -248,7 +248,7 @@ class Emailer {
         <p>We have received your payment. Thank you!</p>
         <div style='background: #f0fdf4; border: 1px solid #bbf7d0; padding: 15px; border-radius: 6px; margin-bottom: 20px; text-align: center;'>
             <p style='margin: 0; color: #166534; font-size: 14px;'>AMOUNT RECEIVED</p>
-            <h2 style='margin: 5px 0; color: #15803d;'>$" . number_format($payment['amount'], 2) . " FJD</h2>
+            <h2 style='margin: 5px 0; color: #15803d;'>$" . number_format($payment['amount'], 2) . " " . htmlspecialchars($sys_info['currency_code'] ?? '') . "</h2>
             <p style='margin: 0; color: #166534; font-size: 13px;'>Receipt #" . htmlspecialchars($payment['payment_no']) . " &bull; " . date('d M Y', strtotime($payment['payment_date'])) . "</p>
         </div>
 
@@ -306,7 +306,7 @@ class Emailer {
             <p style='margin: 4px 0;'><b>FNPF Employee Deduction (8%):</b> $" . number_format($payroll['employee_fnpf'], 2) . "</p>
             <p style='margin: 4px 0;'><b>PAYE Income Tax:</b> $" . number_format($payroll['paye_tax'], 2) . "</p>
             <p style='margin: 4px 0;'><b>Other Deductions:</b> $" . number_format($payroll['deductions'], 2) . "</p>
-            <h3 style='margin: 8px 0; color: #166534;'>Net Salary Payable: $" . number_format($payroll['net_salary'], 2) . " FJD</h3>
+            <h3 style='margin: 8px 0; color: #166534;'>Net Salary Payable: $" . number_format($payroll['net_salary'], 2) . " " . htmlspecialchars($sys_info['currency_code'] ?? '') . "</h3>
         </div>
         <p>This is a confidential communication regarding your personal compensation.</p>";
 

@@ -604,7 +604,7 @@ CREATE TABLE IF NOT EXISTS `payment_list` (
   `reference` varchar(100) DEFAULT NULL,
   `notes` text DEFAULT NULL,
   `status` enum('draft','posted','cancelled') NOT NULL DEFAULT 'posted',
-  `currency` varchar(10) NOT NULL DEFAULT 'FJD',
+  `currency` varchar(10) NOT NULL DEFAULT '',
   `journal_id` int(30) DEFAULT NULL,
   `created_by` int(30) DEFAULT NULL,
   `date_created` datetime NOT NULL DEFAULT current_timestamp(),

@@ -205,6 +205,31 @@ class SystemSettings extends DBConnection{
 			return false;
 		}
 	}
+	/**
+	 * The company's own (base) currency code: its default currency, else the base currency set in financial
+	 * settings, else empty. Nothing is assumed, so no company sees another country's currency.
+	 */
+	function base_currency($tenantId = null){
+		static $cache = array();
+		$t = $tenantId === null ? (int)$this->active_tenant_id() : (int)$tenantId;
+		if(!isset($cache[$t])){
+			$code = '';
+			$r = @$this->conn->query("SELECT code FROM currencies WHERE tenant_id = {$t} AND is_default = 1 AND status = 1 LIMIT 1");
+			if($r && ($row = $r->fetch_assoc())){
+				$code = (string)$row['code'];
+			}
+			if($code === ''){
+				$code = (string)$this->info('currency_code');
+			}
+			$cache[$t] = strtoupper(trim($code));
+		}
+		return $cache[$t];
+	}
+	/** " (USD)" for a column heading, or nothing when the company has no base currency set. */
+	function currency_tag($tenantId = null){
+		$c = $this->base_currency($tenantId);
+		return $c === '' ? '' : ' (' . htmlspecialchars($c) . ')';
+	}
 	function sess_des(){
 		if(isset($_SESSION['userdata'])){
 				unset($_SESSION['userdata']);

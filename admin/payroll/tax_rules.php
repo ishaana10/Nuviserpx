@@ -60,7 +60,7 @@ $brackets = [
                 <thead>
                     <tr class="bg-gradient-navy text-white">
                         <th class="text-center" style="width: 5%;">Tier</th>
-                        <th>Annual Salary Range ($ FJD)</th>
+                        <th>Annual Salary Range<?php echo $_settings->currency_tag() ?></th>
                         <th class="text-right">Marginal Tax Rate</th>
                         <th class="text-right">Base Lump Sum Tax</th>
                         <th>Tax Calculation Formula Details</th>
