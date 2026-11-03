@@ -360,6 +360,12 @@ if($t_qry && $t_qry->num_rows > 0){
                                         </a>
                                     </li>
                                     <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=journals/manage_opening_balances" class="nav-link nav-journals_manage_opening_balances tree-item">
+                                            <i class="nav-icon fas fa-door-open"></i>
+                                            <p>Opening Balances</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=journals/approvals" class="nav-link nav-journals_approvals tree-item">
                                             <i class="nav-icon fas fa-user-check"></i>
                                             <p>Journal Approvals</p>
