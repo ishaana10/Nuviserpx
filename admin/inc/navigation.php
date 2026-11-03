@@ -454,6 +454,14 @@ if($t_qry && $t_qry->num_rows > 0){
                                             <p>Payrun Engine & Retro</p>
                                         </a>
                                     </li>
+                                    <?php if ($_settings->can_access('settings_manage')): ?>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=payroll/rules_settings" class="nav-link nav-payroll_rules_settings tree-item">
+                                            <i class="nav-icon fas fa-sliders-h text-primary"></i>
+                                            <p>Payroll Rules Settings</p>
+                                        </a>
+                                    </li>
+                                    <?php endif; ?>
                                     <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=payroll/tax_rules" class="nav-link nav-payroll_tax_rules tree-item">
                                             <i class="nav-icon fas fa-balance-scale"></i>

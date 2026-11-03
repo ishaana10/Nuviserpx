@@ -24,6 +24,53 @@ class PayrollService
         return json_encode(['status' => 'success', 'data' => $calc]);
     }
 
+    /** Save the company payroll rules (JSON in `payroll_rules`). */
+    public function saveRules(array $post): string
+    {
+        require_once(base_app . 'classes/PayrollEngine.php');
+        $rules = json_decode((string)($post['rules_json'] ?? ''), true);
+        $errors = PayrollEngine::validate_rules($rules);
+        if ($errors) {
+            return json_encode(['status' => 'failed', 'msg' => implode(' ', array_slice($errors, 0, 4))]);
+        }
+        foreach ($rules['employer_levies'] as &$l) {
+            $l['label'] = trim(preg_replace('/[&<>"\'\\\\\x00-\x1f]/', '', (string)$l['label']));
+            $l['key'] = (string)($l['key'] ?? '');
+        }
+        unset($l);
+        $normalized = PayrollEngine::normalize_rules($rules);
+        $json = json_encode($normalized);
+        $this->putSetting('payroll_rules', $json);
+        $this->settings->log_audit('Updated Payroll Rules', 'Payroll', 'Payroll pension, tax band and levy rules changed.');
+        return json_encode(['status' => 'success', 'msg' => 'Payroll rules saved. New payroll runs use them straight away; processed payslips are unchanged.']);
+    }
+
+    /** Remove the company rules so payroll uses the starting preset again. */
+    public function resetRules(): string
+    {
+        $stmt = $this->conn->prepare("DELETE FROM `system_info` WHERE `meta_field` = 'payroll_rules'");
+        $stmt->execute();
+        unset($_SESSION['system_info']['payroll_rules']);
+        $this->settings->log_audit('Reset Payroll Rules', 'Payroll', 'Payroll rules reset to the starting preset.');
+        return json_encode(['status' => 'success', 'msg' => 'Payroll rules reset to the starting preset.']);
+    }
+
+    private function putSetting(string $field, string $value): void
+    {
+        $stmt = $this->conn->prepare("SELECT id FROM `system_info` WHERE `meta_field` = ?");
+        $stmt->bind_param('s', $field);
+        $stmt->execute();
+        $exists = $stmt->get_result()->num_rows > 0;
+        if ($exists) {
+            $up = $this->conn->prepare("UPDATE `system_info` SET `meta_value` = ? WHERE `meta_field` = ?");
+        } else {
+            $up = $this->conn->prepare("INSERT INTO `system_info` (`meta_value`, `meta_field`) VALUES (?, ?)");
+        }
+        $up->bind_param('ss', $value, $field);
+        $up->execute();
+        $_SESSION['system_info'][$field] = $value;
+    }
+
     public function savePayroll(array $post): string
     {
         require_once(base_app . 'classes/PayrollEngine.php');

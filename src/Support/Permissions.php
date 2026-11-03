@@ -499,6 +499,8 @@ final class Permissions
         'update_leave_status'   => ['leaves', 'view'],
         'cancel_leave'          => ['leaves', 'view'],
         // Payroll
+        'save_payroll_rules'    => ['settings_manage'],
+        'reset_payroll_rules'   => ['settings_manage'],
         'save_payroll'          => ['payroll', 'save'],
         'delete_payroll'        => ['payroll', 'delete'],
         'calculate_payroll_ajax'=> ['payroll', 'edit'],
@@ -761,7 +763,9 @@ final class Permissions
         if ($perm === self::SUPER_ONLY) {
             return 'Only the developer can open this.';
         }
-        if ($page === 'payroll/manage_payroll' && empty($query['id'])) {
+        if ($page === 'payroll/rules_settings') {
+            $perm = 'settings_manage';
+        } elseif ($page === 'payroll/manage_payroll' && empty($query['id'])) {
             $perm = 'payroll_process'; // opening the run form = processing payroll
         } elseif (preg_match('/(^|\/)(manage_|new_|add_)/', $page) && preg_match('/_view$/', $perm)) {
             $perm = preg_replace('/_view$/', !empty($query['id']) ? '_edit' : '_create', $perm);
