@@ -47,6 +47,10 @@ class PaymentService
         if ($fx->isForeign($currency)) {
             return $this->saveForeignReceipt($post, $fx, $currency, (string)$id, (int)$tenant_id, (int)$user_id, $party);
         }
+        // A company-currency receipt cannot go into a foreign-currency bank account: the account tracks its own currency.
+        if (($bankCur = $fx->bankCurrency((int)($bank_account_id ?? 0))) !== null) {
+            return json_encode(['status' => 'failed', 'msg' => "That bank account holds {$bankCur}. Record the receipt in {$bankCur}, or choose a company-currency account."]);
+        }
         // A company-currency receipt cannot settle a foreign-currency invoice: its balance is tracked in that currency.
         if (isset($invoice_alloc) && is_array($invoice_alloc) && $invoice_alloc) {
             $ids = implode(',', array_map('intval', array_keys($invoice_alloc)));
@@ -317,7 +321,11 @@ class PaymentService
                     throw new \RuntimeException('The ' . FxService::REALISED_ACCOUNT . ' account could not be created.');
                 }
             }
-            $lines = FxService::receiptLines($cashAcc, $arAcc, $fxAcc, $cashBase, $arTotal, $currency, $rate, $amountFc);
+            $bankCur = $fx->bankCurrency((int)$cashAcc);
+            if ($bankCur !== null && $bankCur !== $currency) {
+                throw new \RuntimeException("That bank account holds {$bankCur}, not {$currency}. Choose an account in {$currency} or in the company currency.");
+            }
+            $lines = FxService::receiptLines($cashAcc, $arAcc, $fxAcc, $cashBase, $arTotal, $currency, $rate, $amountFc, $bankCur === $currency);
 
             // Journal
             $desc = $this->conn->real_escape_string("Payment Receipt {$payment_no} from " . ($party['name'] ?? '') . " - {$currency} " . number_format($amountFc, 2) . " @ {$rate}");

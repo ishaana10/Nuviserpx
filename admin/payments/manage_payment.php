@@ -16,6 +16,7 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
 $fx_svc = new \App\Services\FxService($conn, $_settings);
 $fx_base = $fx_svc->baseCurrency();
 $fx_currencies = $fx_svc->foreignCurrencies();
+$fx_codes = array_map(fn($c) => strtoupper($c['code']), $fx_currencies);
 $pay_currency = (isset($amount_fc) && $amount_fc !== null && !empty($currency)) ? strtoupper($currency) : $fx_base;
 $preset_inv_currency = '';
 if(isset($_GET['invoice_id']) && (int)$_GET['invoice_id'] > 0 && !isset($id)){
@@ -101,7 +102,7 @@ $preset_invoice_id = isset($_GET['invoice_id']) ? (int)$_GET['invoice_id'] : 0;
 						while($acc = $accounts->fetch_assoc()):
 						?>
 						<option value="<?php echo $acc['id'] ?>" <?php echo isset($bank_account_id) && $bank_account_id == $acc['id'] ? 'selected' : '' ?>>
-							<?php echo $acc['name'] ?>
+							<?php echo $acc['name'] ?><?php echo in_array(strtoupper((string)$acc['currency']), $fx_codes, true) ? ' (' . strtoupper($acc['currency']) . ')' : '' ?>
 						</option>
 						<?php endwhile; ?>
 					</select>

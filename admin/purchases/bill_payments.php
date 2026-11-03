@@ -5,7 +5,8 @@ $payments = $svc->payments();
 $can_pay = $_settings->can_access('purchases_edit');
 $can_void = $_settings->can_access('purchases_delete');
 $vendors = $conn->query("SELECT id, party_code, name FROM `party_list` WHERE tenant_id = '{$tenant_id}' AND delete_flag = 0 ORDER BY name ASC");
-$accounts = $conn->query("SELECT id, name FROM `account_list` WHERE tenant_id = '{$tenant_id}' AND delete_flag = 0 AND status = 1 ORDER BY name ASC");
+$fx_codes = array_map(fn($c) => strtoupper($c['code']), (new \App\Services\FxService($conn, $_settings))->foreignCurrencies());
+$accounts = $conn->query("SELECT id, name, currency FROM `account_list` WHERE tenant_id = '{$tenant_id}' AND delete_flag = 0 AND status = 1 ORDER BY name ASC");
 $preset_vendor = (int)($_GET['vendor_id'] ?? 0);
 ?>
 <div class="container-fluid py-2">
@@ -31,7 +32,7 @@ $preset_vendor = (int)($_GET['vendor_id'] ?? 0);
                     <label>Paid from</label>
                     <select name="bank_account_id" class="form-control form-control-sm">
                         <option value="">Default bank / cash account</option>
-                        <?php while ($a = $accounts->fetch_assoc()): ?><option value="<?= (int)$a['id'] ?>"><?= htmlspecialchars($a['name']) ?></option><?php endwhile; ?>
+                        <?php while ($a = $accounts->fetch_assoc()): ?><option value="<?= (int)$a['id'] ?>"><?= htmlspecialchars($a['name']) ?><?= in_array(strtoupper((string)$a['currency']), $fx_codes, true) ? ' (' . htmlspecialchars(strtoupper($a['currency'])) . ')' : '' ?></option><?php endwhile; ?>
                     </select>
                 </div>
                 <div class="col-md-3 form-group">
