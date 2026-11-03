@@ -62,17 +62,7 @@ class InvoiceService
         $rev_acc_id = ($rev_acc && $rev_acc->num_rows > 0) ? $rev_acc->fetch_assoc()['id'] : 2;
 
         // Create/Update Journal
-        $prefix = date("Ym-");
-        $code = sprintf("%'.05d", 1);
-        while (true) {
-            $check = $this->conn->query("SELECT * FROM `journal_entries` where `code` = '{$prefix}{$code}' and tenant_id = '{$tenant_id}' ")->num_rows;
-            if ($check > 0) {
-                $code = sprintf("%'.05d", ceil((float)$code) + 1);
-            } else {
-                break;
-            }
-        }
-        $journal_code = $prefix . $code;
+        $journal_code = \App\Services\SequenceService::journalCode($this->conn, (int)$tenant_id);
         $journal_date = $invoice_date;
         if ($lockMsg = \App\Services\PeriodLockService::guardDocument($this->conn, (int)$tenant_id, $journal_date, 'invoice_list', (int)$id)) {
             return json_encode(['status' => 'failed', 'msg' => $lockMsg]);

@@ -89,17 +89,7 @@ class PayrollService
         $cash_acc = $this->conn->query("SELECT id FROM `account_list` WHERE `name` LIKE '%cash%' AND tenant_id = '{$tenant_id}' AND delete_flag = 0 LIMIT 1");
         $cash_acc_id = ($cash_acc && $cash_acc->num_rows > 0) ? $cash_acc->fetch_assoc()['id'] : 1;
 
-        $prefix = date("Ym-");
-        $code = sprintf("%'.05d", 1);
-        while (true) {
-            $check = $this->conn->query("SELECT * FROM `journal_entries` where `code` = '{$prefix}{$code}' and tenant_id = '{$tenant_id}' ")->num_rows;
-            if ($check > 0) {
-                $code = sprintf("%'.05d", ceil((float)$code) + 1);
-            } else {
-                break;
-            }
-        }
-        $journal_code = $prefix . $code;
+        $journal_code = \App\Services\SequenceService::journalCode($this->conn, (int)$tenant_id);
         $user_id = $this->settings->userdata('id');
         $journal_date = $pay_date;
 

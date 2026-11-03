@@ -47,6 +47,9 @@ class TenantService
         } else {
             $save = $this->conn->query($sql);
             if ($save) {
+                if (empty($id)) {
+                    ChartProvisioner::provision($this->conn, (int)$this->conn->insert_id);
+                }
                 $resp['status'] = 'success';
                 $resp['msg'] = empty($id) ? " Tenant added successfully." : " Tenant details updated successfully.";
             } else {

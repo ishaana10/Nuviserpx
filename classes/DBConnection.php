@@ -68,6 +68,7 @@ class DBConnection{
                 $this->check_budget_migrations();
                 $this->check_tax_migrations();
                 $this->check_fx_migrations();
+                $this->check_tenant_integrity_migrations();
                 $this->check_dolibarr_crm_migrations();
                 $this->check_dolibarr_extended_migrations();
                 $this->check_extrafields_migrations();
@@ -873,6 +874,96 @@ class DBConnection{
                 @$this->conn->query($sql);
             }
         }
+    }
+
+    /**
+     * Multi-tenant hardening for the ledger tables.
+     *  - document_sequences: one atomic counter per company and series (journal numbers).
+     *  - A company with no accounts gets the standard chart (new companies get it when created).
+     *  - tenant_id indexes, a unique journal code per company, and foreign keys to tenants.
+     * Every step is guarded and skipped, never forced: a unique index or foreign key is only added when the
+     * existing data already satisfies it, so an old database with duplicates or orphans still starts.
+     */
+    public function check_tenant_integrity_migrations(){
+        if (!$this->conn) return;
+
+        @$this->conn->query("CREATE TABLE IF NOT EXISTS `document_sequences` (
+          `tenant_id` int(30) NOT NULL,
+          `seq_key` varchar(60) NOT NULL,
+          `last_value` bigint(20) NOT NULL DEFAULT 0,
+          PRIMARY KEY (`tenant_id`, `seq_key`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        // Companies with no chart of accounts.
+        $empty = @$this->conn->query("SELECT t.id FROM tenants t
+            WHERE t.delete_flag = 0 AND NOT EXISTS (SELECT 1 FROM account_list a WHERE a.tenant_id = t.id AND a.delete_flag = 0)");
+        if ($empty) {
+            foreach ($empty->fetch_all(MYSQLI_ASSOC) as $t) {
+                \App\Services\ChartProvisioner::provision($this->conn, (int)$t['id']);
+            }
+        }
+
+        $indexes = array(
+            array('account_list', 'tenant_active', '(`tenant_id`, `delete_flag`)'),
+            array('group_list', 'tenant_active', '(`tenant_id`, `delete_flag`)'),
+            array('journal_entries', 'tenant_date', '(`tenant_id`, `journal_date`)'),
+            array('journal_items', 'account_id', '(`account_id`)'),
+        );
+        foreach ($indexes as $ix) {
+            $this->add_index_if_missing($ix[0], $ix[1], $ix[2]);
+        }
+
+        // One journal number per company. Only when no duplicates already exist.
+        if ($this->table_exists('journal_entries') && !$this->index_exists('journal_entries', 'tenant_code')) {
+            $dup = @$this->conn->query("SELECT 1 FROM journal_entries GROUP BY tenant_id, code HAVING COUNT(*) > 1 LIMIT 1");
+            if ($dup && $dup->num_rows == 0) {
+                @$this->conn->query("ALTER TABLE `journal_entries` ADD UNIQUE INDEX `tenant_code` (`tenant_id`, `code`)");
+            }
+        }
+
+        foreach (array('account_list', 'group_list', 'journal_entries', 'invoice_list', 'vendor_bill_list', 'payment_list', 'budget_lines', 'tax_codes', 'exchange_rates', 'document_sequences', 'period_locks') as $tbl) {
+            $this->add_tenant_fk($tbl);
+        }
+    }
+
+    private function table_exists($table){
+        $t = $this->conn->real_escape_string($table);
+        $r = @$this->conn->query("SHOW TABLES LIKE '{$t}'");
+        return $r && $r->num_rows > 0;
+    }
+
+    private function index_exists($table, $name){
+        $r = @$this->conn->query("SHOW INDEX FROM `{$table}` WHERE Key_name = '" . $this->conn->real_escape_string($name) . "'");
+        return $r && $r->num_rows > 0;
+    }
+
+    private function add_index_if_missing($table, $name, $cols){
+        if ($this->table_exists($table) && !$this->index_exists($table, $name)) {
+            @$this->conn->query("ALTER TABLE `{$table}` ADD INDEX `{$name}` {$cols}");
+        }
+    }
+
+    /** Foreign key tenant_id -> tenants(id), added only if the table is InnoDB and has no orphan rows. */
+    private function add_tenant_fk($table){
+        if (!$this->table_exists($table)) return;
+        $fk = 'fk_' . $table . '_tenant';
+        $db = $this->conn->real_escape_string($this->db_name());
+        $r = @$this->conn->query("SELECT 1 FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = '{$db}' AND TABLE_NAME = '{$table}' AND CONSTRAINT_NAME = '{$fk}'");
+        if (!$r || $r->num_rows > 0) return;
+        $eng = @$this->conn->query("SELECT ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA = '{$db}' AND TABLE_NAME = '{$table}'");
+        $engine = $eng ? ($eng->fetch_assoc()['ENGINE'] ?? '') : '';
+        if (strcasecmp($engine, 'InnoDB') !== 0) return;
+        $orph = @$this->conn->query("SELECT 1 FROM `{$table}` x LEFT JOIN tenants t ON t.id = x.tenant_id WHERE t.id IS NULL LIMIT 1");
+        if (!$orph || $orph->num_rows > 0) return;
+        if (!$this->index_exists($table, 'tenant_id') && !$this->index_exists($table, 'fk_tenant_idx')) {
+            @$this->conn->query("ALTER TABLE `{$table}` ADD INDEX `fk_tenant_idx` (`tenant_id`)");
+        }
+        @$this->conn->query("ALTER TABLE `{$table}` ADD CONSTRAINT `{$fk}` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE");
+    }
+
+    private function db_name(){
+        $r = @$this->conn->query("SELECT DATABASE() d");
+        return $r ? (string)($r->fetch_assoc()['d'] ?? '') : '';
     }
 
     public function check_invoice_template_migrations(){
