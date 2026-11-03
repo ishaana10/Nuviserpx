@@ -11,6 +11,8 @@ use SystemSettings;
 
 class PayrollService
 {
+    private bool $inTransaction = false;
+
     public function __construct(
         private readonly mysqli $conn,
         private readonly SystemSettings $settings
@@ -156,33 +158,31 @@ class PayrollService
         $bank_code = $this->conn->real_escape_string((string)($emp_data['bank_code'] ?? ''));
         $bank_account = $this->conn->real_escape_string((string)($emp_data['bank_account'] ?? ''));
 
-        // Accounts for Journal Entry
-        $salary_acc = $this->conn->query("SELECT id FROM `account_list` WHERE (`name` LIKE '%salary%' OR `name` LIKE '%expense%') AND tenant_id = '{$tenant_id}' AND delete_flag = 0 LIMIT 1");
-        $salary_acc_id = ($salary_acc && $salary_acc->num_rows > 0) ? $salary_acc->fetch_assoc()['id'] : 1;
-
-        $cash_acc = $this->conn->query("SELECT id FROM `account_list` WHERE `name` LIKE '%cash%' AND tenant_id = '{$tenant_id}' AND delete_flag = 0 LIMIT 1");
-        $cash_acc_id = ($cash_acc && $cash_acc->num_rows > 0) ? $cash_acc->fetch_assoc()['id'] : 1;
-
         $journal_code = \App\Services\SequenceService::journalCode($this->conn, (int)$tenant_id);
         $user_id = $this->settings->userdata('id');
         $journal_date = $pay_date;
 
         $empName = $emp_data['name'] ?? '';
-        $description = $this->conn->real_escape_string("Payroll Disbursement for {$empName} ({$salary_month}) - Gross: \${$gross_salary}, Net: \${$net_salary}");
+        $description = $this->conn->real_escape_string("Payroll for {$empName} ({$salary_month}) - Gross: {$gross_salary}, Net: {$net_salary}");
 
         $id = !empty($id) ? intval($id) : 0;
         if ($lockMsg = \App\Services\PeriodLockService::guardDocument($this->conn, (int)$tenant_id, $journal_date, 'payroll_list', $id)) {
             return json_encode(['status' => 'failed', 'msg' => $lockMsg]);
         }
+        $ownTx = !$this->inTransaction;
+        if ($ownTx) {
+            $this->conn->begin_transaction();
+        }
+        try {
+        $posting = new PayrollPostingService($this->conn, $this->settings);
         if (empty($id)) {
             $j_sql = "INSERT INTO `journal_entries` (`tenant_id`, `code`, `journal_date`, `description`, `user_id`) VALUES ('{$tenant_id}', '{$journal_code}', '{$journal_date}', '{$description}', '{$user_id}')";
             $this->conn->query($j_sql);
             $journal_id = $this->conn->insert_id;
-
-            $j_items = "INSERT INTO `journal_items` (`journal_id`, `account_id`, `group_id`, `amount`) VALUES
-				('{$journal_id}', '{$salary_acc_id}', '1', '{$net_salary}'),
-				('{$journal_id}', '{$cash_acc_id}', '2', '{$net_salary}')";
-            $this->conn->query($j_items);
+            if (!$journal_id) {
+                throw new \RuntimeException('The journal could not be created.');
+            }
+            $posting->writeJournalItems((int)$journal_id, $calc);
 
             $sql = "INSERT INTO `payroll_list` SET
 				`tenant_id` = '{$tenant_id}',
@@ -223,11 +223,7 @@ class PayrollService
                 $trail = new JournalTrail($this->conn, $this->settings);
                 $trailBefore = $trail->snapshot((int)$journal_id);
                 $this->conn->query("UPDATE `journal_entries` SET `description` = '{$description}', `journal_date` = '{$journal_date}' WHERE id = '{$journal_id}'");
-                $this->conn->query("DELETE FROM `journal_items` WHERE journal_id = '{$journal_id}'");
-                $j_items = "INSERT INTO `journal_items` (`journal_id`, `account_id`, `group_id`, `amount`) VALUES
-					('{$journal_id}', '{$salary_acc_id}', '1', '{$net_salary}'),
-					('{$journal_id}', '{$cash_acc_id}', '2', '{$net_salary}')";
-                $this->conn->query($j_items);
+                $posting->writeJournalItems((int)$journal_id, $calc);
                 $trail->record((int)$journal_id, 'payroll_list', (int)$id, "Payroll {$id}", $trailBefore);
             }
 
@@ -265,6 +261,21 @@ class PayrollService
         }
 
         $save = $this->conn->query($sql);
+        if (!$save) {
+            throw new \RuntimeException('save failed');
+        }
+        if ($ownTx) {
+            $this->conn->commit();
+        }
+        } catch (\Throwable $e) {
+            if ($ownTx) {
+                $this->conn->rollback();
+            }
+            if ($this->inTransaction) {
+                throw $e; // the batch rolls back the whole run
+            }
+            return json_encode(['status' => 'failed', 'msg' => 'Payroll was not saved. ' . $e->getMessage(), 'err' => $this->conn->error]);
+        }
         if ($save) {
             $resp['status'] = 'success';
             $resp['msg'] = empty($id) ? " Payroll processed and Journal Entry created successfully." : " Payroll updated successfully.";
@@ -310,6 +321,7 @@ class PayrollService
         $processed = 0;
         $skipped = [];
         $this->conn->begin_transaction();
+        $this->inTransaction = true;
         try {
             foreach ($ids as $eid) {
                 $emp = $this->conn->query("SELECT id, concat(firstname,' ',lastname) AS name FROM `employee_list` WHERE id = '{$eid}' AND tenant_id = '{$tenant_id}' AND status = 1 AND delete_flag = 0");
@@ -342,8 +354,10 @@ class PayrollService
                 $processed++;
             }
             $this->conn->commit();
+            $this->inTransaction = false;
         } catch (\Throwable $e) {
             $this->conn->rollback();
+            $this->inTransaction = false;
             return json_encode(['status' => 'failed', 'msg' => 'Batch payroll was not saved. ' . $e->getMessage()]);
         }
 
