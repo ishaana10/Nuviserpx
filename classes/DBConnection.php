@@ -78,6 +78,7 @@ class DBConnection{
                 $this->check_bill_payment_migrations();
                 $this->check_bill_payment_approval_migrations();
                 $this->check_payroll_adjustment_migrations();
+                $this->check_tax_return_migrations();
                 $this->check_dolibarr_crm_migrations();
                 $this->check_dolibarr_extended_migrations();
                 $this->check_extrafields_migrations();
@@ -1182,6 +1183,35 @@ class DBConnection{
                 @$this->conn->query($sql);
             }
         }
+    }
+
+    public function check_tax_return_migrations(){
+        if (!$this->conn) return;
+        // Filed VAT returns: the figures as filed, kept even if the books are later corrected.
+        @$this->conn->query("CREATE TABLE IF NOT EXISTS `tax_returns` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `tenant_id` int(30) NOT NULL DEFAULT 1,
+          `period_from` date NOT NULL,
+          `period_to` date NOT NULL,
+          `taxable_sales` decimal(18,2) NOT NULL DEFAULT 0.00,
+          `taxable_purchases` decimal(18,2) NOT NULL DEFAULT 0.00,
+          `output_tax` decimal(18,2) NOT NULL DEFAULT 0.00,
+          `input_tax` decimal(18,2) NOT NULL DEFAULT 0.00,
+          `net_tax` decimal(18,2) NOT NULL DEFAULT 0.00,
+          `documents` int(11) NOT NULL DEFAULT 0,
+          `reference` varchar(100) DEFAULT NULL,
+          `note` varchar(500) DEFAULT NULL,
+          `filed_date` date NOT NULL,
+          `status` enum('filed','voided') NOT NULL DEFAULT 'filed',
+          `filed_by` int(30) DEFAULT NULL,
+          `filed_at` datetime NOT NULL DEFAULT current_timestamp(),
+          `voided_by` int(30) DEFAULT NULL,
+          `voided_at` datetime DEFAULT NULL,
+          `void_reason` varchar(500) DEFAULT NULL,
+          PRIMARY KEY (`id`),
+          KEY `tenant_period` (`tenant_id`,`period_from`,`period_to`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        $this->add_tenant_fk('tax_returns');
     }
 
     public function check_bill_payment_approval_migrations(){
