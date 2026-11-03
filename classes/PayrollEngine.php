@@ -32,6 +32,7 @@ class PayrollEngine {
             ];
         };
         return [
+            'tax_year_start_month' => 1,
             'pension' => ['employee_rate' => 0.08, 'employer_rate' => 0.08],
             'resident_bands' => $bands(0.0),
             'non_resident_bands' => $bands(0.20),
@@ -88,6 +89,9 @@ class PayrollEngine {
                 if ($ok) $rules[$k] = $bands;
             }
         }
+        if (isset($custom['tax_year_start_month']) && is_numeric($custom['tax_year_start_month']) && $custom['tax_year_start_month'] >= 1 && $custom['tax_year_start_month'] <= 12) {
+            $rules['tax_year_start_month'] = (int)$custom['tax_year_start_month'];
+        }
         if (isset($custom['secondary_income_rate']) && $rate($custom['secondary_income_rate'])) {
             $rules['secondary_income_rate'] = (float)$custom['secondary_income_rate'];
         }
@@ -142,6 +146,9 @@ class PayrollEngine {
 
         foreach (['employee_rate' => 'Employee pension rate', 'employer_rate' => 'Employer pension rate'] as $k => $lbl) {
             if (!isset($r['pension'][$k]) || !$rate($r['pension'][$k])) $err[] = "$lbl must be between 0% and 100%.";
+        }
+        if (!isset($r['tax_year_start_month']) || !is_numeric($r['tax_year_start_month']) || $r['tax_year_start_month'] < 1 || $r['tax_year_start_month'] > 12 || (int)$r['tax_year_start_month'] != $r['tax_year_start_month']) {
+            $err[] = 'Tax year start month must be a month from 1 to 12.';
         }
         if (!isset($r['secondary_income_rate']) || !$rate($r['secondary_income_rate'])) {
             $err[] = 'Secondary income rate must be between 0% and 100%.';
@@ -246,6 +253,52 @@ class PayrollEngine {
     public static function load_rules($settings = null, $asAt = null) {
         $raw = ($settings && method_exists($settings, 'info')) ? $settings->info('payroll_rules') : '';
         return self::rules_on(self::decode_setting($raw), $asAt);
+    }
+
+    /** First day (Y-m-d) of the tax year that contains $date, for a tax year starting in $startMonth. */
+    public static function tax_year_start($date, $startMonth = 1) {
+        $t = strtotime((string)$date);
+        $y = (int)date('Y', $t);
+        $m = (int)date('n', $t);
+        $startMonth = max(1, min(12, (int)$startMonth));
+        if ($m < $startMonth) $y--;
+        return sprintf('%04d-%02d-01', $y, $startMonth);
+    }
+
+    /**
+     * Which pay period of the tax year a period ending on $periodEnd is (1..periods per year).
+     * Monthly: month number; semi-monthly: half-month; weekly / fortnightly: 7 / 14-day blocks from the year start.
+     */
+    public static function period_number($frequency, $taxYearStart, $periodEnd) {
+        $P = self::get_periods_per_year($frequency);
+        $s = strtotime($taxYearStart);
+        $e = strtotime($periodEnd);
+        if ($e < $s) return 1;
+        $months = ((int)date('Y', $e) - (int)date('Y', $s)) * 12 + ((int)date('n', $e) - (int)date('n', $s));
+        $days = (int)floor(($e - $s) / 86400);
+        switch ($P) {
+            case 52: $n = intdiv($days, 7) + 1; break;
+            case 26: $n = intdiv($days, 14) + 1; break;
+            case 24: $n = $months * 2 + ((int)date('j', $e) <= 15 ? 1 : 2); break;
+            default: $n = $months + 1;
+        }
+        return max(1, min($P, $n));
+    }
+
+    /**
+     * Year-to-date inputs for the cumulative tax calculation, from an employee's earlier payroll rows in the tax year.
+     * Back pay (lump sum) and the tax on it are left out: the regular-pay projection must not treat them as salary.
+     * Opening balances brought forward from a previous system are added when $openings is given.
+     * Returns [prior gross, prior tax].
+     */
+    public static function ytd_prior($rows, $openGross = 0.0, $openTax = 0.0) {
+        $g = (float)$openGross;
+        $t = (float)$openTax;
+        foreach ($rows as $r) {
+            $g += (float)($r['gross_salary'] ?? 0) - (float)($r['retro_pay'] ?? 0);
+            $t += (float)($r['paye_tax'] ?? 0) + (float)($r['srt_tax'] ?? 0) - (float)($r['paye_lump'] ?? 0);
+        }
+        return [round($g, 2), round(max(0.0, $t), 2)];
     }
 
     public static function get_periods_per_year($frequency = 'Monthly') {

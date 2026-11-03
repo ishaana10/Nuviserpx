@@ -71,7 +71,7 @@ class PayrollRemittanceService
         return (int)($q->get_result()->fetch_assoc()['id'] ?? 0);
     }
 
-    /** Amount currently owed on a liability: credits less debits on posted journals. */
+    /** Amount still to be paid on a liability: credits less debits on posted journals, less payments awaiting approval. */
     public function outstanding(string $key): float
     {
         $acc = $this->accountId($key);
@@ -88,7 +88,13 @@ class PayrollRemittanceService
             WHERE ji.account_id = ?");
         $q->bind_param('ii', $tenant, $acc);
         $q->execute();
-        return round((float)($q->get_result()->fetch_assoc()['bal'] ?? 0), 2);
+        $posted = round((float)($q->get_result()->fetch_assoc()['bal'] ?? 0), 2);
+
+        // Payments waiting for approval are already spoken for.
+        $p = $this->conn->prepare("SELECT COALESCE(SUM(amount), 0) a FROM payroll_remittances WHERE tenant_id = ? AND liability = ? AND status = 'pending_approval'");
+        $p->bind_param('is', $tenant, $key);
+        $p->execute();
+        return round($posted - (float)($p->get_result()->fetch_assoc()['a'] ?? 0), 2);
     }
 
     /** All four balances: key => [label, owed]. */
@@ -149,17 +155,22 @@ class PayrollRemittanceService
         $label = self::LIABILITIES[$key][0];
         $user = (int)$this->settings->userdata('id');
 
+        // Payments at or above the company's threshold wait for a second person.
+        $policy = (new ApprovalService($this->conn, $this->settings))->policy(ApprovalService::DOC_PAYROLL_REMITTANCE);
+        $held = ApprovalService::requiresApproval($policy['enabled'], $policy['threshold'], $amount);
+        $status = $held ? 'pending_approval' : 'posted';
+
         // Reserve the row first so a failure after posting can be undone, then post the journal.
         $amt = number_format($amount, 2, '.', '');
-        $ins = $this->conn->prepare("INSERT INTO payroll_remittances (tenant_id, liability, remit_date, amount, bank_account_id, reference, note, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-        $ins->bind_param('isssissi', $tenant, $key, $date, $amt, $bank, $ref, $note, $user);
+        $ins = $this->conn->prepare("INSERT INTO payroll_remittances (tenant_id, liability, remit_date, amount, bank_account_id, reference, note, created_by, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $ins->bind_param('isssissis', $tenant, $key, $date, $amt, $bank, $ref, $note, $user, $status);
         if (!$ins->execute()) {
             return $this->fail('The payment could not be saved.');
         }
         $rid = (int)$this->conn->insert_id;
 
         $desc = "Payroll remittance: {$label}" . ($ref !== '' ? " ({$ref})" : '');
-        $res = json_decode((new JournalService($this->conn, $this->settings))->postSystemJournal($date, $desc, self::lines($liabilityAcc, $bank, $amount, $label)), true);
+        $res = json_decode((new JournalService($this->conn, $this->settings))->postSystemJournal($date, $desc, self::lines($liabilityAcc, $bank, $amount, $label), $status), true);
         if (($res['status'] ?? '') !== 'success') {
             $this->conn->query("DELETE FROM payroll_remittances WHERE id = {$rid}");
             return $this->fail($res['msg'] ?? 'The payment could not be posted.');
@@ -167,7 +178,8 @@ class PayrollRemittanceService
         $jid = (int)$res['id'];
         $this->conn->query("UPDATE payroll_remittances SET journal_id = {$jid} WHERE id = {$rid}");
         $this->settings->log_audit('Payroll Remittance', 'Payroll', "{$label}: {$amt} on {$date}" . ($ref !== '' ? ", ref {$ref}" : '') . '.');
-        return json_encode(['status' => 'success', 'msg' => "Payment of {$amt} recorded for {$label}.", 'id' => $rid]);
+        $msg = $held ? "Payment of {$amt} for {$label} is waiting for approval." : "Payment of {$amt} recorded for {$label}.";
+        return json_encode(['status' => 'success', 'msg' => $msg, 'id' => $rid]);
     }
 
     public function reverse(int $id): string

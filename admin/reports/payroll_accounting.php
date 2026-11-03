@@ -19,7 +19,7 @@ $qry = $conn->query("
     SELECT p.*, concat(e.firstname, ' ', e.lastname) as emp_name, e.employee_code, e.tin, e.fnpf_no
     FROM `payroll_list` p
     INNER JOIN `employee_list` e ON p.employee_id = e.id
-    WHERE p.tenant_id = '{$tenant_id}' AND p.salary_month = '" . $conn->real_escape_string($month) . "'
+    WHERE p.tenant_id = '{$tenant_id}' AND p.status = 'posted' AND p.salary_month = '" . $conn->real_escape_string($month) . "'
     ORDER BY e.firstname ASC
 ");
 

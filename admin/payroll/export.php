@@ -22,13 +22,13 @@ $tenant_id = $_settings->active_tenant_id();
 
 // With no run or month given, export the most recent month rather than every run ever.
 if (empty($ref) && empty($month)) {
-    $latest = $conn->query("SELECT salary_month FROM `payroll_list` WHERE tenant_id = '{$tenant_id}' ORDER BY pay_date DESC, id DESC LIMIT 1");
+    $latest = $conn->query("SELECT salary_month FROM `payroll_list` WHERE tenant_id = '{$tenant_id}' AND status = 'posted' ORDER BY pay_date DESC, id DESC LIMIT 1");
     if ($latest && ($lr = $latest->fetch_assoc())) {
         $month = $lr['salary_month'];
     }
 }
 
-$where = " WHERE p.tenant_id = '{$tenant_id}' ";
+$where = " WHERE p.tenant_id = '{$tenant_id}' AND p.status = 'posted' ";
 if (!empty($ref)) {
     $where .= " AND p.payroll_run_ref = '" . $conn->real_escape_string($ref) . "' ";
 } elseif (!empty($month)) {

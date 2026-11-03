@@ -290,6 +290,8 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
 				overtime_1_5_hours: parseFloat($('#overtime_1_5_hours').val()) || 0,
 				overtime_2_0_hours: parseFloat($('#overtime_2_0_hours').val()) || 0,
 				pay_date: $('#pay_date').val() || '',
+				employee_id: $('#employee_id').val() || '',
+				id: $('input[name="id"]').val() || 0,
 				allowances: allowances,
 				other_earnings: other,
 				deductions: deductions,

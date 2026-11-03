@@ -90,7 +90,11 @@ $tag = $_settings->currency_tag();
                     <td class="text-right"><?= number_format((float)$h['amount'], 2) ?></td>
                     <td><?= $e($h['bank_name']) ?></td>
                     <td><?= $e($h['reference']) ?></td>
-                    <td><?= $h['status'] === 'posted' ? '<span class="badge badge-success">Posted</span>' : '<span class="badge badge-secondary">Reversed</span>' ?></td>
+                    <td><?php
+                        $badge = ['posted' => ['success', 'Posted'], 'pending_approval' => ['warning', 'Waiting for approval'], 'rejected' => ['danger', 'Returned'], 'reversed' => ['secondary', 'Reversed']][$h['status']] ?? ['secondary', $h['status']];
+                        echo '<span class="badge badge-' . $badge[0] . '">' . $e($badge[1]) . '</span>';
+                        if ($h['status'] === 'rejected' && $h['approval_note']) echo ' <small class="text-muted">' . $e($h['approval_note']) . '</small>';
+                    ?></td>
                     <td><?php if ($h['status'] === 'posted' && $_settings->can_access('payroll_remit')): ?><button type="button" class="btn btn-xs btn-outline-danger rev-btn" data-id="<?= (int)$h['id'] ?>">Reverse</button><?php endif; ?></td>
                 </tr>
             <?php endforeach; if (!$history): ?>

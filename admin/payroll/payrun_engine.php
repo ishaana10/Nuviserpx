@@ -2,7 +2,7 @@
 $tenant_id = $_settings->active_tenant_id();
 
 $payruns_qry = $conn->query("
-    SELECT payroll_run_ref, salary_month, pay_frequency, pay_date, period_start, period_end,
+    SELECT payroll_run_ref, status, salary_month, pay_frequency, pay_date, period_start, period_end,
            COUNT(id) as total_employees,
            SUM(gross_salary) as total_gross,
            SUM(employee_fnpf) as total_emp_fnpf,
@@ -12,7 +12,7 @@ $payruns_qry = $conn->query("
            MAX(date_created) as created_at
     FROM `payroll_list`
     WHERE tenant_id = '{$tenant_id}'
-    GROUP BY payroll_run_ref
+    GROUP BY payroll_run_ref, status
     ORDER BY created_at DESC
 ");
 
@@ -74,7 +74,9 @@ $adj_qry = $conn->query("
                         <td class="text-right align-middle text-danger font-weight-bold">$<?= number_format($row['total_paye'], 2) ?></td>
                         <td class="text-right align-middle text-success font-weight-bold font-monospace">$<?= number_format($row['total_net'], 2) ?></td>
                         <td class="text-center align-middle">
-                            <span class="badge badge-success px-2 py-1"><i class="fas fa-check-double mr-1"></i> GL Posted</span>
+                            <?php if ($row['status'] === 'pending_approval'): ?><span class="badge badge-warning px-2 py-1"><i class="fas fa-user-clock mr-1"></i> Waiting for approval</span>
+                            <?php elseif ($row['status'] === 'rejected'): ?><span class="badge badge-danger px-2 py-1">Returned</span>
+                            <?php else: ?><span class="badge badge-success px-2 py-1"><i class="fas fa-check-double mr-1"></i> GL Posted</span><?php endif; ?>
                         </td>
                         <td class="text-center align-middle">
                             <a href="./?page=payroll/fnpf_schedule&month=<?= urlencode($row['salary_month']) ?>" class="btn btn-xs btn-outline-primary btn-flat"><i class="fas fa-eye mr-1"></i> View CS3</a>

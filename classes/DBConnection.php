@@ -1093,6 +1093,22 @@ class DBConnection{
             @$this->conn->query("ALTER TABLE `payroll_list` ADD COLUMN `retro_pay` decimal(12,2) NOT NULL DEFAULT 0.00 AFTER `other_earnings`");
         }
 
+        // Payroll approval (maker/checker) and the tax-year-to-date lump tax
+        $pl = array(
+            'status'        => "ALTER TABLE `payroll_list` ADD COLUMN `status` enum('posted','pending_approval','rejected') NOT NULL DEFAULT 'posted'",
+            'created_by'    => "ALTER TABLE `payroll_list` ADD COLUMN `created_by` int(30) DEFAULT NULL",
+            'approved_by'   => "ALTER TABLE `payroll_list` ADD COLUMN `approved_by` int(30) DEFAULT NULL",
+            'approved_at'   => "ALTER TABLE `payroll_list` ADD COLUMN `approved_at` datetime DEFAULT NULL",
+            'approval_note' => "ALTER TABLE `payroll_list` ADD COLUMN `approval_note` varchar(500) DEFAULT NULL",
+            'paye_lump'     => "ALTER TABLE `payroll_list` ADD COLUMN `paye_lump` decimal(12,2) NOT NULL DEFAULT 0.00",
+        );
+        foreach ($pl as $c => $sql) {
+            $res = @$this->conn->query("SHOW COLUMNS FROM `payroll_list` LIKE '{$c}'");
+            if ($res && $res->num_rows == 0) {
+                @$this->conn->query($sql);
+            }
+        }
+
         // Payments of pension, tax and levy liabilities to the fund / authority
         @$this->conn->query("CREATE TABLE IF NOT EXISTS `payroll_remittances` (
           `id` int(30) NOT NULL AUTO_INCREMENT,
@@ -1104,13 +1120,30 @@ class DBConnection{
           `reference` varchar(100) DEFAULT NULL,
           `note` varchar(500) DEFAULT NULL,
           `journal_id` int(30) DEFAULT NULL,
-          `status` enum('posted','reversed') NOT NULL DEFAULT 'posted',
+          `status` enum('posted','reversed','pending_approval','rejected') NOT NULL DEFAULT 'posted',
           `created_by` int(30) DEFAULT NULL,
           `created_at` datetime NOT NULL DEFAULT current_timestamp(),
           PRIMARY KEY (`id`),
           KEY `tenant_id` (`tenant_id`,`liability`),
           KEY `journal_id` (`journal_id`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        $r = @$this->conn->query("SHOW COLUMNS FROM `payroll_remittances` LIKE 'status'");
+        $col = $r ? $r->fetch_assoc() : null;
+        if ($col && stripos((string)$col['Type'], 'pending_approval') === false) {
+            @$this->conn->query("ALTER TABLE `payroll_remittances` MODIFY `status` enum('posted','reversed','pending_approval','rejected') NOT NULL DEFAULT 'posted'");
+        }
+        $rc = array(
+            'approved_by'   => "ALTER TABLE `payroll_remittances` ADD COLUMN `approved_by` int(30) DEFAULT NULL",
+            'approved_at'   => "ALTER TABLE `payroll_remittances` ADD COLUMN `approved_at` datetime DEFAULT NULL",
+            'approval_note' => "ALTER TABLE `payroll_remittances` ADD COLUMN `approval_note` varchar(500) DEFAULT NULL",
+        );
+        foreach ($rc as $c => $sql) {
+            $res = @$this->conn->query("SHOW COLUMNS FROM `payroll_remittances` LIKE '{$c}'");
+            if ($res && $res->num_rows == 0) {
+                @$this->conn->query($sql);
+            }
+        }
     }
 
     public function check_bill_payment_approval_migrations(){
