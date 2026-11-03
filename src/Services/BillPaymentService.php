@@ -227,7 +227,25 @@ class BillPaymentService
             $code = SequenceService::journalCode($this->conn, $t);
             $this->conn->query("INSERT INTO journal_entries (tenant_id, code, journal_date, description, user_id) VALUES ('{$t}', '{$code}', '{$date}', '{$desc}', '{$userId}')");
             $journalId = (int)$this->conn->insert_id;
-            if ($journalId <= 0 || !(new TaxService($this->conn, $this->settings))->writeLines($journalId, self::lines($apAcc, $bankAcc, $amount))) {
+            $fx = new FxService($this->conn, $this->settings);
+            $bankCur = $fx->bankCurrency($bankAcc);
+            if ($bankCur !== null) {
+                // Paying base-currency bills from a foreign-currency account: take the units out at their carried value.
+                $payRate = $fx->documentRate($bankCur, $date, null);
+                if ($payRate === null) {
+                    throw new \RuntimeException("No exchange rate for {$bankCur} on {$date}. Add one under Exchange rates.");
+                }
+                $pos = $fx->bankPosition($bankAcc, $date);
+                $out = FxService::bankOutflow($amount, $payRate, $pos['fc_net'], $pos['base_net']);
+                $fxAcc = $out['gain'] != 0.0 ? $fx->realisedAccount() : 0;
+                if ($out['gain'] != 0.0 && $fxAcc === 0) {
+                    throw new \RuntimeException('The ' . FxService::REALISED_ACCOUNT . ' account could not be created.');
+                }
+                $jl = FxService::bankOutflowLines($apAcc, $bankAcc, $fxAcc, $amount, $out, $bankCur);
+            } else {
+                $jl = self::lines($apAcc, $bankAcc, $amount);
+            }
+            if ($journalId <= 0 || !(new TaxService($this->conn, $this->settings))->writeLines($journalId, $jl)) {
                 throw new \RuntimeException('The payment journal could not be posted.');
             }
 

@@ -85,6 +85,21 @@ class AccountService
             return $this->fail("Code {$fields['code']} is already used by another account.");
         }
 
+        // An account's currency is the company's own or one of its foreign currencies, and cannot change once it has history.
+        if (isset($fields['currency']) && trim((string)$fields['currency']) !== '') {
+            $fx = new FxService($this->conn, $this->settings);
+            $cur = strtoupper(trim((string)$fields['currency']));
+            $allowed = array_merge([$fx->baseCurrency()], array_map(fn($c) => strtoupper($c['code']), $fx->foreignCurrencies()));
+            $prior = $id ? strtoupper((string)(($this->accountRow($id, $tenant_id)['currency'] ?? ''))) : '';
+            if (!in_array($cur, $allowed, true) && $cur !== $prior) {
+                return $this->fail("{$cur} is not one of this company's currencies. Add it under Currencies first.");
+            }
+            if ($id && $prior !== '' && $prior !== $cur && $this->transactionCount($id) > 0) {
+                return $this->fail('This account already has transactions, so its currency cannot be changed.');
+            }
+            $fields['currency'] = $cur;
+        }
+
         // Type must be one the chart of accounts offers (an unchanged legacy type on an existing account is allowed).
         $existing = $id ? $this->accountRow($id, $tenant_id) : null;
         if (!isset($fields['type']) || $fields['type'] === '') {

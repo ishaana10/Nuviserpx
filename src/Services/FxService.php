@@ -102,12 +102,14 @@ class FxService
      * (invoice) value, the difference to realised gain/loss. Lines are [account, side, base amount, fx tag?].
      * The receivable line carries the foreign amount so revaluation sees the balance fall.
      */
-    public static function receiptLines(int $cashAcc, int $arAcc, int $fxAcc, float $cashBase, float $arBase, string $currency, float $rate, float $arFc): array
+    public static function receiptLines(int $cashAcc, int $arAcc, int $fxAcc, float $cashBase, float $arBase, string $currency, float $rate, float $arFc, bool $tagCash = false): array
     {
         $cashBase = round($cashBase, 2);
         $arBase = round($arBase, 2);
         $lines = [
-            [$cashAcc, TaxService::DEBIT, $cashBase],
+            $tagCash
+                ? [$cashAcc, TaxService::DEBIT, $cashBase, ['currency' => $currency, 'fx_rate' => $rate, 'amount_fc' => round($arFc, 2)]]
+                : [$cashAcc, TaxService::DEBIT, $cashBase],
             [$arAcc, TaxService::CREDIT, $arBase, ['currency' => $currency, 'fx_rate' => $rate, 'amount_fc' => round($arFc, 2)]],
         ];
         $gain = round($cashBase - $arBase, 2);
@@ -115,6 +117,42 @@ class FxService
             $lines[] = [$fxAcc, TaxService::CREDIT, $gain];
         } elseif ($gain < 0) {
             $lines[] = [$fxAcc, TaxService::DEBIT, abs($gain)];
+        }
+        return $lines;
+    }
+
+    /**
+     * Paying base-currency money out of a foreign-currency bank account. The bank gives up foreign units
+     * ($baseAmount at the payment-date rate) at their carried value (the account's average rate); the gap between
+     * what was paid and what was carried is realised exchange gain (+) or loss (-). The payment that empties the
+     * account takes its whole carried value.
+     */
+    public static function bankOutflow(float $baseAmount, float $payRate, float $fcNet, float $baseNet): array
+    {
+        $baseAmount = round($baseAmount, 2);
+        $fcOut = round($baseAmount / $payRate, 2);
+        if ($fcNet <= 0.005 || $baseNet <= 0) {
+            $carried = self::toBase($fcOut, $payRate);          // nothing on record to carry: no difference to book
+        } elseif ($fcOut >= round($fcNet, 2) - 0.005) {
+            $carried = round($baseNet, 2);                       // the whole balance goes
+        } else {
+            $carried = self::toBase($fcOut, $baseNet / $fcNet);
+        }
+        return ['fc' => $fcOut, 'carried' => $carried, 'gain' => round($baseAmount - $carried, 2)];
+    }
+
+    /** Journal for a supplier payment from a foreign-currency bank: Dr Payables, Cr Bank (carried, tagged), exchange difference. */
+    public static function bankOutflowLines(int $apAcc, int $bankAcc, int $fxAcc, float $baseAmount, array $out, string $currency): array
+    {
+        $rate = $out['fc'] > 0 ? round($out['carried'] / $out['fc'], 8) : 0.0;
+        $lines = [
+            [$apAcc, TaxService::DEBIT, round($baseAmount, 2)],
+            [$bankAcc, TaxService::CREDIT, $out['carried'], ['currency' => $currency, 'fx_rate' => $rate, 'amount_fc' => $out['fc']]],
+        ];
+        if ($out['gain'] > 0) {
+            $lines[] = [$fxAcc, TaxService::CREDIT, $out['gain']];
+        } elseif ($out['gain'] < 0) {
+            $lines[] = [$fxAcc, TaxService::DEBIT, abs($out['gain'])];
         }
         return $lines;
     }
@@ -313,6 +351,47 @@ class FxService
     {
         $r = ($typed !== null && $typed !== '') ? self::cleanRate($typed) : null;
         return $r ?? $this->rateOn(strtoupper($currency), $date);
+    }
+
+    /** The foreign currency a bank/cash account holds, or null if it is a company-currency account. */
+    public function bankCurrency(int $accountId): ?string
+    {
+        if ($accountId <= 0) {
+            return null;
+        }
+        $t = $this->tenantId();
+        $stmt = $this->conn->prepare("SELECT currency FROM account_list WHERE id = ? AND tenant_id = ?");
+        $stmt->bind_param('ii', $accountId, $t);
+        $stmt->execute();
+        $cur = strtoupper(trim((string)($stmt->get_result()->fetch_assoc()['currency'] ?? '')));
+        if ($cur === '' || $cur === $this->baseCurrency()) {
+            return null;
+        }
+        foreach ($this->foreignCurrencies() as $c) {
+            if (strtoupper($c['code']) === $cur) {
+                return $cur;
+            }
+        }
+        return null; // a label that isn't one of the company's foreign currencies is just a label
+    }
+
+    /** What a foreign account holds as of a date: foreign units and the base value carried for them. */
+    public function bankPosition(int $accountId, string $asOf): array
+    {
+        $t = $this->tenantId();
+        $side = LedgerService::SIDE_SQL;
+        $posted = LedgerService::POSTED_SQL;
+        $stmt = $this->conn->prepare("SELECT
+                COALESCE(SUM(CASE WHEN ji.currency IS NOT NULL AND ji.currency <> '' THEN CASE WHEN {$side} = 1 THEN ji.amount_fc ELSE -ji.amount_fc END ELSE 0 END), 0) fc_net,
+                COALESCE(SUM(CASE WHEN ji.currency IS NOT NULL AND ji.currency <> '' THEN CASE WHEN {$side} = 1 THEN ji.amount ELSE -ji.amount END ELSE 0 END), 0) base_net
+            FROM journal_items ji
+            INNER JOIN journal_entries j ON j.id = ji.journal_id AND j.tenant_id = ? AND j.journal_date <= ? AND {$posted}
+            LEFT JOIN group_list g ON g.id = ji.group_id
+            WHERE ji.account_id = ?");
+        $stmt->bind_param('isi', $t, $asOf, $accountId);
+        $stmt->execute();
+        $r = $stmt->get_result()->fetch_assoc() ?: [];
+        return ['fc_net' => (float)($r['fc_net'] ?? 0), 'base_net' => (float)($r['base_net'] ?? 0)];
     }
 
     public function isForeign(?string $currency): bool

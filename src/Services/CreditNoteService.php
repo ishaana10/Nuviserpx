@@ -494,6 +494,9 @@ class CreditNoteService
         if ($msg = PeriodLockService::guard($this->conn, $t, $date)) {
             return $this->fail($msg);
         }
+        if (($bankCur = (new FxService($this->conn, $this->settings))->bankCurrency($bankAcc)) !== null) {
+            return $this->fail("That account holds {$bankCur}. Refunds are in the company currency, so choose a company-currency account.");
+        }
         $table = $kind === self::CREDIT ? 'invoice_list' : 'vendor_bill_list';
         $noteNo = (string)$n['note_no'];
 

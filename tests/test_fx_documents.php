@@ -54,6 +54,25 @@ check($base === 225.0 && $tax === 33.75 && round($base - $tax, 2) === 191.25, 'a
 $j = \App\Services\CreditNoteService::noteLines('credit', 225.0, 33.75, 2, 3, 1);
 check(round(array_sum(array_column($j, 'debit')) - array_sum(array_column($j, 'credit')), 2) === 0.0, 'the note journal balances');
 
+echo "\n=== Foreign bank account ===\n";
+// USD account holds 1000 USD carried at 2,250 base (avg 2.25). Pay 450 base when USD is 2.30.
+$o = F::bankOutflow(450.00, 2.30, 1000.0, 2250.0);
+check($o['fc'] === 195.65, '450 base at 2.30 takes 195.65 USD out');
+check($o['carried'] === 440.21 && $o['gain'] === 9.79, 'those units were carried at 2.25 = 440.21, so paying 450 books 9.79 realised gain');
+$l = F::bankOutflowLines(20, 10, 30, 450.00, $o, 'USD');
+check(net($l) === 0.0, 'the outflow journal balances');
+check($l[1][3]['amount_fc'] === 195.65 && $l[1][1] === T::CREDIT, 'the bank credit carries the foreign amount');
+$o = F::bankOutflow(450.00, 2.10, 1000.0, 2250.0);
+check($o['gain'] < 0 && net(F::bankOutflowLines(20, 10, 30, 450.00, $o, 'USD')) === 0.0, 'a weaker rate books a loss and still balances');
+$o = F::bankOutflow(2300.00, 2.30, 1000.0, 2250.0);
+check($o['carried'] === 2250.00, 'emptying the account takes the whole carried value');
+$o = F::bankOutflow(230.00, 2.30, 0.0, 0.0);
+check($o['gain'] === 0.0, 'an account with nothing on record books no difference');
+$rc = F::receiptLines(10, 20, 30, 2300.00, 2250.00, 'USD', 2.30, 1000, true);
+check(isset($rc[0][3]) && $rc[0][3]['amount_fc'] === 1000.0, 'a receipt into a foreign account tags the bank line');
+check(!isset(F::receiptLines(10, 20, 30, 2300.00, 2250.00, 'USD', 2.30, 1000)[0][3]), 'a receipt into a company-currency account does not');
+check(net($rc) === 0.0, 'the tagged receipt still balances');
+
 echo "\n=== Plumbing ===\n";
 $m = file_get_contents(__DIR__ . '/../classes/DBConnection.php');
 check(strpos($m, 'check_fx_document_migrations();') !== false, 'the migration is in the chain');
