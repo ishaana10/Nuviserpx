@@ -463,6 +463,8 @@ final class Permissions
         'receive_goods'         => ['purchases', 'edit'],
         'save_vendor_bill'      => ['purchases', 'save'],
         'delete_vendor_bill'    => ['purchases', 'delete'],
+        'pay_vendor_bills'      => ['purchases', 'edit'],
+        'void_bill_payment'     => ['purchases', 'delete'],
         // Bank reconciliation
         'start_reconciliation'    => ['bank_reconciliation', 'edit'],
         'update_reconciliation'   => ['bank_reconciliation', 'edit'],

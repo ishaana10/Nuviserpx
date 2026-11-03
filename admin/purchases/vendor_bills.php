@@ -8,6 +8,7 @@
 		<h3 class="card-title"><i class="fas fa-file-invoice-dollar text-navy"></i> Vendor Bills (Accounts Payable)</h3>
 		<div class="card-tools">
 			<a href="./?page=purchases" class="btn btn-flat btn-outline-secondary btn-sm mr-1"><span class="fas fa-shopping-bag"></span> Purchase Orders</a>
+			<a href="./?page=purchases/bill_payments" class="btn btn-flat btn-outline-success btn-sm mr-1"><span class="fas fa-money-check-alt"></span> Supplier Payments</a>
 			<a href="./?page=purchases/manage_bill" class="btn btn-flat btn-primary btn-sm"><span class="fas fa-plus"></span> New Vendor Bill</a>
 		</div>
 	</div>

@@ -75,6 +75,7 @@ class DBConnection{
                 $this->check_credit_note_migrations();
                 $this->check_fx_document_migrations();
                 $this->check_journal_trail_migrations();
+                $this->check_bill_payment_migrations();
                 $this->check_dolibarr_crm_migrations();
                 $this->check_dolibarr_extended_migrations();
                 $this->check_extrafields_migrations();
@@ -1027,6 +1028,41 @@ class DBConnection{
                 @$this->conn->query($sql);
             }
         }
+    }
+
+    public function check_bill_payment_migrations(){
+        if (!$this->conn) return;
+
+        @$this->conn->query("CREATE TABLE IF NOT EXISTS `bill_payments` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `tenant_id` int(30) NOT NULL DEFAULT 1,
+          `payment_no` varchar(50) NOT NULL,
+          `vendor_id` int(30) NOT NULL,
+          `payment_date` date NOT NULL,
+          `amount` decimal(18,2) NOT NULL DEFAULT 0.00,
+          `method` varchar(50) NOT NULL DEFAULT 'bank_transfer',
+          `bank_account_id` int(30) DEFAULT NULL,
+          `reference` varchar(100) DEFAULT NULL,
+          `notes` varchar(500) DEFAULT NULL,
+          `status` enum('posted','void') NOT NULL DEFAULT 'posted',
+          `journal_id` int(30) DEFAULT NULL,
+          `created_by` int(30) DEFAULT NULL,
+          `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+          PRIMARY KEY (`id`),
+          UNIQUE KEY `pay_tenant_no` (`tenant_id`, `payment_no`),
+          KEY `vendor` (`tenant_id`, `vendor_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        @$this->conn->query("CREATE TABLE IF NOT EXISTS `bill_payment_allocations` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `payment_id` int(30) NOT NULL,
+          `bill_id` int(30) NOT NULL,
+          `amount` decimal(18,2) NOT NULL DEFAULT 0.00,
+          PRIMARY KEY (`id`),
+          KEY `payment` (`payment_id`),
+          KEY `bill` (`bill_id`),
+          CONSTRAINT `bpa_payment_fk` FOREIGN KEY (`payment_id`) REFERENCES `bill_payments` (`id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     }
 
     public function check_journal_trail_migrations(){
