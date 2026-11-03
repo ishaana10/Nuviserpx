@@ -14,6 +14,7 @@ class JournalService
         'invoice_list' => ['label' => 'invoice', 'ref' => 'invoice_no'],
         'payment_list' => ['label' => 'payment', 'ref' => 'payment_no'],
         'payroll_list' => ['label' => 'payroll record', 'ref' => 'payroll_run_ref'],
+        'payroll_payments' => ['label' => 'salary payment', 'ref' => 'reference'],
         'payroll_remittances' => ['label' => 'payroll remittance', 'ref' => 'reference'],
     ];
 

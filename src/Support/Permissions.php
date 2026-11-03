@@ -111,6 +111,7 @@ final class Permissions
         'Payroll' => [
             'payroll_process'  => 'Process payroll runs (Batch & Single Employee Run, retro pay)',
             'payroll_approve'  => 'Approve payroll runs and payroll payments that are waiting for approval (never your own, unless self-approval is allowed)',
+            'payroll_pay'      => 'Pay approved salaries from the bank (net pay)',
             'payroll_remit'    => 'Pay pension, tax and levy amounts owed from payroll',
             'payroll_export'   => 'Download compliance & bank files (bank, tax return, pension schedule)',
             'payroll_view_all' => "See every employee's payroll & payslips (otherwise only their own)",
@@ -513,6 +514,8 @@ final class Permissions
         'reject_payroll_run'    => ['payroll_approve'],
         'approve_payroll_remittance' => ['payroll_approve'],
         'reject_payroll_remittance'  => ['payroll_approve'],
+        'pay_payroll_salaries' => ['payroll_pay'],
+        'reverse_payroll_payment' => ['payroll_pay'],
         'remit_payroll_liability' => ['payroll_remit'],
         'reverse_payroll_remittance' => ['payroll_remit'],
         'save_batch_payroll'    => ['payroll_process'],
@@ -775,6 +778,8 @@ final class Permissions
         }
         if ($page === 'payroll/rules_settings') {
             $perm = 'settings_manage';
+        } elseif ($page === 'payroll/pay_salaries') {
+            $perm = 'payroll_pay';
         } elseif ($page === 'payroll/remittances') {
             $perm = 'payroll_remit';
         } elseif ($page === 'payroll/manage_payroll' && empty($query['id'])) {

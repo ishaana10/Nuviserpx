@@ -1109,6 +1109,35 @@ class DBConnection{
             }
         }
 
+        // Net pay is paid as a separate step. Rows that existed before this were posted straight to the bank, so they
+        // count as paid; new payroll starts as 'unpaid' (set explicitly on insert).
+        $pp = array(
+            'payment_status' => "ALTER TABLE `payroll_list` ADD COLUMN `payment_status` varchar(10) NOT NULL DEFAULT 'paid'",
+            'payment_id'     => "ALTER TABLE `payroll_list` ADD COLUMN `payment_id` int(30) DEFAULT NULL",
+        );
+        foreach ($pp as $c => $sql) {
+            $res = @$this->conn->query("SHOW COLUMNS FROM `payroll_list` LIKE '{$c}'");
+            if ($res && $res->num_rows == 0) {
+                @$this->conn->query($sql);
+            }
+        }
+        @$this->conn->query("CREATE TABLE IF NOT EXISTS `payroll_payments` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `tenant_id` int(30) NOT NULL DEFAULT 1,
+          `pay_date` date NOT NULL,
+          `amount` decimal(12,2) NOT NULL DEFAULT 0.00,
+          `employees` int(11) NOT NULL DEFAULT 0,
+          `bank_account_id` int(30) NOT NULL,
+          `reference` varchar(100) DEFAULT NULL,
+          `journal_id` int(30) DEFAULT NULL,
+          `status` enum('posted','reversed') NOT NULL DEFAULT 'posted',
+          `created_by` int(30) DEFAULT NULL,
+          `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+          PRIMARY KEY (`id`),
+          KEY `tenant_id` (`tenant_id`),
+          KEY `journal_id` (`journal_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
         // Payments of pension, tax and levy liabilities to the fund / authority
         @$this->conn->query("CREATE TABLE IF NOT EXISTS `payroll_remittances` (
           `id` int(30) NOT NULL AUTO_INCREMENT,
