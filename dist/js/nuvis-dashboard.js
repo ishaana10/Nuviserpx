@@ -21,7 +21,8 @@
     var SIZE_LABEL = { sm: 'Small · ¼ width', md: 'Medium · ⅓ width', lg: 'Large · ½ width', xl: 'Wide · ⅔ width', full: 'Full width' };
     var CHART_LABEL = { bar: 'Bar chart', line: 'Line chart', area: 'Area chart', donut: 'Donut chart' };
     var CHART_ICON = { bar: 'fas fa-chart-bar', line: 'fas fa-chart-line', area: 'fas fa-chart-area', donut: 'fas fa-chart-pie' };
-    var TYPE_LABEL = { kpi: 'Metric', chart: 'Chart', list: 'List', actions: 'Shortcuts', note: 'Note' };
+    var TYPE_LABEL = { kpi: 'Metric', chart: 'Chart', list: 'List', actions: 'Shortcuts', note: 'Note', checklist: 'Checklist' };
+    var REDUCED_MOTION = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
     var TONE = { blue: '#2563eb', green: '#16a34a', amber: '#d97706', red: '#dc2626', indigo: '#4f46e5', cyan: '#0891b2' };
     var SERIES_COLORS = ['#2563eb', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#94a3b8'];
     var STATUS_COLORS = ['#10b981', '#f59e0b', '#3b82f6', '#ef4444'];
@@ -134,8 +135,11 @@
         setSaveState('saving');
         var dash = S.active;
         var run = function () {
-            api('save', { id: dash.id, layout: JSON.stringify(dash.layout) })
-                .done(function () { setSaveState('saved'); })
+            api('save', { id: dash.id, name: dash.name, layout: JSON.stringify(dash.layout) })
+                .done(function (resp) {
+                    if (!dash.id && resp && resp.dashboard) { dash.id = resp.dashboard.id; store.set('dash-active', dash.id); renderTabs(); }
+                    setSaveState('saved');
+                })
                 .fail(function (xhr) { setSaveState('error'); apiError(xhr); });
         };
         if (immediate) { run(); } else { saveTimer = setTimeout(run, 500); }
@@ -149,6 +153,10 @@
             S.dashboards = resp.dashboards || [];
             S.ranges = resp.ranges || {};
             S.defaultLayout = resp.defaultLayout || [];
+            if (!S.dashboards.length) {
+                // Nothing stored and nothing created server-side: start from the standard layout (saved on first change).
+                S.dashboards = [{ id: 0, name: 'Overview', range: 'this_month', layout: $.map(S.defaultLayout, function (it) { return { uid: uid(), widget: it.widget, size: it.size, config: {} }; }) }];
+            }
             S.catalog = {};
             $.each(resp.catalog || [], function (_, d) { S.catalog[d.id] = d; });
 
@@ -160,8 +168,9 @@
             $.each(S.dashboards, function (_, d) { if (d.id === wanted) { pick = d; } });
             activate(pick);
         }).fail(function (xhr) {
-            $('#nvGrid').html('<div class="col-12"><div class="nv-dash-empty"><div class="ic"><i class="fas fa-plug"></i></div><h5>Dashboard unavailable</h5><p class="mb-0">' +
-                esc((xhr.responseJSON && xhr.responseJSON.msg) || 'The dashboard service could not be reached.') + '</p></div></div>');
+            $('#nvGrid').html('<div class="col-12"><div class="nv-dash-empty"><div class="ic"><i class="fas fa-plug"></i></div><h5>Dashboard unavailable</h5><p>' +
+                esc((xhr.responseJSON && xhr.responseJSON.msg) || 'The dashboard service could not be reached.') + '</p>' +
+                '<button type="button" class="btn btn-primary" data-act="reload"><i class="fas fa-sync-alt mr-1"></i> Try again</button></div></div>');
             $('#nvRangeText').text('');
         });
     }
@@ -191,6 +200,7 @@
             if (!S.active || S.active.id !== dashId) { return; }
             S.currency = resp.currency || S.currency;
             updateRangeText(resp.range);
+            notice(resp.problems > 0 ? 'Some figures could not be loaded, so they may show as zero. Your administrator can see the reason in the server log.' : '');
             $.each(resp.widgets || {}, function (id, data) { S.data[id] = data; });
             $.each(layout(), function (_, it) {
                 if (ids.indexOf(it.widget) !== -1) { renderBody(it); }
@@ -199,10 +209,17 @@
             $.each(layout(), function (_, it) {
                 if (ids.indexOf(it.widget) !== -1) { bodyEl(it).html(errorState()); }
             });
+            notice('The figures could not be loaded. <a href="#" data-act="retry">Try again</a>');
             if (xhr.status === 401) { apiError(xhr); }
         }).always(function () {
             $('#nvRefresh i').removeClass('fa-spin');
         });
+    }
+
+    function notice(html) {
+        var $n = $('#nvNotice');
+        if (!html) { $n.hide().empty(); return; }
+        $n.html('<i class="fas fa-exclamation-triangle mr-2"></i><span>' + html + '</span>').show();
     }
 
     function updateRangeText(range) {
@@ -318,7 +335,8 @@
             $grid.append(
                 '<div class="col-12"><div class="nv-dash-empty"><div class="ic"><i class="fas fa-th-large"></i></div>' +
                 '<h5>This dashboard is empty</h5><p>Add metrics, charts and lists to build the view you need.</p>' +
-                '<button type="button" class="btn btn-primary" data-act="gallery"><i class="fas fa-plus mr-1"></i> Add widgets</button></div></div>');
+                '<button type="button" class="btn btn-primary mr-2" data-act="gallery"><i class="fas fa-plus mr-1"></i> Add widgets</button>' +
+                '<button type="button" class="btn btn-default" data-act="restore"><i class="fas fa-undo mr-1"></i> Use the standard layout</button></div></div>');
             updateRangeText(null);
             return;
         }
@@ -443,6 +461,7 @@
             case 'list': renderList(item, d, data, $body); break;
             case 'actions': renderActions(item, data, $body); break;
             case 'note': renderNote(item, $body); break;
+            case 'checklist': renderChecklist(item, data, $body); break;
         }
     }
 
@@ -452,7 +471,7 @@
 
     function renderKpi(item, d, data, $body) {
         var value = data.format === 'money' ? money(data.value) : num(data.value);
-        var h = '<div class="nv-kpi-value" title="' + esc(data.format === 'money' ? money(data.value) : num(data.value)) + '">' + esc(value) + '</div><div class="nv-kpi-row">';
+        var h = '<div class="nv-kpi-value" title="' + esc(value) + '">' + esc(value) + '</div><div class="nv-kpi-row">';
 
         if (data.delta !== null && data.delta !== undefined) {
             var good = data.invert ? data.delta <= 0 : data.delta >= 0;
@@ -480,7 +499,11 @@
         }
         $body.html(h);
         setFooter(item, linkFooter(data));
+        countUp($body.find('.nv-kpi-value'), data, item.uid);
 
+        if (hasSpark && !window.ApexCharts) {
+            $body.find('.nv-kpi-spark').html(svgSpark(spark, TONE[(item.config && item.config.color) || d.tone] || TONE.blue));
+        }
         if (hasSpark && window.ApexCharts) {
             var color = TONE[(item.config && item.config.color) || d.tone] || TONE.blue;
             var chart = new ApexCharts($body.find('.nv-kpi-spark')[0], {
@@ -494,6 +517,51 @@
             chart.render();
             S.charts[item.uid + ':spark'] = chart;
         }
+    }
+
+    /** Numbers count up to their value on first paint (respects reduced-motion). */
+    var counted = {};
+    function countUp($el, data, key) {
+        var target = Number(data.value) || 0;
+        if (REDUCED_MOTION || counted[key] || !target || !window.requestAnimationFrame) { counted[key] = true; return; }
+        counted[key] = true;
+        var start = null, dur = 700;
+        function frame(ts) {
+            if (start === null) { start = ts; }
+            var p = Math.min(1, (ts - start) / dur);
+            var eased = 1 - Math.pow(1 - p, 3);
+            var v = target * eased;
+            $el.text(data.format === 'money' ? money(v) : num(Math.round(v)));
+            if (p < 1) { window.requestAnimationFrame(frame); }
+            else { $el.text(data.format === 'money' ? money(target) : num(target)); }
+        }
+        window.requestAnimationFrame(frame);
+    }
+
+    /** Dependency-free sparkline so cards still draw when the chart library is unavailable. */
+    function svgSpark(values, color) {
+        var w = 200, h = 44, min = Math.min.apply(null, values), max = Math.max.apply(null, values);
+        var span = (max - min) || 1;
+        var pts = $.map(values, function (v, i) {
+            return (i / (values.length - 1) * w).toFixed(1) + ',' + (h - 4 - ((Number(v) - min) / span) * (h - 8)).toFixed(1);
+        });
+        return '<svg viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none" width="100%" height="' + h + '" aria-hidden="true">' +
+            '<polygon points="0,' + h + ' ' + pts.join(' ') + ' ' + w + ',' + h + '" fill="' + color + '" opacity=".12"></polygon>' +
+            '<polyline points="' + pts.join(' ') + '" fill="none" stroke="' + color + '" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round"></polyline></svg>';
+    }
+
+    function renderChecklist(item, data, $body) {
+        var steps = data.steps || [];
+        if (!steps.length) { $body.html(emptyState('Nothing to set up.', 'fas fa-check-circle')); setFooter(item, ''); return; }
+        var pct = data.total ? Math.round(data.done / data.total * 100) : 0;
+        var h = '<div class="nv-check-head"><span>' + (data.complete ? 'All set — your company is ready to go.' : data.done + ' of ' + data.total + ' steps done') + '</span><b>' + pct + '%</b></div>' +
+            '<div class="nv-progress" role="progressbar" aria-valuenow="' + pct + '" aria-valuemin="0" aria-valuemax="100"><span style="width:' + pct + '%"></span></div><ul class="nv-check">';
+        $.each(steps, function (_, s) {
+            h += '<li class="' + (s.done ? 'done' : '') + '"><i class="' + (s.done ? 'fas fa-check-circle' : 'far fa-circle') + '"></i>' +
+                (s.done ? '<span>' + esc(s.label) + '</span>' : '<a href="' + esc(s.href) + '">' + esc(s.label) + ' <i class="fas fa-arrow-right"></i></a>') + '</li>';
+        });
+        $body.html(h + '</ul>');
+        setFooter(item, '');
     }
 
     function chartHeight(item) {
@@ -860,6 +928,14 @@
         $('#nvResetBtn').on('click', resetLayout);
 
         $dash.on('click', '[data-act="gallery"]', function () { setEditing(true); openGallery(); });
+        $dash.on('click', '[data-act="reload"]', function () { load(); });
+        $dash.on('click', '[data-act="retry"]', function (e) { e.preventDefault(); S.data = {}; fetchData(); });
+        $dash.on('click', '[data-act="restore"]', function () {
+            S.active.layout = $.map(S.defaultLayout, function (it) { return { uid: uid(), widget: it.widget, size: it.size, config: {} }; });
+            renderBoard();
+            saveLayout(true);
+        });
+        $('#nvThemeBtn').on('click', function () { setTheme($dash.attr('data-nv-theme') === 'dark' ? 'light' : 'dark'); });
 
         $('#nvGrid').on('click', '.nv-w [data-act]', function (e) {
             e.preventDefault();
@@ -918,8 +994,20 @@
         });
     }
 
+    function setTheme(t) {
+        var $d = $('#nvDash');
+        $d.attr('data-nv-theme', t);
+        $('#nvThemeBtn i').attr('class', t === 'dark' ? 'fas fa-sun' : 'fas fa-moon');
+        $('#nvThemeBtn').attr('aria-pressed', t === 'dark' ? 'true' : 'false');
+        try { window.localStorage.setItem('nv-dash-theme', t); } catch (e) { /* private mode */ }
+        $.each(S.charts, function (_, c) { try { c.updateOptions({ theme: { mode: t } }, false, false); } catch (e) { /* chart gone */ } });
+    }
+
     $(function () {
         if (!$('#nvDash').length) { return; }
+        var saved = null;
+        try { saved = window.localStorage.getItem('nv-dash-theme'); } catch (e) { /* private mode */ }
+        setTheme(saved === 'dark' ? 'dark' : 'light');
         bind();
         load();
     });

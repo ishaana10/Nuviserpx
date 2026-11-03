@@ -59,7 +59,7 @@
     <!-- Toastr -->
     <script src="<?php echo base_url ?>plugins/toastr/toastr.min.js"></script>
     <!-- ApexCharts -->
-    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts@3.54.1/dist/apexcharts.min.js"></script>
     <meta name="csrf-token" content="<?php echo $_settings->csrf_token() ?>">
     <script>
         var _base_url_ = '<?php echo base_url ?>';

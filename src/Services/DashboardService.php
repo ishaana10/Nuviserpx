@@ -33,6 +33,9 @@ class DashboardService
     /** @var callable(string):bool */
     private $canAccess;
 
+    /** Queries that failed while building widgets (module tables missing, schema drift…). */
+    public array $failures = [];
+
     public function __construct(
         private readonly ?mysqli $conn,
         private readonly int $tenantId,
@@ -87,7 +90,16 @@ class DashboardService
             'list_low_stock'       => ['title' => 'Reorder list',          'category' => 'Sales & stock', 'type' => 'list', 'icon' => 'fas fa-truck-loading',     'tone' => 'red',    'perm' => 'products_view',     'size' => 'md', 'sizes' => $list, 'ranged' => false, 'description' => 'Products that need restocking, lowest cover first.'],
             'kpi_open_tickets'     => ['title' => 'Open support tickets',  'category' => 'Sales & stock', 'type' => 'kpi', 'icon' => 'fas fa-life-ring',         'tone' => 'red',    'perm' => 'tickets_view',                'size' => 'sm', 'sizes' => $kpi, 'ranged' => false, 'description' => 'Tickets not yet resolved, with the urgent count.'],
 
+            // Cash & control
+            'kpi_bank'             => ['title' => 'Bank balance',          'category' => 'Finance',   'type' => 'kpi',   'icon' => 'fas fa-university',          'tone' => 'green',  'perm' => 'journals_view', 'size' => 'sm', 'sizes' => $kpi,   'ranged' => false, 'description' => 'Combined posted balance of your bank and cash accounts.'],
+            'kpi_payables'         => ['title' => 'Bills to pay',          'category' => 'Finance',   'type' => 'kpi',   'icon' => 'fas fa-file-invoice',        'tone' => 'red',    'perm' => 'purchases_view', 'size' => 'sm', 'sizes' => $kpi,  'ranged' => false, 'description' => 'Unpaid supplier bills, with the overdue count.'],
+            'list_bank_balances'   => ['title' => 'Bank accounts',         'category' => 'Finance',   'type' => 'list',  'icon' => 'fas fa-piggy-bank',          'tone' => 'green',  'perm' => 'journals_view', 'size' => 'md', 'sizes' => $list,  'ranged' => false, 'description' => 'Each bank and cash account with its posted balance.'],
+            'list_bills_due'       => ['title' => 'Bills due',             'category' => 'Finance',   'type' => 'list',  'icon' => 'fas fa-calendar-day',        'tone' => 'amber',  'perm' => 'purchases_view', 'size' => 'lg', 'sizes' => $list, 'ranged' => false, 'description' => 'Supplier bills due soonest, overdue first.'],
+            'list_approvals'       => ['title' => 'Waiting for approval',  'category' => 'Finance',   'type' => 'list',  'icon' => 'fas fa-user-check',          'tone' => 'amber',  'perm' => null, 'size' => 'lg', 'sizes' => $list,             'ranged' => false, 'description' => 'Journals, bills, payments and payroll waiting for you to approve. Only what you may approve is shown.'],
+            'list_activity'        => ['title' => 'Recent activity',       'category' => 'General',   'type' => 'list',  'icon' => 'fas fa-stream',              'tone' => 'indigo', 'perm' => 'settings_manage', 'size' => 'lg', 'sizes' => $list, 'ranged' => false, 'description' => 'The latest actions recorded in the audit log.'],
+
             // General
+            'getting_started'      => ['title' => 'Getting started',       'category' => 'General',   'type' => 'checklist', 'icon' => 'fas fa-rocket',          'tone' => 'blue',   'perm' => null, 'size' => 'lg', 'sizes' => ['md', 'lg', 'xl', 'full'], 'ranged' => false, 'description' => 'Set-up steps for a new company, ticked off as you complete them.'],
             'quick_actions'        => ['title' => 'Quick actions',         'category' => 'General',   'type' => 'actions', 'icon' => 'fas fa-bolt',              'tone' => 'blue',   'perm' => null, 'size' => 'md', 'sizes' => ['sm', 'md', 'lg', 'full'], 'ranged' => false, 'description' => 'Shortcuts to the forms you use most.'],
             'note'                 => ['title' => 'Notes',                 'category' => 'General',   'type' => 'note',    'icon' => 'fas fa-sticky-note',       'tone' => 'amber',  'perm' => null, 'size' => 'md', 'sizes' => ['sm', 'md', 'lg', 'xl', 'full'], 'ranged' => false, 'description' => 'A private note pinned to this dashboard.'],
         ];
@@ -115,9 +127,11 @@ class DashboardService
     public function defaultLayout(): array
     {
         $ids = [
-            'kpi_revenue', 'kpi_receivables', 'kpi_payroll', 'kpi_pending_leaves',
-            'chart_financial', 'chart_payroll_dept',
+            'kpi_revenue', 'kpi_receivables', 'kpi_bank', 'kpi_payables',
+            'getting_started', 'list_approvals',
+            'chart_financial',
             'chart_cashflow', 'list_overdue',
+            'kpi_payroll', 'kpi_pending_leaves', 'chart_payroll_dept',
             'chart_attendance', 'list_accounts', 'quick_actions',
         ];
         $defs = $this->catalog();
@@ -127,11 +141,13 @@ class DashboardService
                 $layout[] = ['uid' => 'd' . $i, 'widget' => $id, 'size' => $defs[$id]['size'], 'config' => new \stdClass()];
             }
         }
-        if (count($layout) <= 1) {
+        if (count($layout) <= 3) {
             // Roles without data permissions still get something useful.
             $layout = [
-                ['uid' => 'd0', 'widget' => 'quick_actions', 'size' => 'md', 'config' => new \stdClass()],
-                ['uid' => 'd1', 'widget' => 'note', 'size' => 'md', 'config' => new \stdClass()],
+                ['uid' => 'd0', 'widget' => 'getting_started', 'size' => 'lg', 'config' => new \stdClass()],
+                ['uid' => 'd1', 'widget' => 'quick_actions', 'size' => 'md', 'config' => new \stdClass()],
+                ['uid' => 'd2', 'widget' => 'list_approvals', 'size' => 'lg', 'config' => new \stdClass()],
+                ['uid' => 'd3', 'widget' => 'note', 'size' => 'md', 'config' => new \stdClass()],
             ];
         }
         return $layout;
@@ -224,6 +240,10 @@ class DashboardService
                 'ii', $this->tenantId, $this->userId
             );
         }
+        if (!$rows) {
+            // The dashboards table could not be read or written: still show the starter dashboard (not saved).
+            return [['id' => 0, 'name' => 'Overview', 'range' => 'this_month', 'layout' => $this->defaultLayout(), 'unsaved' => true]];
+        }
         return array_map(fn (array $r): array => $this->hydrate($r), $rows);
     }
 
@@ -235,7 +255,8 @@ class DashboardService
             'name' => (string)$r['name'],
             'range' => isset(self::RANGES[$r['date_range']]) ? $r['date_range'] : 'this_month',
             // Re-sanitise on read so widgets whose permission was revoked disappear.
-            'layout' => $this->sanitizeLayout(is_array($layout) ? $layout : []),
+            // A layout that cannot be read at all falls back to the starter layout instead of a blank board.
+            'layout' => is_array($layout) ? $this->sanitizeLayout($layout) : $this->defaultLayout(),
         ];
     }
 
@@ -438,7 +459,7 @@ class DashboardService
                 $out[$id] = ['error' => 'failed'];
             }
         }
-        return ['range' => $range, 'currency' => $this->currencySymbol(), 'widgets' => $out];
+        return ['range' => $range, 'currency' => $this->currencySymbol(), 'widgets' => $out, 'problems' => count($this->failures)];
     }
 
     public function currencySymbol(): string
@@ -873,6 +894,155 @@ class DashboardService
 
     // ---- General -------------------------------------------------------
 
+    /** Bank and cash accounts with their posted balance (debit-normal). */
+    private function bankBalances(): array
+    {
+        $side = LedgerService::SIDE_SQL;
+        $posted = LedgerService::POSTED_SQL;
+        return $this->rows(
+            "SELECT a.id, a.code, a.name, COALESCE(SUM(CASE WHEN {$side} = 1 THEN ji.amount ELSE -ji.amount END), 0) balance
+             FROM account_list a
+             LEFT JOIN journal_items ji ON ji.account_id = a.id
+             LEFT JOIN journal_entries j ON j.id = ji.journal_id AND j.tenant_id = a.tenant_id
+             LEFT JOIN group_list g ON g.id = ji.group_id
+             WHERE a.tenant_id = ? AND a.delete_flag = 0 AND a.status = 1 AND a.type = 'Bank' AND (ji.id IS NULL OR ({$posted}))
+             GROUP BY a.id, a.code, a.name ORDER BY a.code IS NULL, a.code, a.name",
+            'i', $this->tenantId
+        );
+    }
+
+    private function w_kpi_bank(array $r): array
+    {
+        $rows = $this->bankBalances();
+        $total = 0.0;
+        foreach ($rows as $x) {
+            $total += (float)$x['balance'];
+        }
+        return $this->kpi(round($total, 2), null, [
+            'format' => 'money',
+            'sub' => count($rows) . ' account' . (count($rows) === 1 ? '' : 's'),
+            'link' => './?page=reports/cash_flow',
+        ]);
+    }
+
+    private function w_list_bank_balances(array $r): array
+    {
+        $rows = $this->bankBalances();
+        return [
+            'columns' => [['key' => 'name', 'label' => 'Account'], ['key' => 'balance', 'label' => 'Balance', 'format' => 'money', 'align' => 'right']],
+            'rows' => array_map(fn ($x) => ['name' => ($x['code'] ? $x['code'] . ' · ' : '') . $x['name'], 'balance' => (float)$x['balance'], 'href' => './?page=reports/general_ledger&account_id=' . (int)$x['id']], $rows),
+            'empty' => 'No bank accounts yet. Add one under Accounts.',
+            'link' => './?page=accounts',
+        ];
+    }
+
+    private function w_kpi_payables(array $r): array
+    {
+        $rows = $this->rows(
+            "SELECT COALESCE(SUM(balance),0) total, COUNT(*) n,
+                    SUM(CASE WHEN due_date IS NOT NULL AND due_date < CURDATE() THEN 1 ELSE 0 END) overdue_count
+             FROM vendor_bill_list WHERE tenant_id = ? AND status IN ('unpaid','partially_paid') AND balance > 0",
+            'i', $this->tenantId
+        );
+        $n = (int)($rows[0]['overdue_count'] ?? 0);
+        return $this->kpi((float)($rows[0]['total'] ?? 0), null, [
+            'format' => 'money',
+            'sub' => $n > 0 ? $n . ' overdue' : ((int)($rows[0]['n'] ?? 0) . ' open bill' . ((int)($rows[0]['n'] ?? 0) === 1 ? '' : 's')),
+            'subTone' => $n > 0 ? 'down' : '',
+            'link' => './?page=reports/ap_aging',
+        ]);
+    }
+
+    private function w_list_bills_due(array $r): array
+    {
+        $rows = $this->rows(
+            "SELECT b.id, b.bill_no, p.name party, b.due_date, b.balance
+             FROM vendor_bill_list b INNER JOIN party_list p ON p.id = b.vendor_id
+             WHERE b.tenant_id = ? AND b.status IN ('unpaid','partially_paid') AND b.balance > 0
+             ORDER BY b.due_date IS NULL, b.due_date ASC, b.id ASC LIMIT 8",
+            'i', $this->tenantId
+        );
+        return [
+            'columns' => [['key' => 'bill_no', 'label' => 'Bill'], ['key' => 'party', 'label' => 'Supplier'], ['key' => 'due_date', 'label' => 'Due', 'format' => 'date'], ['key' => 'balance', 'label' => 'Balance', 'format' => 'money', 'align' => 'right']],
+            'rows' => array_map(fn ($x) => $x + ['href' => './?page=purchases/vendor_bills'], $rows),
+            'empty' => 'No unpaid bills.',
+            'link' => './?page=reports/ap_aging',
+        ];
+    }
+
+    /** What this user may approve, counted per source, newest first. */
+    private function w_list_approvals(array $r): array
+    {
+        $can = $this->canAccess;
+        $t = $this->tenantId;
+        $out = [];
+        if ($can('journals_approve')) {
+            foreach ($this->rows("SELECT id, code, description, journal_date d FROM journal_entries WHERE tenant_id = ? AND status = 'pending_approval' ORDER BY id DESC LIMIT 5", 'i', $t) as $x) {
+                $out[] = ['what' => 'Journal', 'ref' => $x['code'], 'detail' => (string)$x['description'], 'date' => $x['d'], 'href' => './?page=journals/approvals'];
+            }
+        }
+        if ($can('bills_approve')) {
+            foreach ($this->rows("SELECT id, bill_no, bill_date d, total FROM vendor_bill_list WHERE tenant_id = ? AND status = 'pending_approval' ORDER BY id DESC LIMIT 5", 'i', $t) as $x) {
+                $out[] = ['what' => 'Vendor bill', 'ref' => $x['bill_no'], 'detail' => number_format((float)$x['total'], 2), 'date' => $x['d'], 'href' => './?page=purchases/vendor_bills'];
+            }
+        }
+        if ($can('bill_payments_approve')) {
+            foreach ($this->rows("SELECT id, payment_no, payment_date d, amount FROM bill_payments WHERE tenant_id = ? AND status = 'pending_approval' ORDER BY id DESC LIMIT 5", 'i', $t) as $x) {
+                $out[] = ['what' => 'Supplier payment', 'ref' => $x['payment_no'], 'detail' => number_format((float)$x['amount'], 2), 'date' => $x['d'], 'href' => './?page=purchases/bill_payments'];
+            }
+        }
+        if ($can('payroll_approve')) {
+            foreach ($this->rows("SELECT payroll_run_ref ref, MAX(pay_date) d, SUM(net_salary) net, COUNT(*) n FROM payroll_list WHERE tenant_id = ? AND status = 'pending_approval' GROUP BY payroll_run_ref ORDER BY MAX(id) DESC LIMIT 5", 'i', $t) as $x) {
+                $out[] = ['what' => 'Payroll run', 'ref' => $x['ref'], 'detail' => $x['n'] . ' employee(s), net ' . number_format((float)$x['net'], 2), 'date' => $x['d'], 'href' => './?page=payroll/approvals'];
+            }
+            foreach ($this->rows("SELECT id, liability, amount, remit_date d FROM payroll_remittances WHERE tenant_id = ? AND status = 'pending_approval' ORDER BY id DESC LIMIT 5", 'i', $t) as $x) {
+                $out[] = ['what' => 'Payroll remittance', 'ref' => '#' . $x['id'], 'detail' => ucfirst((string)$x['liability']) . ' ' . number_format((float)$x['amount'], 2), 'date' => $x['d'], 'href' => './?page=payroll/approvals'];
+            }
+        }
+        usort($out, fn ($a, $b) => strcmp((string)$b['date'], (string)$a['date']));
+        return [
+            'columns' => [['key' => 'what', 'label' => 'Type'], ['key' => 'ref', 'label' => 'Reference'], ['key' => 'detail', 'label' => 'Details'], ['key' => 'date', 'label' => 'Date', 'format' => 'date']],
+            'rows' => array_slice($out, 0, 8),
+            'empty' => 'Nothing is waiting for your approval.',
+        ];
+    }
+
+    private function w_list_activity(array $r): array
+    {
+        $rows = $this->rows(
+            "SELECT a.id, a.action, a.module, a.date_created, CONCAT(COALESCE(u.firstname, ''), ' ', COALESCE(u.lastname, '')) who
+             FROM audit_logs a LEFT JOIN users u ON u.id = a.user_id
+             WHERE a.tenant_id = ? ORDER BY a.id DESC LIMIT 8",
+            'i', $this->tenantId
+        );
+        return [
+            'columns' => [['key' => 'who', 'label' => 'Who'], ['key' => 'action', 'label' => 'Action'], ['key' => 'module', 'label' => 'Area'], ['key' => 'date_created', 'label' => 'When', 'format' => 'date']],
+            'rows' => array_map(fn ($x) => ['who' => trim((string)$x['who']) ?: 'System', 'action' => $x['action'], 'module' => $x['module'], 'date_created' => $x['date_created']], $rows),
+            'empty' => 'No activity recorded yet.',
+        ];
+    }
+
+    /** Set-up checklist for a new company: each step is ticked once the company has the data. */
+    private function w_getting_started(array $r): array
+    {
+        $count = fn (string $sql) => (int)$this->sumOne($sql, 'i', $this->tenantId);
+        $steps = [
+            ['key' => 'bank', 'label' => 'Add a bank account', 'done' => $count("SELECT COUNT(*) FROM account_list WHERE tenant_id = ? AND delete_flag = 0 AND type = 'Bank'") > 0, 'href' => './?page=accounts/add_bank_account', 'perm' => 'accounts_create'],
+            ['key' => 'customer', 'label' => 'Add your first customer', 'done' => $count("SELECT COUNT(*) FROM party_list WHERE tenant_id = ?") > 0, 'href' => './?page=parties', 'perm' => 'parties_create'],
+            ['key' => 'invoice', 'label' => 'Raise your first invoice', 'done' => $count("SELECT COUNT(*) FROM invoice_list WHERE tenant_id = ?") > 0, 'href' => './?page=invoices/manage_invoice', 'perm' => 'invoices_create'],
+            ['key' => 'employee', 'label' => 'Add your employees', 'done' => $count("SELECT COUNT(*) FROM employee_list WHERE tenant_id = ?") > 0, 'href' => './?page=employees', 'perm' => 'employees_create'],
+            ['key' => 'product', 'label' => 'Add products or services', 'done' => $count("SELECT COUNT(*) FROM product_list WHERE tenant_id = ?") > 0, 'href' => './?page=products', 'perm' => 'products_create'],
+        ];
+        $can = $this->canAccess;
+        $steps = array_values(array_filter($steps, fn ($s) => $can($s['perm'])));
+        foreach ($steps as &$s) {
+            unset($s['perm']);
+        }
+        unset($s);
+        $done = count(array_filter($steps, fn ($s) => $s['done']));
+        return ['steps' => $steps, 'done' => $done, 'total' => count($steps), 'complete' => $steps !== [] && $done === count($steps)];
+    }
+
     private function w_quick_actions(array $r): array
     {
         $all = [
@@ -920,12 +1090,16 @@ class DashboardService
         }
         $stmt = $this->conn->prepare($sql);
         if (!$stmt) {
+            $this->failures[] = $this->conn->error;
+            error_log('Dashboard query failed: ' . $this->conn->error);
             return [];
         }
         if ($types !== '') {
             $stmt->bind_param($types, ...$params);
         }
         if (!$stmt->execute()) {
+            $this->failures[] = $stmt->error;
+            error_log('Dashboard query failed: ' . $stmt->error);
             return [];
         }
         $res = $stmt->get_result();

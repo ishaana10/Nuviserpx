@@ -40,6 +40,7 @@ $asset_v = class_exists('AppVersion') ? urlencode(AppVersion::get('commit')) : '
                 <select class="custom-select" id="nvRange" aria-label="Date range"></select>
             </div>
             <button type="button" class="btn btn-default" id="nvRefresh" title="Refresh data"><i class="fas fa-sync-alt"></i></button>
+            <button type="button" class="btn btn-default" id="nvThemeBtn" title="Switch between light and dark" aria-label="Switch between light and dark" aria-pressed="false"><i class="fas fa-moon"></i></button>
             <button type="button" class="btn btn-default nv-view-btn" id="nvEditBtn"><i class="fas fa-th-large"></i> Customize</button>
             <?php if ($_settings->can_access('invoices_create')): ?>
             <a href="./?page=invoices/manage_invoice" class="btn btn-primary nv-view-btn"><i class="fas fa-plus"></i> New invoice</a>
@@ -48,6 +49,8 @@ $asset_v = class_exists('AppVersion') ? urlencode(AppVersion::get('commit')) : '
     </div>
 
     <div class="nv-dash-tabs" id="nvTabs" role="tablist" aria-label="Dashboards"></div>
+
+    <div class="nv-notice" id="nvNotice" role="status" style="display:none"></div>
 
     <div class="nv-edit-banner">
         <span><i class="fas fa-arrows-alt mr-2"></i>Drag widgets by their handle to rearrange. Use each widget's menu to resize, rename or change the chart. Changes save automatically.</span>
