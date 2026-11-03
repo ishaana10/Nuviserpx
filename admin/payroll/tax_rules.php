@@ -1,88 +1,89 @@
 <?php
-$brackets = [
-    ['min' => 0, 'max' => 30000, 'rate' => 0, 'base_tax' => 0, 'desc' => 'Tax Exempt Threshold ($0 - $30,000)'],
-    ['min' => 30001, 'max' => 50000, 'rate' => 18, 'base_tax' => 0, 'desc' => '18% on excess over $30,000'],
-    ['min' => 50001, 'max' => 270000, 'rate' => 20, 'base_tax' => 3600, 'desc' => '$3,600 + 20% on excess over $50,000'],
-    ['min' => 270001, 'max' => 300000, 'rate' => 22, 'base_tax' => 47600, 'desc' => '$47,600 + 22% on excess over $270,000'],
-    ['min' => 30001, 'max' => 350000, 'rate' => 24, 'base_tax' => 54200, 'desc' => '$54,200 + 24% on excess over $300,000'],
-    ['min' => 350001, 'max' => 400000, 'rate' => 29, 'base_tax' => 66200, 'desc' => '$66,200 + 29% on excess over $350,000'],
-    ['min' => 400001, 'max' => 450000, 'rate' => 34, 'base_tax' => 80700, 'desc' => '$80,700 + 34% on excess over $400,000'],
-    ['min' => 450001, 'max' => 500000, 'rate' => 39, 'base_tax' => 97700, 'desc' => '$97,700 + 39% on excess over $450,000'],
-    ['min' => 500001, 'max' => 9999999, 'rate' => 44, 'base_tax' => 117200, 'desc' => '$117,200 + 44% on excess over $500,000']
+require_once(base_app . 'classes/PayrollEngine.php');
+$rules = PayrollEngine::load_rules($_settings);
+
+$pct = function ($r) { return rtrim(rtrim(number_format($r * 100, 2), '0'), '.') . '%'; };
+
+/* Turn marginal bands into display rows with the cumulative tax at each band floor. */
+$bandRows = function (array $bands) {
+    $rows = []; $floor = 0.0; $cum = 0.0;
+    foreach ($bands as $b) {
+        $rows[] = ['from' => $floor, 'to' => $b['up_to'], 'rate' => $b['rate'], 'base' => $cum];
+        if ($b['up_to'] !== null) { $cum += ($b['up_to'] - $floor) * $b['rate']; $floor = $b['up_to']; }
+    }
+    return $rows;
+};
+$tables = [
+    'Resident income tax bands' => $bandRows($rules['resident_bands']),
+    'Non-resident income tax bands' => $bandRows($rules['non_resident_bands']),
 ];
 ?>
 
 <div class="card card-outline card-primary shadow-sm rounded-0">
     <div class="card-header d-flex align-items-center justify-content-between">
-        <h3 class="card-title font-weight-bold"><i class="fas fa-balance-scale text-primary mr-2"></i> FRCS PAYE Statutory Tax Brackets & FNPF Regulations</h3>
+        <h3 class="card-title font-weight-bold"><i class="fas fa-balance-scale text-primary mr-2"></i> Payroll Tax &amp; Pension Rules</h3>
         <div class="card-tools">
-            <button type="button" class="btn btn-sm btn-outline-secondary btn-flat" onclick="window.print()"><i class="fas fa-print mr-1"></i> Print Tax Schedule</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary btn-flat" onclick="window.print()"><i class="fas fa-print mr-1"></i> Print</button>
         </div>
     </div>
     <div class="card-body">
-        <!-- Statutory Cards -->
-        <div class="row mb-4">
-            <div class="col-md-4">
-                <div class="info-box bg-light border">
-                    <span class="info-box-icon bg-success elevation-1"><i class="fas fa-file-contract"></i></span>
-                    <div class="info-box-content">
-                        <span class="info-box-text text-muted font-weight-bold">FNPF Employee Contribution</span>
-                        <span class="info-box-number text-success h4 mb-0">8.00%</span>
-                        <small class="text-muted">Mandatory Salary Deduction</small>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="info-box bg-light border">
-                    <span class="info-box-icon bg-primary elevation-1"><i class="fas fa-building"></i></span>
-                    <div class="info-box-content">
-                        <span class="info-box-text text-muted font-weight-bold">FNPF Employer Contribution</span>
-                        <span class="info-box-number text-primary h4 mb-0">8.00%</span>
-                        <small class="text-muted">Employer Superannuation</small>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="info-box bg-light border">
-                    <span class="info-box-icon bg-warning elevation-1"><i class="fas fa-globe"></i></span>
-                    <div class="info-box-content">
-                        <span class="info-box-text text-muted font-weight-bold">Non-Resident Tax Rate</span>
-                        <span class="info-box-number text-warning h4 mb-0">20.00%</span>
-                        <small class="text-muted">Flat Rate (No Exemption Threshold)</small>
-                    </div>
-                </div>
-            </div>
+        <div class="alert alert-info text-sm">
+            These are the rules payroll uses to calculate income tax, pension contributions and employer levies.
+            They come from the <code>payroll_rules</code> company setting (JSON); when it is not set, the starting preset is used.
+            Annual bands are marginal: each rate applies only to the slice of income inside its band.
         </div>
 
-        <h5 class="font-weight-bold text-dark border-bottom pb-2 mb-3"><i class="fas fa-list-ol text-secondary mr-2"></i> Primary Resident Progressive PAYE Tax Brackets</h5>
-        <div class="table-responsive">
+        <div class="row mb-4">
+            <div class="col-md-3"><div class="info-box bg-light border"><div class="info-box-content">
+                <span class="info-box-text text-muted font-weight-bold">Employee pension</span>
+                <span class="info-box-number h4 mb-0"><?= $pct($rules['pension']['employee_rate']) ?></span></div></div></div>
+            <div class="col-md-3"><div class="info-box bg-light border"><div class="info-box-content">
+                <span class="info-box-text text-muted font-weight-bold">Employer pension</span>
+                <span class="info-box-number h4 mb-0"><?= $pct($rules['pension']['employer_rate']) ?></span></div></div></div>
+            <div class="col-md-3"><div class="info-box bg-light border"><div class="info-box-content">
+                <span class="info-box-text text-muted font-weight-bold">Secondary income rate</span>
+                <span class="info-box-number h4 mb-0"><?= $pct($rules['secondary_income_rate']) ?></span></div></div></div>
+            <div class="col-md-3"><div class="info-box bg-light border"><div class="info-box-content">
+                <span class="info-box-text text-muted font-weight-bold">Redundancy</span>
+                <span class="info-box-number h6 mb-0"><?= number_format($rules['redundancy']['exempt_up_to'], 2) ?> exempt, then <?= $pct($rules['redundancy']['rate']) ?></span></div></div></div>
+        </div>
+
+        <?php foreach ($tables as $title => $rows): ?>
+        <h5 class="font-weight-bold text-dark border-bottom pb-2 mb-3"><i class="fas fa-list-ol text-secondary mr-2"></i> <?= htmlspecialchars($title) ?></h5>
+        <div class="table-responsive mb-4">
             <table class="table table-hover table-striped table-bordered">
                 <thead>
                     <tr class="bg-gradient-navy text-white">
-                        <th class="text-center" style="width: 5%;">Tier</th>
-                        <th>Annual Salary Range<?php echo $_settings->currency_tag() ?></th>
-                        <th class="text-right">Marginal Tax Rate</th>
-                        <th class="text-right">Base Lump Sum Tax</th>
-                        <th>Tax Calculation Formula Details</th>
+                        <th class="text-center" style="width: 5%;">Band</th>
+                        <th>Annual income<?php echo $_settings->currency_tag() ?></th>
+                        <th class="text-right">Marginal rate</th>
+                        <th class="text-right">Tax at band start</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <?php
-                    $i = 1;
-                    foreach($brackets as $b):
-                    ?>
+                    <?php foreach ($rows as $i => $b): ?>
                     <tr>
-                        <td class="text-center align-middle font-weight-bold"><?= $i++; ?></td>
-                        <td class="align-middle font-weight-bold text-primary font-monospace">
-                            $<?= number_format($b['min']) ?> <?= $b['max'] < 9999999 ? 'to $' . number_format($b['max']) : '+' ?>
-                        </td>
-                        <td class="text-right align-middle font-weight-bold h6 mb-0 text-navy"><?= $b['rate'] ?>%</td>
-                        <td class="text-right align-middle font-weight-bold">$<?= number_format($b['base_tax'], 2) ?></td>
-                        <td class="align-middle text-xs"><?= htmlspecialchars($b['desc']) ?></td>
+                        <td class="text-center font-weight-bold"><?= $i + 1 ?></td>
+                        <td class="font-monospace"><?= number_format($b['from']) ?> <?= $b['to'] === null ? 'and above' : 'to ' . number_format($b['to']) ?></td>
+                        <td class="text-right font-weight-bold"><?= $pct($b['rate']) ?></td>
+                        <td class="text-right"><?= number_format($b['base'], 2) ?></td>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
             </table>
         </div>
+        <?php endforeach; ?>
+
+        <h5 class="font-weight-bold text-dark border-bottom pb-2 mb-3"><i class="fas fa-building text-secondary mr-2"></i> Employer levies (on gross pay)</h5>
+        <table class="table table-bordered table-striped" style="max-width:520px">
+            <thead><tr class="bg-gradient-navy text-white"><th>Levy</th><th class="text-right">Rate</th></tr></thead>
+            <tbody>
+            <?php foreach ($rules['employer_levies'] as $l): ?>
+                <tr><td><?= htmlspecialchars($l['label']) ?></td><td class="text-right"><?= $pct($l['rate']) ?></td></tr>
+            <?php endforeach; if (!$rules['employer_levies']): ?>
+                <tr><td colspan="2" class="text-muted">No employer levies configured.</td></tr>
+            <?php endif; ?>
+            </tbody>
+        </table>
     </div>
 </div>

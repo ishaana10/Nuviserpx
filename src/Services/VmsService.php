@@ -17,6 +17,33 @@ class VmsService
     }
 
     /**
+     * Inspect a PKCS#12 SDC certificate (.p12 / .pfx). Returns success=false
+     * when the file cannot be read or opened with the given password.
+     */
+    public function parseCertificate(string $p12Path, string $password = ''): array
+    {
+        if (!is_file($p12Path)) {
+            return ['success' => false, 'message' => 'Certificate file not found on disk.'];
+        }
+        if (!function_exists('openssl_pkcs12_read')) {
+            return ['success' => false, 'message' => 'OpenSSL extension is not available to read the certificate.'];
+        }
+        $certs = [];
+        if (!openssl_pkcs12_read((string)file_get_contents($p12Path), $certs, $password)) {
+            return ['success' => false, 'message' => 'Could not open the certificate. Check the file and password.'];
+        }
+        $x = openssl_x509_parse($certs['cert']);
+        return [
+            'success' => true,
+            'subject' => $x['subject']['CN'] ?? 'SDC Certificate',
+            'issuer' => $x['issuer']['O'] ?? '',
+            'valid_from' => date('Y-m-d H:i:s', $x['validFrom_time_t'] ?? time()),
+            'valid_to' => date('Y-m-d H:i:s', $x['validTo_time_t'] ?? time()),
+            'serial_number' => $x['serialNumber'] ?? 'N/A',
+        ];
+    }
+
+    /**
      * Retrieve per-tenant VMS v3.0 configuration
      */
     public function getTenantVmsConfig(int $tenantId): array

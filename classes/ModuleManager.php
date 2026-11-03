@@ -1,7 +1,7 @@
 <?php
 /**
  * Modular Event Hook & Module Registry Engine for Nuvis ERPX
- * Nuvis Technologies (nuvistechnologies.com.fj)
+ * Nuvis Technologies
  *
  * trigger_hook() is the single integration spine. When any module emits an event it:
  *   1. runs in-process callback listeners (register_hook),

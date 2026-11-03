@@ -1,13 +1,13 @@
 <div class="card card-outline card-primary shadow-sm rounded-0">
     <div class="card-header d-flex align-items-center justify-content-between">
-        <h3 class="card-title font-weight-bold"><i class="fas fa-calculator text-primary mr-2"></i> Interactive PAYE & FNPF Verification Sandbox</h3>
+        <h3 class="card-title font-weight-bold"><i class="fas fa-calculator text-primary mr-2"></i> Interactive Payroll Verification Sandbox</h3>
         <div class="card-tools">
             <button type="button" class="btn btn-sm btn-outline-secondary btn-flat" onclick="reset_sandbox()"><i class="fas fa-undo mr-1"></i> Reset Calculator</button>
         </div>
     </div>
     <div class="card-body">
         <div class="alert alert-info border-info text-sm mb-4">
-            <i class="fas fa-flask mr-2"></i> Verification Sandbox for testing Nuvis ERPX payroll calculations against Income Tax Act 2015 Regulation 6 Cumulative PAYE rules and FNPF 2026–2027 rates.
+            <i class="fas fa-flask mr-2"></i> Verification Sandbox for testing Nuvis ERPX payroll calculations against the payroll rules configured for this company (pension rates, income-tax bands, levies).
         </div>
 
         <div class="row">
@@ -73,7 +73,7 @@
                             <input type="number" step="0.01" id="sb_g_ytd" class="form-control form-control-sm text-right rounded-0 sb-calc" value="0.00">
                         </div>
                         <div class="col-md-6 form-group mb-0">
-                            <label for="sb_t_ytd" class="font-weight-bold text-dark text-sm">YTD Prior PAYE Tax ($)</label>
+                            <label for="sb_t_ytd" class="font-weight-bold text-dark text-sm">YTD Prior Income Tax ($)</label>
                             <input type="number" step="0.01" id="sb_t_ytd" class="form-control form-control-sm text-right rounded-0 sb-calc" value="0.00">
                         </div>
                     </div>
@@ -117,19 +117,19 @@
                                 <td class="text-right font-weight-bold text-primary" id="sb_res_ot">$0.00</td>
                             </tr>
                             <tr>
-                                <th class="bg-light">Employee Mandatory FNPF (8%)</th>
+                                <th class="bg-light">Employee Pension Contribution</th>
                                 <td class="text-right font-weight-bold text-info" id="sb_res_emp_fnpf">$0.00</td>
                             </tr>
                             <tr>
-                                <th class="bg-light">Employer Mandatory FNPF (8% Relief Rate)</th>
+                                <th class="bg-light">Employer Pension Contribution</th>
                                 <td class="text-right font-weight-bold text-info" id="sb_res_empr_fnpf">$0.00</td>
                             </tr>
                             <tr>
-                                <th class="bg-light">FRCS Regulation 6 PAYE Tax</th>
+                                <th class="bg-light">Income Tax (cumulative withholding)</th>
                                 <td class="text-right font-weight-bold text-danger" id="sb_res_paye">$0.00</td>
                             </tr>
                             <tr>
-                                <th class="bg-light">Employer FNU Levy (1%)</th>
+                                <th class="bg-light">Employer Levy 2</th>
                                 <td class="text-right font-weight-bold text-secondary" id="sb_res_fnu">$0.00</td>
                             </tr>
                         </tbody>

@@ -1,88 +1,55 @@
 <?php
+// Pure tests for the jurisdiction-neutral payroll engine.
 define('base_app', dirname(__DIR__) . '/');
 require_once(base_app . 'classes/PayrollEngine.php');
 
-echo "=== TEST 1: Standard Monthly Resident Payroll Calculation ===\n";
-$input = [
-    'basic_salary' => 3000,
-    'overtime' => 200,
-    'allowances' => 100,
-    'other_earnings' => 50,
-    'deductions' => 50,
-    'pay_frequency' => 'Monthly',
-    'is_resident' => true
-];
-$res = PayrollEngine::calculate($input);
+$fail = 0;
+function check($name, $cond) { global $fail; echo ($cond ? "PASS" : "FAIL") . " - $name\n"; if (!$cond) $fail++; }
+function near($a, $b) { return abs($a - $b) < 0.005; }
 
-assert($res['gross_salary'] == 3350, "Gross salary calculation");
-assert($res['employee_fnpf'] == round(3350 * 0.08, 2), "Employee FNPF 8%");
-assert($res['employer_fnpf'] == round(3350 * 0.08, 2), "Employer FNPF 8%");
-assert($res['taxable_income'] == (3350 - 268), "Taxable Income calculation");
+// Starting preset: marginal bands reproduce the cumulative tables.
+check('resident below threshold', PayrollEngine::tax_lookup(30000, true) == 0.0);
+check('resident 100k', near(PayrollEngine::tax_lookup(100000, true), 13600.00));
+check('resident 300k', near(PayrollEngine::tax_lookup(300000, true), 57500.00));
+check('resident 1.2m', near(PayrollEngine::tax_lookup(1200000, true), 396500.00));
+check('non-resident 100k', near(PayrollEngine::tax_lookup(100000, false), 20000.00));
+check('non-resident 300k', near(PayrollEngine::tax_lookup(300000, false), 63900.00));
+check('secondary income flat', near(PayrollEngine::tax_lookup(1000, true, 'S'), 200.00));
 
-echo "=== TEST 2: High Earner Annual Tax Breakdown (Basic + SRT) ===\n";
-$taxableHigh = 25000; // Monthly 25k = 300k annual
-$payeHigh = PayrollEngine::calculate_paye($taxableHigh, 'Monthly', true);
-assert($payeHigh['srt'] > 0, "SRT should be > 0 for high earner above FJD 270k");
+// Standard monthly calculation.
+$r = PayrollEngine::calculate(['basic_salary' => 3000, 'overtime' => 200, 'allowances' => 100,
+    'other_earnings' => 50, 'deductions' => 50, 'pay_frequency' => 'Monthly', 'is_resident' => true]);
+check('gross', $r['gross_salary'] == 3350);
+check('employee pension 8%', near($r['employee_pension'], 268.00));
+check('employer pension 8%', near($r['employer_pension'], 268.00));
+check('legacy alias equals neutral', $r['employee_fnpf'] == $r['employee_pension'] && $r['paye_tax'] == $r['income_tax']);
+check('net = gross - pension - tax - deductions', near($r['net_salary'], 3350 - 268 - $r['income_tax'] - 50));
+check('employer cost includes levies', near($r['employer_cost'], 3350 + 268 + $r['employer_levies_total']));
 
-echo "=== TEST 3: Non-Resident 20% Flat Tax Calculation ===\n";
-$payeNonRes = PayrollEngine::calculate_paye(2000, 'Monthly', false);
-assert($payeNonRes['paye'] == 400.00, "Non-Resident 20% tax");
+// Custom rules fully replace the preset: 5%/10% pension, one 10% band over 20k, no levies.
+$rules = ['pension' => ['employee_rate' => 0.05, 'employer_rate' => 0.10],
+    'resident_bands' => [['up_to' => 20000, 'rate' => 0], ['up_to' => null, 'rate' => 0.10]],
+    'employer_levies' => []];
+check('custom bands', near(PayrollEngine::tax_lookup(50000, true, 'P', PayrollEngine::normalize_rules($rules)), 3000.00));
+$c = PayrollEngine::calculate(['basic_salary' => 1000, 'rules' => $rules]);
+check('custom employee pension', near($c['employee_pension'], 50.00));
+check('custom employer pension', near($c['employer_pension'], 100.00));
+check('no levies', $c['employer_levies_total'] == 0.0 && $c['workcare_levy'] == 0.0);
+check('employer cost custom', near($c['employer_cost'], 1100.00));
 
-echo "=== TEST 4: Bank Exports (BSP, ANZ, HFC, BRED, Generic) ===\n";
-$testRows = [
-    [
-        'id' => 1,
-        'employee_code' => 'EMP-001',
-        'emp_name' => 'John Doe',
-        'net_salary' => 2500.50,
-        'bank_code' => 'bsp',
-        'bank_account' => '123456789',
-        'pay_date' => '2024-09-30'
-    ],
-    [
-        'id' => 2,
-        'employee_code' => 'EMP-002',
-        'emp_name' => 'Jane Smith',
-        'net_salary' => 1800.00,
-        'bank_code' => 'anz',
-        'bank_account' => '987654321',
-        'pay_date' => '2024-09-30'
-    ]
-];
+// Invalid rules fall back to the preset instead of corrupting payroll.
+$bad = PayrollEngine::normalize_rules(['pension' => ['employee_rate' => 5], 'resident_bands' => [['up_to' => 10, 'rate' => 0.1]]]);
+check('rate > 1 rejected', $bad['pension']['employee_rate'] == 0.08);
+check('bands without open-ended top rejected', count($bad['resident_bands']) === 10);
+$bad2 = PayrollEngine::normalize_rules(['resident_bands' => [['up_to' => 50, 'rate' => 0.1], ['up_to' => 40, 'rate' => 0.2], ['up_to' => null, 'rate' => 0.3]]]);
+check('non-increasing bands rejected', count($bad2['resident_bands']) === 10);
 
-$bspCsv = PayrollEngine::generate_bank_export($testRows, 'bsp', 'RUN-202409-001');
-echo "BSP Export Sample:\n" . substr($bspCsv, 0, 200) . "...\n";
+// Redundancy exemption is rule-driven.
+$red = PayrollEngine::calculate_cumulative_tax(['regular_pay' => 0, 'redundancy_pay' => 20000]);
+check('redundancy excess taxed', near($red['paye_redundancy'], 750.00));
+$red2 = PayrollEngine::calculate_cumulative_tax(['regular_pay' => 0, 'redundancy_pay' => 20000],
+    PayrollEngine::normalize_rules(['redundancy' => ['exempt_up_to' => 5000, 'rate' => 0.10]]));
+check('custom redundancy rule', near($red2['paye_redundancy'], 1500.00));
 
-$anzCsv = PayrollEngine::generate_bank_export($testRows, 'anz', 'RUN-202409-001');
-echo "ANZ Export Sample:\n" . substr($anzCsv, 0, 200) . "...\n";
-
-echo "=== TEST 5: FRCS TPOS & FNPF Schedule Exports ===\n";
-$frcsRows = [
-    [
-        'period_start' => '2024-09-01',
-        'period_end' => '2024-09-30',
-        'pay_date' => '2024-09-30',
-        'tin' => '99-88888-0',
-        'emp_name' => 'John Doe',
-        'tax_code' => 'P',
-        'is_resident' => 1,
-        'gross_salary' => 3350,
-        'employee_fnpf' => 268,
-        'taxable_income' => 3082,
-        'paye_tax' => 105,
-        'deductions' => 50,
-        'net_salary' => 2659,
-        'employer_fnpf' => 268,
-        'employee_code' => 'EMP-001',
-        'fnpf_no' => '123456'
-    ]
-];
-
-$frcsCsv = PayrollEngine::generate_frcs_tpos_export($frcsRows, '00-11111-2', 'RUN-202409-001');
-echo "FRCS TPOS Sample:\n" . substr($frcsCsv, 0, 250) . "...\n";
-
-$fnpfCsv = PayrollEngine::generate_fnpf_schedule_export($frcsRows, 'FNPF-REF-100', 'RUN-202409-001');
-echo "FNPF Schedule Sample:\n" . substr($fnpfCsv, 0, 250) . "...\n";
-
-echo "\nALL PAYROLL UNIT TESTS PASSED SUCCESSFULLY!\n";
-?>
+echo $fail ? "\n$fail FAILED\n" : "\nAll payroll engine tests passed\n";
+exit($fail ? 1 : 0);

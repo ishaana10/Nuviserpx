@@ -132,7 +132,7 @@ nvr_header([
         <?php if (!$bills && !$jv['input']): ?><tr class="acct"><td colspan="6" class="muted">No input VAT recorded in this period. Tag expense journal lines with “VAT on Expenses (15%)” to claim it.</td></tr><?php endif; ?>
         <tr class="sub"><td colspan="3">Total input VAT</td><td class="num"><?= nvr_money($bill_net + $jv['input_net'], false) ?></td><td class="num"><?= nvr_money($input_tax, false) ?></td><td class="num"><?= nvr_money($bill_net + $jv['input_net'] + $input_tax, false) ?></td></tr>
 
-        <tr class="grand"><td colspan="4"><?= $net >= 0 ? 'Net VAT payable to FRCS' : 'Net VAT refundable from FRCS' ?></td><td class="num<?= $net < 0 ? ' neg' : '' ?>"><?= nvr_money($net, false) ?></td><td></td></tr>
+        <tr class="grand"><td colspan="4"><?= $net >= 0 ? 'Net VAT payable to the tax authority' : 'Net VAT refundable from the tax authority' ?></td><td class="num<?= $net < 0 ? ' neg' : '' ?>"><?= nvr_money($net, false) ?></td><td></td></tr>
     </tbody>
 </table>
 </div>

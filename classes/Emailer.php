@@ -1,7 +1,7 @@
 <?php
 /**
  * Centralized Emailing & Notification Engine for Nuvis ERPX
- * Nuvis Technologies (nuvistechnologies.com.fj)
+ * Nuvis Technologies
  */
 
 

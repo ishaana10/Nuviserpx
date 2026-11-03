@@ -110,7 +110,7 @@ final class Permissions
         ],
         'Payroll' => [
             'payroll_process'  => 'Process payroll runs (Batch & Single Employee Run, retro pay)',
-            'payroll_export'   => 'Download compliance & bank files (BSP/ANZ/HFC/BRED, FRCS, FNPF)',
+            'payroll_export'   => 'Download compliance & bank files (bank, tax return, pension schedule)',
             'payroll_view_all' => "See every employee's payroll & payslips (otherwise only their own)",
         ],
     ];
@@ -530,7 +530,6 @@ final class Permissions
         'delete_extrafield'     => ['settings_manage'],
         'save_tenant_vms_settings' => ['settings_manage'],
         'upload_tenant_vsdc_cert'  => ['settings_manage'],
-        'run_frcs_accreditation_test' => ['settings_manage'],
         'test_sdc_ping'         => ['settings_manage'],
         'simulate_vms_fiscalization' => ['settings_manage'],
         // API keys / webhooks / workflows
