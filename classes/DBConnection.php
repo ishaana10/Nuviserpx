@@ -71,6 +71,7 @@ class DBConnection{
                 $this->check_tenant_integrity_migrations();
                 $this->check_approval_migrations();
                 $this->check_asset_depreciation_migrations();
+                $this->check_credit_note_migrations();
                 $this->check_dolibarr_crm_migrations();
                 $this->check_dolibarr_extended_migrations();
                 $this->check_extrafields_migrations();
@@ -1021,6 +1022,39 @@ class DBConnection{
             $res = @$this->conn->query("SHOW COLUMNS FROM `fixed_assets` LIKE '{$col}'");
             if ($res && $res->num_rows == 0) {
                 @$this->conn->query($sql);
+            }
+        }
+    }
+
+    public function check_credit_note_migrations(){
+        if (!$this->conn) return;
+
+        @$this->conn->query("CREATE TABLE IF NOT EXISTS `credit_notes` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `tenant_id` int(30) NOT NULL DEFAULT 1,
+          `note_type` enum('credit','debit') NOT NULL DEFAULT 'credit',
+          `note_no` varchar(50) NOT NULL,
+          `party_id` int(30) DEFAULT NULL,
+          `document_id` int(30) NOT NULL,
+          `note_date` date NOT NULL,
+          `reason` varchar(500) NOT NULL DEFAULT '',
+          `subtotal` decimal(18,2) NOT NULL DEFAULT 0.00,
+          `tax_amount` decimal(18,2) NOT NULL DEFAULT 0.00,
+          `total` decimal(18,2) NOT NULL DEFAULT 0.00,
+          `status` enum('issued','void') NOT NULL DEFAULT 'issued',
+          `journal_id` int(30) DEFAULT NULL,
+          `created_by` int(30) DEFAULT NULL,
+          `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+          PRIMARY KEY (`id`),
+          UNIQUE KEY `note_tenant_no` (`tenant_id`, `note_no`),
+          KEY `document` (`note_type`, `document_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        // Credits raised against a document, kept apart from cash paid so payment reports stay true.
+        foreach (array('invoice_list', 'vendor_bill_list') as $tbl) {
+            $res = @$this->conn->query("SHOW COLUMNS FROM `{$tbl}` LIKE 'credited_amount'");
+            if ($res && $res->num_rows == 0) {
+                @$this->conn->query("ALTER TABLE `{$tbl}` ADD COLUMN `credited_amount` decimal(18,2) NOT NULL DEFAULT 0.00");
             }
         }
     }

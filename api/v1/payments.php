@@ -57,7 +57,7 @@ if($method === 'POST'){
         if(isset($input['invoice_id']) && is_numeric($input['invoice_id'])){
             $inv_id = intval($input['invoice_id']);
             $conn->query("INSERT INTO `payment_allocations` SET `payment_id` = '{$pay_id}', `invoice_id` = '{$inv_id}', `amount` = '{$amount}'");
-            $conn->query("UPDATE `invoice_list` SET `paid_amount` = `paid_amount` + {$amount}, `balance` = GREATEST(0, `total` - (`paid_amount` + {$amount})), `status` = IF((`paid_amount` + {$amount}) >= `total`, 'paid', 'partially_paid') WHERE id = '{$inv_id}'");
+            $conn->query("UPDATE `invoice_list` SET `paid_amount` = `paid_amount` + {$amount}, `balance` = GREATEST(0, `total` - (`paid_amount` + {$amount}) - `credited_amount`), `status` = IF((`paid_amount` + {$amount} + `credited_amount`) >= `total`, 'paid', 'partially_paid') WHERE id = '{$inv_id}'");
         }
 
         http_response_code(201);
