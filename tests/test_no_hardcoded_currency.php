@@ -7,7 +7,6 @@ foreach ($it as $f) {
     $p = $f->getPathname();
     if (substr($p, -4) !== '.php' || preg_match('#/(vendor|tests|plugins|node_modules|\.git)/#', $p)) { continue; }
     $rel = substr($p, strlen($root) + 1);
-    if (preg_match('#^(classes/PayrollEngine\.php|admin/payroll/tax_rules\.php)$#', $rel)) { continue; } // statutory payroll rules
     if (preg_match('/\bFJD\b/', file_get_contents($p))) { $bad[] = $rel; }
 }
 if ($bad) { fwrite(STDERR, "FAIL: hardcoded FJD in: " . implode(', ', $bad) . "\n"); exit(1); }
