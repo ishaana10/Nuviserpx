@@ -186,6 +186,16 @@ class Master extends DBConnection
         return json_encode(['status' => 'failed', 'msg' => 'Failed to save fixed asset. ' . $this->conn->error]);
     }
 
+    public function issue_credit_note()
+    {
+        return $this->container->make(\App\Services\CreditNoteService::class)->issue($_POST);
+    }
+
+    public function void_credit_note()
+    {
+        return $this->container->make(\App\Services\CreditNoteService::class)->void(intval($_POST['id'] ?? 0));
+    }
+
     public function run_depreciation()
     {
         return $this->container->make(\App\Services\AssetService::class)->run((string)($_POST['through'] ?? ''));
@@ -1905,6 +1915,12 @@ switch ($action) {
         break;
     case 'post_fx_revaluation':
         echo $Master->post_fx_revaluation();
+        break;
+    case 'issue_credit_note':
+        echo $Master->issue_credit_note();
+        break;
+    case 'void_credit_note':
+        echo $Master->void_credit_note();
         break;
     case 'run_depreciation':
         echo $Master->run_depreciation();

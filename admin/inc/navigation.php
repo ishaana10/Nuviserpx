@@ -159,6 +159,12 @@ if($t_qry && $t_qry->num_rows > 0){
                                         </a>
                                     </li>
                                     <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=credit_notes" class="nav-link nav-credit_notes tree-item">
+                                            <i class="nav-icon fas fa-file-invoice-dollar"></i>
+                                            <p>Credit &amp; Debit Notes</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=sales_orders" class="nav-link nav-sales_orders tree-item">
                                             <i class="nav-icon fas fa-file-signature"></i>
                                             <p>Quotes & Orders</p>
