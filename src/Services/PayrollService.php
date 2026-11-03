@@ -12,6 +12,7 @@ use SystemSettings;
 class PayrollService
 {
     private bool $inTransaction = false;
+    private int $lastPayrollId = 0;
 
     public function __construct(
         private readonly mysqli $conn,
@@ -21,9 +22,49 @@ class PayrollService
     public function calculatePayrollAjax(array $post): string
     {
         require_once(base_app . 'classes/PayrollEngine.php');
-        $post['rules'] = PayrollEngine::load_rules($this->settings, (string)($post['pay_date'] ?? ''));
+        $payDate = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($post['pay_date'] ?? '')) ? (string)$post['pay_date'] : date('Y-m-d');
+        $post['rules'] = PayrollEngine::load_rules($this->settings, $payDate);
+        if (!empty($post['employee_id'])) {
+            [$post['pay_period_n'], $post['g_ytd_prior'], $post['t_ytd_prior']] =
+                $this->ytdFor((int)$post['employee_id'], $payDate, (string)($post['pay_frequency'] ?? 'Monthly'), (int)($post['id'] ?? 0), $post['rules']);
+        }
         $calc = PayrollEngine::calculate($post);
         return json_encode(['status' => 'success', 'data' => $calc]);
+    }
+
+    /**
+     * Cumulative-tax inputs for an employee paid on $payDate: [period number, prior gross, prior tax].
+     * Prior pay is the employee's earlier payrolls in the same tax year (not rejected, not this one).
+     * Opening balances brought forward from a previous system count towards the first tax year the employee
+     * appears in here. Editing an earlier payroll does not recalculate the later ones.
+     */
+    private function ytdFor(int $employeeId, string $payDate, string $frequency, int $excludeId, array $rules): array
+    {
+        $tenant = (int)$this->settings->active_tenant_id();
+        $taxYear = PayrollEngine::tax_year_start($payDate, $rules['tax_year_start_month']);
+        $n = PayrollEngine::period_number($frequency, $taxYear, $payDate);
+        $q = $this->conn->prepare("SELECT gross_salary, retro_pay, paye_tax, srt_tax, paye_lump FROM payroll_list
+            WHERE tenant_id = ? AND employee_id = ? AND status <> 'rejected' AND id <> ? AND pay_date >= ? AND pay_date < ?");
+        $q->bind_param('iiiss', $tenant, $employeeId, $excludeId, $taxYear, $payDate);
+        $q->execute();
+        $rows = $q->get_result()->fetch_all(MYSQLI_ASSOC);
+
+        $og = $ot = 0.0;
+        $f = $this->conn->prepare("SELECT MIN(pay_date) first_pay FROM payroll_list WHERE tenant_id = ? AND employee_id = ? AND status <> 'rejected' AND id <> ? AND pay_date IS NOT NULL");
+        $f->bind_param('iii', $tenant, $employeeId, $excludeId);
+        $f->execute();
+        $first = $f->get_result()->fetch_assoc()['first_pay'] ?? null;
+        $firstYear = PayrollEngine::tax_year_start($first ?: $payDate, $rules['tax_year_start_month']);
+        if ($firstYear === $taxYear) {
+            $e = $this->conn->prepare("SELECT ytd_opening_gross, ytd_opening_paye FROM employee_list WHERE id = ? AND tenant_id = ?");
+            $e->bind_param('ii', $employeeId, $tenant);
+            $e->execute();
+            $emp = $e->get_result()->fetch_assoc() ?: [];
+            $og = (float)($emp['ytd_opening_gross'] ?? 0);
+            $ot = (float)($emp['ytd_opening_paye'] ?? 0);
+        }
+        [$g, $t] = PayrollEngine::ytd_prior($rows, $og, $ot);
+        return [$n, $g, $t];
     }
 
     /** Save the rules that apply from `effective_from` (a new version, or replace that date's version). */
@@ -137,6 +178,10 @@ class PayrollService
             $retro_pay = PayrollAdjustmentService::total($pendingAdj);
         }
 
+        // Year-to-date position for the cumulative tax method
+        $pay_rules = PayrollEngine::load_rules($this->settings, $pay_date);
+        [$ytd_n, $ytd_g, $ytd_t] = $this->ytdFor((int)$employee_id, $pay_date, $pay_frequency, $editId, $pay_rules);
+
         // Calculate Payroll
         $calc = PayrollEngine::calculate([
             'lump_sum_payments' => $retro_pay,
@@ -149,7 +194,10 @@ class PayrollService
             'pay_frequency' => $pay_frequency,
             'overtime_1_5_hours' => (float)($overtime_1_5_hours ?? 0),
             'overtime_2_0_hours' => (float)($overtime_2_0_hours ?? 0),
-            'rules' => PayrollEngine::load_rules($this->settings, $pay_date)
+            'pay_period_n' => $ytd_n,
+            'g_ytd_prior' => $ytd_g,
+            't_ytd_prior' => $ytd_t,
+            'rules' => $pay_rules
         ]);
         $overtime = (float)$calc['overtime']; // typed amount plus hours-based tiers
 
@@ -164,6 +212,7 @@ class PayrollService
         $workcare_levy = $calc['workcare_levy'];
         $training_levy = $calc['training_levy'];
         $employer_cost = $calc['employer_cost'];
+        $paye_lump = $calc['paye_lump_sum'];
 
         $tin = $this->conn->real_escape_string((string)($emp_data['tin'] ?? ''));
         $fnpf_no = $this->conn->real_escape_string((string)($emp_data['fnpf_no'] ?? ''));
@@ -181,6 +230,12 @@ class PayrollService
         $id = !empty($id) ? intval($id) : 0;
         if ($lockMsg = \App\Services\PeriodLockService::guardDocument($this->conn, (int)$tenant_id, $journal_date, 'payroll_list', $id)) {
             return json_encode(['status' => 'failed', 'msg' => $lockMsg]);
+        }
+        if ($id > 0) {
+            $st = $this->conn->query("SELECT status FROM `payroll_list` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'");
+            if ($st && ($sr = $st->fetch_assoc()) && $sr['status'] === 'rejected') {
+                return json_encode(['status' => 'failed', 'msg' => 'This payroll was returned by the approver and cannot be edited. Run payroll again for the employee.']);
+            }
         }
         $ownTx = !$this->inTransaction;
         if ($ownTx) {
@@ -206,6 +261,7 @@ class PayrollService
             $sql = "INSERT INTO `payroll_list` SET
 				`tenant_id` = '{$tenant_id}',
 				`employee_id` = '{$employee_id}',
+				`created_by` = '" . (int)$user_id . "',
 				`journal_id` = '{$journal_id}',
 				`payroll_run_ref` = '{$payroll_run_ref}',
 				`salary_month` = '{$salary_month}',
@@ -224,6 +280,7 @@ class PayrollService
 				`employer_fnpf` = '{$employer_fnpf}',
 				`taxable_income` = '{$taxable_income}',
 				`paye_tax` = '{$paye_tax}',
+				`paye_lump` = '{$paye_lump}',
 				`srt_tax` = '{$srt_tax}',
 				`deductions` = '{$deductions}',
 				`net_salary` = '{$net_salary}',
@@ -265,6 +322,7 @@ class PayrollService
 				`employer_fnpf` = '{$employer_fnpf}',
 				`taxable_income` = '{$taxable_income}',
 				`paye_tax` = '{$paye_tax}',
+				`paye_lump` = '{$paye_lump}',
 				`srt_tax` = '{$srt_tax}',
 				`deductions` = '{$deductions}',
 				`net_salary` = '{$net_salary}',
@@ -284,9 +342,13 @@ class PayrollService
         if (!$save) {
             throw new \RuntimeException('save failed');
         }
+        $payrollId = empty($id) ? (int)$this->conn->insert_id : (int)$id;
+        $this->lastPayrollId = $payrollId;
         if (empty($id) && $pendingAdj) {
-            $adjustments->markApplied(array_column($pendingAdj, 'id'), (int)$this->conn->insert_id);
+            $adjustments->markApplied(array_column($pendingAdj, 'id'), $payrollId);
         }
+        // A single payroll is held for approval here; a batch run is held as a whole once every employee is saved.
+        $held = $ownTx ? (new PayrollApprovalService($this->conn, $this->settings))->holdIfRequired([$payrollId]) : false;
         if ($ownTx) {
             $this->conn->commit();
         }
@@ -302,6 +364,9 @@ class PayrollService
         if ($save) {
             $resp['status'] = 'success';
             $resp['msg'] = empty($id) ? " Payroll processed and Journal Entry created successfully." : " Payroll updated successfully.";
+            if (!empty($held)) {
+                $resp['msg'] .= ' It is waiting for approval and will not appear in reports until approved.';
+            }
         } else {
             $resp['status'] = 'failed';
             $resp['msg'] = "An error occurred while saving payroll.";
@@ -342,6 +407,8 @@ class PayrollService
         $month = $this->conn->real_escape_string((string)($run['salary_month'] ?? date('F Y')));
 
         $processed = 0;
+        $createdIds = [];
+        $heldRun = false;
         $skipped = [];
         $this->conn->begin_transaction();
         $this->inTransaction = true;
@@ -352,7 +419,7 @@ class PayrollService
                     throw new \RuntimeException("Employee #{$eid} was not found in this company.");
                 }
                 $name = $emp->fetch_assoc()['name'];
-                $dup = $this->conn->query("SELECT id FROM `payroll_list` WHERE employee_id = '{$eid}' AND salary_month = '{$month}' AND tenant_id = '{$tenant_id}' LIMIT 1");
+                $dup = $this->conn->query("SELECT id FROM `payroll_list` WHERE employee_id = '{$eid}' AND salary_month = '{$month}' AND tenant_id = '{$tenant_id}' AND status <> 'rejected' LIMIT 1");
                 if ($dup && $dup->num_rows > 0) {
                     $skipped[] = $name;
                     continue;
@@ -375,7 +442,9 @@ class PayrollService
                     throw new \RuntimeException("Could not process {$name}" . (!empty($res['err']) ? ': ' . $res['err'] : '.'));
                 }
                 $processed++;
+                $createdIds[] = $this->lastPayrollId;
             }
+            $heldRun = (new PayrollApprovalService($this->conn, $this->settings))->holdIfRequired($createdIds);
             $this->conn->commit();
             $this->inTransaction = false;
         } catch (\Throwable $e) {
@@ -388,6 +457,9 @@ class PayrollService
             return json_encode(['status' => 'failed', 'msg' => 'Nothing to process — every selected employee already has payroll for ' . ($run['salary_month'] ?? 'this period') . '.']);
         }
         $msg = "Batch payroll processed for {$processed} employee" . ($processed === 1 ? '' : 's') . '.';
+        if ($heldRun) {
+            $msg .= ' The run is waiting for approval and will not appear in reports until approved.';
+        }
         if ($skipped) {
             $msg .= ' Skipped (already paid this period): ' . implode(', ', $skipped) . '.';
         }
@@ -435,6 +507,9 @@ class PayrollService
         }
 
         $payroll = $pay_qry->fetch_assoc();
+        if (($payroll['status'] ?? 'posted') !== 'posted') {
+            return json_encode(['status' => 'failed', 'msg' => 'This payroll is not approved yet, so the payslip cannot be sent.']);
+        }
         $email_to = !empty($custom_email) ? $this->conn->real_escape_string($custom_email) : '';
 
         if (empty($email_to)) {

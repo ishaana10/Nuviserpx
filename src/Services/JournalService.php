@@ -274,16 +274,16 @@ class JournalService
      * Post a journal produced by the system (depreciation, disposals): already in base currency, balanced,
      * and checked against the period lock. Lines: [account_id, debit, credit, description]. Not reachable from a request.
      */
-    public function postSystemJournal(string $date, string $description, array $lines): string
+    public function postSystemJournal(string $date, string $description, array $lines, string $status = 'posted'): string
     {
-        return $this->postRevaluation($date, $description, $lines);
+        return $this->postRevaluation($date, $description, $lines, $status);
     }
 
     /**
      * Post a foreign-currency revaluation journal. Lines arrive already in base currency, tagged with the
      * currency they restate (amount_fc 0), so only FxService calls this; it is not reachable from a request.
      */
-    public function postRevaluation(string $date, string $description, array $lines): string
+    public function postRevaluation(string $date, string $description, array $lines, string $status = 'posted'): string
     {
         $tenant_id = (int)$this->settings->active_tenant_id();
         $errors = LedgerService::validateLines($lines, (new LedgerService($this->conn, $tenant_id))->accountIds(), true);
@@ -297,8 +297,8 @@ class JournalService
         $this->conn->begin_transaction();
         try {
             $code = $this->nextCode($tenant_id);
-            $h = $this->conn->prepare("INSERT INTO journal_entries (tenant_id, code, journal_date, description, tax_mode, status, user_id) VALUES (?, ?, ?, ?, 'No Tax', 'posted', ?)");
-            $h->bind_param('isssi', $tenant_id, $code, $date, $description, $userId);
+            $h = $this->conn->prepare("INSERT INTO journal_entries (tenant_id, code, journal_date, description, tax_mode, status, user_id) VALUES (?, ?, ?, ?, 'No Tax', ?, ?)");
+            $h->bind_param('issssi', $tenant_id, $code, $date, $description, $status, $userId);
             if (!$h->execute()) {
                 throw new \RuntimeException($this->conn->error);
             }

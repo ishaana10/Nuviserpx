@@ -847,6 +847,26 @@ class Master extends DBConnection
         return $this->container->make(\App\Services\PayrollAdjustmentService::class)->create($_POST);
     }
 
+    public function approve_payroll_run()
+    {
+        return $this->container->make(\App\Services\PayrollApprovalService::class)->approveRun((string)($_POST['ref'] ?? ''));
+    }
+
+    public function reject_payroll_run()
+    {
+        return $this->container->make(\App\Services\PayrollApprovalService::class)->rejectRun((string)($_POST['ref'] ?? ''), (string)($_POST['note'] ?? ''));
+    }
+
+    public function approve_payroll_remittance()
+    {
+        return $this->container->make(\App\Services\PayrollApprovalService::class)->approveRemittance(intval($_POST['id'] ?? 0));
+    }
+
+    public function reject_payroll_remittance()
+    {
+        return $this->container->make(\App\Services\PayrollApprovalService::class)->rejectRemittance(intval($_POST['id'] ?? 0), (string)($_POST['note'] ?? ''));
+    }
+
     public function remit_payroll_liability()
     {
         return $this->container->make(\App\Services\PayrollRemittanceService::class)->remit($_POST);
@@ -2331,6 +2351,18 @@ switch ($action) {
         break;
     case 'terminate_session':
         echo $Master->terminate_session();
+        break;
+    case 'approve_payroll_run':
+        echo $Master->approve_payroll_run();
+        break;
+    case 'reject_payroll_run':
+        echo $Master->reject_payroll_run();
+        break;
+    case 'approve_payroll_remittance':
+        echo $Master->approve_payroll_remittance();
+        break;
+    case 'reject_payroll_remittance':
+        echo $Master->reject_payroll_remittance();
         break;
     case 'remit_payroll_liability':
         echo $Master->remit_payroll_liability();

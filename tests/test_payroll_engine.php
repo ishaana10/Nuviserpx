@@ -90,5 +90,41 @@ $legacy = PayrollEngine::decode_setting(json_encode(['pension' => ['employee_rat
 check('legacy single-object setting still works', PayrollEngine::rules_on($legacy, '2026-05-05')['pension']['employer_rate'] == 0.06);
 check('empty setting gives preset', PayrollEngine::rules_on(PayrollEngine::decode_setting(''), '2026-01-01')['pension']['employer_rate'] == 0.08);
 
+// Tax year and pay-period numbering
+check('tax year start (Jan)', PayrollEngine::tax_year_start('2026-11-30', 1) === '2026-01-01');
+check('tax year start (Jul, before)', PayrollEngine::tax_year_start('2026-03-15', 7) === '2025-07-01');
+check('tax year start (Jul, after)', PayrollEngine::tax_year_start('2026-08-15', 7) === '2026-07-01');
+check('monthly period number', PayrollEngine::period_number('Monthly', '2026-01-01', '2026-06-30') === 6);
+check('monthly period over year start (Jul)', PayrollEngine::period_number('Monthly', '2025-07-01', '2026-03-31') === 9);
+check('weekly period number', PayrollEngine::period_number('Weekly', '2026-01-01', '2026-01-08') === 2);
+check('fortnightly period number', PayrollEngine::period_number('Fortnightly', '2026-01-01', '2026-01-15') === 2);
+check('semi-monthly period number', PayrollEngine::period_number('Semi-monthly', '2026-01-01', '2026-02-20') === 4);
+check('period number never above periods per year', PayrollEngine::period_number('Monthly', '2026-01-01', '2028-01-01') === 12);
+
+// Prior-year-to-date excludes back pay and its tax
+[$pg, $pt] = PayrollEngine::ytd_prior([
+    ['gross_salary' => 3000, 'retro_pay' => 0, 'paye_tax' => 100, 'srt_tax' => 0, 'paye_lump' => 0],
+    ['gross_salary' => 3500, 'retro_pay' => 500, 'paye_tax' => 160, 'srt_tax' => 0, 'paye_lump' => 60],
+], 1000, 50);
+check('prior gross excludes back pay, includes opening', $pg === 7000.0);
+check('prior tax excludes lump tax, includes opening', $pt === 250.0);
+
+// A steady salary taxed cumulatively gives the same tax each month once prior pay is supplied.
+$monthly = 3000.0;
+$tax1 = PayrollEngine::calculate(['basic_salary' => $monthly, 'pay_period_n' => 1])['income_tax'];
+$prevG = 0.0; $prevT = 0.0; $same = true;
+for ($n = 1; $n <= 12; $n++) {
+    $c = PayrollEngine::calculate(['basic_salary' => $monthly, 'pay_period_n' => $n, 'g_ytd_prior' => $prevG, 't_ytd_prior' => $prevT]);
+    if (abs($c['income_tax'] - $tax1) > 0.02) $same = false;
+    $prevG += $c['gross_salary']; $prevT += $c['income_tax'];
+}
+check('steady salary: same tax every month with year-to-date inputs', $same);
+$annual = PayrollEngine::tax_lookup($monthly * 12, true);
+check('steady salary: year total equals annual tax', abs($prevT - $annual) < 0.2);
+// Without prior pay, a mid-year run under-withholds; with it, the catch-up appears.
+$noPrior = PayrollEngine::calculate(['basic_salary' => $monthly, 'pay_period_n' => 7])['income_tax'];
+check('mid-year without prior pay differs from steady tax', abs($noPrior - $tax1) > 0.5);
+check('rule: tax year start month validated', count(PayrollEngine::validate_rules(['tax_year_start_month' => 13] + PayrollEngine::default_rules())) === 1);
+
 echo $fail ? "\n$fail FAILED\n" : "\nAll payroll engine tests passed\n";
 exit($fail ? 1 : 0);

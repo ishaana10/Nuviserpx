@@ -460,6 +460,12 @@ if($t_qry && $t_qry->num_rows > 0){
                                             <p>Payrun Engine & Retro</p>
                                         </a>
                                     </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=payroll/approvals" class="nav-link nav-payroll_approvals tree-item">
+                                            <i class="nav-icon fas fa-user-check text-warning"></i>
+                                            <p>Payroll Approvals</p>
+                                        </a>
+                                    </li>
                                     <?php if ($_settings->can_access('payroll_remit')): ?>
                                     <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=payroll/remittances" class="nav-link nav-payroll_remittances tree-item">

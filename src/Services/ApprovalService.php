@@ -22,6 +22,8 @@ class ApprovalService
     public const DOC_JOURNAL = 'journal';
     public const DOC_BILL = 'vendor_bill';
     public const DOC_BILL_PAYMENT = 'bill_payment';
+    public const DOC_PAYROLL_RUN = 'payroll_run';
+    public const DOC_PAYROLL_REMITTANCE = 'payroll_remittance';
 
     public function __construct(
         private readonly mysqli $conn,
@@ -95,8 +97,8 @@ class ApprovalService
         if ($threshold === null) {
             return $this->fail('The threshold must be an amount of zero or more.');
         }
-        $doc = in_array($post['doc_type'] ?? '', [self::DOC_BILL, self::DOC_BILL_PAYMENT], true) ? $post['doc_type'] : self::DOC_JOURNAL;
-        $docLabel = ['journal' => 'Journal', 'vendor_bill' => 'Vendor bill', 'bill_payment' => 'Supplier payment'][$doc];
+        $doc = in_array($post['doc_type'] ?? '', [self::DOC_BILL, self::DOC_BILL_PAYMENT, self::DOC_PAYROLL_RUN, self::DOC_PAYROLL_REMITTANCE], true) ? $post['doc_type'] : self::DOC_JOURNAL;
+        $docLabel = ['journal' => 'Journal', 'vendor_bill' => 'Vendor bill', 'bill_payment' => 'Supplier payment', 'payroll_run' => 'Payroll run', 'payroll_remittance' => 'Payroll remittance'][$doc];
         $amt = number_format($threshold, 2, '.', '');
         $stmt = $this->conn->prepare("INSERT INTO approval_policies (tenant_id, doc_type, enabled, threshold, allow_self) VALUES (?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE enabled = VALUES(enabled), threshold = VALUES(threshold), allow_self = VALUES(allow_self)");

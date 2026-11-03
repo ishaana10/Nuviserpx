@@ -711,10 +711,10 @@ class DashboardService
 
     private function w_kpi_payroll(array $r): array
     {
-        $sql = "SELECT COALESCE(SUM(net_salary),0) FROM payroll_list WHERE tenant_id = ? AND " . $this->payDate() . " BETWEEN ? AND ?";
+        $sql = "SELECT COALESCE(SUM(net_salary),0) FROM payroll_list WHERE tenant_id = ? AND status = 'posted' AND " . $this->payDate() . " BETWEEN ? AND ?";
         $cur = $this->sumOne($sql, 'iss', $this->tenantId, $r['from'], $r['to']);
         $prev = $this->sumOne($sql, 'iss', $this->tenantId, $r['prev_from'], $r['prev_to']);
-        return $this->kpi($cur, $prev, ['format' => 'money', 'invert' => true, 'link' => './?page=payroll', 'spark' => $this->spark("SELECT DATE_FORMAT(" . $this->payDate() . ",'%Y-%m') ym, SUM(net_salary) total FROM payroll_list WHERE tenant_id = ? AND " . $this->payDate() . " BETWEEN ? AND ? GROUP BY ym", $r)]);
+        return $this->kpi($cur, $prev, ['format' => 'money', 'invert' => true, 'link' => './?page=payroll', 'spark' => $this->spark("SELECT DATE_FORMAT(" . $this->payDate() . ",'%Y-%m') ym, SUM(net_salary) total FROM payroll_list WHERE tenant_id = ? AND status = 'posted' AND " . $this->payDate() . " BETWEEN ? AND ? GROUP BY ym", $r)]);
     }
 
     private function w_kpi_pending_leaves(array $r): array
@@ -752,7 +752,7 @@ class DashboardService
         $first = array_key_first($b) . '-01';
         $rows = $this->rows(
             "SELECT DATE_FORMAT(" . $this->payDate() . ",'%Y-%m') ym, SUM(gross_salary) gross, SUM(net_salary) net, SUM(employee_fnpf + employer_fnpf) fnpf
-             FROM payroll_list WHERE tenant_id = ? AND " . $this->payDate() . " BETWEEN ? AND ? GROUP BY ym",
+             FROM payroll_list WHERE tenant_id = ? AND status = 'posted' AND " . $this->payDate() . " BETWEEN ? AND ? GROUP BY ym",
             'iss', $this->tenantId, $first, $r['to']
         );
         return [

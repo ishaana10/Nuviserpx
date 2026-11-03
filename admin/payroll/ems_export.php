@@ -7,7 +7,7 @@ if(isset($_GET['export_csv']) && $_GET['export_csv'] == 1){
         SELECT p.*, e.firstname, e.lastname, e.tin, e.tax_code, e.is_resident
         FROM `payroll_list` p
         LEFT JOIN `employee_list` e ON p.employee_id = e.id
-        WHERE p.tenant_id = '{$tenant_id}' AND p.salary_month = '{$conn->real_escape_string($month)}'
+        WHERE p.tenant_id = '{$tenant_id}' AND p.status = 'posted' AND p.salary_month = '{$conn->real_escape_string($month)}'
         ORDER BY e.firstname ASC
     ");
 
@@ -67,7 +67,7 @@ $qry = $conn->query("
     SELECT p.*, e.firstname, e.lastname, e.tin, e.tax_code, e.is_resident, e.employee_code
     FROM `payroll_list` p
     LEFT JOIN `employee_list` e ON p.employee_id = e.id
-    WHERE p.tenant_id = '{$tenant_id}' AND p.salary_month = '{$conn->real_escape_string($month)}'
+    WHERE p.tenant_id = '{$tenant_id}' AND p.status = 'posted' AND p.salary_month = '{$conn->real_escape_string($month)}'
     ORDER BY e.firstname ASC
 ");
 

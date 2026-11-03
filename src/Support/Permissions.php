@@ -110,6 +110,7 @@ final class Permissions
         ],
         'Payroll' => [
             'payroll_process'  => 'Process payroll runs (Batch & Single Employee Run, retro pay)',
+            'payroll_approve'  => 'Approve payroll runs and payroll payments that are waiting for approval (never your own, unless self-approval is allowed)',
             'payroll_remit'    => 'Pay pension, tax and levy amounts owed from payroll',
             'payroll_export'   => 'Download compliance & bank files (bank, tax return, pension schedule)',
             'payroll_view_all' => "See every employee's payroll & payslips (otherwise only their own)",
@@ -508,6 +509,10 @@ final class Permissions
         'calculate_payroll_ajax'=> ['payroll', 'edit'],
         'apply_retro_pay'       => ['payroll_process'],
         'cancel_retro_pay'      => ['payroll_process'],
+        'approve_payroll_run'   => ['payroll_approve'],
+        'reject_payroll_run'    => ['payroll_approve'],
+        'approve_payroll_remittance' => ['payroll_approve'],
+        'reject_payroll_remittance'  => ['payroll_approve'],
         'remit_payroll_liability' => ['payroll_remit'],
         'reverse_payroll_remittance' => ['payroll_remit'],
         'save_batch_payroll'    => ['payroll_process'],

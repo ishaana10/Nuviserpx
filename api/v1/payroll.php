@@ -6,7 +6,7 @@ $method = $_SERVER['REQUEST_METHOD'];
 if($method === 'GET'){
     check_permission('read_payroll');
 
-    $where = " WHERE p.tenant_id = '{$api_tenant_id}' ";
+    $where = " WHERE p.tenant_id = '{$api_tenant_id}' AND p.status = 'posted' ";
     if(isset($_GET['month'])){
         $m = $conn->real_escape_string($_GET['month']);
         $where .= " AND p.salary_month = '{$m}' ";

@@ -64,7 +64,7 @@
 					<?php
 					$i = 1;
 						$tenant_id = $_settings->active_tenant_id();
-						$own_filter = $pay_scope === null ? '' : " AND p.employee_id = '".(int)$pay_scope."' ";
+						$own_filter = $pay_scope === null ? '' : " AND p.employee_id = '".(int)$pay_scope."' AND p.status = 'posted' ";
 						$qry = $conn->query("SELECT p.*, concat(e.firstname, ' ', e.lastname) as emp_name, e.employee_code from `payroll_list` p inner join `employee_list` e on p.employee_id = e.id where p.tenant_id = '{$tenant_id}'{$own_filter} order by p.id desc ");
 						while($row = $qry->fetch_assoc()):
 					?>
@@ -72,7 +72,9 @@
 							<td class="text-center"><?php echo $i++; ?></td>
 							<td>
 								<span class="badge badge-light border text-dark"><?php echo !empty($row['payroll_run_ref']) ? $row['payroll_run_ref'] : 'RUN-'.$row['id'] ?></span>
-								<p class="m-0 small font-weight-bold"><?php echo $row['salary_month'] ?></p>
+								<p class="m-0 small font-weight-bold"><?php echo $row['salary_month'] ?>
+									<?php if(($row['status'] ?? 'posted') === 'pending_approval'): ?><span class="badge badge-warning">Waiting for approval</span>
+									<?php elseif(($row['status'] ?? 'posted') === 'rejected'): ?><span class="badge badge-danger" title="<?php echo htmlspecialchars((string)$row['approval_note']) ?>">Returned</span><?php endif; ?></p>
 							</td>
 							<td>
 								<p class="m-0 font-weight-bold"><?php echo $row['emp_name'] ?></p>
