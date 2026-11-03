@@ -140,9 +140,12 @@ class InvoiceService
             $existing = $this->conn->query("SELECT journal_id FROM `invoice_list` WHERE id = '{$id}'")->fetch_assoc();
             $journal_id = isset($existing['journal_id']) ? $existing['journal_id'] : null;
             if ($journal_id) {
+                $trail = new JournalTrail($this->conn, $this->settings);
+                $trailBefore = $trail->snapshot((int)$journal_id);
                 $this->conn->query("UPDATE `journal_entries` SET `description` = '{$description}', `journal_date` = '{$journal_date}' WHERE id = '{$journal_id}'");
                 $this->conn->query("DELETE FROM `journal_items` WHERE journal_id = '{$journal_id}'");
                 $this->postLines((int)$journal_id, (int)$ar_acc_id, (int)$rev_acc_id, (float)$total, (float)$tax_amount, $arFx);
+                $trail->record((int)$journal_id, 'invoice_list', (int)$id, "Invoice {$invoice_no}", $trailBefore);
             }
 
             $sql = "UPDATE `invoice_list` SET
