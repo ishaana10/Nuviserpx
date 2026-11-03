@@ -191,8 +191,29 @@ class JournalService
             return $this->fail('The “Opening Balance Equity” account is missing. Reload the app to recreate it.');
         }
 
-        $acc = $dr = $cr = [];
-        $totalDr = $totalCr = 0.0;
+        $fx = new FxService($this->conn, $this->settings);
+        [$form, $errors] = self::openingBalanceForm($post, $obe, $fx->baseCurrency(), fn ($c) => $fx->rateOn($c, $asAt));
+        if ($errors) {
+            return $this->fail(implode(' ', $errors), $errors);
+        }
+
+        return $this->saveJournal($form + [
+            'journal_date' => $asAt,
+            'description' => 'Opening balances as at ' . $asAt,
+            'status' => 'posted',
+        ]);
+    }
+
+    /**
+     * Build the journal form arrays for an opening-balance posting. A line may name a foreign currency
+     * (currency[], optional fx_rate[]); its debit/credit are then in that currency and are converted at the
+     * as-at rate, so the foreign balance is kept (amount_fc) and the account can be reconciled in that currency.
+     * Whatever the converted lines leave unbalanced goes to Opening Balance Equity in base currency.
+     * Returns [form arrays, errors].
+     */
+    public static function openingBalanceForm(array $post, int $obe, string $base, callable $rateFor): array
+    {
+        $lines = [];
         foreach ((array)($post['account_id'] ?? []) as $k => $accountId) {
             $d = round((float)($post['debit'][$k] ?? 0), 2);
             $c = round((float)($post['credit'][$k] ?? 0), 2);
@@ -200,33 +221,52 @@ class JournalService
                 continue;
             }
             if ((int)$accountId === $obe) {
-                return $this->fail('Opening Balance Equity is filled in automatically. Leave it out of the list.');
+                return [[], ['Opening Balance Equity is filled in automatically. Leave it out of the list.']];
             }
-            $acc[] = (int)$accountId;
-            $dr[] = $d;
-            $cr[] = $c;
-            $totalDr += $d;
-            $totalCr += $c;
+            if ($d > 0 && $c > 0) {
+                return [[], ['Enter either a debit or a credit on each line, not both.']];
+            }
+            if ($d < 0 || $c < 0) {
+                return [[], ['Opening balances cannot be negative. Put the amount on the other side instead.']];
+            }
+            $lines[] = [
+                'account_id' => (int)$accountId, 'debit' => $d, 'credit' => $c,
+                'currency' => (string)($post['currency'][$k] ?? ''),
+                'fx_rate' => (string)($post['fx_rate'][$k] ?? ''),
+            ];
         }
-        if (!$acc) {
-            return $this->fail('Enter at least one opening balance.');
+        if (!$lines) {
+            return [[], ['Enter at least one opening balance.']];
         }
 
+        [$converted, $errors] = FxService::convertLines($lines, $base, $rateFor);
+        if ($errors) {
+            return [[], $errors];
+        }
+        $totalDr = $totalCr = 0.0;
+        foreach ($converted as $l) {
+            $totalDr += round((float)$l['debit'], 2);
+            $totalCr += round((float)$l['credit'], 2);
+        }
+
+        $form = ['account_id' => [], 'debit' => [], 'credit' => [], 'currency' => [], 'fx_rate' => []];
+        foreach ($lines as $i => $l) {
+            $foreign = !empty($converted[$i]['currency']);
+            $form['account_id'][] = $l['account_id'];
+            $form['debit'][] = $l['debit'];
+            $form['credit'][] = $l['credit'];
+            $form['currency'][] = $foreign ? $converted[$i]['currency'] : '';
+            $form['fx_rate'][] = $foreign ? $converted[$i]['fx_rate'] : '';
+        }
         $diff = round($totalDr - $totalCr, 2);
         if ($diff != 0.0) {
-            $acc[] = $obe;
-            $dr[] = $diff < 0 ? -$diff : 0.0;
-            $cr[] = $diff > 0 ? $diff : 0.0;
+            $form['account_id'][] = $obe;
+            $form['debit'][] = $diff < 0 ? -$diff : 0.0;
+            $form['credit'][] = $diff > 0 ? $diff : 0.0;
+            $form['currency'][] = '';
+            $form['fx_rate'][] = '';
         }
-
-        return $this->saveJournal([
-            'journal_date' => $asAt,
-            'description' => 'Opening balances as at ' . $asAt,
-            'status' => 'posted',
-            'account_id' => $acc,
-            'debit' => $dr,
-            'credit' => $cr,
-        ]);
+        return [$form, []];
     }
 
     /**
