@@ -55,6 +55,17 @@ class JournalService
             return $this->fail(implode(' ', $errors), $errors);
         }
 
+        // Maker/checker: a journal over the company's threshold waits for someone else to approve it.
+        $submitted = false;
+        if ($status === 'posted') {
+            $policy = (new ApprovalService($this->conn, $this->settings))->policy();
+            $total = array_sum(array_map(fn ($l) => round((float)$l['debit'], 2), $lines));
+            if (ApprovalService::requiresApproval($policy['enabled'], $policy['threshold'], $total)) {
+                $status = ApprovalService::PENDING;
+                $submitted = true;
+            }
+        }
+
         $existing = null;
         if ($id > 0) {
             $existing = $this->journalRow($id, $tenant_id);
@@ -148,7 +159,8 @@ class JournalService
             return $this->fail('The journal could not be saved. Nothing was changed.');
         }
 
-        $msg = $existing ? 'Journal updated.' : ($status === 'draft' ? 'Journal saved as a draft.' : 'Journal posted.');
+        $msg = $submitted ? "Journal {$journalCode} submitted for approval. It will post once an approver signs it off."
+            : ($existing ? 'Journal updated.' : ($status === 'draft' ? 'Journal saved as a draft.' : 'Journal posted.'));
         $after = self::describeLines($lines);
         $this->settings->log_audit(
             $existing ? ($status === 'posted' ? 'Posted draft journal' : 'Edited draft journal') : ($status === 'draft' ? 'Created draft journal' : 'Posted journal'),
@@ -440,6 +452,9 @@ class JournalService
         if ($s === 'draft') {
             return 'draft';
         }
+        if ($s === ApprovalService::PENDING) {
+            return 'pending';
+        }
         return in_array($s, ['cancelled', 'canceled', 'void', '2', '3'], true) ? 'cancelled' : 'posted';
     }
 
@@ -451,6 +466,7 @@ class JournalService
     {
         return match (self::statusKind($status)) {
             'draft' => null,
+            'pending' => "This journal is waiting for approval and cannot be {$verb}. An approver can approve it or return it to draft.",
             'cancelled' => "A cancelled journal is kept on record and cannot be {$verb}.",
             default => "A posted journal cannot be {$verb}. Reverse it to cancel its effect, then post a corrected journal.",
         };

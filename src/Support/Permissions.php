@@ -103,6 +103,9 @@ final class Permissions
      * them), so sensitive operations stay opt-in.
      */
     private const SPECIAL_PERMS = [
+        'Accounting' => [
+            'journals_approve' => 'Approve manual journals that are waiting for approval (never your own, unless self-approval is allowed)',
+        ],
         'Payroll' => [
             'payroll_process'  => 'Process payroll runs (Batch & Single Employee Run, retro pay)',
             'payroll_export'   => 'Download compliance & bank files (BSP/ANZ/HFC/BRED, FRCS, FNPF)',
@@ -415,6 +418,9 @@ final class Permissions
         'save_budget'           => ['accounts', 'edit'],
         'save_exchange_rate'    => ['settings_manage'],
         'post_fx_revaluation'   => ['journals', 'create'],
+        'approve_journal'       => ['journals_approve'],
+        'reject_journal'        => ['journals_approve'],
+        'save_approval_policy'  => ['settings_manage'],
         'save_tax_code'         => ['settings_manage'],
         'delete_tax_code'       => ['settings_manage'],
         // Closing or reopening the books changes what every other user may do: tenant-admin only.

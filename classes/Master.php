@@ -966,6 +966,21 @@ class Master extends DBConnection
         return $this->container->make(\App\Services\FxService::class)->revalue((string)($_POST['as_at'] ?? ''));
     }
 
+    public function approve_journal()
+    {
+        return $this->container->make(\App\Services\ApprovalService::class)->approve(intval($_POST['id'] ?? 0));
+    }
+
+    public function reject_journal()
+    {
+        return $this->container->make(\App\Services\ApprovalService::class)->reject(intval($_POST['id'] ?? 0), (string)($_POST['note'] ?? ''));
+    }
+
+    public function save_approval_policy()
+    {
+        return $this->container->make(\App\Services\ApprovalService::class)->savePolicy($_POST);
+    }
+
     public function save_tax_code()
     {
         return $this->container->make(\App\Services\TaxService::class)->saveCode($_POST);
@@ -1852,6 +1867,15 @@ switch ($action) {
         break;
     case 'post_fx_revaluation':
         echo $Master->post_fx_revaluation();
+        break;
+    case 'approve_journal':
+        echo $Master->approve_journal();
+        break;
+    case 'reject_journal':
+        echo $Master->reject_journal();
+        break;
+    case 'save_approval_policy':
+        echo $Master->save_approval_policy();
         break;
     case 'save_tax_code':
         echo $Master->save_tax_code();

@@ -69,6 +69,7 @@ class DBConnection{
                 $this->check_tax_migrations();
                 $this->check_fx_migrations();
                 $this->check_tenant_integrity_migrations();
+                $this->check_approval_migrations();
                 $this->check_dolibarr_crm_migrations();
                 $this->check_dolibarr_extended_migrations();
                 $this->check_extrafields_migrations();
@@ -964,6 +965,33 @@ class DBConnection{
     private function db_name(){
         $r = @$this->conn->query("SELECT DATABASE() d");
         return $r ? (string)($r->fetch_assoc()['d'] ?? '') : '';
+    }
+
+    public function check_approval_migrations(){
+        if (!$this->conn) return;
+
+        @$this->conn->query("CREATE TABLE IF NOT EXISTS `approval_policies` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `tenant_id` int(30) NOT NULL,
+          `doc_type` varchar(30) NOT NULL DEFAULT 'journal',
+          `enabled` tinyint(1) NOT NULL DEFAULT 0,
+          `threshold` decimal(18,2) NOT NULL DEFAULT 0.00,
+          `allow_self` tinyint(1) NOT NULL DEFAULT 0,
+          PRIMARY KEY (`id`),
+          UNIQUE KEY `policy_doc` (`tenant_id`, `doc_type`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        $cols = array(
+            'approved_by'   => "ALTER TABLE `journal_entries` ADD COLUMN `approved_by` int(50) DEFAULT NULL",
+            'approved_at'   => "ALTER TABLE `journal_entries` ADD COLUMN `approved_at` datetime DEFAULT NULL",
+            'approval_note' => "ALTER TABLE `journal_entries` ADD COLUMN `approval_note` varchar(500) DEFAULT NULL",
+        );
+        foreach ($cols as $col => $sql) {
+            $res = @$this->conn->query("SHOW COLUMNS FROM `journal_entries` LIKE '{$col}'");
+            if ($res && $res->num_rows == 0) {
+                @$this->conn->query($sql);
+            }
+        }
     }
 
     public function check_invoice_template_migrations(){
