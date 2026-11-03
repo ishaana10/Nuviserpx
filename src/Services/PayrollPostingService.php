@@ -17,9 +17,10 @@ use SystemSettings;
  *       Cr Income Tax Withheld Payable  income tax withheld (owed to the tax authority)
  *       Cr Employer Levies Payable      employer levies
  *       Cr Other Payroll Deductions Payable   other deductions taken from pay
- *       Cr Bank                         net pay
+ *       Cr Net Salaries Payable         net pay owed to employees (cleared to the bank when salaries are paid)
  *
- * so the ledger shows the full cost of employing people and what is still owed to each authority,
+ * Paying the salaries is a separate step (PayrollPaymentService): Dr Net Salaries Payable, Cr Bank.
+ * So the ledger shows the full cost of employing people and what is still owed to each authority,
  * instead of just net pay against cash.
  */
 class PayrollPostingService
@@ -31,6 +32,7 @@ class PayrollPostingService
         'pension'    => ['Pension Payable', 'Current Liability', 'Employee and employer pension contributions owed to the fund'],
         'tax'        => ['Income Tax Withheld Payable', 'Current Liability', 'Income tax withheld from pay, owed to the tax authority'],
         'levies'     => ['Employer Levies Payable', 'Current Liability', 'Employer payroll levies owed'],
+        'net'        => ['Net Salaries Payable', 'Current Liability', 'Net pay owed to employees until it is paid'],
         'other'      => ['Other Payroll Deductions Payable', 'Current Liability', 'Deductions taken from pay and owed to others'],
     ];
 
@@ -40,8 +42,7 @@ class PayrollPostingService
     ) {}
 
     /**
-     * Pure: the journal lines [account_id, side, amount] for one pay slip. $acc maps the ACCOUNTS keys plus 'bank'
-     * to account ids. Zero lines are left out. Throws if the figures do not balance to the cent.
+     * Pure: the journal lines [account_id, side, amount] for one pay slip. $acc maps the ACCOUNTS keys to account ids. Zero lines are left out. Throws if the figures do not balance to the cent.
      */
     public static function lines(array $p, array $acc): array
     {
@@ -57,7 +58,7 @@ class PayrollPostingService
             ['wages', $gross], ['er_pension', $erP], ['er_levies', $levies],
         ];
         $credits = [
-            ['pension', round($empP + $erP, 2)], ['tax', $tax], ['levies', $levies], ['other', $other], ['bank', $net],
+            ['pension', round($empP + $erP, 2)], ['tax', $tax], ['levies', $levies], ['other', $other], ['net', $net],
         ];
         $dr = round(array_sum(array_column($debits, 1)), 2);
         $cr = round(array_sum(array_column($credits, 1)), 2);
@@ -88,7 +89,7 @@ class PayrollPostingService
         ];
     }
 
-    /** Account ids for the tenant, creating missing payroll accounts. Throws if there is no bank account. */
+    /** Account ids for the tenant, creating missing payroll accounts. */
     public function accounts(): array
     {
         $t = (int)$this->settings->active_tenant_id();
@@ -96,15 +97,6 @@ class PayrollPostingService
         foreach (self::ACCOUNTS as $key => [$name, $type, $desc]) {
             $ids[$key] = $this->ensure($t, $name, $type, $desc);
         }
-        $b = $this->conn->prepare("SELECT id FROM account_list WHERE tenant_id = ? AND delete_flag = 0 AND status = 1 AND type = 'Bank'
-                                   ORDER BY code IS NULL, code = '', CAST(code AS UNSIGNED), id LIMIT 1");
-        $b->bind_param('i', $t);
-        $b->execute();
-        $bank = (int)($b->get_result()->fetch_assoc()['id'] ?? 0);
-        if ($bank === 0) {
-            throw new \RuntimeException('Add a bank account (account type Bank) before processing payroll.');
-        }
-        $ids['bank'] = $bank;
         return $ids;
     }
 

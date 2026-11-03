@@ -466,6 +466,14 @@ if($t_qry && $t_qry->num_rows > 0){
                                             <p>Payroll Approvals</p>
                                         </a>
                                     </li>
+                                    <?php if ($_settings->can_access('payroll_pay')): ?>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=payroll/pay_salaries" class="nav-link nav-payroll_pay_salaries tree-item">
+                                            <i class="nav-icon fas fa-money-check-alt text-success"></i>
+                                            <p>Pay Salaries</p>
+                                        </a>
+                                    </li>
+                                    <?php endif; ?>
                                     <?php if ($_settings->can_access('payroll_remit')): ?>
                                     <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=payroll/remittances" class="nav-link nav-payroll_remittances tree-item">

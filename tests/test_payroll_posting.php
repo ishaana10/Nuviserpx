@@ -6,7 +6,7 @@ use App\Services\PayrollPostingService as P;
 
 $fail = 0;
 function check($n, $c) { global $fail; echo ($c ? 'PASS' : 'FAIL') . " - $n\n"; if (!$c) $fail++; }
-$acc = ['wages' => 1, 'er_pension' => 2, 'er_levies' => 3, 'pension' => 4, 'tax' => 5, 'levies' => 6, 'other' => 7, 'bank' => 8];
+$acc = ['wages' => 1, 'er_pension' => 2, 'er_levies' => 3, 'pension' => 4, 'tax' => 5, 'levies' => 6, 'other' => 7, 'net' => 8];
 function totals($lines) { $d = $c = 0.0; foreach ($lines as [$a, $s, $x]) { $s === 1 ? $d += $x : $c += $x; } return [round($d, 2), round($c, 2)]; }
 function by($lines, $a) { foreach ($lines as $l) if ($l[0] === $a) return $l; return null; }
 
@@ -17,7 +17,7 @@ $lines = P::lines(P::figures($calc), $acc);
 check('balanced', $d === $c && $d > 0);
 check('debits = employer cost', abs($d - $calc['employer_cost']) < 0.005);
 check('wages debit = gross', by($lines, 1)[1] === 1 && abs(by($lines, 1)[2] - $calc['gross_salary']) < 0.005);
-check('bank credit = net pay', by($lines, 8)[1] === 2 && abs(by($lines, 8)[2] - $calc['net_salary']) < 0.005);
+check('net salaries payable credit = net pay', by($lines, 8)[1] === 2 && abs(by($lines, 8)[2] - $calc['net_salary']) < 0.005);
 check('pension payable = employee + employer', abs(by($lines, 4)[2] - ($calc['employee_pension'] + $calc['employer_pension'])) < 0.005);
 check('income tax payable = tax withheld', abs(by($lines, 5)[2] - $calc['income_tax']) < 0.005);
 check('other deductions payable', abs(by($lines, 7)[2] - 60.10) < 0.005);

@@ -263,6 +263,7 @@ class PayrollService
 				`employee_id` = '{$employee_id}',
 				`created_by` = '" . (int)$user_id . "',
 				`journal_id` = '{$journal_id}',
+				`payment_status` = 'unpaid',
 				`payroll_run_ref` = '{$payroll_run_ref}',
 				`salary_month` = '{$salary_month}',
 				`pay_frequency` = '{$pay_frequency}',
@@ -294,7 +295,10 @@ class PayrollService
 				`bank_code` = '{$bank_code}',
 				`bank_account` = '{$bank_account}'";
         } else {
-            $existing = $this->conn->query("SELECT journal_id FROM `payroll_list` WHERE id = '{$id}'")->fetch_assoc();
+            $existing = $this->conn->query("SELECT journal_id, payment_status FROM `payroll_list` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}' FOR UPDATE")->fetch_assoc();
+            if (($existing['payment_status'] ?? 'unpaid') === 'paid') {
+                throw new \RuntimeException('This payroll has already been paid. Reverse the salary payment before changing it.');
+            }
             $journal_id = isset($existing['journal_id']) ? $existing['journal_id'] : null;
             if ($journal_id) {
                 $trail = new JournalTrail($this->conn, $this->settings);
@@ -474,7 +478,10 @@ class PayrollService
         if ($lockMsg = \App\Services\PeriodLockService::guardDocument($this->conn, (int)$tenant_id, null, 'payroll_list', $id)) {
             return json_encode(['status' => 'failed', 'msg' => $lockMsg]);
         }
-        $existing = $this->conn->query("SELECT journal_id FROM `payroll_list` WHERE id = '{$id}' and tenant_id = '{$tenant_id}'")->fetch_assoc();
+        $existing = $this->conn->query("SELECT journal_id, payment_status FROM `payroll_list` WHERE id = '{$id}' and tenant_id = '{$tenant_id}'")->fetch_assoc();
+        if (($existing['payment_status'] ?? 'unpaid') === 'paid') {
+            return json_encode(['status' => 'failed', 'msg' => 'This payroll has already been paid. Reverse the salary payment before deleting it.']);
+        }
         if (!empty($existing['journal_id'])) {
             $this->conn->query("DELETE FROM `journal_entries` WHERE id = '{$existing['journal_id']}' and tenant_id = '{$tenant_id}'");
         }
