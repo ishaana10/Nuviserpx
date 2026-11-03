@@ -20,45 +20,25 @@ if ($from > $to) {
 }
 $tid = (int)$_settings->active_tenant_id();
 
-$invoices = [];
-$stmt = $conn->prepare("SELECT i.id, i.invoice_no, i.invoice_date, i.subtotal, i.discount, i.tax_amount, i.total, i.status, p.name party
-    FROM invoice_list i LEFT JOIN party_list p ON p.id = i.party_id
-    WHERE i.tenant_id = ? AND i.status NOT IN ('draft','cancelled') AND i.invoice_date BETWEEN ? AND ?
-    ORDER BY i.invoice_date, i.id");
-if ($stmt) {
-    $stmt->bind_param('iss', $tid, $from, $to);
-    $stmt->execute();
-    $res = $stmt->get_result();
-    $invoices = $res ? $res->fetch_all(MYSQLI_ASSOC) : [];
-}
-$inv_net = $inv_tax = 0.0;
+$svc = new \App\Services\TaxReturnService($conn, $_settings);
+$ret = $svc->compute($from, $to);
+$invoices = $ret['invoices'];
+$bills = $ret['bills'];
+$jv = $ret['jv'];
+$inv_net = $inv_tax = $bill_net = $bill_tax = 0.0;
 foreach ($invoices as $i) {
     $inv_net += (float)$i['total'] - (float)$i['tax_amount'];
     $inv_tax += (float)$i['tax_amount'];
 }
-
-$bills = [];
-$stmt = $conn->prepare("SELECT b.id, b.bill_no, b.bill_date, b.total, b.tax_amount, p.name party
-    FROM vendor_bill_list b LEFT JOIN party_list p ON p.id = b.vendor_id
-    WHERE b.tenant_id = ? AND b.status NOT IN ('draft','pending_approval','cancelled') AND b.tax_amount > 0 AND b.bill_date BETWEEN ? AND ?
-    ORDER BY b.bill_date, b.id");
-if ($stmt) {
-    $stmt->bind_param('iss', $tid, $from, $to);
-    $stmt->execute();
-    $res = $stmt->get_result();
-    $bills = $res ? $res->fetch_all(MYSQLI_ASSOC) : [];
-}
-$bill_net = $bill_tax = 0.0;
 foreach ($bills as $b) {
     $bill_net += (float)$b['total'] - (float)$b['tax_amount'];
     $bill_tax += (float)$b['tax_amount'];
 }
-
-$jv = LedgerService::vatFromJournalLines(nvr_ledger()->vatJournalLines($from, $to));
-
-$output_tax = round($inv_tax + $jv['output_tax'], 2);
-$input_tax = round($bill_tax + $jv['input_tax'], 2);
-$net = round($output_tax - $input_tax, 2);
+$output_tax = $ret['totals']['output_tax'];
+$input_tax = $ret['totals']['input_tax'];
+$net = $ret['totals']['net_tax'];
+$filed = $svc->filedOverlapping($from, $to);
+$lock_date = \App\Services\PeriodLockService::lockDate($conn, $tid);
 
 nvr_header([
     'page' => 'tax/report',
@@ -70,6 +50,20 @@ nvr_header([
     'subtitle' => nvr_nice_date($from) . ' – ' . nvr_nice_date($to),
 ]);
 ?>
+<?php if ($filed): ?>
+<div class="alert alert-success text-sm d-print-none">
+    A return for <?= htmlspecialchars($filed['period_from']) ?> to <?= htmlspecialchars($filed['period_to']) ?> was filed on <?= htmlspecialchars($filed['filed_date']) ?><?= $filed['reference'] ? ' (ref ' . htmlspecialchars($filed['reference']) . ')' : '' ?>
+    with net VAT <?= nvr_money($filed['net_tax'], false) ?>. <a href="./?page=tax/returns">See filed returns</a>.
+</div>
+<?php elseif ($_settings->can_access('tax_file') && $to <= date('Y-m-d')): ?>
+<div class="d-print-none mb-2">
+    <?php if ($lock_date !== null && $lock_date >= $to): ?>
+    <button type="button" class="btn btn-sm btn-success btn-flat" id="file-return"><i class="fas fa-stamp mr-1"></i> Record this return as filed</button>
+    <?php else: ?>
+    <span class="text-muted text-sm">To record this return as filed, first close the books up to <?= htmlspecialchars($to) ?>.</span>
+    <?php endif; ?>
+</div>
+<?php endif; ?>
 <div class="nvr-summary">
     <div class="nvr-stat"><div class="k">Taxable sales (net)</div><div class="v"><?= nvr_money($inv_net + $jv['output_net'], false) ?></div><div class="s"><?= count($invoices) ?> invoice<?= count($invoices) === 1 ? '' : 's' ?></div></div>
     <div class="nvr-stat"><div class="k">Output VAT</div><div class="v"><?= nvr_money($output_tax, false) ?></div><div class="s">Collected on sales</div></div>
@@ -161,6 +155,21 @@ if ($ledger['output'] !== null || $ledger['input'] !== null):
     </tbody>
 </table>
 </div>
+<?php endif; ?>
+<?php if (!$filed && $_settings->can_access('tax_file') && $lock_date !== null && $lock_date >= $to && $to <= date('Y-m-d')): ?>
+<script>
+$('#file-return').on('click', function(){
+    var ref = prompt('Reference given by the tax authority (optional):', '');
+    if (ref === null) return;
+    if (!confirm('Record the return for <?= $from ?> to <?= $to ?> as filed? The figures shown are saved as filed.')) return;
+    start_loader();
+    $.post(_base_url_ + 'classes/Master.php?f=file_tax_return', {period_from: '<?= $from ?>', period_to: '<?= $to ?>', filed_date: '<?= date('Y-m-d') ?>', reference: ref}, function(r){
+        end_loader();
+        if (r && r.status === 'success') { alert_toast(r.msg, 'success'); setTimeout(function(){ location.reload(); }, 800); }
+        else { alert_toast((r && r.msg) || 'Failed', 'error'); }
+    }, 'json').fail(function(){ end_loader(); alert_toast('An error occurred.', 'error'); });
+});
+</script>
 <?php endif; ?>
 <?php
 nvr_footer([

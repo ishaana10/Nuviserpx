@@ -108,6 +108,9 @@ final class Permissions
             'bills_approve'    => 'Approve vendor bills that are waiting for approval (never your own, unless self-approval is allowed)',
             'journals_approve' => 'Approve manual journals that are waiting for approval (never your own, unless self-approval is allowed)',
         ],
+        'Tax' => [
+            'tax_file'         => 'Record VAT returns as filed and void them (the books must be closed up to the end of the period)',
+        ],
         'Payroll' => [
             'payroll_process'  => 'Process payroll runs (Batch & Single Employee Run, retro pay)',
             'payroll_approve'  => 'Approve payroll runs and payroll payments that are waiting for approval (never your own, unless self-approval is allowed)',
@@ -441,6 +444,8 @@ final class Permissions
         'delete_tax_code'       => ['settings_manage'],
         // Closing or reopening the books changes what every other user may do: tenant-admin only.
         'set_period_lock'       => ['settings_manage'],
+        'file_tax_return'       => ['tax_file'],
+        'void_tax_return'       => ['tax_file'],
         // Invoices
         'save_invoice'          => ['invoices', 'save'],
         'delete_invoice'        => ['invoices', 'delete'],
@@ -778,6 +783,8 @@ final class Permissions
         }
         if ($page === 'payroll/rules_settings') {
             $perm = 'settings_manage';
+        } elseif ($page === 'tax/returns') {
+            $perm = 'tax_file';
         } elseif ($page === 'payroll/pay_salaries') {
             $perm = 'payroll_pay';
         } elseif ($page === 'payroll/remittances') {

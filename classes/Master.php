@@ -1081,6 +1081,16 @@ class Master extends DBConnection
         return $this->container->make(\App\Services\ApprovalService::class)->savePolicy($_POST);
     }
 
+    public function file_tax_return()
+    {
+        return $this->container->make(\App\Services\TaxReturnService::class)->file($_POST);
+    }
+
+    public function void_tax_return()
+    {
+        return $this->container->make(\App\Services\TaxReturnService::class)->void(intval($_POST['id'] ?? 0), (string)($_POST['reason'] ?? ''));
+    }
+
     public function save_tax_code()
     {
         return $this->container->make(\App\Services\TaxService::class)->saveCode($_POST);
@@ -2034,6 +2044,12 @@ switch ($action) {
         break;
     case 'save_approval_policy':
         echo $Master->save_approval_policy();
+        break;
+    case 'file_tax_return':
+        echo $Master->file_tax_return();
+        break;
+    case 'void_tax_return':
+        echo $Master->void_tax_return();
         break;
     case 'save_tax_code':
         echo $Master->save_tax_code();
