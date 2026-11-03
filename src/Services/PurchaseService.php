@@ -458,9 +458,12 @@ class PurchaseService
             $existing = $this->conn->query("SELECT journal_id FROM `vendor_bill_list` WHERE id = '{$id}'")->fetch_assoc();
             $journal_id = $existing['journal_id'] ?? null;
             if ($journal_id) {
+                $trail = new JournalTrail($this->conn, $this->settings);
+                $trailBefore = $trail->snapshot((int)$journal_id);
                 $this->conn->query("UPDATE `journal_entries` SET `description` = '{$description}', `journal_date` = '{$journal_date}' WHERE id = '{$journal_id}'");
                 $this->conn->query("DELETE FROM `journal_items` WHERE journal_id = '{$journal_id}'");
                 $this->postBillLines((int)$journal_id, (int)$ap_acc_id, (int)$exp_acc_id, (float)$total, (float)$tax_amount);
+                $trail->record((int)$journal_id, 'vendor_bill_list', (int)$id, "Bill {$bill_no}", $trailBefore);
             }
 
             $sql = "UPDATE `vendor_bill_list` SET

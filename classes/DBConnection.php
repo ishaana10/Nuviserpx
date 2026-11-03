@@ -74,6 +74,7 @@ class DBConnection{
                 $this->check_bill_approval_migrations();
                 $this->check_credit_note_migrations();
                 $this->check_fx_document_migrations();
+                $this->check_journal_trail_migrations();
                 $this->check_dolibarr_crm_migrations();
                 $this->check_dolibarr_extended_migrations();
                 $this->check_extrafields_migrations();
@@ -1026,6 +1027,25 @@ class DBConnection{
                 @$this->conn->query($sql);
             }
         }
+    }
+
+    public function check_journal_trail_migrations(){
+        if (!$this->conn) return;
+
+        @$this->conn->query("CREATE TABLE IF NOT EXISTS `journal_revisions` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `tenant_id` int(30) NOT NULL DEFAULT 1,
+          `journal_id` int(30) NOT NULL,
+          `source_table` varchar(40) NOT NULL,
+          `document_id` int(30) NOT NULL DEFAULT 0,
+          `label` varchar(150) NOT NULL DEFAULT '',
+          `changed_by` int(30) DEFAULT NULL,
+          `changed_at` datetime NOT NULL DEFAULT current_timestamp(),
+          `before_json` mediumtext NOT NULL,
+          `after_json` mediumtext NOT NULL,
+          PRIMARY KEY (`id`),
+          KEY `journal` (`tenant_id`, `journal_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     }
 
     public function check_fx_document_migrations(){

@@ -146,12 +146,15 @@ class PayrollService
             $existing = $this->conn->query("SELECT journal_id FROM `payroll_list` WHERE id = '{$id}'")->fetch_assoc();
             $journal_id = isset($existing['journal_id']) ? $existing['journal_id'] : null;
             if ($journal_id) {
+                $trail = new JournalTrail($this->conn, $this->settings);
+                $trailBefore = $trail->snapshot((int)$journal_id);
                 $this->conn->query("UPDATE `journal_entries` SET `description` = '{$description}', `journal_date` = '{$journal_date}' WHERE id = '{$journal_id}'");
                 $this->conn->query("DELETE FROM `journal_items` WHERE journal_id = '{$journal_id}'");
                 $j_items = "INSERT INTO `journal_items` (`journal_id`, `account_id`, `group_id`, `amount`) VALUES
 					('{$journal_id}', '{$salary_acc_id}', '1', '{$net_salary}'),
 					('{$journal_id}', '{$cash_acc_id}', '2', '{$net_salary}')";
                 $this->conn->query($j_items);
+                $trail->record((int)$journal_id, 'payroll_list', (int)$id, "Payroll {$id}", $trailBefore);
             }
 
             $sql = "UPDATE `payroll_list` SET

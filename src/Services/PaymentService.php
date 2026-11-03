@@ -105,12 +105,15 @@ class PaymentService
             $existing = $this->conn->query("SELECT journal_id FROM `payment_list` WHERE id = '{$id}'")->fetch_assoc();
             $journal_id = isset($existing['journal_id']) ? $existing['journal_id'] : null;
             if ($journal_id) {
+                $trail = new JournalTrail($this->conn, $this->settings);
+                $trailBefore = $trail->snapshot((int)$journal_id);
                 $this->conn->query("UPDATE `journal_entries` SET `description` = '{$description}', `journal_date` = '{$journal_date}' WHERE id = '{$journal_id}'");
                 $this->conn->query("DELETE FROM `journal_items` WHERE journal_id = '{$journal_id}'");
                 $j_items = "INSERT INTO `journal_items` (`journal_id`, `account_id`, `group_id`, `amount`) VALUES
 					('{$journal_id}', '{$cash_acc_id}', '1', '{$amount}'),
 					('{$journal_id}', '{$ar_acc_id}', '2', '{$amount}')";
                 $this->conn->query($j_items);
+                $trail->record((int)$journal_id, 'payment_list', (int)$id, "Receipt {$payment_no}", $trailBefore);
             }
 
             $bank_account_sql = $bank_account_id ? "'{$bank_account_id}'" : "NULL";
@@ -324,6 +327,8 @@ class PaymentService
                 $e = $this->conn->query("SELECT journal_id FROM `payment_list` WHERE id = '{$payId}' AND tenant_id = '{$tenant_id}'")->fetch_assoc();
                 $journalId = (int)($e['journal_id'] ?? 0);
             }
+            $trail = new JournalTrail($this->conn, $this->settings);
+            $trailBefore = $journalId > 0 ? $trail->snapshot($journalId) : null;
             if ($journalId > 0) {
                 $this->conn->query("UPDATE `journal_entries` SET `description` = '{$desc}', `journal_date` = '{$payment_date}' WHERE id = '{$journalId}'");
                 $this->conn->query("DELETE FROM `journal_items` WHERE journal_id = '{$journalId}'");
@@ -334,6 +339,9 @@ class PaymentService
             }
             if (!$tax->writeLines($journalId, $lines)) {
                 throw new \RuntimeException('The receipt journal could not be posted.');
+            }
+            if ($trailBefore !== null) {
+                $trail->record($journalId, 'payment_list', $payId, "Receipt {$payment_no}", $trailBefore);
             }
 
             // Receipt row

@@ -83,6 +83,18 @@ if ($journal) {
         </tbody>
         <tfoot><tr><td colspan="3">Total<?php if (abs($tdr - $tcr) >= 0.005): ?> <span class="badge badge-danger ml-2">Out by <?= number_format(abs($tdr - $tcr), 2) ?></span><?php endif; ?></td><td class="num"><?= number_format($tdr, 2) ?></td><td class="num"><?= number_format($tcr, 2) ?></td></tr></tfoot>
     </table>
+    <?php $revs = (new \App\Services\JournalTrail($conn, $_settings))->history($id); if ($revs): ?>
+        <div class="mt-3 text-sm">
+            <div class="font-weight-bold mb-1">Revision history <span class="badge badge-warning"><?= count($revs) ?></span></div>
+            <?php foreach ($revs as $r): $total = static fn($ls) => array_sum(array_map(static fn($l) => $l[1] === 1 ? $l[2] : 0, $ls ?? [])); ?>
+                <div class="border rounded p-2 mb-1">
+                    <?= date('j M Y H:i', strtotime($r['changed_at'])) ?> · <?= htmlspecialchars(trim((string)$r['author']) ?: 'Unknown') ?> · <?= htmlspecialchars($r['label']) ?><br>
+                    <span class="text-muted">Was: <?= htmlspecialchars((string)($r['before']['date'] ?? '')) ?>, <?= count($r['before']['lines'] ?? []) ?> lines, debits <?= number_format($total($r['before']['lines'] ?? []), 2) ?>
+                    &nbsp;→&nbsp; Now: <?= htmlspecialchars((string)($r['after']['date'] ?? '')) ?>, <?= count($r['after']['lines'] ?? []) ?> lines, debits <?= number_format($total($r['after']['lines'] ?? []), 2) ?></span>
+                </div>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
     <div class="jv-actions">
         <?php if (!$cancelled && !$source): ?>
             <a class="btn btn-default" href="./?page=journals/manage_journal&id=<?= $id ?>"><i class="fas fa-edit mr-1"></i> Edit</a>
