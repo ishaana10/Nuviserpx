@@ -73,6 +73,14 @@ check(isset($rc[0][3]) && $rc[0][3]['amount_fc'] === 1000.0, 'a receipt into a f
 check(!isset(F::receiptLines(10, 20, 30, 2300.00, 2250.00, 'USD', 2.30, 1000)[0][3]), 'a receipt into a company-currency account does not');
 check(net($rc) === 0.0, 'the tagged receipt still balances');
 
+echo "\n=== Foreign bank reconciliation ===\n";
+check(F::untracked(2250.00, 2250.00) === 0.0, 'a fully tagged account has nothing untracked');
+check(F::untracked(3000.00, 2250.00) === 750.0, 'balance from before the account was foreign shows as untracked');
+check(F::untracked(2250.004, 2250.00) === 0.0, 'sub-cent differences are ignored');
+$rs = file_get_contents(__DIR__ . '/../src/Services/BankReconciliationService.php');
+check(strpos($rs, 'movementAmountSql') !== false && strpos($rs, 'ji.amount_fc') !== false, 'a foreign account is matched on foreign amounts');
+check(strpos($rs, "'untracked_base'") !== false, 'the summary reports untracked balance');
+
 echo "\n=== Plumbing ===\n";
 $m = file_get_contents(__DIR__ . '/../classes/DBConnection.php');
 check(strpos($m, 'check_fx_document_migrations();') !== false, 'the migration is in the chain');

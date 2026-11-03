@@ -394,6 +394,33 @@ class FxService
         return ['fc_net' => (float)($r['fc_net'] ?? 0), 'base_net' => (float)($r['base_net'] ?? 0)];
     }
 
+    /**
+     * Base value on a foreign account that no foreign amount stands behind (entries from before the account was
+     * foreign, or untagged lines). Revaluation and statement matching can't see it. Zero when everything is tagged.
+     */
+    public function untrackedBase(int $accountId, string $asOf): float
+    {
+        $t = $this->tenantId();
+        $side = LedgerService::SIDE_SQL;
+        $posted = LedgerService::POSTED_SQL;
+        $stmt = $this->conn->prepare("SELECT COALESCE(SUM(CASE WHEN {$side} = 1 THEN ji.amount ELSE -ji.amount END), 0) base_net
+            FROM journal_items ji
+            INNER JOIN journal_entries j ON j.id = ji.journal_id AND j.tenant_id = ? AND j.journal_date <= ? AND {$posted}
+            LEFT JOIN group_list g ON g.id = ji.group_id
+            WHERE ji.account_id = ?");
+        $stmt->bind_param('isi', $t, $asOf, $accountId);
+        $stmt->execute();
+        $all = (float)($stmt->get_result()->fetch_assoc()['base_net'] ?? 0);
+        return self::untracked($all, $this->bankPosition($accountId, $asOf)['base_net']);
+    }
+
+    /** Pure: ledger balance less the part carried against foreign amounts. */
+    public static function untracked(float $ledgerBase, float $taggedBase): float
+    {
+        $d = round($ledgerBase - $taggedBase, 2);
+        return abs($d) < 0.005 ? 0.0 : $d;
+    }
+
     public function isForeign(?string $currency): bool
     {
         $c = strtoupper(trim((string)$currency));

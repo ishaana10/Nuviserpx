@@ -37,13 +37,25 @@ class BankReconciliationService
     }
 
     /**
+     * The amount a statement is compared with. A company-currency account compares base amounts. A foreign-currency
+     * account's statement is in its own currency, so it compares the foreign amounts recorded on the lines; lines
+     * with no foreign amount (a revaluation, or an entry made before the account was foreign) don't move it.
+     */
+    private function movementAmountSql(int $accountId): string
+    {
+        $foreign = (new FxService($this->conn, $this->settings))->bankCurrency($accountId) !== null;
+        return $foreign ? "(CASE WHEN ji.currency IS NOT NULL AND ji.currency <> '' THEN COALESCE(ji.amount_fc, 0) ELSE 0 END)" : 'ji.amount';
+    }
+
+    /**
      * Signed book movement of one journal entry on a given bank account.
      * Positive = net debit (money in), negative = net credit (money out).
      */
     private function journalBankMovement(int $journal_id, int $account_id, int $tenant_id): float
     {
         $side = LedgerService::SIDE_SQL;
-        $sql = "SELECT COALESCE(SUM(CASE WHEN {$side} = 1 THEN ji.amount ELSE -ji.amount END),0) mv
+        $amt = $this->movementAmountSql($account_id);
+        $sql = "SELECT COALESCE(SUM(CASE WHEN {$side} = 1 THEN {$amt} ELSE -{$amt} END),0) mv
                 FROM journal_items ji
                 INNER JOIN journal_entries j ON j.id = ji.journal_id
                 LEFT JOIN group_list g ON g.id = ji.group_id
@@ -320,6 +332,8 @@ class BankReconciliationService
             'difference'         => $difference,
             'unmatched_lines'    => (int)$unm['n'],
             'balanced'           => abs($difference) <= 0.009,
+            'currency'           => $cur = (new FxService($this->conn, $this->settings))->bankCurrency((int)$rec['account_id']),
+            'untracked_base'     => $cur !== null ? (new FxService($this->conn, $this->settings))->untrackedBase((int)$rec['account_id'], (string)$rec['statement_date']) : 0.0,
         ];
     }
 
@@ -335,9 +349,10 @@ class BankReconciliationService
         $side = LedgerService::SIDE_SQL;
         $posted = LedgerService::POSTED_SQL;
         $dateClause = $up_to ? "AND j.journal_date <= ?" : '';
+        $amt = $this->movementAmountSql($account_id);
 
         $sql = "SELECT j.id journal_id, j.code, j.journal_date, j.description,
-                    COALESCE(SUM(CASE WHEN {$side} = 1 THEN ji.amount ELSE -ji.amount END),0) movement
+                    COALESCE(SUM(CASE WHEN {$side} = 1 THEN {$amt} ELSE -{$amt} END),0) movement
                 FROM journal_items ji
                 INNER JOIN journal_entries j ON j.id = ji.journal_id
                 LEFT JOIN group_list g ON g.id = ji.group_id

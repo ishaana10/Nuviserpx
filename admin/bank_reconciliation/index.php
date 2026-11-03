@@ -53,15 +53,16 @@ if ($_settings->chk_flashdata('success')):
 					if ($recs): while ($row = $recs->fetch_assoc()):
 						$sum = $svc->summary((int)$row['id'], (int)$tenant_id);
 						$diff = $sum ? $sum['difference'] : 0.0;
+						$sym = !empty($sum['currency']) ? $sum['currency'] . ' ' : '$';
 						$is_done = $row['status'] === 'reconciled';
 					?>
 						<tr>
 							<td class="text-center"><?php echo $i++; ?></td>
 							<td><b><?php echo htmlspecialchars($row['acc_name']) ?></b> <small class="text-muted"><?php echo htmlspecialchars((string)$row['acc_code']) ?></small></td>
 							<td><?php echo date("d M Y", strtotime($row['statement_date'])) ?></td>
-							<td class="text-right">$<?php echo number_format((float)$row['opening_balance'], 2) ?></td>
-							<td class="text-right">$<?php echo number_format((float)$row['closing_balance'], 2) ?></td>
-							<td class="text-right <?php echo abs($diff) > 0.009 ? 'text-danger font-weight-bold' : 'text-success' ?>">$<?php echo number_format($diff, 2) ?></td>
+							<td class="text-right"><?php echo $sym . number_format((float)$row['opening_balance'], 2) ?></td>
+							<td class="text-right"><?php echo $sym . number_format((float)$row['closing_balance'], 2) ?></td>
+							<td class="text-right <?php echo abs($diff) > 0.009 ? 'text-danger font-weight-bold' : 'text-success' ?>"><?php echo $sym . number_format($diff, 2) ?></td>
 							<td class="text-center">
 								<span class="badge badge-<?php echo $is_done ? 'success' : 'warning' ?> px-2 py-1"><?php echo $is_done ? 'RECONCILED' : 'IN PROGRESS' ?></span>
 							</td>

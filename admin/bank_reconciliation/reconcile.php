@@ -29,6 +29,7 @@ $mm = $conn->query("SELECT m.*, j.code, j.journal_date, j.description FROM `bank
 if ($mm) { while ($r = $mm->fetch_assoc()) { $matched_map[(int)$r['statement_line_id']] = $r; } }
 
 $fmt = fn($n) => number_format((float)$n, 2);
+$sym = !empty($sum['currency']) ? $sum['currency'] . ' ' : '$';
 ?>
 <style>
 	.rec-wrap { max-width: 1200px; margin: 0 auto; }
@@ -66,12 +67,18 @@ $fmt = fn($n) => number_format((float)$n, 2);
 		</div>
 	</div>
 
+	<?php if (!empty($sum['currency']) && abs($sum['untracked_base']) > 0.004): ?>
+	<div class="alert alert-warning py-2 text-sm">
+		This is a <?php echo htmlspecialchars($sum['currency']) ?> account, but <b><?php echo number_format($sum['untracked_base'], 2) ?></b> of its balance in company currency has no <?php echo htmlspecialchars($sum['currency']) ?> amount behind it
+		(entries from before the account was set up, or without a foreign amount). Statement matching and revaluation can't see those entries. To bring them in, post one manual journal: credit this account for that amount in company currency, and debit this account again with the <?php echo htmlspecialchars($sum['currency']) ?> amount (type the rate that makes it the same value). The balance does not change; it just gains its foreign amount.
+	</div>
+	<?php endif; ?>
 	<div class="rec-bal">
-		<div class="box"><div class="k">Opening</div><div class="v">$<?php echo $fmt($rec['opening_balance']) ?></div></div>
-		<div class="box"><div class="k">Closing</div><div class="v">$<?php echo $fmt($rec['closing_balance']) ?></div></div>
-		<div class="box"><div class="k">Statement movement</div><div class="v">$<?php echo $fmt($sum['statement_movement']) ?></div></div>
-		<div class="box"><div class="k">Matched (book)</div><div class="v" id="matched_box">$<?php echo $fmt($sum['matched_movement']) ?></div></div>
-		<div class="box diff"><div class="k">Difference</div><div class="v <?php echo $sum['balanced'] ? 'ok' : 'bad' ?>" id="diff_box">$<?php echo $fmt($sum['difference']) ?></div></div>
+		<div class="box"><div class="k">Opening</div><div class="v"><?php echo $sym . $fmt($rec['opening_balance']) ?></div></div>
+		<div class="box"><div class="k">Closing</div><div class="v"><?php echo $sym . $fmt($rec['closing_balance']) ?></div></div>
+		<div class="box"><div class="k">Statement movement</div><div class="v"><?php echo $sym . $fmt($sum['statement_movement']) ?></div></div>
+		<div class="box"><div class="k">Matched (book)</div><div class="v" id="matched_box"><?php echo $sym . $fmt($sum['matched_movement']) ?></div></div>
+		<div class="box diff"><div class="k">Difference</div><div class="v <?php echo $sum['balanced'] ? 'ok' : 'bad' ?>" id="diff_box"><?php echo $sym . $fmt($sum['difference']) ?></div></div>
 	</div>
 
 	<?php if (!$is_done): ?>
