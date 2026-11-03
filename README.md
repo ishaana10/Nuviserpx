@@ -8,8 +8,9 @@
 
 - **Multi-Tenant Architecture:** Multi-company support with instant active tenant switching and complete data isolation.
 - **Accounting & Journal Management:** Double-entry journal vouchers, account groups, chart of accounts, trial balance, and working trial balance reports.
-- **Payroll & Human Resources:** Employee master profiles, attendance logging, leave request workflow, automated payroll processing with printable payslips.
-- **Automated Journal Postings:** Payroll disbursements automatically create and post balanced GL journal entries (Debits: Salaries Expense, Credits: Cash/Payable).
+- **Payroll & Human Resources:** Employee master profiles, attendance logging, leave request workflow, rules-driven payroll (pension rates, tax bands, overtime tiers and employer levies are settings with effective dates, not code), retroactive pay, printable payslips, and bank, tax and pension export files.
+- **Automated Journal Postings:** Payroll posts balanced journals with the full employer cost (wages, employer pension, employer levies) against what is owed to employees, the pension fund and the tax authority; remittances then pay those liabilities down.
+- **Accounting controls:** period locks, immutable posted entries with a reversal-only workflow, a journal audit trail, maker/checker approvals, gapless document numbering, and database-level integrity (exact `DECIMAL` money, explicit debit/credit side, enforced account types and codes, tenant foreign keys). See [docs/ACCOUNTING_CONTROLS.md](docs/ACCOUNTING_CONTROLS.md).
 - **Executive ApexCharts Dashboard:** Interactive real-time analytics for financial movement (Debits vs. Credits), department payroll expense distribution, and workforce attendance analytics.
 - **Modern UI & Security:** Glassmorphism dashboard cards, responsive navigation, email OTP password resets, and SMTP settings.
 

@@ -87,6 +87,7 @@ class DBConnection{
                 $this->check_vms_v3_migrations();
                 $this->check_frcs_accreditation_migrations();
                 $this->check_2026_statutory_migrations();
+                $this->check_integrity_hardening_migrations();
             }
 
             // Run versioned migrations
@@ -950,6 +951,107 @@ class DBConnection{
     private function add_index_if_missing($table, $name, $cols){
         if ($this->table_exists($table) && !$this->index_exists($table, $name)) {
             @$this->conn->query("ALTER TABLE `{$table}` ADD INDEX `{$name}` {$cols}");
+        }
+    }
+
+    /** Pure: the SQL list of account types the chart offers, e.g. 'Bank','Current Asset',… */
+    public static function account_type_sql_list(array $groups){
+        $out = array();
+        foreach ($groups as $types) {
+            foreach ($types as $t) {
+                $out[] = "'" . str_replace("'", "''", $t) . "'";
+            }
+        }
+        return implode(',', $out);
+    }
+
+    /** True at most once a day per key, so heavy integrity sweeps do not run on every request. */
+    private function once_a_day($key){
+        $today = date('Y-m-d');
+        $k = $this->conn->real_escape_string($key);
+        $r = @$this->conn->query("SELECT meta_value FROM `system_info` WHERE meta_field = '{$k}' LIMIT 1");
+        $row = $r ? $r->fetch_assoc() : null;
+        if ($row && $row['meta_value'] === $today) return false;
+        if ($row) {
+            @$this->conn->query("UPDATE `system_info` SET meta_value = '{$today}' WHERE meta_field = '{$k}'");
+        } else {
+            @$this->conn->query("INSERT INTO `system_info` (meta_field, meta_value) VALUES ('{$k}', '{$today}')");
+        }
+        return true;
+    }
+
+    private function table_has_constraint($table, $name){
+        $r = @$this->conn->query("SHOW CREATE TABLE `{$table}`");
+        $row = $r ? $r->fetch_row() : null;
+        return $row && stripos((string)$row[1], $name) !== false;
+    }
+
+    /**
+     * Database-level integrity, so data that bypasses the app (imports, scripts, SQL) cannot break the ledger:
+     *  1. account_list.type must be a chart-of-accounts type (CHECK constraint).
+     *  2. account_list.code is required (NOT NULL + CHECK not empty).
+     *  3. every tenant_id column references tenants(id).
+     * Each step is added only when the existing data already satisfies it, so nothing is rejected or rewritten
+     * silently; a step that is skipped is written to the error log with the reason. Runs at most once a day.
+     */
+    public function check_integrity_hardening_migrations(){
+        if (!$this->conn || !$this->table_exists('account_list')) return;
+        if (!$this->once_a_day('integrity_sweep')) return;
+
+        // 1. Account type.
+        if (class_exists('App\\Services\\AccountService') && !$this->table_has_constraint('account_list', 'chk_account_type')) {
+            $list = self::account_type_sql_list(\App\Services\AccountService::ACCOUNT_TYPES);
+            $bad = @$this->conn->query("SELECT type, COUNT(*) n FROM `account_list` WHERE delete_flag = 0 AND type NOT IN ({$list}) GROUP BY type LIMIT 5");
+            if ($bad && $bad->num_rows === 0) {
+                // Archived accounts keep whatever type they had, so the constraint covers live accounts only via a lenient check.
+                $bad2 = @$this->conn->query("SELECT 1 FROM `account_list` WHERE type NOT IN ({$list}) LIMIT 1");
+                if ($bad2 && $bad2->num_rows === 0) {
+                    @$this->conn->query("ALTER TABLE `account_list` ADD CONSTRAINT `chk_account_type` CHECK (`type` IN ({$list}))");
+                } else {
+                    error_log('Nuvis: account type constraint skipped: deleted accounts carry unrecognised types.');
+                }
+            } elseif ($bad) {
+                $found = array();
+                while ($b = $bad->fetch_assoc()) $found[] = $b['type'] . ' (' . $b['n'] . ')';
+                error_log('Nuvis: account type constraint skipped: unrecognised types in use: ' . implode(', ', $found));
+            }
+        }
+
+        // 2. Account code.
+        $col = @$this->conn->query("SHOW COLUMNS FROM `account_list` LIKE 'code'");
+        $c = $col ? $col->fetch_assoc() : null;
+        if ($c && ($c['Null'] ?? '') === 'YES') {
+            $miss = @$this->conn->query("SELECT 1 FROM `account_list` WHERE code IS NULL OR TRIM(code) = '' LIMIT 1");
+            if ($miss && $miss->num_rows === 0) {
+                @$this->conn->query("ALTER TABLE `account_list` MODIFY `code` varchar(50) NOT NULL");
+            } elseif ($miss) {
+                error_log('Nuvis: account code requirement skipped: some accounts have no code.');
+            }
+        }
+        if ($c && !$this->table_has_constraint('account_list', 'chk_account_code')) {
+            $miss = @$this->conn->query("SELECT 1 FROM `account_list` WHERE TRIM(code) = '' LIMIT 1");
+            if ($miss && $miss->num_rows === 0) {
+                @$this->conn->query("ALTER TABLE `account_list` ADD CONSTRAINT `chk_account_code` CHECK (TRIM(`code`) <> '')");
+            }
+        }
+
+        // 3. Tenant foreign keys on every table that has a tenant_id and does not have one yet.
+        $db = $this->conn->real_escape_string($this->db_name());
+        $r = @$this->conn->query("SELECT c.TABLE_NAME t FROM information_schema.COLUMNS c
+            JOIN information_schema.TABLES tb ON tb.TABLE_SCHEMA = c.TABLE_SCHEMA AND tb.TABLE_NAME = c.TABLE_NAME AND tb.TABLE_TYPE = 'BASE TABLE'
+            WHERE c.TABLE_SCHEMA = '{$db}' AND c.COLUMN_NAME = 'tenant_id' AND c.TABLE_NAME <> 'tenants'
+              AND NOT EXISTS (SELECT 1 FROM information_schema.KEY_COLUMN_USAGE k WHERE k.TABLE_SCHEMA = c.TABLE_SCHEMA AND k.TABLE_NAME = c.TABLE_NAME
+                              AND k.COLUMN_NAME = 'tenant_id' AND k.REFERENCED_TABLE_NAME = 'tenants')");
+        if ($r) {
+            $tables = array();
+            while ($row = $r->fetch_assoc()) $tables[] = $row['t'];
+            foreach ($tables as $tbl) {
+                $before = $this->table_has_constraint($tbl, 'fk_' . $tbl . '_tenant');
+                $this->add_tenant_fk($tbl);
+                if (!$before && !$this->table_has_constraint($tbl, 'fk_' . $tbl . '_tenant')) {
+                    error_log("Nuvis: tenant foreign key skipped on {$tbl} (not InnoDB, or rows point at a missing tenant).");
+                }
+            }
         }
     }
 
