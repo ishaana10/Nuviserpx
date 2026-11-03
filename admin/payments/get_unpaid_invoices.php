@@ -57,7 +57,7 @@ if($invoices->num_rows == 0){
             while($inv = $invoices->fetch_assoc()):
                 $inv_id = $inv['id'];
                 $curr_alloc = isset($existing_alloc[$inv_id]) ? $existing_alloc[$inv_id] : 0;
-                $balance_due = $is_fc ? round((float)$inv['total_fc'] - (float)$inv['paid_fc'], 2) + $curr_alloc : (float)$inv['balance'] + $curr_alloc;
+                $balance_due = $is_fc ? round((float)$inv['total_fc'] - (float)$inv['paid_fc'] - (float)$inv['credited_fc'], 2) + $curr_alloc : (float)$inv['balance'] + $curr_alloc;
                 $sym = $is_fc ? $sel_currency . ' ' : '$';
                 $shown_total = $is_fc ? (float)$inv['total_fc'] : (float)$inv['total'];
                 $default_amt = $curr_alloc > 0 ? $curr_alloc : (($preset_invoice_id == $inv_id) ? $balance_due : 0);

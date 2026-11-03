@@ -8,6 +8,9 @@ $queue = $svc->pending();
 $billPolicy = $svc->policy(\App\Services\ApprovalService::DOC_BILL);
 $billQueue = $svc->pendingBills();
 $can_approve_bill = $_settings->can_access('bills_approve');
+$payPolicy = $svc->policy(\App\Services\ApprovalService::DOC_BILL_PAYMENT);
+$payQueue = (new \App\Services\BillPaymentService($conn, $_settings))->pendingApproval();
+$can_approve_pay = $_settings->can_access('bill_payments_approve');
 $me = (int)$_settings->userdata('id');
 $can_approve = $_settings->can_access('journals_approve');
 $can_configure = $_settings->can_access('settings_manage');
@@ -144,6 +147,67 @@ $can_configure = $_settings->can_access('settings_manage');
             <p class="text-xs text-muted mt-2">Needs the “Approve vendor bills” permission on the role. A pending bill cannot be edited or paid.</p>
         </div>
     </div>
+    <div class="row">
+        <div class="col-lg-8 mb-3">
+            <div class="card shadow-sm">
+                <div class="card-header font-weight-bold">Supplier payments waiting for approval <span class="badge badge-warning ml-1"><?= count($payQueue) ?></span></div>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead><tr><th>Date</th><th>Payment</th><th>Vendor</th><th class="text-right">Amount</th><th>Entered by</th><th class="text-center" width="22%">Action</th></tr></thead>
+                        <tbody>
+                        <?php foreach ($payQueue as $q): $mine = (int)$q['created_by'] === $me; ?>
+                            <tr>
+                                <td style="white-space:nowrap"><?= date('j M Y', strtotime($q['payment_date'])) ?></td>
+                                <td class="font-weight-bold"><?= htmlspecialchars($q['payment_no']) ?></td>
+                                <td><?= htmlspecialchars((string)$q['vendor']) ?></td>
+                                <td class="text-right"><?= number_format((float)$q['amount'], 2) ?></td>
+                                <td><?= htmlspecialchars(trim((string)$q['author']) ?: '—') ?><?= $mine ? ' <span class="badge badge-light">you</span>' : '' ?></td>
+                                <td class="text-center" style="white-space:nowrap">
+                                    <?php if ($can_approve_pay): ?>
+                                        <?php if ($mine && !$payPolicy['allow_self']): ?>
+                                            <span class="text-muted text-xs">Needs another approver</span>
+                                        <?php else: ?>
+                                            <button class="btn btn-xs btn-success approve-p" data-id="<?= (int)$q['id'] ?>">Approve</button>
+                                        <?php endif; ?>
+                                        <button class="btn btn-xs btn-outline-secondary return-p" data-id="<?= (int)$q['id'] ?>">Return</button>
+                                    <?php else: ?>
+                                        <span class="text-muted text-xs">Awaiting an approver</span>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                        <?php if (!$payQueue): ?><tr><td colspan="6" class="text-center text-muted py-4">No supplier payments are waiting for approval.</td></tr><?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4 mb-3">
+            <div class="card shadow-sm">
+                <div class="card-header font-weight-bold">Supplier payment policy</div>
+                <form id="form_pay_policy" class="card-body">
+                    <input type="hidden" name="doc_type" value="bill_payment">
+                    <fieldset <?= $can_configure ? '' : 'disabled' ?>>
+                        <div class="custom-control custom-switch mb-3">
+                            <input type="checkbox" class="custom-control-input" id="ppol_enabled" name="enabled" value="1" <?= $payPolicy['enabled'] ? 'checked' : '' ?>>
+                            <label class="custom-control-label font-weight-bold" for="ppol_enabled">Require approval for supplier payments</label>
+                        </div>
+                        <div class="form-group">
+                            <label class="font-weight-bold">Approve payments of</label>
+                            <input type="number" name="threshold" class="form-control text-right" step="0.01" min="0" value="<?= number_format($payPolicy['threshold'], 2, '.', '') ?>">
+                            <small class="text-muted">or more. 0 means every payment.</small>
+                        </div>
+                        <div class="custom-control custom-checkbox mb-3">
+                            <input type="checkbox" class="custom-control-input" id="ppol_self" name="allow_self" value="1" <?= $payPolicy['allow_self'] ? 'checked' : '' ?>>
+                            <label class="custom-control-label" for="ppol_self">Let people approve their own payments</label>
+                        </div>
+                        <?php if ($can_configure): ?><button class="btn btn-primary btn-sm font-weight-bold" type="submit">Save policy</button><?php endif; ?>
+                    </fieldset>
+                </form>
+            </div>
+            <p class="text-xs text-muted mt-2">Needs the “Approve supplier payments” permission. Until approved, a payment does not touch the ledger and its bills stay unpaid.</p>
+        </div>
+    </div>
 </div>
 <script>
 $(function () {
@@ -168,6 +232,12 @@ $(function () {
         if (note && note.trim()) { post('reject_bill', { id: $(this).data('id'), note: note }); }
     });
     $('#form_bill_policy').on('submit', function (e) { e.preventDefault(); post('save_approval_policy', $(this).serialize()); });
+    $('.approve-p').on('click', function () { post('approve_bill_payment', { id: $(this).data('id') }); });
+    $('.return-p').on('click', function () {
+        var note = window.prompt('Why is this payment being returned?');
+        if (note && note.trim()) { post('reject_bill_payment', { id: $(this).data('id'), note: note }); }
+    });
+    $('#form_pay_policy').on('submit', function (e) { e.preventDefault(); post('save_approval_policy', $(this).serialize()); });
     $('#form_policy').on('submit', function (e) { e.preventDefault(); post('save_approval_policy', $(this).serialize()); });
 });
 </script>

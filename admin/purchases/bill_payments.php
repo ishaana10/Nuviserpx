@@ -66,8 +66,8 @@ $preset_vendor = (int)($_GET['vendor_id'] ?? 0);
                         <td><?= htmlspecialchars(ucfirst(str_replace('_', ' ', $p['method']))) ?></td>
                         <td><?= htmlspecialchars(implode(', ', array_map(fn($a) => $a['bill_no'] . ' (' . number_format((float)$a['amount'], 2) . ')', $al))) ?></td>
                         <td class="text-right"><?= number_format((float)$p['amount'], 2) ?></td>
-                        <td><span class="badge badge-<?= $p['status'] === 'void' ? 'dark' : 'success' ?>"><?= strtoupper($p['status']) ?></span></td>
-                        <td><?php if ($p['status'] === 'posted' && $can_void): ?><button class="btn btn-xs btn-outline-danger void-bp" data-id="<?= (int)$p['id'] ?>">Void</button><?php endif; ?></td>
+                        <td><span class="badge badge-<?= $p['status'] === 'void' ? 'dark' : ($p['status'] === 'pending_approval' ? 'warning' : 'success') ?>"><?= strtoupper(str_replace('_', ' ', $p['status'])) ?></span></td>
+                        <td><?php if (in_array($p['status'], ['posted', 'pending_approval'], true) && $can_void): ?><button class="btn btn-xs btn-outline-danger void-bp" data-id="<?= (int)$p['id'] ?>">Void</button><?php endif; ?></td>
                     </tr>
                 <?php endforeach; ?>
                 <?php if (!$payments): ?><tr><td colspan="8" class="text-center text-muted py-4">No supplier payments yet.</td></tr><?php endif; ?>

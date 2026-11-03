@@ -275,7 +275,7 @@ class PaymentService
                     continue;
                 }
                 $invId = (int)$invId;
-                $q = $this->conn->prepare("SELECT invoice_no, currency, fx_rate, total, total_fc, status FROM `invoice_list` WHERE id = ? AND tenant_id = ? AND party_id = ? FOR UPDATE");
+                $q = $this->conn->prepare("SELECT invoice_no, currency, fx_rate, total, total_fc, credited_fc, credited_amount, status FROM `invoice_list` WHERE id = ? AND tenant_id = ? AND party_id = ? FOR UPDATE");
                 $q->bind_param('iii', $invId, $tenant_id, $party_id);
                 $q->execute();
                 $inv = $q->get_result()->fetch_assoc();
@@ -289,8 +289,8 @@ class PaymentService
                 $o->bind_param('ii', $invId, $payId);
                 $o->execute();
                 $other = $o->get_result()->fetch_assoc();
-                $remFc = round((float)$inv['total_fc'] - (float)$other['fc'], 2);
-                $remBase = round((float)$inv['total'] - (float)$other['base'], 2);
+                $remFc = round((float)$inv['total_fc'] - (float)$inv['credited_fc'] - (float)$other['fc'], 2);
+                $remBase = round((float)$inv['total'] - (float)$inv['credited_amount'] - (float)$other['base'], 2);
                 if ($allocFc > $remFc + 0.005) {
                     throw new \RuntimeException("Invoice {$inv['invoice_no']} has only {$currency} " . number_format($remFc, 2) . ' left to pay.');
                 }

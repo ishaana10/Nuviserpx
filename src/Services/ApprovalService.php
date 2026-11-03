@@ -21,6 +21,7 @@ class ApprovalService
     public const PENDING = 'pending_approval';
     public const DOC_JOURNAL = 'journal';
     public const DOC_BILL = 'vendor_bill';
+    public const DOC_BILL_PAYMENT = 'bill_payment';
 
     public function __construct(
         private readonly mysqli $conn,
@@ -94,7 +95,8 @@ class ApprovalService
         if ($threshold === null) {
             return $this->fail('The threshold must be an amount of zero or more.');
         }
-        $doc = ($post['doc_type'] ?? '') === self::DOC_BILL ? self::DOC_BILL : self::DOC_JOURNAL;
+        $doc = in_array($post['doc_type'] ?? '', [self::DOC_BILL, self::DOC_BILL_PAYMENT], true) ? $post['doc_type'] : self::DOC_JOURNAL;
+        $docLabel = ['journal' => 'Journal', 'vendor_bill' => 'Vendor bill', 'bill_payment' => 'Supplier payment'][$doc];
         $amt = number_format($threshold, 2, '.', '');
         $stmt = $this->conn->prepare("INSERT INTO approval_policies (tenant_id, doc_type, enabled, threshold, allow_self) VALUES (?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE enabled = VALUES(enabled), threshold = VALUES(threshold), allow_self = VALUES(allow_self)");
@@ -103,7 +105,7 @@ class ApprovalService
             return $this->fail('The approval settings could not be saved.');
         }
         $this->settings->log_audit('Changed approval policy', 'Approvals',
-            ($doc === self::DOC_BILL ? 'Vendor bill' : 'Journal') . ' approval ' . ($enabled ? 'on' : 'off') . ", threshold {$amt}, self-approval " . ($allowSelf ? 'allowed' : 'not allowed'));
+            $docLabel . ' approval ' . ($enabled ? 'on' : 'off') . ", threshold {$amt}, self-approval " . ($allowSelf ? 'allowed' : 'not allowed'));
         $this->settings->set_flashdata('success', 'Approval settings saved.');
         return json_encode(['status' => 'success', 'msg' => 'Approval settings saved.']);
     }

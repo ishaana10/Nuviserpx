@@ -41,6 +41,19 @@ check($arLeftBase === 0.0 && $arLeftFc === 0.0, 'the invoice clears to exactly z
 check(round($cashTotal - $totalBase - $realised, 2) === 0.0, 'cash received = invoice value + realised gain/loss');
 check($realised === round(2.30*400 + 2.10*600 - 2250, 2), 'realised result is cash less carried value (' . $realised . ')');
 
+echo "\n=== Credit note on a foreign invoice ===\n";
+// Invoice USD 1000 at 2.25 = 2250 base, nothing paid. Two notes of USD 400 then the last USD 600.
+$remFc = 1000.0; $remBase = 2250.0; $credited = 0.0;
+foreach ([400.0, 600.0] as $fcNote) {
+    $base = F::allocationBase($fcNote, $remFc, $remBase, 2.25);
+    $credited += $base; $remFc = round($remFc - $fcNote, 2); $remBase = round($remBase - $base, 2);
+}
+check($credited === 2250.0 && $remBase === 0.0 && $remFc === 0.0, 'notes that clear the foreign balance clear the base balance exactly');
+$base = F::allocationBase(100.0, 1000.0, 2250.0, 2.25); $tax = min(F::toBase(15.0, 2.25), $base);
+check($base === 225.0 && $tax === 33.75 && round($base - $tax, 2) === 191.25, 'a USD 100 note incl. USD 15 tax posts 191.25 net + 33.75 tax = 225.00');
+$j = \App\Services\CreditNoteService::noteLines('credit', 225.0, 33.75, 2, 3, 1);
+check(round(array_sum(array_column($j, 'debit')) - array_sum(array_column($j, 'credit')), 2) === 0.0, 'the note journal balances');
+
 echo "\n=== Plumbing ===\n";
 $m = file_get_contents(__DIR__ . '/../classes/DBConnection.php');
 check(strpos($m, 'check_fx_document_migrations();') !== false, 'the migration is in the chain');

@@ -76,6 +76,7 @@ class DBConnection{
                 $this->check_fx_document_migrations();
                 $this->check_journal_trail_migrations();
                 $this->check_bill_payment_migrations();
+                $this->check_bill_payment_approval_migrations();
                 $this->check_dolibarr_crm_migrations();
                 $this->check_dolibarr_extended_migrations();
                 $this->check_extrafields_migrations();
@@ -1065,6 +1066,27 @@ class DBConnection{
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     }
 
+    public function check_bill_payment_approval_migrations(){
+        if (!$this->conn) return;
+
+        $r = @$this->conn->query("SHOW COLUMNS FROM `bill_payments` LIKE 'status'");
+        $col = $r ? $r->fetch_assoc() : null;
+        if ($col && stripos((string)$col['Type'], 'pending_approval') === false) {
+            @$this->conn->query("ALTER TABLE `bill_payments` MODIFY `status` enum('posted','void','pending_approval') NOT NULL DEFAULT 'posted'");
+        }
+        $cols = array(
+            'approved_by'   => "ALTER TABLE `bill_payments` ADD COLUMN `approved_by` int(30) DEFAULT NULL",
+            'approved_at'   => "ALTER TABLE `bill_payments` ADD COLUMN `approved_at` datetime DEFAULT NULL",
+            'approval_note' => "ALTER TABLE `bill_payments` ADD COLUMN `approval_note` varchar(500) DEFAULT NULL",
+        );
+        foreach ($cols as $c => $sql) {
+            $res = @$this->conn->query("SHOW COLUMNS FROM `bill_payments` LIKE '{$c}'");
+            if ($res && $res->num_rows == 0) {
+                @$this->conn->query($sql);
+            }
+        }
+    }
+
     public function check_journal_trail_migrations(){
         if (!$this->conn) return;
 
@@ -1094,6 +1116,12 @@ class DBConnection{
                 'fx_rate'  => "ALTER TABLE `invoice_list` ADD COLUMN `fx_rate` decimal(18,8) DEFAULT NULL",
                 'total_fc' => "ALTER TABLE `invoice_list` ADD COLUMN `total_fc` decimal(18,4) DEFAULT NULL",
                 'paid_fc'  => "ALTER TABLE `invoice_list` ADD COLUMN `paid_fc` decimal(18,4) NOT NULL DEFAULT 0.0000",
+                'credited_fc' => "ALTER TABLE `invoice_list` ADD COLUMN `credited_fc` decimal(18,4) NOT NULL DEFAULT 0.0000",
+            ),
+            'credit_notes' => array(
+                'currency'  => "ALTER TABLE `credit_notes` ADD COLUMN `currency` varchar(10) DEFAULT NULL",
+                'fx_rate'   => "ALTER TABLE `credit_notes` ADD COLUMN `fx_rate` decimal(18,8) DEFAULT NULL",
+                'total_fc'  => "ALTER TABLE `credit_notes` ADD COLUMN `total_fc` decimal(18,4) DEFAULT NULL",
             ),
             'payment_list' => array(
                 'fx_rate'   => "ALTER TABLE `payment_list` ADD COLUMN `fx_rate` decimal(18,8) DEFAULT NULL",
