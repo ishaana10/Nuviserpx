@@ -9,6 +9,9 @@
  *   POST ?f=delete   id
  *   POST ?f=reorder  ids[]
  */
+// Anything PHP prints (notices, warnings) would corrupt the JSON, so buffer and discard it.
+ini_set('display_errors', '0');
+ob_start();
 require_once(__DIR__ . '/../config.php');
 
 use App\Services\DashboardService;
@@ -18,10 +21,18 @@ header('Cache-Control: no-store');
 
 function dash_out(array $payload, int $code = 200): void
 {
+    while (ob_get_level() > 0) {
+        ob_end_clean();
+    }
     http_response_code($code);
     echo json_encode($payload);
     exit;
 }
+
+set_exception_handler(function (\Throwable $e): void {
+    error_log('Dashboard error: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+    dash_out(['status' => 'failed', 'msg' => 'The dashboard could not be loaded. Please try again.'], 500);
+});
 
 if (!isset($_SESSION['userdata']['id'])) {
     dash_out(['status' => 'failed', 'msg' => 'Your session has expired. Please sign in again.'], 401);
@@ -66,6 +77,13 @@ switch ($action) {
            : dash_out(['status' => 'failed', 'msg' => 'You have reached the maximum number of dashboards.'], 422);
 
     case 'save':
+        if ((int)($_POST['id'] ?? 0) === 0 && isset($_POST['layout'])) {
+            // The starter dashboard could not be stored earlier (id 0): store it now.
+            $decoded = json_decode((string)$_POST['layout'], true);
+            $d = is_array($decoded) ? $service->createDashboard((string)($_POST['name'] ?? 'Overview'), $decoded) : null;
+            $d ? dash_out(['status' => 'success', 'dashboard' => $d])
+               : dash_out(['status' => 'failed', 'msg' => 'The dashboard could not be saved.'], 500);
+        }
         $changes = [];
         if (isset($_POST['name'])) {
             $changes['name'] = (string)$_POST['name'];

@@ -41,7 +41,7 @@ $def = $admin->defaultLayout();
 check(count($def) >= 8, 'standard dashboard has the executive widgets');
 check($def[0]['widget'] === 'kpi_revenue', 'starts with the revenue KPI');
 $limited = (new DashboardService(null, 1, 3, fn () => false))->defaultLayout();
-check(count($limited) === 2 && $limited[0]['widget'] === 'quick_actions', 'role with no permissions still gets a usable dashboard');
+check(count($limited) >= 2 && in_array('quick_actions', array_column($limited, 'widget'), true) && in_array('getting_started', array_column($limited, 'widget'), true), 'role with no permissions still gets a usable dashboard (shortcuts, checklist, approvals)');
 
 echo "\n=== Layout sanitising ===\n";
 $dirty = [
