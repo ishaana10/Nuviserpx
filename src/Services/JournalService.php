@@ -87,7 +87,7 @@ class JournalService
             $fcq->execute();
             $hasFc = (int)($fcq->get_result()->fetch_assoc()['n'] ?? 0) > 0;
             if ($hasFc && !array_filter((array)($post['currency'] ?? []), fn ($c) => trim((string)$c) !== '')) {
-                return $this->fail('This journal has foreign-currency lines, which this form cannot edit. Reverse it and post a corrected journal.');
+                return $this->fail('This journal has foreign-currency lines. Send the currency of each line with the save, or reverse it and post a corrected journal.');
             }
         }
         if ($msg = PeriodLockService::guard($this->conn, $tenant_id, $date, $id ?: null)) {

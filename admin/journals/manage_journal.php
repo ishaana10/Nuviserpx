@@ -11,6 +11,16 @@ use App\Services\LedgerService;
 
 $tenant_id = (int)$_settings->active_tenant_id();
 
+/* ---- Foreign currencies and their rates (for the optional Currency column) ---- */
+$fx = new \App\Services\FxService($conn, $_settings);
+$base_currency = $fx->baseCurrency();
+$foreign_currencies = $fx->foreignCurrencies();
+$has_fx = count($foreign_currencies) > 0;
+$rate_history = [];
+foreach ($fx->history(1000) as $h) {
+    $rate_history[$h['currency_code']][] = [$h['rate_date'], (float)$h['rate']];   // newest first
+}
+
 /* ---- Accounts, grouped for the picker ---------------------------------- */
 $accounts_by_class = [];
 $acc_stmt = $conn->prepare("SELECT id, code, name, type FROM account_list WHERE tenant_id = ? AND delete_flag = 0 AND status = 1
@@ -48,7 +58,7 @@ if ($load_id) {
 
     if ($journal) {
         $side = LedgerService::SIDE_SQL;
-        $q = $conn->prepare("SELECT ji.account_id, ji.amount, ji.description, ji.tax_rate, {$side} side
+        $q = $conn->prepare("SELECT ji.account_id, ji.amount, ji.description, ji.tax_rate, ji.currency, ji.amount_fc, {$side} side
                              FROM journal_items ji LEFT JOIN group_list g ON g.id = ji.group_id
                              WHERE ji.journal_id = ? ORDER BY ji.id");
         $q->bind_param('i', $load_id);
@@ -62,8 +72,10 @@ if ($load_id) {
                 'account_id' => (int)$r['account_id'],
                 'description' => (string)($r['description'] ?? ''),
                 'tax_rate' => (string)($r['tax_rate'] ?? 'No Tax (0%)'),
-                'debit' => $isDebit ? (float)$r['amount'] : null,
-                'credit' => $isDebit ? null : (float)$r['amount'],
+                // A foreign line shows the amount in its own currency; the server converts it again on save.
+                'currency' => (string)($r['currency'] ?? ''),
+                'debit' => $isDebit ? (float)($r['currency'] ? $r['amount_fc'] : $r['amount']) : null,
+                'credit' => $isDebit ? null : (float)($r['currency'] ? $r['amount_fc'] : $r['amount']),
             ];
         }
     } elseif ($mode === 'edit') {
@@ -93,7 +105,7 @@ $default_narration = $journal ? (int)($journal['default_narration'] ?? 1) : 1;
 $show_cash_basis = $journal ? (int)($journal['show_cash_basis'] ?? 1) : 1;
 
 while (count($lines) < 2) {
-    $lines[] = ['account_id' => 0, 'description' => '', 'tax_rate' => 'No Tax (0%)', 'debit' => null, 'credit' => null];
+    $lines[] = ['account_id' => 0, 'description' => '', 'tax_rate' => 'No Tax (0%)', 'currency' => '', 'debit' => null, 'credit' => null];
 }
 
 $tax_rates = ['No Tax (0%)', 'VAT on Income (15%)', 'VAT on Expenses (15%)', 'Tax Exempt (0%)'];
@@ -167,6 +179,7 @@ function mj_amount(?float $v): string
 .mj-lines .select2-container .select2-selection--single { height: 38px !important; border-radius: 7px !important; border-color: #d5dde8 !important; }
 .mj-lines .select2-container .select2-selection__rendered { line-height: 36px !important; font-size: .9rem; }
 .mj-lines .select2-container .select2-selection__arrow { height: 36px !important; }
+.mj-lines tr.no-rate .mj-cur { border-color: #d97706 !important; background: #fffbeb; }
 .mj-lines tr.has-error .select2-selection, .mj-lines tr.has-error .form-control.err { border-color: #dc2626 !important; }
 .mj-del { width: 34px; height: 38px; border: 0; background: transparent; color: #cbd5e1; border-radius: 7px; }
 .mj-del:hover { background: #fef2f2; color: #dc2626; }
@@ -279,6 +292,7 @@ function mj_amount(?float $v): string
                             <th style="min-width:240px">Account</th>
                             <th style="min-width:200px">Description</th>
                             <th style="min-width:160px">Tax rate</th>
+                            <?php if ($has_fx): ?><th style="width:110px" title="Amounts on a line are entered in its currency and converted at the rate for the journal date">Currency</th><?php endif; ?>
                             <th class="text-right" style="width:140px">Debit</th>
                             <th class="text-right" style="width:140px">Credit</th>
                             <th></th>
@@ -293,6 +307,10 @@ function mj_amount(?float $v): string
                             <td data-label="Tax rate"><select name="tax_rate[]" class="custom-select" data-no-select2>
                                 <?php foreach ($tax_rates as $tr): ?><option <?= $l['tax_rate'] === $tr ? 'selected' : '' ?>><?= $tr ?></option><?php endforeach; ?>
                             </select></td>
+                            <?php if ($has_fx): ?><td data-label="Currency"><select name="currency[]" class="custom-select mj-cur" data-no-select2>
+                                <option value=""><?= htmlspecialchars($base_currency) ?></option>
+                                <?php foreach ($foreign_currencies as $fc): ?><option value="<?= htmlspecialchars($fc['code']) ?>" <?= ($l['currency'] ?? '') === $fc['code'] ? 'selected' : '' ?>><?= htmlspecialchars($fc['code']) ?></option><?php endforeach; ?>
+                            </select></td><?php endif; ?>
                             <td data-label="Debit"><input type="number" step="0.01" min="0" inputmode="decimal" name="debit[]" class="form-control amt mj-dr" placeholder="0.00" value="<?= mj_amount($l['debit']) ?>"></td>
                             <td data-label="Credit"><input type="number" step="0.01" min="0" inputmode="decimal" name="credit[]" class="form-control amt mj-cr" placeholder="0.00" value="<?= mj_amount($l['credit']) ?>"></td>
                             <td class="x"><button type="button" class="mj-del" title="Remove line" aria-label="Remove line"><i class="fas fa-times"></i></button></td>
@@ -354,6 +372,10 @@ function mj_amount(?float $v): string
         <td data-label="Tax rate"><select name="tax_rate[]" class="custom-select" data-no-select2>
             <?php foreach ($tax_rates as $tr): ?><option><?= $tr ?></option><?php endforeach; ?>
         </select></td>
+        <?php if ($has_fx): ?><td data-label="Currency"><select name="currency[]" class="custom-select mj-cur" data-no-select2>
+            <option value=""><?= htmlspecialchars($base_currency) ?></option>
+            <?php foreach ($foreign_currencies as $fc): ?><option value="<?= htmlspecialchars($fc['code']) ?>"><?= htmlspecialchars($fc['code']) ?></option><?php endforeach; ?>
+        </select></td><?php endif; ?>
         <td data-label="Debit"><input type="number" step="0.01" min="0" inputmode="decimal" name="debit[]" class="form-control amt mj-dr" placeholder="0.00"></td>
         <td data-label="Credit"><input type="number" step="0.01" min="0" inputmode="decimal" name="credit[]" class="form-control amt mj-cr" placeholder="0.00"></td>
         <td class="x"><button type="button" class="mj-del" title="Remove line" aria-label="Remove line"><i class="fas fa-times"></i></button></td>
@@ -366,6 +388,22 @@ function mj_amount(?float $v): string
     var $body = $('#mj-lines tbody');
     var fmt = function (n) { return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
     var cents = function (v) { var n = parseFloat(v); return isNaN(n) ? 0 : Math.round(n * 100); };
+    // Rates by currency, newest first: the rate in force on a date is the latest one on or before it.
+    var rateHistory = <?= json_encode($rate_history, JSON_HEX_TAG | JSON_HEX_AMP) ?>;
+    var rateOn = function (cur, date) {
+        var list = rateHistory[cur] || [];
+        for (var i = 0; i < list.length; i++) { if (list[i][0] <= date) { return list[i][1]; } }
+        return null;
+    };
+    // The base-currency cents of one amount cell on a row (foreign lines are converted at the journal date's rate).
+    var baseCents = function ($tr, sel) {
+        var c = cents($tr.find(sel).val());
+        var cur = $tr.find('.mj-cur').val();
+        if (!cur || !c) { return c; }
+        var r = rateOn(cur, $('#mj-date').val());
+        $tr.toggleClass('no-rate', r === null).attr('title', r === null ? 'No exchange rate for ' + cur + ' on or before this date' : '');
+        return r === null ? 0 : Math.round(c * r);
+    };
 
     function initRow($tr) {
         if ($.fn.select2) {
@@ -381,7 +419,7 @@ function mj_amount(?float $v): string
     function totals() {
         var dr = 0, cr = 0, used = 0;
         $body.children('tr').each(function () {
-            var d = cents($(this).find('.mj-dr').val()), c = cents($(this).find('.mj-cr').val());
+            var d = baseCents($(this), '.mj-dr'), c = baseCents($(this), '.mj-cr');
             dr += d; cr += c;
             if (d || c) { used++; }
         });
@@ -443,6 +481,7 @@ function mj_amount(?float $v): string
         markRowErrors();
         if ($body.children('tr.has-error').length) { errs.push('Each line with an amount needs an account, and each account needs an amount.'); }
         var t = totals();
+        if ($body.children('tr.no-rate').length) { errs.push('A foreign-currency line has no exchange rate on or before the journal date. Add the rate under Exchange rates.'); }
         if (status === 'posted') {
             if (t.used < 2) { errs.push('A journal needs at least two lines.'); }
             if (t.dr !== t.cr) { errs.push('Debits and credits must be equal before posting — save it as a draft if you need to finish later.'); }
@@ -511,7 +550,8 @@ function mj_amount(?float $v): string
                 if ($(this).val() === '' || $(this).data('auto')) { $(this).val(v).data('auto', true); }
             });
         });
-        $('#mj-date, #mj-reverse').on('change', function () { $(this).removeClass('is-invalid'); });
+        $('#mj-date, #mj-reverse').on('change', function () { $(this).removeClass('is-invalid'); totals(); });
+        $body.on('change', '.mj-cur', function () { totals(); });
 
         $('#mj-balance').on('click', function () {
             var t = totals();
@@ -522,6 +562,7 @@ function mj_amount(?float $v): string
                 if (!$target && !cents($(this).find('.mj-dr').val()) && !cents($(this).find('.mj-cr').val())) { $target = $(this); }
             });
             if (!$target) { $target = addLine(false); }
+            $target.find('.mj-cur').val('');   // the balancing amount is in base currency
             $target.find(diff > 0 ? '.mj-cr' : '.mj-dr').val((Math.abs(diff) / 100).toFixed(2));
             $target.find(diff > 0 ? '.mj-dr' : '.mj-cr').val('');
             totals();
