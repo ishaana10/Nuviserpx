@@ -191,6 +191,16 @@ class Master extends DBConnection
         return $this->container->make(\App\Services\CreditNoteService::class)->issue($_POST);
     }
 
+    public function refund_credit_note()
+    {
+        return $this->container->make(\App\Services\CreditNoteService::class)->refund($_POST);
+    }
+
+    public function void_note_refund()
+    {
+        return $this->container->make(\App\Services\CreditNoteService::class)->voidRefund(intval($_POST['id'] ?? 0));
+    }
+
     public function void_credit_note()
     {
         return $this->container->make(\App\Services\CreditNoteService::class)->void(intval($_POST['id'] ?? 0));
@@ -1938,6 +1948,12 @@ switch ($action) {
         break;
     case 'issue_credit_note':
         echo $Master->issue_credit_note();
+        break;
+    case 'refund_credit_note':
+        echo $Master->refund_credit_note();
+        break;
+    case 'void_note_refund':
+        echo $Master->void_note_refund();
         break;
     case 'void_credit_note':
         echo $Master->void_credit_note();
