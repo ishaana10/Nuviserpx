@@ -14,6 +14,7 @@ class JournalService
         'invoice_list' => ['label' => 'invoice', 'ref' => 'invoice_no'],
         'payment_list' => ['label' => 'payment', 'ref' => 'payment_no'],
         'payroll_list' => ['label' => 'payroll record', 'ref' => 'payroll_run_ref'],
+        'payroll_remittances' => ['label' => 'payroll remittance', 'ref' => 'reference'],
     ];
 
     public function __construct(
@@ -378,14 +379,14 @@ class JournalService
      * opposite side, linked to the original. The original is never touched, so the ledger keeps the full
      * story — what was booked, and that it was undone, by whom and when.
      */
-    public function reverseJournal(int $id, ?string $date = null): string
+    public function reverseJournal(int $id, ?string $date = null, bool $fromSource = false): string
     {
         $tenant_id = (int)$this->settings->active_tenant_id();
         $orig = $this->journalRow($id, $tenant_id);
         if (!$orig) {
             return $this->fail('Journal not found.');
         }
-        if ($source = $this->sourceDocument($id, $tenant_id)) {
+        if (!$fromSource && ($source = $this->sourceDocument($id, $tenant_id))) {
             return $this->fail("This journal belongs to {$source}. Cancel or credit that document instead.");
         }
         if (self::statusKind($orig['status'] ?? '') !== 'posted') {

@@ -460,6 +460,14 @@ if($t_qry && $t_qry->num_rows > 0){
                                             <p>Payrun Engine & Retro</p>
                                         </a>
                                     </li>
+                                    <?php if ($_settings->can_access('payroll_remit')): ?>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=payroll/remittances" class="nav-link nav-payroll_remittances tree-item">
+                                            <i class="nav-icon fas fa-hand-holding-usd text-success"></i>
+                                            <p>Payroll Remittances</p>
+                                        </a>
+                                    </li>
+                                    <?php endif; ?>
                                     <?php if ($_settings->can_access('settings_manage')): ?>
                                     <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=payroll/rules_settings" class="nav-link nav-payroll_rules_settings tree-item">

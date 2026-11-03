@@ -847,6 +847,16 @@ class Master extends DBConnection
         return $this->container->make(\App\Services\PayrollAdjustmentService::class)->create($_POST);
     }
 
+    public function remit_payroll_liability()
+    {
+        return $this->container->make(\App\Services\PayrollRemittanceService::class)->remit($_POST);
+    }
+
+    public function reverse_payroll_remittance()
+    {
+        return $this->container->make(\App\Services\PayrollRemittanceService::class)->reverse(intval($_POST['id'] ?? 0));
+    }
+
     public function cancel_retro_pay()
     {
         return $this->container->make(\App\Services\PayrollAdjustmentService::class)->cancel(intval($_POST['id'] ?? 0));
@@ -2321,6 +2331,12 @@ switch ($action) {
         break;
     case 'terminate_session':
         echo $Master->terminate_session();
+        break;
+    case 'remit_payroll_liability':
+        echo $Master->remit_payroll_liability();
+        break;
+    case 'reverse_payroll_remittance':
+        echo $Master->reverse_payroll_remittance();
         break;
     case 'cancel_retro_pay':
         echo $Master->cancel_retro_pay();
