@@ -1094,6 +1094,12 @@ class DBConnection{
                 'fx_rate'  => "ALTER TABLE `invoice_list` ADD COLUMN `fx_rate` decimal(18,8) DEFAULT NULL",
                 'total_fc' => "ALTER TABLE `invoice_list` ADD COLUMN `total_fc` decimal(18,4) DEFAULT NULL",
                 'paid_fc'  => "ALTER TABLE `invoice_list` ADD COLUMN `paid_fc` decimal(18,4) NOT NULL DEFAULT 0.0000",
+                'credited_fc' => "ALTER TABLE `invoice_list` ADD COLUMN `credited_fc` decimal(18,4) NOT NULL DEFAULT 0.0000",
+            ),
+            'credit_notes' => array(
+                'currency'  => "ALTER TABLE `credit_notes` ADD COLUMN `currency` varchar(10) DEFAULT NULL",
+                'fx_rate'   => "ALTER TABLE `credit_notes` ADD COLUMN `fx_rate` decimal(18,8) DEFAULT NULL",
+                'total_fc'  => "ALTER TABLE `credit_notes` ADD COLUMN `total_fc` decimal(18,4) DEFAULT NULL",
             ),
             'payment_list' => array(
                 'fx_rate'   => "ALTER TABLE `payment_list` ADD COLUMN `fx_rate` decimal(18,8) DEFAULT NULL",

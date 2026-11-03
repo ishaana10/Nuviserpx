@@ -47,7 +47,7 @@ $accounts = $conn->query("SELECT id, name FROM `account_list` WHERE tenant_id = 
                         <?php foreach ($svc->lines((int)$n['id']) as $l): ?><br><small class="text-muted"><?= htmlspecialchars($l['description']) ?> × <?= rtrim(rtrim(number_format((float)$l['qty'], 4, '.', ''), '0'), '.') ?> @ <?= $fmt($l['unit_price']) ?><?= (float)$l['tax_rate'] > 0 ? ' +' . rtrim(rtrim(number_format((float)$l['tax_rate'], 4, '.', ''), '0'), '.') . '%' : '' ?></small><?php endforeach; ?></td>
                     <td class="text-right"><?= $fmt($n['subtotal']) ?></td>
                     <td class="text-right"><?= $fmt($n['tax_amount']) ?></td>
-                    <td class="text-right font-weight-bold"><?= $fmt($n['total']) ?></td>
+                    <td class="text-right font-weight-bold"><?= $fmt($n['total']) ?><?= !empty($n['currency']) ? '<br><small class="text-muted">' . htmlspecialchars($n['currency']) . ' ' . $fmt($n['total_fc']) . '</small>' : '' ?></td>
                     <td><span class="badge badge-<?= $void ? 'secondary' : 'success' ?>"><?= $void ? 'Void' : 'Issued' ?></span></td>
                     <td class="text-right"><?= $n['refundable'] > 0 ? '<b class="text-danger">' . $fmt($n['refundable']) . '</b>' : '—' ?></td>
                     <td class="text-right" style="white-space:nowrap"><?php if ($n['refundable'] > 0 && ($n['note_type'] === 'credit' ? $_settings->can_access('invoices_edit') : $_settings->can_access('purchases_edit'))): ?><button class="btn btn-xs btn-success refund-note mr-1" data-id="<?= (int)$n['id'] ?>" data-no="<?= htmlspecialchars($n['note_no'], ENT_QUOTES) ?>" data-max="<?= number_format((float)$n['refundable'], 2, '.', '') ?>" data-type="<?= $n['note_type'] ?>">Refund</button><?php endif; ?><?php if (!$void && ($n['note_type'] === 'credit' ? $_settings->can_access('invoices_edit') : $_settings->can_access('purchases_edit'))): ?><button class="btn btn-xs btn-outline-danger void-note" data-id="<?= (int)$n['id'] ?>" data-no="<?= htmlspecialchars($n['note_no'], ENT_QUOTES) ?>">Void</button><?php endif; ?></td>
@@ -163,7 +163,7 @@ $(function () {
     var pick = function () {
         var d = (docs[$('#note_type').val()] || []).find(function (x) { return String(x.id) === $('#document_id').val(); });
         if (d) {
-            $('#doc_hint').text('Can still be credited: ' + Number(d.outstanding).toFixed(2));
+            $('#doc_hint').text('Can still be credited: ' + (d.currency ? d.currency + ' ' : '') + Number(d.outstanding).toFixed(2) + (d.currency ? ' — enter this note in ' + d.currency + '; it is recorded at the invoice rate.' : ''));
             $('#note_lines tbody tr:first [name="line_tax[]"]').val(d.tax_rate);
         }
         total();
@@ -189,7 +189,7 @@ $(function () {
         $('#note_title').text(type === 'credit' ? 'New credit note' : 'New debit note');
         $('#doc_label').text(type === 'credit' ? 'Invoice' : 'Bill');
         var sel = $('#document_id').empty();
-        list.forEach(function (d) { sel.append($('<option>').val(d.id).text(d.doc_no + ' — ' + (d.party || '') + ' — owed ' + Number(d.outstanding).toFixed(2))); });
+        list.forEach(function (d) { sel.append($('<option>').val(d.id).text(d.doc_no + ' — ' + (d.party || '') + ' — can credit ' + (d.currency ? d.currency + ' ' : '') + Number(d.outstanding).toFixed(2))); });
         if (!list.length) { sel.append($('<option>').val('').text('Nothing outstanding to credit')); }
         $('#note_lines tbody').empty(); addLine(0);
         pick();

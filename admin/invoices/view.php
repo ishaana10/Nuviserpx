@@ -38,7 +38,7 @@ if($is_fc){
     $fc_tax = round((float)$fcq['t'], 2);
     $fc_disc = max(0, round($fc_sub + $fc_tax - $fc_total, 2));
     $fc_paid = (float)$invoice['paid_fc'];
-    $fc_bal = max(0, round($fc_total - $fc_paid, 2));
+    $fc_bal = max(0, round($fc_total - $fc_paid - (float)$invoice['credited_fc'], 2));
     $cc = htmlspecialchars($invoice['currency']) . ' ';
 }
 

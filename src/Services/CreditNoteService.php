@@ -180,7 +180,7 @@ class CreditNoteService
     {
         $t = $this->tenantId();
         if ($kind === self::CREDIT) {
-            $sql = "SELECT d.id, d.invoice_no doc_no, d.invoice_date doc_date, d.total, d.tax_amount, d.paid_amount, d.credited_amount, p.name party
+            $sql = "SELECT d.id, d.invoice_no doc_no, d.invoice_date doc_date, d.total, d.tax_amount, d.paid_amount, d.credited_amount, d.currency, d.total_fc, d.paid_fc, d.credited_fc, p.name party
                     FROM invoice_list d LEFT JOIN party_list p ON p.id = d.party_id
                     WHERE d.tenant_id = ? AND d.status NOT IN ('draft','cancelled') ORDER BY d.invoice_date DESC, d.id DESC LIMIT 300";
         } else {
@@ -193,7 +193,11 @@ class CreditNoteService
         $stmt->execute();
         $rows = [];
         foreach ($stmt->get_result()->fetch_all(MYSQLI_ASSOC) as $r) {
-            $r['outstanding'] = self::creditable((float)$r['total'], (float)$r['credited_amount']);
+            // A foreign-currency invoice is credited in its own currency, and only for what is still unpaid.
+            $r['outstanding'] = !empty($r['currency'])
+                ? round(max(0.0, (float)$r['total_fc'] - (float)$r['paid_fc'] - (float)$r['credited_fc']), 2)
+                : self::creditable((float)$r['total'], (float)$r['credited_amount']);
+            $r['currency'] = $r['currency'] ?? null;
             $net = (float)$r['total'] - (float)$r['tax_amount'];
             $r['tax_rate'] = $net > 0 ? round((float)$r['tax_amount'] / $net * 100, 2) : 0.0;
             if ($r['outstanding'] > 0) {
@@ -279,10 +283,11 @@ class CreditNoteService
         if (!$doc || in_array($doc['status'], ['draft', 'pending_approval', 'cancelled'], true)) {
             return $this->fail('Choose an issued ' . ($kind === self::CREDIT ? 'invoice' : 'bill') . ' to raise the note against.');
         }
+        $fcInfo = null;
         if ($kind === self::CREDIT) {
-            $fcq = $this->conn->query("SELECT currency FROM invoice_list WHERE id = " . (int)$docId . " AND tenant_id = " . (int)$t)->fetch_assoc();
+            $fcq = $this->conn->query("SELECT currency, fx_rate, total_fc, paid_fc, credited_fc FROM invoice_list WHERE id = " . (int)$docId . " AND tenant_id = " . (int)$t)->fetch_assoc();
             if (!empty($fcq['currency'])) {
-                return $this->fail('This invoice is in ' . $fcq['currency'] . '. Credit notes against foreign-currency invoices are not supported yet; reverse the invoice or contact support.');
+                $fcInfo = $fcq;
             }
         }
         if ($date < $doc['doc_date']) {
@@ -290,9 +295,27 @@ class CreditNoteService
         }
 
         $total = round($net + $tax, 2);
-        $outstanding = self::creditable((float)$doc['total'], (float)$doc['credited_amount']);
+        $noteFc = null;
+        if ($fcInfo) {
+            // The note is written in the invoice's currency and limited to its unpaid foreign balance.
+            $outstanding = round(max(0.0, (float)$fcInfo['total_fc'] - (float)$fcInfo['paid_fc'] - (float)$fcInfo['credited_fc']), 2);
+        } else {
+            $outstanding = self::creditable((float)$doc['total'], (float)$doc['credited_amount']);
+        }
         if ($err = self::amountError($net, $tax, $outstanding)) {
-            return $this->fail($err);
+            return $this->fail($fcInfo ? str_replace('document', $fcInfo['currency'] . ' invoice', $err) : $err);
+        }
+        if ($fcInfo) {
+            // Carry it in base at the invoice's own rate; the note that clears the last foreign unit takes the remaining base value.
+            $noteFc = $total;
+            $rate = (float)$fcInfo['fx_rate'];
+            $remBase = self::outstanding((float)$doc['total'], (float)$doc['paid_amount'], (float)$doc['credited_amount']);
+            $total = FxService::allocationBase($noteFc, $outstanding, $remBase, $rate);
+            $tax = min(FxService::toBase($tax, $rate), $total);
+            $net = round($total - $tax, 2);
+            if ($net <= 0) {
+                return $this->fail('That note is too small to post in the company currency.');
+            }
         }
         if ($msg = PeriodLockService::guard($this->conn, $t, $date)) {
             return $this->fail($msg);
@@ -310,6 +333,18 @@ class CreditNoteService
             $taxAcc = $tax > 0 ? $taxSvc->controlAccount('input') : 0;
         }
         $lines = self::noteLines($kind, $total, $tax, $main, $taxAcc, $control);
+        if ($fcInfo) {
+            // The receivable line carries the foreign amount so revaluation sees the balance fall.
+            foreach ($lines as &$ln) {
+                if ($ln['account_id'] === $control && $ln['credit'] > 0) {
+                    $ln['currency'] = strtoupper((string)$fcInfo['currency']);
+                    $ln['fx_rate'] = (float)$fcInfo['fx_rate'];
+                    $ln['amount_fc'] = $noteFc;
+                    break;
+                }
+            }
+            unset($ln);
+        }
 
         // Record the note and reduce the document first, then post the journal; undo both if the journal fails.
         $noteNo = $this->nextNumber($kind, $date);
@@ -337,6 +372,15 @@ class CreditNoteService
                 }
             }
             $this->applyToDocument($table, $docId, $t, $total);
+            if ($fcInfo) {
+                $cur = strtoupper((string)$fcInfo['currency']);
+                $rt = number_format((float)$fcInfo['fx_rate'], 8, '.', '');
+                $fcAmt = number_format((float)$noteFc, 4, '.', '');
+                $fu = $this->conn->prepare("UPDATE credit_notes SET currency = ?, fx_rate = ?, total_fc = ? WHERE id = ? AND tenant_id = ?");
+                $fu->bind_param('sssii', $cur, $rt, $fcAmt, $noteId, $t);
+                $fu->execute();
+                $this->conn->query("UPDATE invoice_list SET credited_fc = credited_fc + {$fcAmt} WHERE id = " . (int)$docId . " AND tenant_id = {$t}");
+            }
             $this->conn->commit();
         } catch (\Throwable $e) {
             $this->conn->rollback();
@@ -350,6 +394,9 @@ class CreditNoteService
         if (($res['status'] ?? '') !== 'success') {
             $this->conn->begin_transaction();
             $this->applyToDocument($table, $docId, $t, -$total);
+            if ($fcInfo) {
+                $this->conn->query("UPDATE invoice_list SET credited_fc = GREATEST(0, credited_fc - " . number_format((float)$noteFc, 4, '.', '') . ") WHERE id = " . (int)$docId . " AND tenant_id = {$t}");
+            }
             $d = $this->conn->prepare("DELETE FROM credit_notes WHERE id = ? AND tenant_id = ?");
             $d->bind_param('ii', $noteId, $t);
             $d->execute();
@@ -401,6 +448,9 @@ class CreditNoteService
         $total = (float)$n['total'];
         $this->conn->begin_transaction();
         $this->applyToDocument($table, (int)$n['document_id'], $t, -$total);
+        if (!empty($n['currency']) && $n['total_fc'] !== null) {
+            $this->conn->query("UPDATE invoice_list SET credited_fc = GREATEST(0, credited_fc - " . number_format((float)$n['total_fc'], 4, '.', '') . ") WHERE id = " . (int)$n['document_id'] . " AND tenant_id = {$t}");
+        }
         $u = $this->conn->prepare("UPDATE credit_notes SET status = 'void' WHERE id = ? AND tenant_id = ? AND status = 'issued'");
         $u->bind_param('ii', $id, $t);
         $u->execute();

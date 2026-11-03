@@ -272,7 +272,7 @@ class JournalService
                 $desc = mb_substr((string)$l['description'], 0, 500);
                 $cur = !empty($l['currency']) ? (string)$l['currency'] : null;
                 $rate = $cur !== null ? number_format((float)$l['fx_rate'], 8, '.', '') : null;
-                $fc = $cur !== null ? '0.0000' : null;
+                $fc = $cur !== null ? number_format((float)($l['amount_fc'] ?? 0), 4, '.', '') : null;
                 $ins->bind_param('iiissssss', $id, $acc, $side, $entry, $amount, $desc, $cur, $rate, $fc);
                 if (!$ins->execute()) {
                     throw new \RuntimeException($this->conn->error);
