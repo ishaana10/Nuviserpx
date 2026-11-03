@@ -421,6 +421,8 @@ final class Permissions
         'post_fx_revaluation'   => ['journals', 'create'],
         'issue_credit_note'     => ['invoices', 'view'],
         'void_credit_note'      => ['invoices', 'view'],
+        'refund_credit_note'    => ['invoices', 'view'],
+        'void_note_refund'      => ['invoices', 'view'],
         'run_depreciation'      => ['assets', 'edit'],
         'dispose_asset'         => ['assets', 'edit'],
         'run_auto_reversals'    => ['journals', 'create'],

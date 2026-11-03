@@ -1166,6 +1166,42 @@ class DBConnection{
                 @$this->conn->query("ALTER TABLE `{$tbl}` ADD COLUMN `credited_amount` decimal(18,2) NOT NULL DEFAULT 0.00");
             }
         }
+
+        // What a note is made of, line by line.
+        @$this->conn->query("CREATE TABLE IF NOT EXISTS `credit_note_lines` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `note_id` int(30) NOT NULL,
+          `description` varchar(250) NOT NULL,
+          `qty` decimal(12,4) NOT NULL DEFAULT 1.0000,
+          `unit_price` decimal(18,4) NOT NULL DEFAULT 0.0000,
+          `tax_rate` decimal(7,4) NOT NULL DEFAULT 0.0000,
+          `net` decimal(18,2) NOT NULL DEFAULT 0.00,
+          `tax` decimal(18,2) NOT NULL DEFAULT 0.00,
+          PRIMARY KEY (`id`),
+          KEY `note` (`note_id`),
+          CONSTRAINT `cnl_note_fk` FOREIGN KEY (`note_id`) REFERENCES `credit_notes` (`id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        // Money handed back (customer) or received back (supplier) against the credit a note created.
+        @$this->conn->query("CREATE TABLE IF NOT EXISTS `credit_note_refunds` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `tenant_id` int(30) NOT NULL DEFAULT 1,
+          `credit_note_id` int(30) NOT NULL,
+          `refund_no` varchar(50) NOT NULL,
+          `refund_date` date NOT NULL,
+          `amount` decimal(18,2) NOT NULL DEFAULT 0.00,
+          `method` varchar(50) NOT NULL DEFAULT 'bank_transfer',
+          `bank_account_id` int(30) DEFAULT NULL,
+          `reference` varchar(100) DEFAULT NULL,
+          `status` enum('issued','void') NOT NULL DEFAULT 'issued',
+          `journal_id` int(30) DEFAULT NULL,
+          `created_by` int(30) DEFAULT NULL,
+          `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+          PRIMARY KEY (`id`),
+          UNIQUE KEY `refund_tenant_no` (`tenant_id`, `refund_no`),
+          KEY `note` (`credit_note_id`),
+          CONSTRAINT `cnr_note_fk` FOREIGN KEY (`credit_note_id`) REFERENCES `credit_notes` (`id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     }
 
     public function check_invoice_template_migrations(){
