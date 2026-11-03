@@ -391,6 +391,26 @@ class PurchaseService
             }
         }
 
+        // Maker/checker: a bill over the company's threshold is held for approval before it reaches the ledger.
+        $pendingApproval = false;
+        if (!in_array($status, ['draft', 'cancelled'], true)) {
+            $existingBill = null;
+            if (!empty($id)) {
+                $eb = $this->conn->query("SELECT status, total FROM `vendor_bill_list` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'");
+                $existingBill = $eb ? $eb->fetch_assoc() : null;
+                if ($existingBill && $existingBill['status'] === ApprovalService::PENDING) {
+                    return json_encode(['status' => 'failed', 'msg' => 'This bill is waiting for approval and cannot be changed. An approver can approve it or return it to draft.']);
+                }
+            }
+            $pol = (new ApprovalService($this->conn, $this->settings))->policy(ApprovalService::DOC_BILL);
+            // An approved bill whose amount is unchanged does not need approving again.
+            $unchanged = $existingBill && $existingBill['status'] !== 'draft' && abs((float)$existingBill['total'] - $total) < 0.005;
+            if (!$unchanged && ApprovalService::requiresApproval($pol['enabled'], $pol['threshold'], $total)) {
+                $status = ApprovalService::PENDING;
+                $pendingApproval = true;
+            }
+        }
+
         // GL accounts: Dr Purchases/Inventory/Expense, Cr Accounts Payable.
         $ap_acc_id = $this->findAccount(['payable', 'liabilit'], 3, (int)$tenant_id);
         $exp_acc_id = $this->findAccount(['purchase', 'inventory', 'cost of goods', 'expense'], 5, (int)$tenant_id);
@@ -431,6 +451,9 @@ class PurchaseService
 				`created_by` = '{$user_id}'";
             $save = $this->conn->query($sql);
             $bill_id = $this->conn->insert_id;
+            if ($save && $pendingApproval) {
+                $this->conn->query("UPDATE `vendor_bill_list` SET `submitted_by` = '{$user_id}' WHERE id = '{$bill_id}'");
+            }
         } else {
             $existing = $this->conn->query("SELECT journal_id FROM `vendor_bill_list` WHERE id = '{$id}'")->fetch_assoc();
             $journal_id = $existing['journal_id'] ?? null;
@@ -457,6 +480,15 @@ class PurchaseService
 				WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'";
             $save = $this->conn->query($sql);
             $bill_id = (int)$id;
+            if ($save && $pendingApproval) {
+                $this->conn->query("UPDATE `vendor_bill_list` SET `submitted_by` = '{$user_id}' WHERE id = '{$bill_id}'");
+            }
+        }
+
+        // The bill's journal follows its approval state: held out of the ledger until approved.
+        if ($save && !empty($journal_id) && ($pendingApproval || $status !== 'draft')) {
+            $jstatus = $pendingApproval ? ApprovalService::PENDING : 'posted';
+            $this->conn->query("UPDATE `journal_entries` SET `status` = '{$jstatus}' WHERE id = '{$journal_id}' AND tenant_id = '{$tenant_id}'");
         }
 
         if (!$save) {
@@ -514,7 +546,7 @@ class PurchaseService
 
         return json_encode([
             'status' => 'success',
-            'msg'    => empty($id) ? ' Vendor bill created successfully.' : ' Vendor bill updated successfully.',
+            'msg'    => $pendingApproval ? ' Vendor bill saved and submitted for approval.' : (empty($id) ? ' Vendor bill created successfully.' : ' Vendor bill updated successfully.'),
             'id'     => (int)$bill_id,
         ]);
     }

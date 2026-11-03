@@ -40,7 +40,7 @@ foreach ($invoices as $i) {
 $bills = [];
 $stmt = $conn->prepare("SELECT b.id, b.bill_no, b.bill_date, b.total, b.tax_amount, p.name party
     FROM vendor_bill_list b LEFT JOIN party_list p ON p.id = b.vendor_id
-    WHERE b.tenant_id = ? AND b.status NOT IN ('draft','cancelled') AND b.tax_amount > 0 AND b.bill_date BETWEEN ? AND ?
+    WHERE b.tenant_id = ? AND b.status NOT IN ('draft','pending_approval','cancelled') AND b.tax_amount > 0 AND b.bill_date BETWEEN ? AND ?
     ORDER BY b.bill_date, b.id");
 if ($stmt) {
     $stmt->bind_param('iss', $tid, $from, $to);

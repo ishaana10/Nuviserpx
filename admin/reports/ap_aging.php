@@ -16,7 +16,7 @@ $rows = [];
 $stmt = $conn->prepare("SELECT b.id, b.bill_no, b.bill_date, b.due_date, b.total, b.balance,
         p.id vendor_id, p.name vendor_name, p.party_code
     FROM vendor_bill_list b INNER JOIN party_list p ON p.id = b.vendor_id
-    WHERE b.tenant_id = ? AND b.status NOT IN ('draft','cancelled') AND b.balance > 0 AND b.bill_date <= ?
+    WHERE b.tenant_id = ? AND b.status NOT IN ('draft','pending_approval','cancelled') AND b.balance > 0 AND b.bill_date <= ?
     ORDER BY p.name, b.bill_date");
 if ($stmt) {
     $stmt->bind_param('is', $tid, $as_of);

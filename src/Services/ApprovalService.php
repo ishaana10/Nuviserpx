@@ -20,6 +20,7 @@ class ApprovalService
 {
     public const PENDING = 'pending_approval';
     public const DOC_JOURNAL = 'journal';
+    public const DOC_BILL = 'vendor_bill';
 
     public function __construct(
         private readonly mysqli $conn,
@@ -69,12 +70,11 @@ class ApprovalService
         return (int)$this->settings->active_tenant_id();
     }
 
-    /** The company's journal approval policy: enabled, threshold, allow_self. */
-    public function policy(): array
+    /** The company's approval policy for a document type (journal or vendor_bill): enabled, threshold, allow_self. */
+    public function policy(string $doc = self::DOC_JOURNAL): array
     {
         $t = $this->tenantId();
         $stmt = @$this->conn->prepare("SELECT enabled, threshold, allow_self FROM approval_policies WHERE tenant_id = ? AND doc_type = ?");
-        $doc = self::DOC_JOURNAL;
         if ($stmt) {
             $stmt->bind_param('is', $t, $doc);
             $stmt->execute();
@@ -94,7 +94,7 @@ class ApprovalService
         if ($threshold === null) {
             return $this->fail('The threshold must be an amount of zero or more.');
         }
-        $doc = self::DOC_JOURNAL;
+        $doc = ($post['doc_type'] ?? '') === self::DOC_BILL ? self::DOC_BILL : self::DOC_JOURNAL;
         $amt = number_format($threshold, 2, '.', '');
         $stmt = $this->conn->prepare("INSERT INTO approval_policies (tenant_id, doc_type, enabled, threshold, allow_self) VALUES (?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE enabled = VALUES(enabled), threshold = VALUES(threshold), allow_self = VALUES(allow_self)");
@@ -103,7 +103,7 @@ class ApprovalService
             return $this->fail('The approval settings could not be saved.');
         }
         $this->settings->log_audit('Changed approval policy', 'Approvals',
-            'Journal approval ' . ($enabled ? 'on' : 'off') . ", threshold {$amt}, self-approval " . ($allowSelf ? 'allowed' : 'not allowed'));
+            ($doc === self::DOC_BILL ? 'Vendor bill' : 'Journal') . ' approval ' . ($enabled ? 'on' : 'off') . ", threshold {$amt}, self-approval " . ($allowSelf ? 'allowed' : 'not allowed'));
         $this->settings->set_flashdata('success', 'Approval settings saved.');
         return json_encode(['status' => 'success', 'msg' => 'Approval settings saved.']);
     }
@@ -196,6 +196,115 @@ class ApprovalService
         $this->settings->log_audit('Returned journal', 'Approvals', "{$row['code']} returned to draft: {$note}");
         $this->settings->set_flashdata('success', "Journal {$row['code']} returned to draft.");
         return json_encode(['status' => 'success', 'msg' => "Journal {$row['code']} returned to draft."]);
+    }
+
+    /* ------------------------------ vendor bills ------------------------------ */
+
+    /** Bills waiting for approval, oldest first. */
+    public function pendingBills(): array
+    {
+        $t = $this->tenantId();
+        $stmt = $this->conn->prepare("SELECT b.id, b.bill_no, b.bill_date, b.total, b.submitted_by, p.name vendor,
+                CONCAT(u.firstname, ' ', u.lastname) author
+            FROM vendor_bill_list b LEFT JOIN party_list p ON p.id = b.vendor_id LEFT JOIN users u ON u.id = b.submitted_by
+            WHERE b.tenant_id = ? AND b.status = ? ORDER BY b.bill_date, b.id");
+        $p = self::PENDING;
+        $stmt->bind_param('is', $t, $p);
+        $stmt->execute();
+        return $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    }
+
+    private function pendingBill(int $id, int $tenantId): ?array
+    {
+        $stmt = $this->conn->prepare("SELECT id, bill_no, bill_date, total, paid_amount, journal_id, submitted_by FROM vendor_bill_list WHERE id = ? AND tenant_id = ? AND status = ?");
+        $p = self::PENDING;
+        $stmt->bind_param('iis', $id, $tenantId, $p);
+        $stmt->execute();
+        return $stmt->get_result()->fetch_assoc() ?: null;
+    }
+
+    /** Approve a bill: the bill becomes payable and its journal posts to the ledger. */
+    public function approveBill(int $id): string
+    {
+        $t = $this->tenantId();
+        $bill = $this->pendingBill($id, $t);
+        if (!$bill) {
+            return $this->fail('That bill is not waiting for approval.');
+        }
+        $me = (int)$this->settings->userdata('id');
+        $block = self::approvalBlock((int)$bill['submitted_by'], $me, $this->settings->can_access('bills_approve'), $this->policy(self::DOC_BILL)['allow_self']);
+        if ($block) {
+            return $this->fail(str_replace('journal', 'bill', $block));
+        }
+        if ($msg = PeriodLockService::guard($this->conn, $t, (string)$bill['bill_date'])) {
+            return $this->fail($msg);
+        }
+        $paid = (float)$bill['paid_amount'];
+        $status = $paid >= (float)$bill['total'] && (float)$bill['total'] > 0 ? 'paid' : ($paid > 0 ? 'partially_paid' : 'unpaid');
+
+        $this->conn->begin_transaction();
+        try {
+            $up = $this->conn->prepare("UPDATE vendor_bill_list SET status = ?, approved_by = ?, approved_at = NOW(), approval_note = NULL WHERE id = ? AND tenant_id = ? AND status = ?");
+            $p = self::PENDING;
+            $up->bind_param('siiis', $status, $me, $id, $t, $p);
+            $up->execute();
+            if ($up->affected_rows < 1) {
+                throw new \RuntimeException('taken');
+            }
+            if (!empty($bill['journal_id'])) {
+                $j = $this->conn->prepare("UPDATE journal_entries SET status = 'posted' WHERE id = ? AND tenant_id = ?");
+                $jid = (int)$bill['journal_id'];
+                $j->bind_param('ii', $jid, $t);
+                $j->execute();
+            }
+            $this->conn->commit();
+        } catch (\Throwable $e) {
+            $this->conn->rollback();
+            return $this->fail('That bill was already dealt with by someone else.');
+        }
+        $this->settings->log_audit('Approved vendor bill', 'Approvals', "{$bill['bill_no']} dated {$bill['bill_date']}, total " . number_format((float)$bill['total'], 2) . '.');
+        $this->settings->set_flashdata('success', "Bill {$bill['bill_no']} approved.");
+        return json_encode(['status' => 'success', 'msg' => "Bill {$bill['bill_no']} approved."]);
+    }
+
+    /** Return a pending bill to draft with a reason; its journal stays out of the ledger. */
+    public function rejectBill(int $id, string $note): string
+    {
+        $t = $this->tenantId();
+        $bill = $this->pendingBill($id, $t);
+        if (!$bill) {
+            return $this->fail('That bill is not waiting for approval.');
+        }
+        if (!$this->settings->can_access('bills_approve')) {
+            return $this->fail('You do not have permission to review bills.');
+        }
+        $note = mb_substr(trim($note), 0, 500);
+        if ($note === '') {
+            return $this->fail('Say why the bill is being returned.');
+        }
+        $this->conn->begin_transaction();
+        try {
+            $up = $this->conn->prepare("UPDATE vendor_bill_list SET status = 'draft', approval_note = ? WHERE id = ? AND tenant_id = ? AND status = ?");
+            $p = self::PENDING;
+            $up->bind_param('siis', $note, $id, $t, $p);
+            $up->execute();
+            if ($up->affected_rows < 1) {
+                throw new \RuntimeException('taken');
+            }
+            if (!empty($bill['journal_id'])) {
+                $j = $this->conn->prepare("UPDATE journal_entries SET status = 'draft' WHERE id = ? AND tenant_id = ?");
+                $jid = (int)$bill['journal_id'];
+                $j->bind_param('ii', $jid, $t);
+                $j->execute();
+            }
+            $this->conn->commit();
+        } catch (\Throwable $e) {
+            $this->conn->rollback();
+            return $this->fail('That bill was already dealt with by someone else.');
+        }
+        $this->settings->log_audit('Returned vendor bill', 'Approvals', "{$bill['bill_no']} returned to draft: {$note}");
+        $this->settings->set_flashdata('success', "Bill {$bill['bill_no']} returned to draft.");
+        return json_encode(['status' => 'success', 'msg' => "Bill {$bill['bill_no']} returned to draft."]);
     }
 
     private function pendingRow(int $id, int $tenantId): ?array

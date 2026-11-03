@@ -71,6 +71,7 @@ class DBConnection{
                 $this->check_tenant_integrity_migrations();
                 $this->check_approval_migrations();
                 $this->check_asset_depreciation_migrations();
+                $this->check_bill_approval_migrations();
                 $this->check_credit_note_migrations();
                 $this->check_dolibarr_crm_migrations();
                 $this->check_dolibarr_extended_migrations();
@@ -1020,6 +1021,28 @@ class DBConnection{
         );
         foreach ($cols as $col => $sql) {
             $res = @$this->conn->query("SHOW COLUMNS FROM `fixed_assets` LIKE '{$col}'");
+            if ($res && $res->num_rows == 0) {
+                @$this->conn->query($sql);
+            }
+        }
+    }
+
+    public function check_bill_approval_migrations(){
+        if (!$this->conn) return;
+
+        $r = @$this->conn->query("SHOW COLUMNS FROM `vendor_bill_list` LIKE 'status'");
+        $col = $r ? $r->fetch_assoc() : null;
+        if ($col && stripos((string)$col['Type'], 'pending_approval') === false) {
+            @$this->conn->query("ALTER TABLE `vendor_bill_list` MODIFY `status` enum('draft','pending_approval','unpaid','partially_paid','paid','cancelled') NOT NULL DEFAULT 'unpaid'");
+        }
+        $cols = array(
+            'submitted_by'  => "ALTER TABLE `vendor_bill_list` ADD COLUMN `submitted_by` int(50) DEFAULT NULL",
+            'approved_by'   => "ALTER TABLE `vendor_bill_list` ADD COLUMN `approved_by` int(50) DEFAULT NULL",
+            'approved_at'   => "ALTER TABLE `vendor_bill_list` ADD COLUMN `approved_at` datetime DEFAULT NULL",
+            'approval_note' => "ALTER TABLE `vendor_bill_list` ADD COLUMN `approval_note` varchar(500) DEFAULT NULL",
+        );
+        foreach ($cols as $c => $sql) {
+            $res = @$this->conn->query("SHOW COLUMNS FROM `vendor_bill_list` LIKE '{$c}'");
             if ($res && $res->num_rows == 0) {
                 @$this->conn->query($sql);
             }
