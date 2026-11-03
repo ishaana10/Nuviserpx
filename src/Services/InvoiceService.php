@@ -106,6 +106,38 @@ class InvoiceService
         if ($lockMsg = \App\Services\PeriodLockService::guardDocument($this->conn, (int)$tenant_id, $journal_date, 'invoice_list', (int)$id)) {
             return json_encode(['status' => 'failed', 'msg' => $lockMsg]);
         }
+
+        // Stock: lines that name a product are issued from stock at average cost (Dr Cost of Sales, Cr Inventory) when
+        // the company has inventory accounting on. Everything that can fail is done before the invoice is written.
+        $stockSvc = new InventoryAccountingService($this->conn, $this->settings);
+        $stockLines = $this->productLines($post, $stockSvc);
+        $held = ['items' => [], 'journal' => 0, 'warehouse' => 0];
+        if (!empty($id)) {
+            $held = $this->issuedStock((int)$id, (int)$tenant_id);
+        }
+        $issued = ['ok' => true, 'msg' => '', 'journal_id' => 0, 'costs' => []];
+        $need = $status === InvoiceStatus::CANCELLED->value || $status === 'draft'
+            ? [] : InventoryAccountingService::aggregate($stockLines);
+        $returning = array_map(fn ($i) => $i['qty'], $held['items']);
+        // Stock already issued by this invoice is always taken back first (even if inventory accounting has since
+        // been switched off), so an edit never leaves cost of sales or stock behind.
+        if ($stockSvc->isEnabled() || $held['items']) {
+            if ($msg = $stockSvc->checkAvailable($need, $returning)) {
+                return json_encode(['status' => 'failed', 'msg' => $msg]);
+            }
+            if ($held['items']) {
+                $back = $stockSvc->restore($held['items'], $held['journal'], $invoice_date, $invoice_no, $held['warehouse']);
+                if (!$back['ok']) {
+                    return json_encode(['status' => 'failed', 'msg' => 'The stock on this invoice could not be taken back: ' . $back['msg']]);
+                }
+            }
+            $issued = $stockSvc->issue($need, $invoice_date, $invoice_no, $held['warehouse']);
+            if (!$issued['ok']) {
+                return json_encode(['status' => 'failed', 'msg' => $issued['msg']]);
+            }
+        }
+        $cogsJournalId = (int)$issued['journal_id'];
+        $stockCosts = $issued['costs'];
         $partyName = $party['name'] ?? '';
         $description = $this->conn->real_escape_string("Sales Invoice {$invoice_no} to {$partyName} - Total: " . ($isForeign ? "{$docCurrency} " . number_format((float)$total_fc, 2) . " @ {$docRate}" : "\${$total}"));
         $arFx = $isForeign ? ['currency' => $docCurrency, 'fx_rate' => $docRate, 'amount_fc' => (float)$total_fc] : null;
@@ -133,6 +165,7 @@ class InvoiceService
 				{$fxSql}
 				`notes` = '{$notes}',
 				`journal_id` = '{$journal_id}',
+				`cogs_journal_id` = " . ($cogsJournalId > 0 ? $cogsJournalId : 'NULL') . ",
 				`created_by` = '{$user_id}'";
             $save = $this->conn->query($sql);
             $invoice_id = $this->conn->insert_id;
@@ -161,7 +194,8 @@ class InvoiceService
 				`balance` = '{$balance}',
 				`status` = '{$status}',
 				{$fxSql}
-				`notes` = '{$notes}'
+				`notes` = '{$notes}',
+				`cogs_journal_id` = " . ($cogsJournalId > 0 ? $cogsJournalId : 'NULL') . "
 				WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'";
             $save = $this->conn->query($sql);
             $invoice_id = $id;
@@ -182,8 +216,13 @@ class InvoiceService
                     $i_tax_amt = round(($i_qty * $i_price) * ($i_tax_rate / 100), 2);
                     $i_amount = round(($i_qty * $i_price) + $i_tax_amt, 2);
 
+                    $i_pid = (int)($stockLines[$k]['product_id'] ?? 0);
+                    $i_cost = ($i_pid > 0 && isset($stockCosts[$i_pid]) && $i_qty > 0) ? number_format((float)$stockCosts[$i_pid], 4, '.', '') : null;
+
                     $item_sql = "INSERT INTO `invoice_items` SET
 						`invoice_id` = '{$invoice_id}',
+						`product_id` = " . ($i_pid > 0 ? $i_pid : 'NULL') . ",
+						`unit_cost` = " . ($i_cost !== null ? "'{$i_cost}'" : 'NULL') . ",
 						`item_name` = '{$i_name}',
 						`description` = '{$i_desc}',
 						`qty` = '{$i_qty}',
@@ -230,12 +269,72 @@ class InvoiceService
                 ], (int)$tenant_id);
             }
         } else {
+            // The invoice did not save: put back the stock just issued so the books and the shelves stay level.
+            if ($need && $stockCosts && $stockSvc->isEnabled()) {
+                $undo = [];
+                foreach ($need as $pid => $qty) {
+                    $undo[$pid] = ['qty' => $qty, 'cost' => (float)($stockCosts[$pid] ?? 0)];
+                }
+                $stockSvc->restore($undo, $cogsJournalId, $invoice_date, $invoice_no, $held['warehouse']);
+            }
             $resp['status'] = 'failed';
             $resp['msg'] = "An error occurred while saving invoice.";
             $resp['err'] = $this->conn->error;
         }
 
         return json_encode($resp);
+    }
+
+    /**
+     * The invoice's lines as [product_id, qty] by position, keeping only products that belong to this company.
+     *
+     * @return array<int,array{product_id:int,qty:float}>
+     */
+    private function productLines(array $post, InventoryAccountingService $stock): array
+    {
+        $rows = [];
+        $ids = [];
+        foreach ((array)($post['item_name'] ?? []) as $k => $name) {
+            $pid = isset($post['product_id'][$k]) && is_numeric($post['product_id'][$k]) ? (int)$post['product_id'][$k] : 0;
+            $rows[$k] = ['product_id' => empty($name) ? 0 : $pid, 'qty' => isset($post['item_qty'][$k]) ? (float)$post['item_qty'][$k] : 1.0];
+            if ($rows[$k]['product_id'] > 0) {
+                $ids[] = $rows[$k]['product_id'];
+            }
+        }
+        $known = $stock->products($ids);
+        foreach ($rows as $k => $r) {
+            if ($r['product_id'] > 0 && !isset($known[$r['product_id']])) {
+                $rows[$k]['product_id'] = 0;
+            }
+        }
+        return $rows;
+    }
+
+    /**
+     * Stock this invoice has already issued: per product the quantity and the cost it left at, plus the journal.
+     *
+     * @return array{items:array<int,array{qty:float,cost:float}>,journal:int,warehouse:int}
+     */
+    private function issuedStock(int $invoiceId, int $tenantId): array
+    {
+        $out = ['items' => [], 'journal' => 0, 'warehouse' => 0];
+        $stmt = $this->conn->prepare("SELECT COALESCE(cogs_journal_id, 0) j, stock_warehouse_id w FROM invoice_list WHERE id = ? AND tenant_id = ?");
+        $stmt->bind_param('ii', $invoiceId, $tenantId);
+        $stmt->execute();
+        if ($h = $stmt->get_result()->fetch_assoc()) {
+            $out['journal'] = (int)$h['j'];
+            $out['warehouse'] = (int)$h['w'];
+        }
+        $it = $this->conn->prepare("SELECT product_id, qty, unit_cost FROM invoice_items WHERE invoice_id = ? AND product_id IS NOT NULL AND unit_cost IS NOT NULL");
+        $it->bind_param('i', $invoiceId);
+        $it->execute();
+        foreach ($it->get_result()->fetch_all(MYSQLI_ASSOC) as $r) {
+            $pid = (int)$r['product_id'];
+            $cur = $out['items'][$pid] ?? ['qty' => 0.0, 'cost' => (float)$r['unit_cost']];
+            $cur['qty'] = round($cur['qty'] + (float)$r['qty'], 4);
+            $out['items'][$pid] = $cur;
+        }
+        return $out;
     }
 
     /**
@@ -263,6 +362,17 @@ class InvoiceService
         }
 
         $inv = $this->conn->query("SELECT invoice_no, journal_id FROM `invoice_list` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'")->fetch_assoc();
+        if (!$inv) {
+            return json_encode(['status' => 'failed', 'msg' => 'Invoice not found.']);
+        }
+        // Take back any stock the invoice issued (and its cost of sales) before the invoice disappears.
+        $held = $this->issuedStock($id, (int)$tenant_id);
+        if ($held['items'] || $held['journal']) {
+            $back = (new InventoryAccountingService($this->conn, $this->settings))->restore($held['items'], $held['journal'], date('Y-m-d'), (string)$inv['invoice_no'], $held['warehouse']);
+            if (!$back['ok']) {
+                return json_encode(['status' => 'failed', 'msg' => 'This invoice issued stock that could not be taken back: ' . $back['msg']]);
+            }
+        }
         if (!empty($inv['journal_id'])) {
             $this->conn->query("DELETE FROM `journal_entries` WHERE id = '{$inv['journal_id']}'");
         }

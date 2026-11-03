@@ -88,6 +88,7 @@ class DBConnection{
                 $this->check_frcs_accreditation_migrations();
                 $this->check_2026_statutory_migrations();
                 $this->check_integrity_hardening_migrations();
+                $this->check_inventory_accounting_migrations();
             }
 
             // Run versioned migrations
@@ -1285,6 +1286,51 @@ class DBConnection{
                 @$this->conn->query($sql);
             }
         }
+    }
+
+    public function check_inventory_accounting_migrations(){
+        if (!$this->conn) return;
+        // Per-company switch and account choices for posting stock to the ledger (see InventoryAccountingService).
+        @$this->conn->query("CREATE TABLE IF NOT EXISTS `inventory_settings` (
+          `tenant_id` int(30) NOT NULL,
+          `enabled` tinyint(1) NOT NULL DEFAULT 0,
+          `inventory_account_id` int(30) DEFAULT NULL,
+          `cogs_account_id` int(30) DEFAULT NULL,
+          `adjustment_account_id` int(30) DEFAULT NULL,
+          `offset_account_id` int(30) DEFAULT NULL,
+          `enabled_on` date DEFAULT NULL,
+          `opening_journal_id` int(30) DEFAULT NULL,
+          `date_updated` datetime DEFAULT NULL ON UPDATE current_timestamp(),
+          PRIMARY KEY (`tenant_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        $this->add_tenant_fk('inventory_settings');
+
+        $cols = array(
+            'invoice_items' => array(
+                'product_id' => "ALTER TABLE `invoice_items` ADD COLUMN `product_id` int(30) DEFAULT NULL AFTER `invoice_id`",
+                'unit_cost'  => "ALTER TABLE `invoice_items` ADD COLUMN `unit_cost` decimal(14,4) DEFAULT NULL",
+            ),
+            'invoice_list' => array(
+                'cogs_journal_id' => "ALTER TABLE `invoice_list` ADD COLUMN `cogs_journal_id` int(30) DEFAULT NULL",
+                'stock_warehouse_id' => "ALTER TABLE `invoice_list` ADD COLUMN `stock_warehouse_id` int(30) NOT NULL DEFAULT 0",
+            ),
+            'inventory_logs' => array(
+                'warehouse_id' => "ALTER TABLE `inventory_logs` ADD COLUMN `warehouse_id` int(30) NOT NULL DEFAULT 0 AFTER `product_id`",
+                'journal_id'   => "ALTER TABLE `inventory_logs` ADD COLUMN `journal_id` int(30) DEFAULT NULL",
+            ),
+        );
+        foreach ($cols as $table => $adds) {
+            if (!$this->table_exists($table)) continue;
+            foreach ($adds as $col => $sql) {
+                $r = @$this->conn->query("SHOW COLUMNS FROM `{$table}` LIKE '{$col}'");
+                if ($r && $r->num_rows == 0) {
+                    @$this->conn->query($sql);
+                }
+            }
+        }
+        $this->add_index_if_missing('invoice_items', 'idx_invoice_items_product', '(`product_id`)');
+        $this->add_index_if_missing('invoice_list', 'idx_invoice_cogs_journal', '(`cogs_journal_id`)');
+        $this->add_index_if_missing('inventory_logs', 'idx_inventory_logs_journal', '(`journal_id`)');
     }
 
     public function check_tax_return_migrations(){

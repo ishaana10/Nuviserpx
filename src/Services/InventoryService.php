@@ -52,6 +52,9 @@ class InventoryService
             $save = $this->conn->query($sql);
             $product_id = $this->conn->insert_id;
 
+            if ($save && $stock_quantity > 0 && ($openMsg = (new InventoryAccountingService($this->conn, $this->settings))->postOpeningStock((int)$product_id, $stock_quantity, $cost_price, $product_code))) {
+                $openingWarning = ' The opening stock could not be posted to the ledger: ' . $openMsg;
+            }
             if ($save && $stock_quantity > 0) {
                 // Log initial stock entry
                 $userId = $this->settings->userdata('id');
@@ -82,7 +85,7 @@ class InventoryService
 
         if ($save) {
             $resp['status'] = 'success';
-            $resp['msg'] = empty($id) ? " Product added successfully." : " Product details updated successfully.";
+            $resp['msg'] = (empty($id) ? " Product added successfully." : " Product details updated successfully.") . ($openingWarning ?? '');
             $this->settings->set_flashdata('success', $resp['msg']);
         } else {
             $resp['status'] = 'failed';
@@ -129,6 +132,27 @@ class InventoryService
         if (!$prod_qry || $prod_qry->num_rows == 0) {
             return json_encode(['status' => 'failed', 'msg' => 'Selected product not found.']);
         }
+        $product = $prod_qry->fetch_assoc();
+
+        // With inventory accounting on, the change in stock value is posted to the ledger first (and refused if the
+        // period is closed or the stock is not there), then the quantities are applied below.
+        $accounting = new InventoryAccountingService($this->conn, $this->settings);
+        $journalId = 0;
+        if ($accounting->isEnabled()) {
+            $current = (float)$product['stock_quantity'];
+            if ($type === 'out') {
+                $delta = -$qty;
+            } elseif ($type === 'adjustment' && isset($is_absolute) && $is_absolute == 1) {
+                $delta = round($qty - $current, 4);
+            } else {
+                $delta = $qty;
+            }
+            $valued = $accounting->valueChange($product_id, $delta, $delta > 0 && $unit_cost > 0 ? $unit_cost : null, date('Y-m-d'), $reference);
+            if (!$valued['ok']) {
+                return json_encode(['status' => 'failed', 'msg' => $valued['msg']]);
+            }
+            $journalId = $valued['journal_id'];
+        }
 
         // Keep the authoritative product total, and mirror the change into the
         // chosen warehouse location (syncTotal = false — the total is set here).
@@ -160,6 +184,7 @@ class InventoryService
 			`unit_cost` = '{$unit_cost}',
 			`reference` = '{$reference}',
 			`notes` = '{$notes}',
+			" . ($journalId > 0 ? "`journal_id` = '{$journalId}'," : '') . "
 			`created_by` = '{$user_id}'");
 
         if ($save_log) {

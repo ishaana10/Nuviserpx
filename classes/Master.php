@@ -21,6 +21,9 @@ require_once(__DIR__ . '/../config.php');
 
 class Master extends DBConnection
 {
+    /** Why the last confirm_sales_order_internal() call returned false (shown to the user). */
+    private string $confirm_error = '';
+
     private $settings;
     private Container $container;
 
@@ -1081,6 +1084,11 @@ class Master extends DBConnection
         return $this->container->make(\App\Services\ApprovalService::class)->savePolicy($_POST);
     }
 
+    public function save_inventory_accounting()
+    {
+        return $this->container->make(\App\Services\InventoryAccountingService::class)->saveSettings($_POST);
+    }
+
     public function file_tax_return()
     {
         return $this->container->make(\App\Services\TaxReturnService::class)->file($_POST);
@@ -1333,7 +1341,10 @@ class Master extends DBConnection
             }
 
             if ($status === 'confirmed' || $status === 'converted_to_invoice') {
-                $this->confirm_sales_order_internal($sales_order_id);
+                if (!$this->confirm_sales_order_internal($sales_order_id)) {
+                    // The order is saved but could not be confirmed (for example not enough stock): say so rather than pretend.
+                    return json_encode(['status' => 'failed', 'msg' => 'The order was saved but not confirmed. ' . ($this->confirm_error !== '' ? $this->confirm_error : 'Please try again.')]);
+                }
             }
 
             $resp['status'] = 'success';
@@ -1359,7 +1370,29 @@ class Master extends DBConnection
         $order = $order_qry->fetch_assoc();
 
         if ($order['stock_adjusted'] == 0) {
-            $items = $this->conn->query("SELECT * FROM `sales_order_items` WHERE sales_order_id = '{$sales_order_id}'");
+            // Confirming books the invoice and the stock movement, so it must fall in an open period.
+            if ($lockMsg = \App\Services\PeriodLockService::guard($this->conn, (int)$tenant_id, (string)$order['order_date'])) {
+                $this->confirm_error = $lockMsg;
+                return false;
+            }
+            // With inventory accounting on, issue the stock through the service: it checks availability, posts the
+            // cost of sales and moves stock atomically. Otherwise the long-standing units-only deduction runs.
+            $stockSvc = $this->container->make(\App\Services\InventoryAccountingService::class);
+            $issued = ['ok' => true, 'msg' => '', 'journal_id' => 0, 'costs' => []];
+            $wh = isset($order['warehouse_id']) ? max(0, (int)$order['warehouse_id']) : 0;
+            if ($stockSvc->isEnabled()) {
+                $rows = [];
+                $lines = $this->conn->query("SELECT product_id, qty FROM `sales_order_items` WHERE sales_order_id = '{$sales_order_id}'");
+                while ($lines && ($ln = $lines->fetch_assoc())) {
+                    $rows[] = $ln;
+                }
+                $issued = $stockSvc->issue(\App\Services\InventoryAccountingService::aggregate($rows), (string)$order['order_date'], (string)$order['order_no'], $wh);
+                if (!$issued['ok']) {
+                    $this->confirm_error = $issued['msg'];
+                    return false;
+                }
+            }
+            $items = $stockSvc->isEnabled() ? false : $this->conn->query("SELECT * FROM `sales_order_items` WHERE sales_order_id = '{$sales_order_id}'");
             if ($items) {
                 while ($item = $items->fetch_assoc()) {
                     $pid = (int)$item['product_id'];
@@ -1437,6 +1470,8 @@ class Master extends DBConnection
 					`status` = 'unpaid',
 					`notes` = '{$notesEsc}',
 					`journal_id` = '{$journal_id}',
+					`cogs_journal_id` = " . ((int)$issued['journal_id'] > 0 ? (int)$issued['journal_id'] : 'NULL') . ",
+					`stock_warehouse_id` = '{$wh}',
 					`created_by` = '{$user_id}'";
                 $this->conn->query($inv_sql);
                 $invoice_id = $this->conn->insert_id;
@@ -1446,8 +1481,12 @@ class Master extends DBConnection
                     while ($it2 = $items2->fetch_assoc()) {
                         $itNameEsc = $this->conn->real_escape_string((string)$it2['item_name']);
                         $itDescEsc = $this->conn->real_escape_string((string)$it2['description']);
+                        $itPid = (int)($it2['product_id'] ?? 0);
+                        $itCost = ($itPid > 0 && isset($issued['costs'][$itPid])) ? "'" . number_format((float)$issued['costs'][$itPid], 4, '.', '') . "'" : 'NULL';
                         $this->conn->query("INSERT INTO `invoice_items` SET
 							`invoice_id` = '{$invoice_id}',
+							`product_id` = " . ($itPid > 0 ? $itPid : 'NULL') . ",
+							`unit_cost` = {$itCost},
 							`item_name` = '{$itNameEsc}',
 							`description` = '{$itDescEsc}',
 							`qty` = '{$it2['qty']}',
@@ -1474,7 +1513,7 @@ class Master extends DBConnection
             $this->settings->set_flashdata('success', $resp['msg']);
         } else {
             $resp['status'] = 'failed';
-            $resp['msg'] = "An error occurred while confirming order.";
+            $resp['msg'] = $this->confirm_error !== '' ? $this->confirm_error : "An error occurred while confirming order.";
         }
         return json_encode($resp);
     }
@@ -1486,6 +1525,13 @@ class Master extends DBConnection
         $tenant_id = $this->settings->active_tenant_id();
 
         $order = $this->conn->query("SELECT * FROM `sales_order_list` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'")->fetch_assoc();
+        if ($order && !empty($order['invoice_id'])) {
+            // The invoice's cost of sales and stock are tied to it: cancel or delete the invoice instead.
+            $iss = $this->conn->query("SELECT 1 FROM `invoice_items` WHERE invoice_id = '" . (int)$order['invoice_id'] . "' AND unit_cost IS NOT NULL LIMIT 1");
+            if ($iss && $iss->num_rows > 0) {
+                return json_encode(['status' => 'failed', 'msg' => 'This order has been invoiced and its stock issued. Delete or cancel the invoice instead, which also puts the stock back.']);
+            }
+        }
         if ($order) {
             if ($order['stock_adjusted'] == 1) {
                 $wh = isset($order['warehouse_id']) ? max(0, (int)$order['warehouse_id']) : 0;
@@ -2044,6 +2090,9 @@ switch ($action) {
         break;
     case 'save_approval_policy':
         echo $Master->save_approval_policy();
+        break;
+    case 'save_inventory_accounting':
+        echo $Master->save_inventory_accounting();
         break;
     case 'file_tax_return':
         echo $Master->file_tax_return();
