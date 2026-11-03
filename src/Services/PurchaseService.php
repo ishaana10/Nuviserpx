@@ -587,17 +587,7 @@ class PurchaseService
 
     private function nextJournalCode(int $tenant_id): string
     {
-        $prefix = date('Ym-');
-        $code = sprintf("%'.05d", 1);
-        while (true) {
-            $check = $this->conn->query("SELECT 1 FROM `journal_entries` WHERE `code` = '{$prefix}{$code}' AND tenant_id = '{$tenant_id}'");
-            if ($check && $check->num_rows > 0) {
-                $code = sprintf("%'.05d", (int)ceil((float)$code) + 1);
-            } else {
-                break;
-            }
-        }
-        return $prefix . $code;
+        return SequenceService::journalCode($this->conn, $tenant_id);
     }
 
     /**

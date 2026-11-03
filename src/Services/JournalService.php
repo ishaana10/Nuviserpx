@@ -554,13 +554,7 @@ class JournalService
 
     private function nextCode(int $tenant_id): string
     {
-        $prefix = date('Ym-');
-        $like = $prefix . '%';
-        $stmt = $this->conn->prepare("SELECT MAX(CAST(SUBSTRING(code, 8) AS UNSIGNED)) n FROM journal_entries WHERE tenant_id = ? AND code LIKE ?");
-        $stmt->bind_param('is', $tenant_id, $like);
-        $stmt->execute();
-        $n = (int)($stmt->get_result()->fetch_assoc()['n'] ?? 0);
-        return $prefix . sprintf('%05d', $n + 1);
+        return SequenceService::journalCode($this->conn, $tenant_id);
     }
 
     private function journalRow(int $id, int $tenant_id): ?array
