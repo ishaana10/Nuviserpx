@@ -17,6 +17,7 @@ if($status == 'draft'){
     <div class="card-header d-flex align-items-center justify-content-between">
         <h3 class="card-title font-weight-bold"><i class="fas fa-boxes text-primary mr-2"></i> Fixed Assets</h3>
         <div class="card-tools">
+            <a href="./?page=assets/depreciation" class="btn btn-sm btn-outline-primary btn-flat mr-1"><i class="fas fa-chart-line mr-1"></i> Depreciation</a>
             <a href="./?page=assets/manage_asset" class="btn btn-sm btn-primary btn-flat"><i class="fas fa-plus mr-1"></i> New Asset</a>
         </div>
     </div>

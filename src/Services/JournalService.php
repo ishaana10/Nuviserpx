@@ -230,6 +230,15 @@ class JournalService
     }
 
     /**
+     * Post a journal produced by the system (depreciation, disposals): already in base currency, balanced,
+     * and checked against the period lock. Lines: [account_id, debit, credit, description]. Not reachable from a request.
+     */
+    public function postSystemJournal(string $date, string $description, array $lines): string
+    {
+        return $this->postRevaluation($date, $description, $lines);
+    }
+
+    /**
      * Post a foreign-currency revaluation journal. Lines arrive already in base currency, tagged with the
      * currency they restate (amount_fc 0), so only FxService calls this; it is not reachable from a request.
      */
