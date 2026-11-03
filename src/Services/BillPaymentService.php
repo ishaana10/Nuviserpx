@@ -94,13 +94,15 @@ class BillPaymentService
     public function openBills(int $vendorId): array
     {
         $t = $this->tenantId();
-        $stmt = $this->conn->prepare("SELECT id, bill_no, bill_date, due_date, total, paid_amount, credited_amount
-            FROM vendor_bill_list WHERE tenant_id = ? AND vendor_id = ? AND status IN ('unpaid','partially_paid') ORDER BY bill_date, id");
+        $stmt = $this->conn->prepare("SELECT b.id, b.bill_no, b.bill_date, b.due_date, b.total, b.paid_amount, b.credited_amount,
+                (SELECT COALESCE(SUM(a.amount), 0) FROM bill_payment_allocations a INNER JOIN bill_payments p ON p.id = a.payment_id AND p.status = 'pending_approval' WHERE a.bill_id = b.id) reserved
+            FROM vendor_bill_list b WHERE b.tenant_id = ? AND b.vendor_id = ? AND b.status IN ('unpaid','partially_paid') ORDER BY b.bill_date, b.id");
         $stmt->bind_param('ii', $t, $vendorId);
         $stmt->execute();
         $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
         foreach ($rows as &$r) {
-            $r['owed'] = CreditNoteService::outstanding((float)$r['total'], (float)$r['paid_amount'], (float)$r['credited_amount']);
+            // Money already promised in a payment awaiting approval is not available to pay again.
+            $r['owed'] = CreditNoteService::outstanding((float)$r['total'], (float)$r['paid_amount'] + (float)$r['reserved'], (float)$r['credited_amount']);
         }
         return $rows;
     }
@@ -207,7 +209,8 @@ class BillPaymentService
                     WHERE tenant_id = {$t} AND vendor_id = {$vendorId} AND id IN ({$ids}) FOR UPDATE");
                 while ($q && ($b = $q->fetch_assoc())) {
                     if (self::payable((string)$b['status'])) {
-                        $open[(int)$b['id']] = CreditNoteService::outstanding((float)$b['total'], (float)$b['paid_amount'], (float)$b['credited_amount']);
+                        $rs = $this->conn->query("SELECT COALESCE(SUM(a.amount), 0) r FROM bill_payment_allocations a INNER JOIN bill_payments p ON p.id = a.payment_id AND p.status = 'pending_approval' WHERE a.bill_id = " . (int)$b['id'])->fetch_assoc();
+                        $open[(int)$b['id']] = CreditNoteService::outstanding((float)$b['total'], (float)$b['paid_amount'] + (float)$rs['r'], (float)$b['credited_amount']);
                         $bills[(int)$b['id']] = $b;
                     }
                 }
@@ -216,6 +219,9 @@ class BillPaymentService
                 throw new \RuntimeException($err);
             }
 
+            $policy = (new ApprovalService($this->conn, $this->settings))->policy(ApprovalService::DOC_BILL_PAYMENT);
+            $pending = ApprovalService::requiresApproval($policy['enabled'], $policy['threshold'], $amount);
+            $pstatus = $pending ? ApprovalService::PENDING : 'posted';
             $no = $this->nextNumber($date);
             $desc = $this->conn->real_escape_string("Supplier payment {$no} - " . implode(', ', array_map(fn($b) => $b['bill_no'], $bills)));
             $code = SequenceService::journalCode($this->conn, $t);
@@ -225,10 +231,13 @@ class BillPaymentService
                 throw new \RuntimeException('The payment journal could not be posted.');
             }
 
+            if ($pending) {
+                $this->conn->query("UPDATE journal_entries SET status = 'pending_approval' WHERE id = {$journalId} AND tenant_id = {$t}");
+            }
             $ins = $this->conn->prepare("INSERT INTO bill_payments (tenant_id, payment_no, vendor_id, payment_date, amount, method, bank_account_id, reference, notes, status, journal_id, created_by)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'posted', ?, ?)");
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
             $amt = number_format($amount, 2, '.', '');
-            $ins->bind_param('isisssissii', $t, $no, $vendorId, $date, $amt, $method, $bankAcc, $reference, $notes, $journalId, $userId);
+            $ins->bind_param('isisssisssii', $t, $no, $vendorId, $date, $amt, $method, $bankAcc, $reference, $notes, $pstatus, $journalId, $userId);
             $ins->execute();
             $paymentId = (int)$this->conn->insert_id;
 
@@ -244,9 +253,10 @@ class BillPaymentService
             $this->conn->rollback();
             return $this->fail($e instanceof \RuntimeException ? $e->getMessage() : 'The payment could not be saved.');
         }
-        $this->settings->log_audit('Paid supplier bills', 'Purchases', "{$no}: " . number_format($amount, 2) . ' across ' . count($allocs) . ' bill(s).');
-        $this->settings->set_flashdata('success', "Payment {$no} recorded.");
-        return json_encode(['status' => 'success', 'msg' => "Payment {$no} recorded.", 'id' => $paymentId]);
+        $this->settings->log_audit($pending ? 'Submitted supplier payment for approval' : 'Paid supplier bills', 'Purchases', "{$no}: " . number_format($amount, 2) . ' across ' . count($allocs) . ' bill(s).');
+        $msg = $pending ? "Payment {$no} recorded and sent for approval. The bills stay unpaid until it is approved." : "Payment {$no} recorded.";
+        $this->settings->set_flashdata('success', $msg);
+        return json_encode(['status' => 'success', 'msg' => $msg, 'id' => $paymentId, 'pending' => $pending]);
     }
 
     /** Void a payment: its journal leaves the ledger and its bills owe the amount again. */
@@ -260,7 +270,7 @@ class BillPaymentService
         if (!$p) {
             return $this->fail('Payment not found.');
         }
-        if ($p['status'] === 'void') {
+        if (!in_array($p['status'], ['posted', 'pending_approval'], true)) {
             return $this->fail('That payment is already void.');
         }
         if ($msg = PeriodLockService::guard($this->conn, $t, (string)$p['payment_date'])) {
@@ -269,7 +279,7 @@ class BillPaymentService
         $this->conn->begin_transaction();
         try {
             $bills = array_column($this->allocationsFor($id), 'bill_id');
-            $up = $this->conn->prepare("UPDATE bill_payments SET status = 'void' WHERE id = ? AND tenant_id = ? AND status = 'posted'");
+            $up = $this->conn->prepare("UPDATE bill_payments SET status = 'void' WHERE id = ? AND tenant_id = ? AND status IN ('posted','pending_approval')");
             $up->bind_param('ii', $id, $t);
             $up->execute();
             if ($up->affected_rows < 1) {
@@ -292,6 +302,114 @@ class BillPaymentService
         $this->settings->log_audit('Voided supplier payment', 'Purchases', "{$p['payment_no']} voided.");
         $this->settings->set_flashdata('success', "Payment {$p['payment_no']} voided.");
         return json_encode(['status' => 'success', 'msg' => "Payment {$p['payment_no']} voided."]);
+    }
+
+    /** Payments waiting for approval, oldest first. */
+    public function pendingApproval(): array
+    {
+        $t = $this->tenantId();
+        $stmt = $this->conn->prepare("SELECT p.id, p.payment_no, p.payment_date, p.amount, p.created_by, v.name vendor, CONCAT(u.firstname, ' ', u.lastname) author
+            FROM bill_payments p LEFT JOIN party_list v ON v.id = p.vendor_id LEFT JOIN users u ON u.id = p.created_by
+            WHERE p.tenant_id = ? AND p.status = 'pending_approval' ORDER BY p.payment_date, p.id");
+        if (!$stmt) {
+            return [];
+        }
+        $stmt->bind_param('i', $t);
+        $stmt->execute();
+        return $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    }
+
+    private function pendingPayment(int $id, int $t): ?array
+    {
+        $stmt = $this->conn->prepare("SELECT id, payment_no, payment_date, amount, created_by, journal_id FROM bill_payments WHERE id = ? AND tenant_id = ? AND status = 'pending_approval'");
+        $stmt->bind_param('ii', $id, $t);
+        $stmt->execute();
+        return $stmt->get_result()->fetch_assoc() ?: null;
+    }
+
+    /** Approve a payment: it posts to the ledger and its bills are paid down. */
+    public function approve(int $id): string
+    {
+        $t = $this->tenantId();
+        $p = $this->pendingPayment($id, $t);
+        if (!$p) {
+            return $this->fail('That payment is not waiting for approval.');
+        }
+        $me = (int)$this->settings->userdata('id');
+        $policy = (new ApprovalService($this->conn, $this->settings))->policy(ApprovalService::DOC_BILL_PAYMENT);
+        $block = ApprovalService::approvalBlock((int)$p['created_by'], $me, $this->settings->can_access('bill_payments_approve'), $policy['allow_self']);
+        if ($block) {
+            return $this->fail(str_replace('journal', 'payment', $block));
+        }
+        if ($msg = PeriodLockService::guard($this->conn, $t, (string)$p['payment_date'])) {
+            return $this->fail($msg);
+        }
+        $this->conn->begin_transaction();
+        try {
+            $bills = $this->allocationsFor($id);
+            foreach ($bills as $a) {
+                $b = $this->conn->query("SELECT total, paid_amount, credited_amount, status FROM vendor_bill_list WHERE id = " . (int)$a['bill_id'] . " AND tenant_id = {$t} FOR UPDATE")->fetch_assoc();
+                if (!$b || !self::payable((string)$b['status'])
+                    || (float)$a['amount'] > CreditNoteService::outstanding((float)$b['total'], (float)$b['paid_amount'], (float)$b['credited_amount']) + 0.005) {
+                    throw new \RuntimeException("Bill {$a['bill_no']} no longer owes this much, so the payment cannot be approved. Return it and enter a new one.");
+                }
+            }
+            $up = $this->conn->prepare("UPDATE bill_payments SET status = 'posted', approved_by = ?, approved_at = NOW(), approval_note = NULL WHERE id = ? AND tenant_id = ? AND status = 'pending_approval'");
+            $up->bind_param('iii', $me, $id, $t);
+            $up->execute();
+            if ($up->affected_rows < 1) {
+                throw new \RuntimeException('That payment was already dealt with by someone else.');
+            }
+            if (!empty($p['journal_id'])) {
+                $this->conn->query("UPDATE journal_entries SET status = 'posted' WHERE id = " . (int)$p['journal_id'] . " AND tenant_id = {$t}");
+            }
+            foreach ($bills as $a) {
+                $this->refreshBill((int)$a['bill_id']);
+            }
+            $this->conn->commit();
+        } catch (\Throwable $e) {
+            $this->conn->rollback();
+            return $this->fail($e instanceof \RuntimeException ? $e->getMessage() : 'The payment could not be approved.');
+        }
+        $this->settings->log_audit('Approved supplier payment', 'Approvals', "{$p['payment_no']} for " . number_format((float)$p['amount'], 2) . '.');
+        $this->settings->set_flashdata('success', "Payment {$p['payment_no']} approved.");
+        return json_encode(['status' => 'success', 'msg' => "Payment {$p['payment_no']} approved."]);
+    }
+
+    /** Return a pending payment with a reason: it is voided, its journal never posts, and the bills are free again. */
+    public function reject(int $id, string $note): string
+    {
+        $t = $this->tenantId();
+        $p = $this->pendingPayment($id, $t);
+        if (!$p) {
+            return $this->fail('That payment is not waiting for approval.');
+        }
+        if (!$this->settings->can_access('bill_payments_approve')) {
+            return $this->fail('You do not have permission to review payments.');
+        }
+        $note = mb_substr(trim($note), 0, 500);
+        if ($note === '') {
+            return $this->fail('Say why the payment is being returned.');
+        }
+        $this->conn->begin_transaction();
+        try {
+            $up = $this->conn->prepare("UPDATE bill_payments SET status = 'void', approval_note = ? WHERE id = ? AND tenant_id = ? AND status = 'pending_approval'");
+            $up->bind_param('sii', $note, $id, $t);
+            $up->execute();
+            if ($up->affected_rows < 1) {
+                throw new \RuntimeException('That payment was already dealt with by someone else.');
+            }
+            if (!empty($p['journal_id'])) {
+                $this->conn->query("UPDATE journal_entries SET status = 'cancelled' WHERE id = " . (int)$p['journal_id'] . " AND tenant_id = {$t}");
+            }
+            $this->conn->commit();
+        } catch (\Throwable $e) {
+            $this->conn->rollback();
+            return $this->fail($e instanceof \RuntimeException ? $e->getMessage() : 'The payment could not be returned.');
+        }
+        $this->settings->log_audit('Returned supplier payment', 'Approvals', "{$p['payment_no']} returned: {$note}");
+        $this->settings->set_flashdata('success', "Payment {$p['payment_no']} returned.");
+        return json_encode(['status' => 'success', 'msg' => "Payment {$p['payment_no']} returned."]);
     }
 
     /** Recompute a bill's paid amount, balance and status from its live (non-void) payments. */

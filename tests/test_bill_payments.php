@@ -45,4 +45,17 @@ check(Permissions::forAction('pay_vendor_bills') === 'purchases_edit', 'paying n
 check(Permissions::forAction('void_bill_payment') === 'purchases_delete', 'voiding needs purchases delete');
 check(strpos(file_get_contents(__DIR__ . '/../classes/DBConnection.php'), 'check_bill_payment_migrations();') !== false, 'the migration is in the chain');
 check(strpos(file_get_contents(__DIR__ . '/../src/Services/PurchaseService.php'), 'bill_payment_allocations') !== false, 'a bill with payments cannot be deleted');
+echo "\n=== Approval ===\n";
+use App\Services\ApprovalService as A;
+check(A::DOC_BILL_PAYMENT === 'bill_payment', 'supplier payments have their own policy');
+check(A::requiresApproval(true, 5000, 5000) && !A::requiresApproval(true, 5000, 4999.99), 'payments at or above the threshold need approval');
+check(!A::requiresApproval(false, 0, 1000000), 'nothing needs approval while the policy is off');
+check(A::approvalBlock(7, 7, true, false) !== null, 'the person who entered a payment cannot approve it');
+check(A::approvalBlock(7, 8, true, false) === null, 'another approver can');
+check(A::approvalBlock(7, 8, false, false) !== null, 'approving needs the permission');
+foreach (['approve_bill_payment', 'reject_bill_payment'] as $a) { check(Permissions::forAction($a) === 'bill_payments_approve', "$a needs bill_payments_approve"); }
+check(in_array('bill_payments_approve', Permissions::keys(), true), 'bill_payments_approve is a grantable permission');
+$svc = file_get_contents(__DIR__ . '/../src/Services/BillPaymentService.php');
+check(strpos($svc, "p.status = 'pending_approval'") !== false, 'money promised in a pending payment is held back from the bill');
+check(strpos(file_get_contents(__DIR__ . '/../classes/DBConnection.php'), 'check_bill_payment_approval_migrations();') !== false, 'the approval migration is in the chain');
 echo "\nAll {$passed} bill payment checks passed.\n";

@@ -76,6 +76,7 @@ class DBConnection{
                 $this->check_fx_document_migrations();
                 $this->check_journal_trail_migrations();
                 $this->check_bill_payment_migrations();
+                $this->check_bill_payment_approval_migrations();
                 $this->check_dolibarr_crm_migrations();
                 $this->check_dolibarr_extended_migrations();
                 $this->check_extrafields_migrations();
@@ -1063,6 +1064,27 @@ class DBConnection{
           KEY `bill` (`bill_id`),
           CONSTRAINT `bpa_payment_fk` FOREIGN KEY (`payment_id`) REFERENCES `bill_payments` (`id`) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    }
+
+    public function check_bill_payment_approval_migrations(){
+        if (!$this->conn) return;
+
+        $r = @$this->conn->query("SHOW COLUMNS FROM `bill_payments` LIKE 'status'");
+        $col = $r ? $r->fetch_assoc() : null;
+        if ($col && stripos((string)$col['Type'], 'pending_approval') === false) {
+            @$this->conn->query("ALTER TABLE `bill_payments` MODIFY `status` enum('posted','void','pending_approval') NOT NULL DEFAULT 'posted'");
+        }
+        $cols = array(
+            'approved_by'   => "ALTER TABLE `bill_payments` ADD COLUMN `approved_by` int(30) DEFAULT NULL",
+            'approved_at'   => "ALTER TABLE `bill_payments` ADD COLUMN `approved_at` datetime DEFAULT NULL",
+            'approval_note' => "ALTER TABLE `bill_payments` ADD COLUMN `approval_note` varchar(500) DEFAULT NULL",
+        );
+        foreach ($cols as $c => $sql) {
+            $res = @$this->conn->query("SHOW COLUMNS FROM `bill_payments` LIKE '{$c}'");
+            if ($res && $res->num_rows == 0) {
+                @$this->conn->query($sql);
+            }
+        }
     }
 
     public function check_journal_trail_migrations(){
