@@ -418,6 +418,7 @@ final class Permissions
         'save_budget'           => ['accounts', 'edit'],
         'save_exchange_rate'    => ['settings_manage'],
         'post_fx_revaluation'   => ['journals', 'create'],
+        'run_auto_reversals'    => ['journals', 'create'],
         'approve_journal'       => ['journals_approve'],
         'reject_journal'        => ['journals_approve'],
         'save_approval_policy'  => ['settings_manage'],

@@ -55,6 +55,7 @@ $unbalanced = count(array_filter($rows, fn ($r) => $norm($r['status']) === 'post
 if ($status_tab !== 'all') {
     $rows = array_values(array_filter($rows, fn ($r) => $norm($r['status']) === $status_tab));
 }
+$due_reversals = $_settings->can_access('journals_create') ? count((new \App\Services\AutoReversalService($conn, $_settings))->due(date('Y-m-d'))) : 0;
 $qs = fn (array $over) => './?' . http_build_query(array_merge(['page' => 'journals', 'from' => $from, 'to' => $to, 'status' => $status_tab], $over));
 ?>
 <style>
@@ -75,6 +76,9 @@ $qs = fn (array $over) => './?' . http_build_query(array_merge(['page' => 'journ
     <div class="card-header">
         <h3 class="card-title"><i class="fas fa-book text-primary"></i> Manual Journals</h3>
         <div class="card-tools">
+            <?php if ($due_reversals): ?>
+            <button type="button" class="btn btn-warning btn-sm" id="run_reversals"><i class="fas fa-undo mr-1"></i> Post <?= $due_reversals ?> due reversal<?= $due_reversals === 1 ? '' : 's' ?></button>
+            <?php endif; ?>
             <a class="btn btn-default btn-sm" href="./?page=reports/general_ledger"><i class="fas fa-book-open mr-1"></i> General ledger</a>
             <a class="btn btn-primary btn-sm" href="./?page=journals/manage_journal"><i class="fas fa-plus mr-1"></i> New journal</a>
         </div>
@@ -180,4 +184,13 @@ function nv_journal_action(action, id) {
 function nv_delete_journal(id) { nv_journal_action('delete_journal', id); }
 function nv_cancel_journal(id) { nv_journal_action('cancel_journal', id); }
 function nv_reverse_journal(id) { nv_journal_action('reverse_journal', id); }
+    $('#run_reversals').on('click', function () {
+        start_loader();
+        $.ajax({ url: _base_url_ + 'classes/Master.php?f=run_auto_reversals', method: 'POST', dataType: 'json',
+            error: function () { alert_toast('An error occurred.', 'error'); end_loader(); },
+            success: function (r) {
+                if (r && r.status === 'success') { location.reload(); }
+                else { alert_toast((r && r.msg) || 'An error occurred.', 'error'); end_loader(); }
+            } });
+    });
 </script>

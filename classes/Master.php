@@ -966,6 +966,21 @@ class Master extends DBConnection
         return $this->container->make(\App\Services\FxService::class)->revalue((string)($_POST['as_at'] ?? ''));
     }
 
+    public function run_auto_reversals()
+    {
+        $res = (new \App\Services\AutoReversalService($this->conn, $this->settings))->run(date('Y-m-d'));
+        $n = count($res['done']);
+        $f = count($res['failed']);
+        if ($n === 0 && $f === 0) {
+            return json_encode(['status' => 'failed', 'msg' => 'No journals are due for reversal.']);
+        }
+        $msg = "{$n} journal" . ($n === 1 ? '' : 's') . ' reversed.' . ($f ? " {$f} could not be reversed: " . implode(' ', array_slice(array_map(fn ($c, $w) => "{$c}: {$w}", array_keys($res['failed']), $res['failed']), 0, 2)) : '');
+        if ($n) {
+            $this->settings->set_flashdata('success', $msg);
+        }
+        return json_encode(['status' => $n ? 'success' : 'failed', 'msg' => $msg]);
+    }
+
     public function approve_journal()
     {
         return $this->container->make(\App\Services\ApprovalService::class)->approve(intval($_POST['id'] ?? 0));
@@ -1867,6 +1882,9 @@ switch ($action) {
         break;
     case 'post_fx_revaluation':
         echo $Master->post_fx_revaluation();
+        break;
+    case 'run_auto_reversals':
+        echo $Master->run_auto_reversals();
         break;
     case 'approve_journal':
         echo $Master->approve_journal();
