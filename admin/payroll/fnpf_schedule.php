@@ -15,7 +15,7 @@ if(isset($_GET['export_csv']) && $_GET['export_csv'] == 1){
     header('Content-Disposition: attachment; filename="fnpf_cs3_schedule_' . strtolower(str_replace(' ', '_', $month)) . '.csv"');
 
     $output = fopen('php://output', 'w');
-    fputcsv($output, ['FNPF_MEMBER_NO', 'EMPLOYEE_NAME', 'TIN_NUMBER', 'GROSS_WAGES', 'EMPLOYEE_CONTRIB_8', 'EMPLOYER_CONTRIB_8', 'TOTAL_CONTRIB_16']);
+    fputcsv($output, ['FNPF_MEMBER_NO', 'EMPLOYEE_NAME', 'TIN_NUMBER', 'GROSS_WAGES', 'EMPLOYEE_CONTRIB', 'EMPLOYER_CONTRIB', 'TOTAL_CONTRIB']);
 
     while($row = $qry->fetch_assoc()){
         $emp_fnpf = floatval($row['employee_fnpf']);
@@ -81,8 +81,8 @@ $tot_empr_fnpf = 0;
                         <th>Employee Name & Code</th>
                         <th>TIN Number</th>
                         <th class="text-right">Gross Wages ($)</th>
-                        <th class="text-right">Employee (8%)</th>
-                        <th class="text-right">Employer (8%)</th>
+                        <th class="text-right">Employee</th>
+                        <th class="text-right">Employer</th>
                         <th class="text-right">Total FNPF (16%)</th>
                     </tr>
                 </thead>

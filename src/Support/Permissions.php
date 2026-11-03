@@ -501,6 +501,7 @@ final class Permissions
         // Payroll
         'save_payroll_rules'    => ['settings_manage'],
         'reset_payroll_rules'   => ['settings_manage'],
+        'delete_payroll_rules_version' => ['settings_manage'],
         'save_payroll'          => ['payroll', 'save'],
         'delete_payroll'        => ['payroll', 'delete'],
         'calculate_payroll_ajax'=> ['payroll', 'edit'],

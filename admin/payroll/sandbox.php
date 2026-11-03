@@ -1,3 +1,4 @@
+<?php require_once(base_app . 'classes/PayrollEngine.php'); $ot_rules = PayrollEngine::load_rules($_settings)['overtime']['tiers']; ?>
 <div class="card card-outline card-primary shadow-sm rounded-0">
     <div class="card-header d-flex align-items-center justify-content-between">
         <h3 class="card-title font-weight-bold"><i class="fas fa-calculator text-primary mr-2"></i> Interactive Payroll Verification Sandbox</h3>
@@ -47,11 +48,11 @@
 
                     <div class="row">
                         <div class="col-md-6 form-group">
-                            <label for="sb_ot15" class="font-weight-bold text-dark text-sm">Overtime 1.5x Hours</label>
+                            <label for="sb_ot15" class="font-weight-bold text-dark text-sm"><?php echo htmlspecialchars($ot_rules[0]['label']) ?> Hours</label>
                             <input type="number" step="0.5" id="sb_ot15" class="form-control form-control-sm text-right rounded-0 sb-calc" value="4.0">
                         </div>
                         <div class="col-md-6 form-group">
-                            <label for="sb_ot20" class="font-weight-bold text-dark text-sm">Overtime 2.0x Hours</label>
+                            <label for="sb_ot20" class="font-weight-bold text-dark text-sm"><?php echo htmlspecialchars($ot_rules[1]['label']) ?> Hours</label>
                             <input type="number" step="0.5" id="sb_ot20" class="form-control form-control-sm text-right rounded-0 sb-calc" value="2.0">
                         </div>
                     </div>
@@ -113,7 +114,7 @@
                                 <td class="text-right font-weight-bold" id="sb_res_basic">$0.00</td>
                             </tr>
                             <tr>
-                                <th class="bg-light">Overtime Earnings ($1.5\times$ & $2.0\times$)</th>
+                                <th class="bg-light">Overtime Earnings</th>
                                 <td class="text-right font-weight-bold text-primary" id="sb_res_ot">$0.00</td>
                             </tr>
                             <tr>

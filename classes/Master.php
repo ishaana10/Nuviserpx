@@ -1566,6 +1566,11 @@ class Master extends DBConnection
         return $this->container->make(PayrollService::class)->saveRules($_POST);
     }
 
+    public function delete_payroll_rules_version()
+    {
+        return $this->container->make(PayrollService::class)->deleteRulesVersion((string)($_POST['effective_from'] ?? ''));
+    }
+
     public function reset_payroll_rules()
     {
         return $this->container->make(PayrollService::class)->resetRules();
@@ -2040,6 +2045,9 @@ switch ($action) {
         break;
     case 'save_payroll_rules':
         echo $Master->save_payroll_rules();
+        break;
+    case 'delete_payroll_rules_version':
+        echo $Master->delete_payroll_rules_version();
         break;
     case 'reset_payroll_rules':
         echo $Master->reset_payroll_rules();
