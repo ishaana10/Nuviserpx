@@ -30,8 +30,9 @@ if ($journal) {
 }
 $status = strtolower((string)($journal['status'] ?? 'posted'));
 $cancelled = in_array($status, ['cancelled', 'canceled', 'void', '2', '3'], true);
-$label = $cancelled ? 'Cancelled' : ($status === 'draft' ? 'Draft' : 'Posted');
-$badge = $cancelled ? 'secondary' : ($status === 'draft' ? 'warning' : 'success');
+$pending = $status === 'pending_approval';
+$label = $cancelled ? 'Cancelled' : ($pending ? 'Awaiting approval' : ($status === 'draft' ? 'Draft' : 'Posted'));
+$badge = $cancelled ? 'secondary' : ($pending || $status === 'draft' ? 'warning' : 'success');
 $tdr = $tcr = 0.0;
 $source = null;
 if ($journal) {

@@ -5,7 +5,7 @@
 use App\Services\LedgerService;
 
 $tenant_id = (int)$_settings->active_tenant_id();
-$status_tab = in_array($_GET['status'] ?? '', ['posted', 'draft', 'cancelled'], true) ? $_GET['status'] : 'all';
+$status_tab = in_array($_GET['status'] ?? '', ['posted', 'draft', 'pending', 'cancelled'], true) ? $_GET['status'] : 'all';
 $from = isset($_GET['from']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['from']) ? $_GET['from'] : date('Y-m-d', strtotime('-12 months'));
 $to = isset($_GET['to']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['to']) ? $_GET['to'] : date('Y-m-d');
 
@@ -40,9 +40,10 @@ if ($stmt) {
 $norm = function ($s): string {
     $s = strtolower((string)$s);
     if (in_array($s, ['cancelled', 'canceled', 'void', '2', '3'], true)) { return 'cancelled'; }
+    if ($s === 'pending_approval') { return 'pending'; }
     return $s === 'draft' ? 'draft' : 'posted';
 };
-$counts = ['all' => count($rows), 'posted' => 0, 'draft' => 0, 'cancelled' => 0];
+$counts = ['all' => count($rows), 'posted' => 0, 'draft' => 0, 'pending' => 0, 'cancelled' => 0];
 $posted_total = 0.0;
 foreach ($rows as $r) {
     $st = $norm($r['status']);
@@ -83,7 +84,7 @@ $qs = fn (array $over) => './?' . http_build_query(array_merge(['page' => 'journ
         <div class="d-flex align-items-center mb-3" style="gap:10px;padding:10px 14px;border-radius:10px;background:#fef2f2;border:1px solid #fecaca;color:#991b1b;font-size:.88rem"><i class="fas fa-exclamation-triangle"></i> <span><b><?= $unbalanced ?> posted journal<?= $unbalanced === 1 ? ' is' : 's are' ?> out of balance</b> in this period, so your trial balance won’t agree. Open <?= $unbalanced === 1 ? 'it' : 'them' ?> to correct the lines.</span></div>
         <?php endif; ?>
         <div class="jl-tabs">
-            <?php foreach (['all' => 'All', 'posted' => 'Posted', 'draft' => 'Draft', 'cancelled' => 'Cancelled'] as $k => $lbl): ?>
+            <?php foreach (['all' => 'All', 'posted' => 'Posted', 'draft' => 'Draft', 'pending' => 'Awaiting approval', 'cancelled' => 'Cancelled'] as $k => $lbl): ?>
                 <a href="<?= htmlspecialchars($qs(['status' => $k])) ?>" class="<?= $status_tab === $k ? 'active' : '' ?>"><?= $lbl ?><span class="count"><?= $counts[$k] ?></span></a>
             <?php endforeach; ?>
         </div>
@@ -124,7 +125,7 @@ $qs = fn (array $over) => './?' . http_build_query(array_merge(['page' => 'journ
                     </td>
                     <td class="text-right" data-order="<?= (float)$r['debit'] ?>"><?= number_format((float)$r['debit'], 2) ?></td>
                     <td class="text-right" data-order="<?= (float)$r['credit'] ?>"><?= number_format((float)$r['credit'], 2) ?></td>
-                    <td><span class="badge badge-<?= $st === 'posted' ? 'success' : ($st === 'draft' ? 'warning' : 'secondary') ?>"><?= ucfirst($st) ?></span></td>
+                    <td><span class="badge badge-<?= $st === 'posted' ? 'success' : ($st === 'draft' || $st === 'pending' ? 'warning' : 'secondary') ?>"><?= $st === 'pending' ? 'Awaiting approval' : ucfirst($st) ?></span></td>
                     <td><?= htmlspecialchars(trim((string)$r['author']) ?: '—') ?></td>
                     <td class="text-center">
                         <button type="button" class="btn btn-default btn-sm dropdown-toggle dropdown-icon" data-toggle="dropdown">Action</button>

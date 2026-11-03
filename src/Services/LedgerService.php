@@ -21,7 +21,7 @@ use mysqli;
 class LedgerService
 {
     public const SIDE_SQL = "(CASE WHEN ji.entry_side = 'debit' THEN 1 WHEN ji.entry_side = 'credit' THEN 2 WHEN ji.group_id IN (1,2) THEN ji.group_id ELSE COALESCE(g.type, 1) END)";
-    public const POSTED_SQL = "(j.status IS NULL OR LOWER(j.status) NOT IN ('draft','cancelled','canceled','void','2','3'))";
+    public const POSTED_SQL = "(j.status IS NULL OR LOWER(j.status) NOT IN ('draft','pending_approval','cancelled','canceled','void','2','3'))";
 
     /** Statement sections in display order, with the class they belong to. */
     public const SECTIONS = [
