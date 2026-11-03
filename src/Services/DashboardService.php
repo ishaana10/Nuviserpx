@@ -274,7 +274,10 @@ class DashboardService
         if (!$stmt) {
             return null;
         }
-        $stmt->bind_param('iisssi', $this->tenantId, $this->userId, $name, $json, $range, $order);
+        // bind_param takes references, and readonly properties cannot be passed by reference: copy them first.
+        $tid = $this->tenantId;
+        $uid = $this->userId;
+        $stmt->bind_param('iisssi', $tid, $uid, $name, $json, $range, $order);
         if (!$stmt->execute()) {
             return null;
         }
@@ -308,7 +311,9 @@ class DashboardService
         if (!$stmt) {
             return null;
         }
-        $stmt->bind_param('sssiii', $name, $json, $range, $id, $this->tenantId, $this->userId);
+        $tid = $this->tenantId;
+        $uid = $this->userId;
+        $stmt->bind_param('sssiii', $name, $json, $range, $id, $tid, $uid);
         $stmt->execute();
         return $this->getDashboard($id);
     }
@@ -323,7 +328,9 @@ class DashboardService
         if (!$stmt) {
             return false;
         }
-        $stmt->bind_param('iii', $id, $this->tenantId, $this->userId);
+        $tid = $this->tenantId;
+        $uid = $this->userId;
+        $stmt->bind_param('iii', $id, $tid, $uid);
         $stmt->execute();
         return $stmt->affected_rows > 0;
     }
@@ -335,9 +342,11 @@ class DashboardService
         if (!$stmt) {
             return;
         }
+        $tid = $this->tenantId;
+        $uid = $this->userId;
         foreach (array_values($ids) as $pos => $id) {
             $id = (int)$id;
-            $stmt->bind_param('iiii', $pos, $id, $this->tenantId, $this->userId);
+            $stmt->bind_param('iiii', $pos, $id, $tid, $uid);
             $stmt->execute();
         }
     }
