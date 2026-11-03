@@ -70,6 +70,7 @@ class DBConnection{
                 $this->check_fx_migrations();
                 $this->check_tenant_integrity_migrations();
                 $this->check_approval_migrations();
+                $this->check_asset_depreciation_migrations();
                 $this->check_dolibarr_crm_migrations();
                 $this->check_dolibarr_extended_migrations();
                 $this->check_extrafields_migrations();
@@ -988,6 +989,36 @@ class DBConnection{
         );
         foreach ($cols as $col => $sql) {
             $res = @$this->conn->query("SHOW COLUMNS FROM `journal_entries` LIKE '{$col}'");
+            if ($res && $res->num_rows == 0) {
+                @$this->conn->query($sql);
+            }
+        }
+    }
+
+    public function check_asset_depreciation_migrations(){
+        if (!$this->conn) return;
+
+        @$this->conn->query("CREATE TABLE IF NOT EXISTS `asset_depreciation` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `tenant_id` int(30) NOT NULL DEFAULT 1,
+          `asset_id` int(30) NOT NULL,
+          `period_end` date NOT NULL,
+          `amount` decimal(18,4) NOT NULL DEFAULT 0.0000,
+          `journal_id` int(30) DEFAULT NULL,
+          `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+          PRIMARY KEY (`id`),
+          UNIQUE KEY `asset_month` (`asset_id`, `period_end`),
+          KEY `tenant_period` (`tenant_id`, `period_end`),
+          KEY `journal_id` (`journal_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        $cols = array(
+            'disposal_date'       => "ALTER TABLE `fixed_assets` ADD COLUMN `disposal_date` date DEFAULT NULL",
+            'disposal_proceeds'   => "ALTER TABLE `fixed_assets` ADD COLUMN `disposal_proceeds` decimal(18,4) DEFAULT NULL",
+            'disposal_journal_id' => "ALTER TABLE `fixed_assets` ADD COLUMN `disposal_journal_id` int(30) DEFAULT NULL",
+        );
+        foreach ($cols as $col => $sql) {
+            $res = @$this->conn->query("SHOW COLUMNS FROM `fixed_assets` LIKE '{$col}'");
             if ($res && $res->num_rows == 0) {
                 @$this->conn->query($sql);
             }

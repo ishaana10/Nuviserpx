@@ -120,6 +120,12 @@ class Master extends DBConnection
 
         // Check unique asset number within tenant
         $target_id = !empty($id) ? intval($id) : 0;
+        if ($target_id > 0) {
+            $cur = $this->conn->query("SELECT status FROM `fixed_assets` WHERE id = '{$target_id}' AND tenant_id = '{$tenant_id}'");
+            if ($cur && ($cr = $cur->fetch_assoc()) && $cr['status'] === 'disposed') {
+                return json_encode(['status' => 'failed', 'msg' => 'A disposed asset cannot be changed.']);
+            }
+        }
         $chk_sql = "SELECT id FROM `fixed_assets` WHERE `tenant_id` = '{$tenant_id}' AND `asset_number` = '{$this->conn->real_escape_string($asset_number)}' ";
         if ($target_id > 0) {
             $chk_sql .= " AND id != '{$target_id}' ";
@@ -180,10 +186,27 @@ class Master extends DBConnection
         return json_encode(['status' => 'failed', 'msg' => 'Failed to save fixed asset. ' . $this->conn->error]);
     }
 
+    public function run_depreciation()
+    {
+        return $this->container->make(\App\Services\AssetService::class)->run((string)($_POST['through'] ?? ''));
+    }
+
+    public function dispose_asset()
+    {
+        return $this->container->make(\App\Services\AssetService::class)->dispose($_POST);
+    }
+
     public function delete_asset()
     {
         $tenant_id = $this->settings->active_tenant_id();
         $id = intval($_POST['id'] ?? 0);
+
+        // An asset with depreciation or a disposal in the ledger stays on record.
+        $hist = $this->conn->query("SELECT (SELECT COUNT(*) FROM asset_depreciation WHERE asset_id = '{$id}') d, (SELECT status FROM fixed_assets WHERE id = '{$id}' AND tenant_id = '{$tenant_id}') s");
+        $h = $hist ? $hist->fetch_assoc() : null;
+        if ($h && ((int)$h['d'] > 0 || $h['s'] === 'disposed')) {
+            return json_encode(['status' => 'failed', 'msg' => 'This asset has depreciation or a disposal posted to the ledger, so it cannot be deleted.']);
+        }
 
         $del = $this->conn->query("DELETE FROM `fixed_assets` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'");
         if ($del) {
@@ -1882,6 +1905,12 @@ switch ($action) {
         break;
     case 'post_fx_revaluation':
         echo $Master->post_fx_revaluation();
+        break;
+    case 'run_depreciation':
+        echo $Master->run_depreciation();
+        break;
+    case 'dispose_asset':
+        echo $Master->dispose_asset();
         break;
     case 'run_auto_reversals':
         echo $Master->run_auto_reversals();
