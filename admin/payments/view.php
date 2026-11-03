@@ -307,9 +307,10 @@ $type_label = $payment['type'] === 'receipt' ? 'Payment Receipt' : 'Payment Vouc
         <!-- Amount Highlight -->
         <div class="amount-box">
             <div class="label">Amount <?= $payment['type'] === 'receipt' ? 'Received' : 'Paid' ?></div>
-            <div class="value">$<?= number_format($payment['amount'], 2) ?></div>
+            <?php $pay_fc = isset($payment['amount_fc']) && $payment['amount_fc'] !== null; ?>
+            <div class="value"><?= $pay_fc ? htmlspecialchars($payment['currency']) . ' ' . number_format((float)$payment['amount_fc'], 2) : '$' . number_format($payment['amount'], 2) ?></div>
             <div style="font-size:0.9rem;color:#0369a1;">
-                <?= htmlspecialchars($payment['currency'] ?? 'FJD') ?>
+                <?= $pay_fc ? '= ' . number_format((float)$payment['amount'], 2) . ' at ' . rtrim(rtrim(number_format((float)$payment['fx_rate'], 8, '.', ''), '0'), '.') : htmlspecialchars($payment['currency'] ?? '') ?>
                 <?php if ($payment['reference']): ?>
                     &nbsp;|&nbsp; Ref: <?= htmlspecialchars($payment['reference']) ?>
                 <?php endif; ?>

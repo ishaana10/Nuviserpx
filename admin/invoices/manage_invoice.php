@@ -14,6 +14,10 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
     }
 }
 
+$fx_svc = new \App\Services\FxService($conn, $_settings);
+$fx_base = $fx_svc->baseCurrency();
+$fx_currencies = $fx_svc->foreignCurrencies();
+
 // Fetch products for line item dropdowns
 $products_qry = $conn->query("SELECT * FROM `product_list` WHERE tenant_id = '{$tenant_id}' AND delete_flag = 0 AND status = 1 ORDER BY name ASC");
 $products = [];
@@ -184,13 +188,16 @@ while($ac = $accounts_qry->fetch_assoc()){
             <div class="row align-items-center mb-4 pb-3 border-bottom">
                 <div class="col-md-3 form-group mb-md-0">
                     <label for="currency" class="form-label-custom">Currency</label>
-                    <select name="currency" id="currency" class="form-control form-control-modern">
-                        <option value="FJD" selected>Dollar (FJD)</option>
-                        <option value="USD">US Dollar (USD $)</option>
-                        <option value="AUD">Australian Dollar (AUD $)</option>
-                        <option value="NZD">NZ Dollar (NZD $)</option>
-                        <option value="EUR">Euro (EUR €)</option>
+                    <select name="currency" id="currency" class="form-control form-control-modern" <?php echo (!empty($currency) && (float)($paid_amount ?? 0) + (float)($credited_amount ?? 0) > 0) ? 'data-locked="1"' : '' ?>>
+                        <option value="<?php echo htmlspecialchars($fx_base) ?>"><?php echo htmlspecialchars($fx_base) ?> (company currency)</option>
+                        <?php foreach($fx_currencies as $fc): ?>
+                        <option value="<?php echo htmlspecialchars($fc['code']) ?>" <?php echo (!empty($currency) && strtoupper($currency) === strtoupper($fc['code'])) ? 'selected' : '' ?>><?php echo htmlspecialchars($fc['code'] . ' - ' . $fc['name']) ?></option>
+                        <?php endforeach; ?>
                     </select>
+                    <div id="fx_rate_box" class="mt-2" style="display:none">
+                        <input type="number" step="any" min="0" name="fx_rate" id="fx_rate" class="form-control form-control-modern" placeholder="Rate (blank = rate on invoice date)" value="<?php echo !empty($fx_rate) ? htmlspecialchars(rtrim(rtrim((string)$fx_rate, '0'), '.')) : '' ?>">
+                        <small class="text-muted">1 <span class="fx-cur-name"></span> = ? <?php echo htmlspecialchars($fx_base) ?>. Amounts on this invoice are in <span class="fx-cur-name"></span>.</small>
+                    </div>
                 </div>
 
                 <div class="col-md-3 form-group mb-md-0">
@@ -546,6 +553,18 @@ while($ac = $accounts_qry->fetch_assoc()){
 </div>
 
 <script>
+    $(function(){
+        var base = <?php echo json_encode($fx_base) ?>;
+        function sync_fx(){
+            var c = $('#currency').val();
+            var foreign = c && c !== base;
+            $('#fx_rate_box').toggle(!!foreign);
+            $('.fx-cur-name').text(c);
+            if($('#currency').data('locked')){ $('#currency, #fx_rate').css('pointer-events','none').attr('tabindex','-1'); }
+        }
+        $('#currency').on('change', sync_fx);
+        sync_fx();
+    });
     function calculate_invoice_totals(){
         var subtotal = 0;
         var total_tax = 0;

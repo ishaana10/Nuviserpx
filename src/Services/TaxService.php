@@ -242,7 +242,27 @@ class TaxService
         if (!$stmt) {
             return false;
         }
-        foreach ($lines as [$acc, $side, $amt]) {
+        $fxStmt = null;
+        foreach ($lines as $ln) {
+            [$acc, $side, $amt] = $ln;
+            $fx = $ln[3] ?? null;
+            if ($fx) {
+                $fxStmt ??= $this->conn->prepare("INSERT INTO journal_items (journal_id, account_id, group_id, entry_side, amount, currency, fx_rate, amount_fc) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+                if (!$fxStmt) {
+                    return false;
+                }
+                $g = (int)$side;
+                $s = $side === self::DEBIT ? 'debit' : 'credit';
+                $a = number_format((float)$amt, 4, '.', '');
+                $cur = (string)$fx['currency'];
+                $rt = number_format((float)$fx['fx_rate'], 8, '.', '');
+                $fc = number_format((float)$fx['amount_fc'], 4, '.', '');
+                $fxStmt->bind_param('iiisssss', $journalId, $acc, $g, $s, $a, $cur, $rt, $fc);
+                if (!$fxStmt->execute()) {
+                    return false;
+                }
+                continue;
+            }
             $g = (int)$side;
             $s = $side === self::DEBIT ? 'debit' : 'credit';
             $a = number_format((float)$amt, 4, '.', '');

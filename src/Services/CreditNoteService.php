@@ -167,6 +167,12 @@ class CreditNoteService
         if (!$doc || in_array($doc['status'], ['draft', 'pending_approval', 'cancelled'], true)) {
             return $this->fail('Choose an issued ' . ($kind === self::CREDIT ? 'invoice' : 'bill') . ' to raise the note against.');
         }
+        if ($kind === self::CREDIT) {
+            $fcq = $this->conn->query("SELECT currency FROM invoice_list WHERE id = " . (int)$docId . " AND tenant_id = " . (int)$t)->fetch_assoc();
+            if (!empty($fcq['currency'])) {
+                return $this->fail('This invoice is in ' . $fcq['currency'] . '. Credit notes against foreign-currency invoices are not supported yet; reverse the invoice or contact support.');
+            }
+        }
         if ($date < $doc['doc_date']) {
             return $this->fail('The note cannot be dated before the ' . ($kind === self::CREDIT ? 'invoice' : 'bill') . ' (' . $doc['doc_date'] . ').');
         }

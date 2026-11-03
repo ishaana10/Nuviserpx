@@ -110,6 +110,10 @@ if ($method === 'POST') {
         $inv = inv_fetch($conn, $api_tenant_id, $id);
         if (!$inv) api_respond(404, ['status' => 'not_found', 'message' => 'Invoice not found.']);
 
+        $fcRow = $conn->query("SELECT currency FROM `invoice_list` WHERE id = '{$id}'")->fetch_assoc();
+        if (!empty($fcRow['currency'])) {
+            api_respond(422, ['status' => 'failed', 'message' => 'This invoice is in ' . $fcRow['currency'] . '. Record the receipt in the application so the exchange difference is booked.']);
+        }
         $amount = isset($input['amount']) ? (float)$input['amount'] : (float)$inv['balance'];
         if ($amount <= 0) api_respond(400, ['status' => 'failed', 'message' => 'Payment amount must be greater than zero.']);
         $amount = min($amount, (float)$inv['balance']);
