@@ -332,6 +332,19 @@ class Master extends DBConnection
             return json_encode(['status' => 'failed', 'msg' => 'Signer Name, Email, and Signature drawing are required.']);
         }
 
+        // The quote itself decides the company, and only an open, current, unexpired quote can be accepted.
+        $quoteRow = $this->conn->query("SELECT tenant_id, status, type, valid_until FROM `sales_order_list` WHERE id = '{$so_id}'")->fetch_assoc();
+        if (!$quoteRow || !\App\Services\QuotationService::isQuote((string)$quoteRow['type'])) {
+            return json_encode(['status' => 'failed', 'msg' => 'This proposal could not be found.']);
+        }
+        $t_id = (int)$quoteRow['tenant_id'];
+        if ($quoteRow['status'] === 'confirmed' || $quoteRow['status'] === 'converted_to_invoice') {
+            return json_encode(['status' => 'failed', 'msg' => 'This proposal has already been accepted.']);
+        }
+        if ($problem = \App\Services\QuotationService::acceptProblem($quoteRow, date('Y-m-d'))) {
+            return json_encode(['status' => 'failed', 'msg' => $problem]);
+        }
+
         $ip = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
         $s_name = $this->conn->real_escape_string($signer_name);
         $s_email = $this->conn->real_escape_string($signer_email);
@@ -1114,6 +1127,21 @@ class Master extends DBConnection
         return $this->container->make(\App\Services\PriceListService::class)->lookup($_POST);
     }
 
+    public function revise_quote()
+    {
+        return $this->container->make(\App\Services\QuotationService::class)->revise((int)($_POST['id'] ?? 0));
+    }
+
+    public function decline_quote()
+    {
+        return $this->container->make(\App\Services\QuotationService::class)->decline((int)($_POST['id'] ?? 0), (string)($_POST['reason'] ?? ''));
+    }
+
+    public function extend_quote()
+    {
+        return $this->container->make(\App\Services\QuotationService::class)->extend((int)($_POST['id'] ?? 0), (string)($_POST['valid_until'] ?? ''));
+    }
+
     public function save_default_accounts()
     {
         return $this->container->make(\App\Services\AccountDefaultsService::class)->save($_POST);
@@ -1305,6 +1333,26 @@ class Master extends DBConnection
         $notes = isset($notes) ? $this->conn->real_escape_string((string)$notes) : '';
         $status = !empty($status) ? $this->conn->real_escape_string((string)$status) : 'proforma';
 
+        // Quotes: a validity date (30 days by default), and a quote that has been replaced, declined or accepted is not edited in place.
+        $valid_until = isset($valid_until) && preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$valid_until) ? (string)$valid_until : '';
+        if (\App\Services\QuotationService::isQuote($type) && $valid_until === '') {
+            $valid_until = \App\Services\QuotationService::defaultValidUntil($order_date);
+        }
+        $validSql = $valid_until === '' ? 'NULL' : "'" . $this->conn->real_escape_string($valid_until) . "'";
+        if (!empty($id)) {
+            $existing = $this->conn->query("SELECT status, type, valid_until FROM `sales_order_list` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'")->fetch_assoc();
+            if (!$existing) {
+                return json_encode(['status' => 'failed', 'msg' => 'Order not found.']);
+            }
+            if (in_array($existing['status'], ['superseded', 'declined', 'converted_to_invoice'], true)) {
+                return json_encode(['status' => 'failed', 'msg' => 'This ' . str_replace('_', ' ', $existing['status']) . ' order can no longer be edited.' . ($existing['status'] === 'converted_to_invoice' ? '' : ' Revise the quote to change it.')]);
+            }
+        }
+        if (in_array($status, ['confirmed', 'converted_to_invoice'], true)
+            && ($problem = \App\Services\QuotationService::acceptProblem(['status' => 'proforma', 'valid_until' => $valid_until === '' ? null : $valid_until], date('Y-m-d')))) {
+            return json_encode(['status' => 'failed', 'msg' => $problem]);
+        }
+
         // Confirming an order books its invoice and stock movement, so the order date must fall in an open period.
         if (in_array($status, ['confirmed', 'converted_to_invoice'], true)
             && ($lockMsg = \App\Services\PeriodLockService::guard($this->conn, (int)$tenant_id, $order_date))) {
@@ -1325,6 +1373,7 @@ class Master extends DBConnection
 				`total` = '{$total}',
 				`status` = '{$status}',
 				`notes` = '{$notes}',
+				`valid_until` = {$validSql},
 				`created_by` = '{$user_id}'";
             $save = $this->conn->query($sql);
             $sales_order_id = $this->conn->insert_id;
@@ -1340,7 +1389,8 @@ class Master extends DBConnection
 				`discount` = '{$discount}',
 				`total` = '{$total}',
 				`status` = '{$status}',
-				`notes` = '{$notes}'
+				`notes` = '{$notes}',
+				`valid_until` = {$validSql}
 				WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'";
             $save = $this->conn->query($sql);
             $sales_order_id = $id;
@@ -1406,6 +1456,12 @@ class Master extends DBConnection
         $order = $order_qry->fetch_assoc();
         if ($order['stock_adjusted'] != 0) {
             return true; // already confirmed
+        }
+
+        // A superseded, declined, cancelled or expired quote cannot be confirmed.
+        if ($problem = \App\Services\QuotationService::acceptProblem($order, date('Y-m-d'))) {
+            $this->confirm_error = $problem;
+            return false;
         }
 
         // Confirming books the invoice and the stock movement, so it must fall in an open period.
@@ -2112,6 +2168,15 @@ switch ($action) {
         break;
     case 'lookup_prices':
         echo $Master->lookup_prices();
+        break;
+    case 'revise_quote':
+        echo $Master->revise_quote();
+        break;
+    case 'decline_quote':
+        echo $Master->decline_quote();
+        break;
+    case 'extend_quote':
+        echo $Master->extend_quote();
         break;
     case 'save_default_accounts':
         echo $Master->save_default_accounts();

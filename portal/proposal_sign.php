@@ -119,6 +119,12 @@ $items = $conn->query("SELECT * FROM `sales_order_items` WHERE sales_order_id = 
         </table>
     </div>
 
+    <?php
+    $accepted = in_array($proposal['status'], ['confirmed', 'converted_to_invoice'], true);
+    $blocked = (!$existing_sig && !$accepted) ? \App\Services\QuotationService::acceptProblem($proposal, date('Y-m-d')) : null;
+    if ($blocked): ?>
+        <div class="alert alert-warning"><?= htmlspecialchars($blocked) ?> Please contact us for an up-to-date quote.</div>
+    <?php endif; ?>
     <?php if($existing_sig): ?>
         <!-- Completed Signature Section -->
         <div class="alert alert-success p-4 border-success">
@@ -128,7 +134,7 @@ $items = $conn->query("SELECT * FROM `sales_order_items` WHERE sales_order_id = 
                 <img src="<?= $existing_sig['signature_data'] ?>" alt="Client Signature" style="max-height: 100px;">
             </div>
         </div>
-    <?php else: ?>
+    <?php elseif (!$blocked): ?>
         <!-- Online E-Signature Pad Section -->
         <div class="card card-outline card-primary shadow-none border">
             <div class="card-header bg-light">
