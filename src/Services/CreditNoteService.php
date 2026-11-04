@@ -112,15 +112,25 @@ class CreditNoteService
             $qty = BudgetService::cleanAmount($qtyRaw === '' ? '1' : $qtyRaw);
             $price = BudgetService::cleanAmount($priceRaw);
             $rate = TaxService::cleanRate(($r['tax_rate'] ?? '') === '' ? '0' : $r['tax_rate']);
+            $productId = max(0, (int)($r['product_id'] ?? 0));
+            $retRaw = $r['return_qty'] ?? '';
+            $retQty = trim((string)$retRaw) === '' ? 0.0 : BudgetService::cleanAmount($retRaw);
             if ($desc === '') {
                 return ['error' => "Line {$n}: describe what is being credited."];
+            }
+            if ($retQty === null) {
+                return ['error' => "Line {$n}: enter the quantity returned to stock as a number."];
+            }
+            if ($retQty > 0 && $productId <= 0) {
+                return ['error' => "Line {$n}: choose the product that is coming back into stock."];
             }
             if ($qty === null || $qty <= 0 || $price === null || $price <= 0 || $rate === null) {
                 return ['error' => "Line {$n}: enter a quantity, a price above zero and a tax rate of 0-100."];
             }
             $lineNet = round($qty * $price, 2);
             $lineTax = TaxService::taxOn($lineNet, $rate);
-            $lines[] = ['description' => $desc, 'qty' => $qty, 'price' => $price, 'tax_rate' => $rate, 'net' => $lineNet, 'tax' => $lineTax];
+            $lines[] = ['description' => $desc, 'qty' => $qty, 'price' => $price, 'tax_rate' => $rate, 'net' => $lineNet, 'tax' => $lineTax,
+                'product_id' => $retQty > 0 ? $productId : 0, 'return_qty' => $retQty];
             $net += $lineNet;
             $tax += $lineTax;
         }
@@ -204,7 +214,56 @@ class CreditNoteService
                 $rows[] = $r;
             }
         }
+        if ($kind === self::CREDIT && $rows) {
+            $items = $this->returnables(array_map(fn ($r) => (int)$r['id'], $rows));
+            foreach ($rows as &$r) {
+                $r['items'] = $items[(int)$r['id']] ?? [];
+            }
+            unset($r);
+        }
         return $rows;
+    }
+
+    /**
+     * Goods each invoice sold from stock that can still come back: invoice id => [{product_id, name, left}].
+     * Empty when inventory accounting is off (returns restock only then).
+     */
+    private function returnables(array $invoiceIds): array
+    {
+        $inv = new InventoryAccountingService($this->conn, $this->settings);
+        $ids = array_values(array_unique(array_filter(array_map('intval', $invoiceIds))));
+        if (!$ids || !$inv->isEnabled()) {
+            return [];
+        }
+        $t = $this->tenantId();
+        $in = implode(',', $ids);
+        $sold = [];
+        $res = $this->conn->query("SELECT ii.invoice_id, ii.product_id, p.name, SUM(ii.qty) q
+            FROM invoice_items ii INNER JOIN invoice_list i ON i.id = ii.invoice_id AND i.tenant_id = {$t}
+            LEFT JOIN product_list p ON p.id = ii.product_id
+            WHERE ii.invoice_id IN ({$in}) AND ii.product_id IS NOT NULL AND ii.unit_cost IS NOT NULL
+            GROUP BY ii.invoice_id, ii.product_id, p.name");
+        while ($res && ($r = $res->fetch_assoc())) {
+            $sold[(int)$r['invoice_id']][(int)$r['product_id']] = ['name' => (string)$r['name'], 'q' => (float)$r['q']];
+        }
+        $ret = [];
+        $res = $this->conn->query("SELECT n.document_id, l.product_id, SUM(l.return_qty) q
+            FROM credit_note_lines l INNER JOIN credit_notes n ON n.id = l.note_id
+            WHERE n.tenant_id = {$t} AND n.note_type = 'credit' AND n.status = 'issued' AND n.document_id IN ({$in})
+              AND l.product_id IS NOT NULL AND l.return_qty > 0 GROUP BY n.document_id, l.product_id");
+        while ($res && ($r = $res->fetch_assoc())) {
+            $ret[(int)$r['document_id']][(int)$r['product_id']] = (float)$r['q'];
+        }
+        $out = [];
+        foreach ($sold as $invId => $prods) {
+            foreach ($prods as $pid => $p) {
+                $left = round($p['q'] - ($ret[$invId][$pid] ?? 0.0), 4);
+                if ($left > 0) {
+                    $out[$invId][] = ['product_id' => $pid, 'name' => $p['name'], 'left' => $left];
+                }
+            }
+        }
+        return $out;
     }
 
     public function notes(): array
@@ -250,7 +309,8 @@ class CreditNoteService
         if (isset($post['line_desc']) && is_array($post['line_desc'])) {
             $rows = [];
             foreach ($post['line_desc'] as $i => $d) {
-                $rows[] = ['description' => $d, 'qty' => $post['line_qty'][$i] ?? '', 'price' => $post['line_price'][$i] ?? '', 'tax_rate' => $post['line_tax'][$i] ?? ''];
+                $rows[] = ['description' => $d, 'qty' => $post['line_qty'][$i] ?? '', 'price' => $post['line_price'][$i] ?? '', 'tax_rate' => $post['line_tax'][$i] ?? '',
+                    'product_id' => $kind === self::CREDIT ? ($post['line_product'][$i] ?? 0) : 0, 'return_qty' => $kind === self::CREDIT ? ($post['line_return'][$i] ?? '') : ''];
             }
             $lt = self::lineTotals($rows);
             if (isset($lt['error'])) {
@@ -353,6 +413,39 @@ class CreditNoteService
         // Record the note and reduce the document first, then post the journal; undo both if the journal fails.
         $noteNo = $this->nextNumber($kind, $date);
         $userId = (int)$this->settings->userdata('id');
+
+        // Goods coming back: put them on the shelf (and the cost back in Inventory) before the note is recorded.
+        $inv = new InventoryAccountingService($this->conn, $this->settings);
+        $restock = [];
+        foreach ($noteLines as $l) {
+            if (($l['return_qty'] ?? 0) > 0) {
+                $restock[(int)$l['product_id']] = round(($restock[(int)$l['product_id']] ?? 0.0) + (float)$l['return_qty'], 4);
+            }
+        }
+        $stockItems = [];
+        $stockJournal = 0;
+        $stockWh = 0;
+        if ($restock) {
+            $sr = $inv->soldAndReturned($docId);
+            if ($errs = InventoryAccountingService::returnProblems($restock, $sr['sold'], $sr['returned'])) {
+                return $this->fail(implode(' ', $errs));
+            }
+            foreach ($restock as $pid => $q) {
+                $stockItems[$pid] = ['qty' => $q, 'cost' => $sr['sold'][$pid]['cost']];
+            }
+            $stockWh = $sr['warehouse'];
+            $rs = $inv->returnToStock($stockItems, $date, "credit note {$noteNo}", $stockWh);
+            if (!$rs['ok']) {
+                return $this->fail($rs['msg']);
+            }
+            $stockJournal = $rs['journal_id'];
+        }
+        $undoStock = function () use ($inv, $stockItems, $stockJournal, $date, $noteNo, $stockWh): void {
+            if ($stockItems) {
+                $inv->takeBack($stockItems, $stockJournal, $date, "credit note {$noteNo}", $stockWh, false);
+            }
+        };
+
         $this->conn->begin_transaction();
         try {
             $ins = $this->conn->prepare("INSERT INTO credit_notes (tenant_id, note_type, note_no, party_id, document_id, note_date, reason, subtotal, tax_amount, total, status, created_by)
@@ -367,13 +460,25 @@ class CreditNoteService
             }
             $noteId = (int)$this->conn->insert_id;
             if ($noteLines) {
-                $li = $this->conn->prepare("INSERT INTO credit_note_lines (note_id, description, qty, unit_price, tax_rate, net, tax) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                $li = $this->conn->prepare("INSERT INTO credit_note_lines (note_id, description, qty, unit_price, tax_rate, net, tax, product_id, return_qty, unit_cost) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
                 foreach ($noteLines as $l) {
                     $q = (string)$l['qty']; $pr = (string)$l['price']; $tr = (string)$l['tax_rate'];
                     $ln = number_format($l['net'], 2, '.', ''); $lx = number_format($l['tax'], 2, '.', '');
-                    $li->bind_param('issssss', $noteId, $l['description'], $q, $pr, $tr, $ln, $lx);
-                    $li->execute();
+                    $rp = ($l['return_qty'] ?? 0) > 0 ? (int)$l['product_id'] : null;
+                    $rq = $rp !== null ? (string)$l['return_qty'] : null;
+                    $rc = $rp !== null ? (string)$stockItems[$rp]['cost'] : null;
+                    $li->bind_param('isssssssss', $noteId, $l['description'], $q, $pr, $tr, $ln, $lx, $rp, $rq, $rc);
+                    if (!$li->execute()) {
+                        throw new \RuntimeException($this->conn->error);
+                    }
                 }
+            }
+            if ($stockItems) {
+                $sj = $stockJournal > 0 ? $stockJournal : null;
+                $sw = $stockWh;
+                $su = $this->conn->prepare("UPDATE credit_notes SET stock_journal_id = ?, stock_warehouse_id = ? WHERE id = ? AND tenant_id = ?");
+                $su->bind_param('iiii', $sj, $sw, $noteId, $t);
+                $su->execute();
             }
             $this->applyToDocument($table, $docId, $t, $total);
             if ($fcInfo) {
@@ -388,6 +493,7 @@ class CreditNoteService
             $this->conn->commit();
         } catch (\Throwable $e) {
             $this->conn->rollback();
+            $undoStock();
             return $this->fail('The note could not be saved. Nothing was changed.');
         }
 
@@ -405,6 +511,7 @@ class CreditNoteService
             $d->bind_param('ii', $noteId, $t);
             $d->execute();
             $this->conn->commit();
+            $undoStock();
             return $this->fail('The ledger entry could not be posted, so the note was not raised: ' . ($res['msg'] ?? ''));
         }
         $jid = (int)$res['id'];
@@ -444,9 +551,33 @@ class CreditNoteService
             return $this->fail('Money has been refunded against this note. Void the refund first, then void the note.');
         }
         $date = date('Y-m-d') < $n['note_date'] ? $n['note_date'] : date('Y-m-d');
+
+        // Goods the note put back on the shelf must still be there to take out again.
+        $inv = new InventoryAccountingService($this->conn, $this->settings);
+        $back = [];
+        $rl = $this->conn->prepare("SELECT product_id, return_qty, unit_cost FROM credit_note_lines WHERE note_id = ? AND product_id IS NOT NULL AND return_qty > 0");
+        $rl->bind_param('i', $id);
+        $rl->execute();
+        foreach ($rl->get_result()->fetch_all(MYSQLI_ASSOC) as $r) {
+            $pid = (int)$r['product_id'];
+            $back[$pid] = ['qty' => round(($back[$pid]['qty'] ?? 0.0) + (float)$r['return_qty'], 4), 'cost' => (float)$r['unit_cost']];
+        }
+        if ($back) {
+            $need = array_map(fn ($b) => $b['qty'], $back);
+            if ($msg = $inv->shortageMessage($need)) {
+                return $this->fail('The goods this note returned are no longer all in stock, so it cannot be voided: ' . $msg);
+            }
+        }
         $res = json_decode((new JournalService($this->conn, $this->settings))->reverseJournal((int)$n['journal_id'], $date), true);
         if (($res['status'] ?? '') !== 'success') {
             return $this->fail((string)($res['msg'] ?? 'The ledger entry could not be reversed.'));
+        }
+        $stockNote = '';
+        if ($back) {
+            $tb = $inv->takeBack($back, (int)($n['stock_journal_id'] ?? 0), $date, "credit note {$n['note_no']} voided", (int)($n['stock_warehouse_id'] ?? 0), false);
+            if (!$tb['ok']) {
+                $stockNote = ' The returned stock could not be taken back out automatically (' . $tb['msg'] . '): correct it with a stock adjustment.';
+            }
         }
         $table = $n['note_type'] === self::CREDIT ? 'invoice_list' : 'vendor_bill_list';
         $total = (float)$n['total'];
@@ -461,7 +592,7 @@ class CreditNoteService
         $this->conn->commit();
 
         $this->settings->log_audit('Voided note', 'Credit notes', "{$n['note_no']} voided; reversed by {$res['code']}.");
-        $msg = "Note {$n['note_no']} voided and its ledger entry reversed.";
+        $msg = "Note {$n['note_no']} voided and its ledger entry reversed." . $stockNote;
         $this->settings->set_flashdata('success', $msg);
         return json_encode(['status' => 'success', 'msg' => $msg]);
     }

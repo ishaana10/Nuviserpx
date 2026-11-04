@@ -90,6 +90,7 @@ class DBConnection{
                 $this->check_integrity_hardening_migrations();
                 $this->check_inventory_accounting_migrations();
                 $this->check_sales_account_migrations();
+                $this->check_sales_return_migrations();
             }
 
             // Run versioned migrations
@@ -1308,6 +1309,31 @@ class DBConnection{
             $dups = @$this->conn->query("SELECT 1 FROM `{$table}` GROUP BY tenant_id, `{$def[1]}` HAVING COUNT(*) > 1 LIMIT 1");
             if ($dups && $dups->num_rows == 0) {
                 @$this->conn->query("ALTER TABLE `{$table}` ADD UNIQUE KEY `{$def[0]}` (`tenant_id`, `{$def[1]}`)");
+            }
+        }
+    }
+
+    public function check_sales_return_migrations(){
+        if (!$this->conn) return;
+        // Goods that come back with a credit note: which product, how many, at what cost, and the stock journal.
+        $cols = array(
+            'credit_note_lines' => array(
+                'product_id' => "ALTER TABLE `credit_note_lines` ADD COLUMN `product_id` int(30) DEFAULT NULL",
+                'return_qty' => "ALTER TABLE `credit_note_lines` ADD COLUMN `return_qty` decimal(12,4) DEFAULT NULL",
+                'unit_cost'  => "ALTER TABLE `credit_note_lines` ADD COLUMN `unit_cost` decimal(14,4) DEFAULT NULL",
+            ),
+            'credit_notes' => array(
+                'stock_journal_id'   => "ALTER TABLE `credit_notes` ADD COLUMN `stock_journal_id` int(30) DEFAULT NULL",
+                'stock_warehouse_id' => "ALTER TABLE `credit_notes` ADD COLUMN `stock_warehouse_id` int(30) DEFAULT NULL",
+            ),
+        );
+        foreach ($cols as $table => $defs) {
+            if (!$this->table_exists($table)) continue;
+            foreach ($defs as $col => $sql) {
+                $res = @$this->conn->query("SHOW COLUMNS FROM `{$table}` LIKE '{$col}'");
+                if ($res && $res->num_rows == 0) {
+                    @$this->conn->query($sql);
+                }
             }
         }
     }

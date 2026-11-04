@@ -108,6 +108,48 @@ class InventoryAccountingService
         ];
     }
 
+    /** Journal lines for goods coming back into stock at cost: the mirror of issueLines (Dr Inventory, Cr Cost of Sales). */
+    public static function returnLines(float $total, int $inventoryAcc, int $cogsAcc, string $description): array
+    {
+        $total = round($total, 2);
+        if ($total <= 0 || $inventoryAcc <= 0 || $cogsAcc <= 0) {
+            return [];
+        }
+        return [
+            ['account_id' => $inventoryAcc, 'debit' => $total, 'credit' => 0.0, 'description' => $description],
+            ['account_id' => $cogsAcc, 'debit' => 0.0, 'credit' => $total, 'description' => $description],
+        ];
+    }
+
+    /**
+     * Why these returns can't be taken: a product that was not sold on the invoice, or more than was sold less what
+     * has already come back. Messages are per product; empty when fine. Pure.
+     *
+     * @param array<int,float> $want     product id => quantity coming back now
+     * @param array<int,array{qty:float,cost:float,name?:string}> $sold product id => what the invoice sold
+     * @param array<int,float> $returned product id => already returned on other notes
+     * @return string[]
+     */
+    public static function returnProblems(array $want, array $sold, array $returned): array
+    {
+        $errors = [];
+        foreach ($want as $pid => $qty) {
+            if ($qty <= 0) {
+                continue;
+            }
+            $label = $sold[$pid]['name'] ?? ('product #' . $pid);
+            if (!isset($sold[$pid])) {
+                $errors[] = "{$label} was not sold on this invoice, so it cannot be returned to stock against it.";
+                continue;
+            }
+            $room = round($sold[$pid]['qty'] - ($returned[$pid] ?? 0.0), 4);
+            if ($qty > $room + 0.00005) {
+                $errors[] = "{$label}: only " . rtrim(rtrim(number_format(max(0.0, $room), 4, '.', ''), '0'), '.') . ' can still be returned (sold ' . rtrim(rtrim(number_format($sold[$pid]['qty'], 4, '.', ''), '0'), '.') . ', already returned ' . rtrim(rtrim(number_format($returned[$pid] ?? 0.0, 4, '.', ''), '0'), '.') . ').';
+            }
+        }
+        return $errors;
+    }
+
     /**
      * A change in stock value against an offsetting account: a gain debits Inventory, a loss credits it.
      * $signedValue > 0 is stock coming in (or counted up), < 0 stock going out.
@@ -502,6 +544,135 @@ class InventoryAccountingService
             $stmt->execute();
             $this->locate($pid, $warehouseId, $qty);
             $this->log($pid, $warehouseId, 'in', $qty, $cost, $reference, 'Sale reversed', 0);
+        }
+        return ['ok' => true, 'msg' => ''];
+    }
+
+    /**
+     * What an invoice sold from stock (quantity and the cost it left at) and what earlier, still-valid credit notes
+     * have already taken back, per product.
+     *
+     * @return array{sold:array<int,array{qty:float,cost:float,name:string}>,returned:array<int,float>,warehouse:int}
+     */
+    public function soldAndReturned(int $invoiceId): array
+    {
+        $t = $this->tenantId();
+        $out = ['sold' => [], 'returned' => [], 'warehouse' => 0];
+        $h = $this->conn->prepare("SELECT COALESCE(stock_warehouse_id, 0) w FROM invoice_list WHERE id = ? AND tenant_id = ?");
+        $h->bind_param('ii', $invoiceId, $t);
+        $h->execute();
+        $out['warehouse'] = (int)($h->get_result()->fetch_assoc()['w'] ?? 0);
+        $stmt = $this->conn->prepare("SELECT ii.product_id, ii.qty, ii.unit_cost, p.name
+            FROM invoice_items ii INNER JOIN invoice_list i ON i.id = ii.invoice_id AND i.tenant_id = ?
+            LEFT JOIN product_list p ON p.id = ii.product_id
+            WHERE ii.invoice_id = ? AND ii.product_id IS NOT NULL AND ii.unit_cost IS NOT NULL");
+        $stmt->bind_param('ii', $t, $invoiceId);
+        $stmt->execute();
+        $value = [];
+        foreach ($stmt->get_result()->fetch_all(MYSQLI_ASSOC) as $r) {
+            $pid = (int)$r['product_id'];
+            $q = (float)$r['qty'];
+            $cur = $out['sold'][$pid] ?? ['qty' => 0.0, 'cost' => 0.0, 'name' => (string)($r['name'] ?? '')];
+            $value[$pid] = ($value[$pid] ?? 0.0) + $q * (float)$r['unit_cost'];
+            $cur['qty'] = round($cur['qty'] + $q, 4);
+            $cur['cost'] = $cur['qty'] > 0 ? round($value[$pid] / $cur['qty'], 4) : 0.0;
+            $out['sold'][$pid] = $cur;
+        }
+        $ret = $this->conn->prepare("SELECT l.product_id, SUM(l.return_qty) q
+            FROM credit_note_lines l INNER JOIN credit_notes n ON n.id = l.note_id
+            WHERE n.tenant_id = ? AND n.note_type = 'credit' AND n.document_id = ? AND n.status = 'issued'
+              AND l.product_id IS NOT NULL AND l.return_qty > 0 GROUP BY l.product_id");
+        if ($ret) {
+            $ret->bind_param('ii', $t, $invoiceId);
+            $ret->execute();
+            foreach ($ret->get_result()->fetch_all(MYSQLI_ASSOC) as $r) {
+                $out['returned'][(int)$r['product_id']] = (float)$r['q'];
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Put returned goods back on the shelf at the cost they left at and post Dr Inventory / Cr Cost of Sales.
+     * Nothing is changed if the journal cannot be posted.
+     *
+     * @param array<int,array{qty:float,cost:float}> $items
+     * @return array{ok:bool,msg:string,journal_id:int}
+     */
+    public function returnToStock(array $items, string $date, string $reference, int $warehouseId = 0): array
+    {
+        if (!$this->isEnabled()) {
+            return ['ok' => false, 'msg' => 'Turn on inventory accounting before returning goods to stock.', 'journal_id' => 0];
+        }
+        $c = $this->config();
+        $total = 0.0;
+        foreach ($items as $it) {
+            $total += self::lineValue((float)$it['qty'], (float)$it['cost']);
+        }
+        $journalId = 0;
+        $lines = self::returnLines($total, $c['inventory_account_id'], $c['cogs_account_id'], "Goods returned {$reference}");
+        if ($lines) {
+            $res = json_decode((new JournalService($this->conn, $this->settings))->postSystemJournal($date, "Stock returned on {$reference}", $lines), true);
+            if (($res['status'] ?? '') !== 'success') {
+                return ['ok' => false, 'msg' => (string)($res['msg'] ?? 'The returned stock could not be posted.'), 'journal_id' => 0];
+            }
+            $journalId = (int)$res['id'];
+        }
+        $t = $this->tenantId();
+        $prods = $this->products(array_keys($items));
+        foreach ($items as $pid => $it) {
+            $qty = (float)$it['qty'];
+            $cost = (float)$it['cost'];
+            if ($qty <= 0 || !isset($prods[$pid])) {
+                continue;
+            }
+            $avg = self::weightedAverage(max(0.0, $prods[$pid]['qty']), $prods[$pid]['cost'], $qty, $cost);
+            $q = $qty;
+            $p = $pid;
+            $a = $avg;
+            $stmt = $this->conn->prepare("UPDATE product_list SET stock_quantity = stock_quantity + ?, cost_price = ? WHERE id = ? AND tenant_id = ?");
+            $stmt->bind_param('ddii', $q, $a, $p, $t);
+            $stmt->execute();
+            $this->locate($pid, $warehouseId, $qty);
+            $this->log($pid, $warehouseId, 'in', $qty, $cost, $reference, 'Sales return', $journalId);
+        }
+        return ['ok' => true, 'msg' => '', 'journal_id' => $journalId];
+    }
+
+    /**
+     * Take returned goods back off the shelf (the note is voided or failed): reverse the stock journal and remove
+     * the quantity. With $check the quantity must still be on hand, and nothing is changed if it is not.
+     *
+     * @param array<int,array{qty:float,cost:float}> $items
+     * @return array{ok:bool,msg:string}
+     */
+    public function takeBack(array $items, int $journalId, string $date, string $reference, int $warehouseId = 0, bool $check = true): array
+    {
+        $need = [];
+        foreach ($items as $pid => $it) {
+            $need[$pid] = (float)$it['qty'];
+        }
+        if ($check && ($msg = $this->checkAvailable($need))) {
+            return ['ok' => false, 'msg' => 'The returned goods cannot be taken back out of stock: ' . $msg];
+        }
+        if ($journalId > 0) {
+            $res = json_decode((new JournalService($this->conn, $this->settings))->reverseJournal($journalId, $this->reversalDate($journalId, $date), true), true);
+            if (($res['status'] ?? '') !== 'success') {
+                return ['ok' => false, 'msg' => (string)($res['msg'] ?? 'The stock entry could not be reversed.')];
+            }
+        }
+        $t = $this->tenantId();
+        foreach ($need as $pid => $qty) {
+            if ($qty <= 0) {
+                continue;
+            }
+            $q = $qty;
+            $p = $pid;
+            $stmt = $this->conn->prepare("UPDATE product_list SET stock_quantity = GREATEST(0, stock_quantity - ?) WHERE id = ? AND tenant_id = ?");
+            $stmt->bind_param('dii', $q, $p, $t);
+            $stmt->execute();
+            $this->locate($pid, $warehouseId, -$qty);
+            $this->log($pid, $warehouseId, 'out', $qty, (float)$items[$pid]['cost'], $reference, 'Sales return reversed', 0);
         }
         return ['ok' => true, 'msg' => ''];
     }
