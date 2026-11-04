@@ -29,6 +29,15 @@ class PartyService
         $address = isset($address) ? $this->conn->real_escape_string((string)$address) : '';
         $status = isset($status) ? (int)$status : 1;
 
+        // Credit limit and payment terms (customers); empty means none.
+        $limit = CreditControlService::cleanLimit($credit_limit ?? '');
+        $terms = CreditControlService::cleanTerms($payment_terms_days ?? '');
+        if (isset($limit['error']) || isset($terms['error'])) {
+            return json_encode(['status' => 'failed', 'msg' => $limit['error'] ?? $terms['error']]);
+        }
+        $limitSql = $limit['value'] === null ? 'NULL' : "'" . number_format($limit['value'], 2, '.', '') . "'";
+        $termsSql = $terms['value'] === null ? 'NULL' : (string)$terms['value'];
+
         $check = $this->conn->query("SELECT * FROM `party_list` WHERE `party_code` = '{$party_code}' AND tenant_id = '{$tenant_id}' AND delete_flag = 0 " . (!empty($id) ? " AND id != '{$id}'" : ""))->num_rows;
         if ($check > 0) {
             return json_encode(['status' => 'failed', 'msg' => 'Party Code already exists.']);
@@ -44,6 +53,8 @@ class PartyService
 				`phone` = '{$phone}',
 				`tin` = '{$tin}',
 				`address` = '{$address}',
+				`credit_limit` = {$limitSql},
+				`payment_terms_days` = {$termsSql},
 				`status` = '{$status}'";
         } else {
             $sql = "UPDATE `party_list` SET
@@ -54,6 +65,8 @@ class PartyService
 				`phone` = '{$phone}',
 				`tin` = '{$tin}',
 				`address` = '{$address}',
+				`credit_limit` = {$limitSql},
+				`payment_terms_days` = {$termsSql},
 				`status` = '{$status}'
 				WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'";
         }

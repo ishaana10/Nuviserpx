@@ -58,6 +58,17 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
 			</div>
 		</div>
 
+		<div class="row">
+			<div class="col-md-6 form-group">
+				<label for="credit_limit" class="control-label">Credit limit <small class="text-muted">(customers; empty = no limit)</small></label>
+				<input type="number" step="0.01" min="0" name="credit_limit" id="credit_limit" class="form-control form-control-sm rounded-0" value="<?php echo isset($credit_limit) && $credit_limit !== null ? htmlspecialchars((string)$credit_limit) : ''; ?>" />
+			</div>
+			<div class="col-md-6 form-group">
+				<label for="payment_terms_days" class="control-label">Payment terms <small class="text-muted">(days until invoices are due)</small></label>
+				<input type="number" step="1" min="0" max="365" name="payment_terms_days" id="payment_terms_days" class="form-control form-control-sm rounded-0" value="<?php echo isset($payment_terms_days) && $payment_terms_days !== null ? (int)$payment_terms_days : ''; ?>" />
+			</div>
+		</div>
+
 		<div class="form-group">
 			<label for="address" class="control-label">Address</label>
 			<textarea name="address" id="address" rows="2" class="form-control form-control-sm rounded-0"><?php echo isset($address) ? $address : ''; ?></textarea>
