@@ -478,6 +478,9 @@ final class Permissions
         'save_sales_order'      => ['sales_orders', 'save'],
         'delete_sales_order'    => ['sales_orders', 'delete'],
         'confirm_sales_order'   => ['sales_orders', 'edit'],
+        'revise_quote'          => ['sales_orders', 'edit'],
+        'decline_quote'         => ['sales_orders', 'edit'],
+        'extend_quote'          => ['sales_orders', 'edit'],
         // Purchases
         'save_purchase_order'   => ['purchases', 'save'],
         'delete_purchase_order' => ['purchases', 'delete'],

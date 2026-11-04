@@ -83,6 +83,12 @@ while($p = $products_qry->fetch_assoc()){
 					<label for="order_date" class="control-label">Order Date</label>
 					<input type="date" name="order_date" id="order_date" class="form-control form-control-sm rounded-0" value="<?php echo isset($order_date) ? $order_date : date('Y-m-d'); ?>" required/>
 				</div>
+				<?php if (!$is_po): ?>
+				<div class="col-md-2 col-6 form-group">
+					<label for="valid_until" class="control-label">Valid until <small class="text-muted">(quotes)</small></label>
+					<input type="date" name="valid_until" id="valid_until" class="form-control form-control-sm rounded-0" value="<?php echo !empty($valid_until) ? htmlspecialchars($valid_until) : ''; ?>"/>
+				</div>
+				<?php endif; ?>
 				<div class="col-md-2 col-12 form-group">
 					<label for="type" class="control-label">Order Type</label>
 					<select name="type" id="type" class="form-control form-control-sm rounded-0" required>

@@ -93,6 +93,7 @@ class DBConnection{
                 $this->check_sales_return_migrations();
                 $this->check_pricing_migrations();
                 $this->check_credit_control_migrations();
+                $this->check_quotation_migrations();
             }
 
             // Run versioned migrations
@@ -1329,6 +1330,39 @@ class DBConnection{
                 @$this->conn->query($sql);
             }
         }
+    }
+
+    public function check_quotation_migrations(){
+        if (!$this->conn) return;
+        // Quotation validity and versions (see QuotationService).
+        if (!$this->table_exists('sales_order_list')) return;
+        $cols = array(
+            'valid_until'   => "ALTER TABLE `sales_order_list` ADD COLUMN `valid_until` date DEFAULT NULL",
+            'version'       => "ALTER TABLE `sales_order_list` ADD COLUMN `version` int(11) NOT NULL DEFAULT 1",
+            'parent_id'     => "ALTER TABLE `sales_order_list` ADD COLUMN `parent_id` int(30) DEFAULT NULL",
+            'quote_root_id' => "ALTER TABLE `sales_order_list` ADD COLUMN `quote_root_id` int(30) DEFAULT NULL",
+            'decline_reason'=> "ALTER TABLE `sales_order_list` ADD COLUMN `decline_reason` varchar(250) DEFAULT NULL",
+            'declined_at'   => "ALTER TABLE `sales_order_list` ADD COLUMN `declined_at` datetime DEFAULT NULL",
+        );
+        foreach ($cols as $col => $sql) {
+            $res = @$this->conn->query("SHOW COLUMNS FROM `sales_order_list` LIKE '{$col}'");
+            if ($res && $res->num_rows == 0) {
+                @$this->conn->query($sql);
+            }
+        }
+        // The type list gains 'quote' (the order form already offers it) and the status list 'superseded' and 'declined'.
+        $enums = array(
+            'type'   => array('quote', "ALTER TABLE `sales_order_list` MODIFY `type` enum('proforma','quote','sales_order') NOT NULL DEFAULT 'proforma'"),
+            'status' => array('superseded', "ALTER TABLE `sales_order_list` MODIFY `status` enum('draft','proforma','confirmed','converted_to_invoice','cancelled','superseded','declined') NOT NULL DEFAULT 'proforma'"),
+        );
+        foreach ($enums as $col => $def) {
+            $res = @$this->conn->query("SHOW COLUMNS FROM `sales_order_list` LIKE '{$col}'");
+            $row = $res ? $res->fetch_assoc() : null;
+            if ($row && stripos((string)$row['Type'], "'{$def[0]}'") === false) {
+                @$this->conn->query($def[1]);
+            }
+        }
+        $this->add_index_if_missing('sales_order_list', 'idx_quote_root', '(`quote_root_id`)');
     }
 
     public function check_pricing_migrations(){

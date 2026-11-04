@@ -40,8 +40,14 @@ $status_class = [
     'proforma'              => 'info',
     'confirmed'             => 'primary',
     'converted_to_invoice'  => 'success',
-    'cancelled'             => 'dark'
+    'cancelled'             => 'dark',
+    'declined'              => 'danger',
+    'superseded'            => 'light'
 ][$order['status']] ?? 'secondary';
+$quoteSvc = new \App\Services\QuotationService($conn, $_settings);
+$isQuote = \App\Services\QuotationService::isQuote((string)$order['type']);
+$history = $isQuote ? $quoteSvc->history($order) : [];
+$expired = $isQuote && in_array($order['status'], ['proforma', 'draft'], true) && \App\Services\QuotationService::isExpired($order['valid_until'] ?? null, date('Y-m-d'));
 
 $title_label = $order['type'] === 'proforma' ? 'PROFORMA INVOICE' : 'SALES ORDER';
 ?>
@@ -59,10 +65,13 @@ $title_label = $order['type'] === 'proforma' ? 'PROFORMA INVOICE' : 'SALES ORDER
 <div class="card card-outline card-primary">
     <div class="card-header no-print">
         <h3 class="card-title">
-            <?= $title_label ?> <strong>#<?= htmlspecialchars($order['order_no']) ?></strong>
+            <?= $title_label ?> <strong>#<?= htmlspecialchars(\App\Services\QuotationService::label((string)$order['order_no'], (int)($order['version'] ?? 1))) ?></strong>
+            <?php if ($isQuote && !empty($order['valid_until'])): ?>
+                <small class="<?= $expired ? 'text-danger font-weight-bold' : 'text-muted' ?> ml-2"><?= $expired ? 'Expired' : 'Valid until' ?> <?= date('d M Y', strtotime($order['valid_until'])) ?></small>
+            <?php endif; ?>
         </h3>
         <div class="card-tools">
-            <?php if($order['status'] == 'proforma' || $order['status'] == 'draft'): ?>
+            <?php if(($order['status'] == 'proforma' || $order['status'] == 'draft') && !$expired): ?>
             <button onclick="confirm_order(<?= $order['id'] ?>)" class="btn btn-sm btn-success">
                 <i class="fa fa-check-circle"></i> Confirm Sale & Auto Stock Adjust
             </button>
@@ -200,6 +209,29 @@ $title_label = $order['type'] === 'proforma' ? 'PROFORMA INVOICE' : 'SALES ORDER
             </div>
         </div>
     </div>
+
+    <?php if (count($history) > 1): ?>
+    <div class="px-4 pb-3 no-print">
+        <h6 class="font-weight-bold">Versions of this quote</h6>
+        <table class="table table-sm table-bordered w-auto">
+            <thead><tr><th>Version</th><th>Date</th><th>Valid until</th><th class="text-right">Total</th><th>Status</th></tr></thead>
+            <tbody>
+            <?php foreach ($history as $h): ?>
+                <tr class="<?= (int)$h['id'] === (int)$order['id'] ? 'table-active' : '' ?>">
+                    <td><a href="./?page=sales_orders/view&id=<?= (int)$h['id'] ?>">v<?= (int)$h['version'] ?></a></td>
+                    <td><?= date('d M Y', strtotime($h['order_date'])) ?></td>
+                    <td><?= $h['valid_until'] ? date('d M Y', strtotime($h['valid_until'])) : '—' ?></td>
+                    <td class="text-right"><?= number_format((float)$h['total'], 2) ?></td>
+                    <td><?= htmlspecialchars(strtoupper(str_replace('_', ' ', $h['status']))) ?></td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+    <?php endif; ?>
+    <?php if ($order['status'] === 'declined' && !empty($order['decline_reason'])): ?>
+    <div class="px-4 pb-3 no-print text-danger">Declined: <?= htmlspecialchars($order['decline_reason']) ?></div>
+    <?php endif; ?>
 
     <div class="card-footer text-center no-print">
         <button onclick="window.print()" class="btn btn-primary">
