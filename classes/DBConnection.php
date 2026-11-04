@@ -91,6 +91,7 @@ class DBConnection{
                 $this->check_inventory_accounting_migrations();
                 $this->check_sales_account_migrations();
                 $this->check_sales_return_migrations();
+                $this->check_pricing_migrations();
             }
 
             // Run versioned migrations
@@ -1309,6 +1310,47 @@ class DBConnection{
             $dups = @$this->conn->query("SELECT 1 FROM `{$table}` GROUP BY tenant_id, `{$def[1]}` HAVING COUNT(*) > 1 LIMIT 1");
             if ($dups && $dups->num_rows == 0) {
                 @$this->conn->query("ALTER TABLE `{$table}` ADD UNIQUE KEY `{$def[0]}` (`tenant_id`, `{$def[1]}`)");
+            }
+        }
+    }
+
+    public function check_pricing_migrations(){
+        if (!$this->conn) return;
+        // Customer price lists (see PriceListService) and the discount a line carried when it was sold.
+        @$this->conn->query("CREATE TABLE IF NOT EXISTS `price_lists` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `tenant_id` int(30) NOT NULL,
+          `name` varchar(100) NOT NULL,
+          `status` tinyint(1) NOT NULL DEFAULT 1,
+          `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+          PRIMARY KEY (`id`),
+          UNIQUE KEY `price_list_name` (`tenant_id`, `name`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        $this->add_tenant_fk('price_lists');
+        @$this->conn->query("CREATE TABLE IF NOT EXISTS `price_list_items` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `tenant_id` int(30) NOT NULL,
+          `price_list_id` int(30) NOT NULL,
+          `product_id` int(30) NOT NULL,
+          `min_qty` decimal(12,4) NOT NULL DEFAULT 1.0000,
+          `price` decimal(18,4) NOT NULL DEFAULT 0.0000,
+          PRIMARY KEY (`id`),
+          UNIQUE KEY `list_product_qty` (`price_list_id`, `product_id`, `min_qty`),
+          KEY `product` (`product_id`),
+          CONSTRAINT `pli_list_fk` FOREIGN KEY (`price_list_id`) REFERENCES `price_lists` (`id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        $this->add_tenant_fk('price_list_items');
+        $cols = array(
+            'party_list'    => array('price_list_id' => "ALTER TABLE `party_list` ADD COLUMN `price_list_id` int(30) DEFAULT NULL"),
+            'invoice_items' => array('discount_pct' => "ALTER TABLE `invoice_items` ADD COLUMN `discount_pct` decimal(7,4) NOT NULL DEFAULT 0.0000"),
+        );
+        foreach ($cols as $table => $defs) {
+            if (!$this->table_exists($table)) continue;
+            foreach ($defs as $col => $sql) {
+                $res = @$this->conn->query("SHOW COLUMNS FROM `{$table}` LIKE '{$col}'");
+                if ($res && $res->num_rows == 0) {
+                    @$this->conn->query($sql);
+                }
             }
         }
     }

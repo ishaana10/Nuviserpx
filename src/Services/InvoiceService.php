@@ -34,6 +34,27 @@ class InvoiceService
         $notes = isset($notes) ? $this->conn->real_escape_string((string)$notes) : '';
         $status = !empty($status) ? $this->conn->real_escape_string((string)$status) : InvoiceStatus::UNPAID->value;
 
+        // The totals are worked out from the lines here, the same way the form does, and must agree with what the
+        // form sent: a line discount cannot be dropped and a total cannot be typed in by hand.
+        $calc = null;
+        if (isset($tax_type) && isset($item_name) && is_array($item_name)) {
+            $rows = [];
+            foreach ($item_name as $k => $v) {
+                if (trim((string)$v) === '') continue;
+                $rows[$k] = ['qty' => $item_qty[$k] ?? 1, 'price' => $item_price[$k] ?? 0, 'discount_pct' => $item_discount_pct[$k] ?? 0, 'tax_rate' => $item_tax_rate[$k] ?? 0];
+            }
+            $calc = self::computeTotals($rows, (string)$tax_type, $discount);
+            if (isset($calc['error'])) {
+                return json_encode(['status' => 'failed', 'msg' => $calc['error']]);
+            }
+            if (abs($calc['subtotal'] - $subtotal) > 0.02 || abs($calc['tax'] - $tax_amount) > 0.02 || abs($calc['total'] - $total) > 0.02) {
+                return json_encode(['status' => 'failed', 'msg' => 'The invoice totals do not match its lines (lines come to ' . number_format($calc['total'], 2) . '). Reload the page and try again.']);
+            }
+            $subtotal = $calc['subtotal'];
+            $tax_amount = $calc['tax'];
+            $total = $calc['total'];
+        }
+
         // Get party details
         $party_qry = $this->conn->query("SELECT * FROM `party_list` WHERE id = '{$party_id}' AND tenant_id = '{$tenant_id}'");
         if (!$party_qry || $party_qry->num_rows == 0) {
@@ -236,8 +257,10 @@ class InvoiceService
                     $i_qty = isset($item_qty[$k]) ? (float)$item_qty[$k] : 1.0;
                     $i_price = isset($item_price[$k]) ? (float)$item_price[$k] : 0.0;
                     $i_tax_rate = isset($item_tax_rate[$k]) ? (float)$item_tax_rate[$k] : 0.0;
-                    $i_tax_amt = round(($i_qty * $i_price) * ($i_tax_rate / 100), 2);
-                    $i_amount = round(($i_qty * $i_price) + $i_tax_amt, 2);
+                    $i_disc = isset($item_discount_pct[$k]) ? max(0.0, min(100.0, (float)$item_discount_pct[$k])) : 0.0;
+                    $la = self::lineAmounts($i_qty, $i_price, $i_disc, $i_tax_rate, isset($tax_type) ? (string)$tax_type : 'exclusive');
+                    $i_tax_amt = round($la['tax'], 2);
+                    $i_amount = round($la['amount'], 2);
 
                     $i_pid = (int)($stockLines[$k]['product_id'] ?? 0);
                     $i_cost = ($i_pid > 0 && isset($stockCosts[$i_pid]) && $i_qty > 0) ? number_format((float)$stockCosts[$i_pid], 4, '.', '') : null;
@@ -250,6 +273,7 @@ class InvoiceService
 						`description` = '{$i_desc}',
 						`qty` = '{$i_qty}',
 						`unit_price` = '{$i_price}',
+						`discount_pct` = '{$i_disc}',
 						`tax_rate` = '{$i_tax_rate}',
 						`tax_amount` = '{$i_tax_amt}',
 						`amount` = '{$i_amount}'";
@@ -404,6 +428,64 @@ class InvoiceService
             }
         }
         return $rows;
+    }
+
+    /**
+     * One line's figures the way the invoice form works them out. $mode is 'exclusive' (tax added), 'inclusive'
+     * (tax is inside the price) or 'none'. Unrounded; callers round for display. Pure.
+     *
+     * @return array{sub:float,tax:float,amount:float}
+     */
+    public static function lineAmounts(float $qty, float $price, float $discountPct, float $taxRate, string $mode): array
+    {
+        $sub = $qty * $price * (1 - $discountPct / 100);
+        $rate = $mode === 'none' ? 0.0 : $taxRate;
+        $tax = match ($mode) {
+            'inclusive' => $sub - ($sub / (1 + $rate / 100)),
+            'none'      => 0.0,
+            default     => $sub * ($rate / 100),
+        };
+        return ['sub' => $sub, 'tax' => $tax, 'amount' => $mode === 'inclusive' || $mode === 'none' ? $sub : $sub + $tax];
+    }
+
+    /**
+     * Subtotal, tax and total from the lines: subtotal is after line discounts, total = subtotal (+ tax when tax is
+     * added on top) - the overall discount. Returns ['error'] for impossible lines. Pure.
+     *
+     * @param array<int,array{qty:mixed,price:mixed,discount_pct:mixed,tax_rate:mixed}> $rows
+     */
+    public static function computeTotals(array $rows, string $mode, float $overallDiscount): array
+    {
+        if (!in_array($mode, ['exclusive', 'inclusive', 'none'], true)) {
+            $mode = 'exclusive';
+        }
+        if ($overallDiscount < 0) {
+            return ['error' => 'The discount cannot be negative.'];
+        }
+        $sub = $tax = 0.0;
+        foreach ($rows as $r) {
+            $q = (float)$r['qty'];
+            $p = (float)$r['price'];
+            $d = (float)$r['discount_pct'];
+            $t = (float)$r['tax_rate'];
+            if ($q < 0 || $p < 0) {
+                return ['error' => 'Quantities and prices cannot be negative.'];
+            }
+            if ($d < 0 || $d > 100) {
+                return ['error' => 'A line discount must be between 0% and 100%.'];
+            }
+            if ($t < 0 || $t > 100) {
+                return ['error' => 'A tax rate must be between 0% and 100%.'];
+            }
+            $l = self::lineAmounts($q, $p, $d, $t, $mode);
+            $sub += $l['sub'];
+            $tax += $l['tax'];
+        }
+        $total = $sub + ($mode === 'exclusive' ? $tax : 0.0) - $overallDiscount;
+        if ($total < -0.005) {
+            return ['error' => 'The discount is more than the invoice comes to.'];
+        }
+        return ['subtotal' => round($sub, 2), 'tax' => round($tax, 2), 'total' => round($total, 2)];
     }
 
     /**

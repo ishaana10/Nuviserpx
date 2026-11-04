@@ -446,6 +446,12 @@ final class Permissions
         'set_period_lock'       => ['settings_manage'],
         'save_inventory_accounting' => ['settings_manage'],
         'save_default_accounts' => ['settings_manage'],
+        'save_price_list' => ['settings_manage'],
+        'delete_price_list' => ['settings_manage'],
+        'save_price_list_item' => ['settings_manage'],
+        'delete_price_list_item' => ['settings_manage'],
+        'assign_price_list' => ['settings_manage'],
+        'lookup_prices' => ['invoices', 'view'],
         'file_tax_return'       => ['tax_file'],
         'void_tax_return'       => ['tax_file'],
         // Invoices
@@ -651,6 +657,7 @@ final class Permissions
         'bank_reconciliation' => 'bank_reconciliation_view',
         'assets'            => 'assets_view',
         'credit_notes'      => 'invoices_view',
+        'price_lists'       => 'products_view',
         'expense_reports'   => 'expenses_view',
         'reports'           => 'reports_view',
         'employees'         => 'employees_view',
@@ -783,7 +790,7 @@ final class Permissions
         if ($perm === self::SUPER_ONLY) {
             return 'Only the developer can open this.';
         }
-        if ($page === 'payroll/rules_settings' || $page === 'stock_adjustments/accounting' || $page === 'accounts/default_accounts') {
+        if ($page === 'payroll/rules_settings' || $page === 'stock_adjustments/accounting' || $page === 'accounts/default_accounts' || $page === 'price_lists') {
             $perm = 'settings_manage';
         } elseif ($page === 'tax/returns') {
             $perm = 'tax_file';
