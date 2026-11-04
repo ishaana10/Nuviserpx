@@ -1084,6 +1084,11 @@ class Master extends DBConnection
         return $this->container->make(\App\Services\ApprovalService::class)->savePolicy($_POST);
     }
 
+    public function save_default_accounts()
+    {
+        return $this->container->make(\App\Services\AccountDefaultsService::class)->save($_POST);
+    }
+
     public function save_inventory_accounting()
     {
         return $this->container->make(\App\Services\InventoryAccountingService::class)->saveSettings($_POST);
@@ -2059,6 +2064,9 @@ switch ($action) {
         break;
     case 'save_approval_policy':
         echo $Master->save_approval_policy();
+        break;
+    case 'save_default_accounts':
+        echo $Master->save_default_accounts();
         break;
     case 'save_inventory_accounting':
         echo $Master->save_inventory_accounting();

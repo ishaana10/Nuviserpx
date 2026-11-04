@@ -74,7 +74,7 @@
 				                    <a class="dropdown-item send_email" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>" data-email="<?php echo htmlspecialchars($row['party_email'] ?? '') ?>"><span class="fa fa-envelope text-warning"></span> Send Email</a>
 				                    <a class="dropdown-item" href="./?page=payments/manage_payment&id=<?php echo $row['id'] ?>"><span class="fa fa-edit text-primary"></span> Edit</a>
 				                    <div class="dropdown-divider"></div>
-				                    <a class="dropdown-item delete_data" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>"><span class="fa fa-trash text-danger"></span> Delete</a>
+				                    <a class="dropdown-item delete_data" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>"><span class="fa fa-ban text-danger"></span> Cancel receipt</a>
 				                  </div>
 							</td>
 						</tr>
@@ -87,7 +87,7 @@
 <script>
 	$(document).ready(function(){
 		$('.delete_data').click(function(){
-			_conf("Are you sure to delete this payment receipt permanently? Associated invoice balances and journal entries will be updated.","delete_payment",[$(this).attr('data-id')])
+			_conf("Cancel this receipt? It is reversed in the ledger, the invoices it paid owe the money again, and the receipt stays on record as cancelled.","delete_payment",[$(this).attr('data-id')])
 		})
 		$('.send_email').click(function(){
 			var id = $(this).attr('data-id');

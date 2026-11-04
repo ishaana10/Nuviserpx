@@ -324,8 +324,12 @@ class CreditNoteService
         // Accounts: the same ones the original document posts to.
         $taxSvc = new TaxService($this->conn, $this->settings);
         if ($kind === self::CREDIT) {
-            $control = $this->find(['receivable', 'asset'], 1);
-            $main = $this->find(['sales', 'revenue'], 2);
+            $defaults = new AccountDefaultsService($this->conn, $this->settings);
+            $control = $defaults->resolve('receivable');
+            $main = $defaults->resolve('revenue');
+            if ($control <= 0 || $main <= 0) {
+                return $this->fail(AccountDefaultsService::missing($control <= 0 ? 'receivable' : 'revenue'));
+            }
             $taxAcc = $tax > 0 ? $taxSvc->controlAccount('output') : 0;
         } else {
             $control = $this->find(['payable', 'liabilit'], 3);
@@ -500,9 +504,13 @@ class CreditNoteService
         $table = $kind === self::CREDIT ? 'invoice_list' : 'vendor_bill_list';
         $noteNo = (string)$n['note_no'];
 
-        $control = $kind === self::CREDIT ? $this->find(['receivable', 'asset'], 1) : $this->find(['payable', 'liabilit'], 3);
+        $defaults = new AccountDefaultsService($this->conn, $this->settings);
+        $control = $kind === self::CREDIT ? $defaults->resolve('receivable') : $this->find(['payable', 'liabilit'], 3);
         if ($bankAcc <= 0) {
-            $bankAcc = $this->find(['bank', 'cash'], 1);
+            $bankAcc = $kind === self::CREDIT ? $defaults->resolve('cash') : $this->find(['bank', 'cash'], 1);
+        }
+        if ($control <= 0 || $bankAcc <= 0) {
+            return $this->fail(AccountDefaultsService::missing($control <= 0 ? 'receivable' : 'cash'));
         }
         $no = $this->nextRefundNumber($date);
         $userId = (int)$this->settings->userdata('id');

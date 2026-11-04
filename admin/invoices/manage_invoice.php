@@ -174,7 +174,7 @@ while($ac = $accounts_qry->fetch_assoc()){
                 <!-- Invoice Number -->
                 <div class="col-lg-2 col-md-6 form-group">
                     <label for="invoice_no" class="form-label-custom">Invoice Number <span class="text-danger">*</span></label>
-                    <input type="text" name="invoice_no" id="invoice_no" class="form-control form-control-modern font-weight-bold" value="<?php echo isset($invoice_no) ? $invoice_no : 'INV-'.date('Ym').'-'.rand(1000,9999); ?>" required/>
+                    <input type="text" name="invoice_no" id="invoice_no" class="form-control form-control-modern font-weight-bold" value="<?php echo isset($invoice_no) ? $invoice_no : ''; ?>" placeholder="Automatic (next number)"/>
                 </div>
 
                 <!-- Reference -->

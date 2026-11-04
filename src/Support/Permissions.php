@@ -445,6 +445,7 @@ final class Permissions
         // Closing or reopening the books changes what every other user may do: tenant-admin only.
         'set_period_lock'       => ['settings_manage'],
         'save_inventory_accounting' => ['settings_manage'],
+        'save_default_accounts' => ['settings_manage'],
         'file_tax_return'       => ['tax_file'],
         'void_tax_return'       => ['tax_file'],
         // Invoices
@@ -782,7 +783,7 @@ final class Permissions
         if ($perm === self::SUPER_ONLY) {
             return 'Only the developer can open this.';
         }
-        if ($page === 'payroll/rules_settings' || $page === 'stock_adjustments/accounting') {
+        if ($page === 'payroll/rules_settings' || $page === 'stock_adjustments/accounting' || $page === 'accounts/default_accounts') {
             $perm = 'settings_manage';
         } elseif ($page === 'tax/returns') {
             $perm = 'tax_file';

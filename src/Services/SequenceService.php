@@ -62,6 +62,40 @@ class SequenceService
     }
 
     /**
+     * Next number for a sales document in a month, e.g. "INV-202611-0042": continues from the highest number
+     * already used with that prefix, takes it under the row lock, and steps past any number already in use.
+     * $table and $column are fixed names chosen by the caller, never user input.
+     */
+    public static function documentNo(mysqli $conn, int $tenantId, string $table, string $column, string $prefix, string $key): string
+    {
+        $n = self::next($conn, $tenantId, $key, function () use ($conn, $tenantId, $table, $column, $prefix): int {
+            $like = $prefix . '%';
+            $from = strlen($prefix) + 1;
+            $stmt = $conn->prepare("SELECT MAX(CAST(SUBSTRING(`{$column}`, ?) AS UNSIGNED)) n FROM `{$table}` WHERE tenant_id = ? AND `{$column}` LIKE ?");
+            $stmt->bind_param('iis', $from, $tenantId, $like);
+            $stmt->execute();
+            return (int)($stmt->get_result()->fetch_assoc()['n'] ?? 0);
+        });
+        $no = self::formatDoc($prefix, $n);
+        $chk = $conn->prepare("SELECT 1 FROM `{$table}` WHERE tenant_id = ? AND `{$column}` = ? LIMIT 1");
+        for ($i = 0; $i < 50; $i++) {
+            $chk->bind_param('is', $tenantId, $no);
+            $chk->execute();
+            if (!$chk->get_result()->num_rows) {
+                break;
+            }
+            $no = self::formatDoc($prefix, self::next($conn, $tenantId, $key, fn () => 0));
+        }
+        return $no;
+    }
+
+    /** "INV-202611-0042" from a prefix and a number (at least four digits). */
+    public static function formatDoc(string $prefix, int $n): string
+    {
+        return $prefix . str_pad((string)$n, 4, '0', STR_PAD_LEFT);
+    }
+
+    /**
      * Take the next number in a series. $seed gives the highest number already in use, asked for only the
      * first time the series is seen, so existing documents are continued rather than overlapped.
      */
