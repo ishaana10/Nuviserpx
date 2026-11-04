@@ -36,25 +36,41 @@ class WarehouseStockService
      * $syncTotal = false when the caller already updates the product total itself
      * (e.g. legacy code paths), so we only touch the location row.
      */
-    public function adjustLocation(int $product_id, int $warehouse_id, float $delta, bool $syncTotal = true): void
+    public function adjustLocation(int $product_id, int $warehouse_id, float $delta, bool $syncTotal = true): bool
     {
         $tenant_id = (int)$this->settings->active_tenant_id();
         if ($product_id <= 0 || $delta == 0.0) {
-            return;
+            return true;
         }
         $warehouse_id = max(0, $warehouse_id);
 
         // Upsert the location row.
-        $this->conn->query("INSERT INTO `product_stock` (`tenant_id`, `product_id`, `warehouse_id`, `quantity`)
+        $ok = (bool)$this->conn->query("INSERT INTO `product_stock` (`tenant_id`, `product_id`, `warehouse_id`, `quantity`)
             VALUES ('{$tenant_id}', '{$product_id}', '{$warehouse_id}', '{$delta}')
             ON DUPLICATE KEY UPDATE `quantity` = `quantity` + VALUES(`quantity`)");
 
-        if ($syncTotal) {
+        if ($ok && $syncTotal) {
             $sign = $delta >= 0 ? '+' : '-';
             $abs = abs($delta);
-            $this->conn->query("UPDATE `product_list` SET `stock_quantity` = `stock_quantity` {$sign} {$abs}
+            $ok = (bool)$this->conn->query("UPDATE `product_list` SET `stock_quantity` = `stock_quantity` {$sign} {$abs}
                 WHERE id = '{$product_id}' AND tenant_id = '{$tenant_id}'");
         }
+        return $ok;
+    }
+
+    /** Why a transfer cannot go ahead, or null. Pure, so the rule can be tested without a database. */
+    public static function transferProblem(float $qty, float $available, int $from, int $to): ?string
+    {
+        if ($qty <= 0) {
+            return 'Valid product and quantity (> 0) are required.';
+        }
+        if ($from === $to) {
+            return 'Source and destination warehouses must be different.';
+        }
+        if ($qty > $available + 0.00001) {
+            return 'Only ' . rtrim(rtrim(number_format(max(0.0, $available), 2, '.', ''), '0'), '.') . ' in stock at the source warehouse.';
+        }
+        return null;
     }
 
     /**
@@ -78,35 +94,58 @@ class WarehouseStockService
         $from_wh = max(0, $from_wh);
         $to_wh = max(0, $to_wh);
 
-        if ($product_id <= 0 || $qty <= 0) {
+        if ($product_id <= 0) {
             return json_encode(['status' => 'failed', 'msg' => 'Valid product and quantity (> 0) are required.']);
         }
-        if ($from_wh === $to_wh) {
-            return json_encode(['status' => 'failed', 'msg' => 'Source and destination warehouses must be different.']);
+        // Both ends must be this company's warehouses (0 is the implicit Main location).
+        foreach ([$from_wh, $to_wh] as $w) {
+            if ($w !== self::MAIN_WAREHOUSE_ID) {
+                $chk = $this->conn->query("SELECT 1 FROM `warehouses` WHERE id = '{$w}' AND tenant_id = '{$tenant_id}' LIMIT 1");
+                if (!$chk || $chk->num_rows === 0) {
+                    return json_encode(['status' => 'failed', 'msg' => 'That warehouse was not found.']);
+                }
+            }
+        }
+        $prod = $this->conn->query("SELECT 1 FROM `product_list` WHERE id = '{$product_id}' AND tenant_id = '{$tenant_id}' LIMIT 1");
+        if (!$prod || $prod->num_rows === 0) {
+            return json_encode(['status' => 'failed', 'msg' => 'Product not found.']);
         }
 
-        $available = $this->quantityAt($product_id, $from_wh);
-        if ($qty > $available + 0.00001) {
-            return json_encode(['status' => 'failed', 'msg' => 'Only ' . rtrim(rtrim(number_format($available, 2), '0'), '.') . ' in stock at the source warehouse.']);
-        }
-
-        // Move: out of source, into destination. Total unchanged -> syncTotal = false.
-        $this->adjustLocation($product_id, $from_wh, -$qty, false);
-        $this->adjustLocation($product_id, $to_wh, $qty, false);
-
-        // Record the transfer and movement logs (location-aware).
         $notes_e = $this->conn->real_escape_string($notes);
-        $this->conn->query("INSERT INTO `warehouse_transfers`
-            (`tenant_id`, `from_warehouse_id`, `to_warehouse_id`, `product_id`, `qty`, `notes`, `created_by`)
-            VALUES ('{$tenant_id}', '{$from_wh}', '{$to_wh}', '{$product_id}', '{$qty}', '{$notes_e}', '{$user_id}')");
-
         $ref = 'Transfer ' . $this->warehouseName($from_wh) . ' -> ' . $this->warehouseName($to_wh);
         $ref_e = $this->conn->real_escape_string($ref);
-        // Log an out from source and an in to destination for the movement ledger.
-        $this->conn->query("INSERT INTO `inventory_logs` (`tenant_id`, `product_id`, `warehouse_id`, `type`, `qty`, `reference`, `notes`, `created_by`)
-            VALUES ('{$tenant_id}', '{$product_id}', '{$from_wh}', 'out', '{$qty}', '{$ref_e}', '{$notes_e}', '{$user_id}')");
-        $this->conn->query("INSERT INTO `inventory_logs` (`tenant_id`, `product_id`, `warehouse_id`, `type`, `qty`, `reference`, `notes`, `created_by`)
-            VALUES ('{$tenant_id}', '{$product_id}', '{$to_wh}', 'in', '{$qty}', '{$ref_e}', '{$notes_e}', '{$user_id}')");
+
+        // One transaction: the source row is locked while availability is checked, so two transfers cannot both
+        // take the same units, and a failure part-way leaves nothing moved.
+        $this->conn->begin_transaction();
+        try {
+            $lock = $this->conn->query("SELECT quantity FROM `product_stock`
+                WHERE product_id = '{$product_id}' AND warehouse_id = '{$from_wh}' AND tenant_id = '{$tenant_id}' FOR UPDATE");
+            $available = ($lock && ($row = $lock->fetch_assoc())) ? round((float)$row['quantity'], 2) : 0.0;
+            if ($problem = self::transferProblem($qty, $available, $from_wh, $to_wh)) {
+                $this->conn->rollback();
+                return json_encode(['status' => 'failed', 'msg' => $problem]);
+            }
+
+            // Move: out of source, into destination. Total unchanged -> syncTotal = false.
+            $ok = $this->adjustLocation($product_id, $from_wh, -$qty, false)
+                && $this->adjustLocation($product_id, $to_wh, $qty, false)
+                && $this->conn->query("INSERT INTO `warehouse_transfers`
+                    (`tenant_id`, `from_warehouse_id`, `to_warehouse_id`, `product_id`, `qty`, `notes`, `created_by`)
+                    VALUES ('{$tenant_id}', '{$from_wh}', '{$to_wh}', '{$product_id}', '{$qty}', '{$notes_e}', '{$user_id}')")
+                // An out from the source and an in to the destination for the movement ledger.
+                && $this->conn->query("INSERT INTO `inventory_logs` (`tenant_id`, `product_id`, `warehouse_id`, `type`, `qty`, `reference`, `notes`, `created_by`)
+                    VALUES ('{$tenant_id}', '{$product_id}', '{$from_wh}', 'out', '{$qty}', '{$ref_e}', '{$notes_e}', '{$user_id}')")
+                && $this->conn->query("INSERT INTO `inventory_logs` (`tenant_id`, `product_id`, `warehouse_id`, `type`, `qty`, `reference`, `notes`, `created_by`)
+                    VALUES ('{$tenant_id}', '{$product_id}', '{$to_wh}', 'in', '{$qty}', '{$ref_e}', '{$notes_e}', '{$user_id}')");
+            if (!$ok) {
+                throw new \RuntimeException($this->conn->error);
+            }
+            $this->conn->commit();
+        } catch (\Throwable $e) {
+            $this->conn->rollback();
+            return json_encode(['status' => 'failed', 'msg' => 'The transfer could not be completed. Nothing was moved.']);
+        }
 
         $this->settings->log_audit('Transferred Stock', 'Warehouses', "Product #{$product_id}, Qty {$qty}, {$this->warehouseName($from_wh)} -> {$this->warehouseName($to_wh)}");
         return json_encode(['status' => 'success', 'msg' => 'Stock transferred successfully.']);

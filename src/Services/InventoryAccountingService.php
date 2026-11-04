@@ -387,7 +387,13 @@ class InventoryAccountingService
      */
     public function checkAvailable(array $need, array $returning = []): ?string
     {
-        if (!$this->isEnabled() || !$need) {
+        return $this->isEnabled() ? $this->shortageMessage($need, $returning) : null;
+    }
+
+    /** Same check, whether or not inventory accounting is on: units can never go below zero. */
+    public function shortageMessage(array $need, array $returning = []): ?string
+    {
+        if (!$need) {
             return null;
         }
         $prods = $this->products(array_keys($need));

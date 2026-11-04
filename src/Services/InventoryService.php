@@ -124,7 +124,11 @@ class InventoryService
         $reference = isset($reference) ? $this->conn->real_escape_string((string)$reference) : 'Stock Adj ' . date('Ymd');
         $notes = isset($notes) ? $this->conn->real_escape_string((string)$notes) : '';
 
-        if ($product_id <= 0 || $qty <= 0) {
+        $absolute = $type === 'adjustment' && isset($is_absolute) && $is_absolute == 1;
+        if (!in_array($type, ['in', 'out', 'adjustment'], true)) {
+            return json_encode(['status' => 'failed', 'msg' => 'Choose a valid adjustment type.']);
+        }
+        if ($product_id <= 0 || $qty < 0 || ($qty == 0 && !$absolute)) {
             return json_encode(['status' => 'failed', 'msg' => 'Please select a product and enter a valid positive quantity.']);
         }
 
@@ -132,21 +136,36 @@ class InventoryService
         if (!$prod_qry || $prod_qry->num_rows == 0) {
             return json_encode(['status' => 'failed', 'msg' => 'Selected product not found.']);
         }
-        $product = $prod_qry->fetch_assoc();
+        if ($warehouse_id > 0) {
+            $wh = $this->conn->query("SELECT 1 FROM `warehouses` WHERE id = '{$warehouse_id}' AND tenant_id = '{$tenant_id}' LIMIT 1");
+            if (!$wh || $wh->num_rows === 0) {
+                return json_encode(['status' => 'failed', 'msg' => 'That warehouse was not found.']);
+            }
+        }
+
+        // The change is always to one location (the chosen warehouse); the product total moves by the same amount, so
+        // the total stays equal to the sum of its locations. A count sets that location to the counted figure.
+        $stockSvc = new WarehouseStockService($this->conn, $this->settings);
+        $atLocation = $stockSvc->quantityAt($product_id, $warehouse_id);
+        if ($type === 'out') {
+            $delta = -$qty;
+        } elseif ($absolute) {
+            $delta = round($qty - $atLocation, 4);
+        } else {
+            $delta = $qty;
+        }
+        if ($delta == 0.0) {
+            return json_encode(['status' => 'failed', 'msg' => 'That is already the quantity recorded there, so there is nothing to change.']);
+        }
+        if ($delta < 0 && -$delta > $atLocation + 0.00001) {
+            return json_encode(['status' => 'failed', 'msg' => 'Only ' . rtrim(rtrim(number_format($atLocation, 2, '.', ''), '0'), '.') . ' in stock at that warehouse, so ' . rtrim(rtrim(number_format(-$delta, 2, '.', ''), '0'), '.') . ' cannot be taken out.']);
+        }
 
         // With inventory accounting on, the change in stock value is posted to the ledger first (and refused if the
         // period is closed or the stock is not there), then the quantities are applied below.
         $accounting = new InventoryAccountingService($this->conn, $this->settings);
         $journalId = 0;
         if ($accounting->isEnabled()) {
-            $current = (float)$product['stock_quantity'];
-            if ($type === 'out') {
-                $delta = -$qty;
-            } elseif ($type === 'adjustment' && isset($is_absolute) && $is_absolute == 1) {
-                $delta = round($qty - $current, 4);
-            } else {
-                $delta = $qty;
-            }
             $valued = $accounting->valueChange($product_id, $delta, $delta > 0 && $unit_cost > 0 ? $unit_cost : null, date('Y-m-d'), $reference);
             if (!$valued['ok']) {
                 return json_encode(['status' => 'failed', 'msg' => $valued['msg']]);
@@ -154,49 +173,48 @@ class InventoryService
             $journalId = $valued['journal_id'];
         }
 
-        // Keep the authoritative product total, and mirror the change into the
-        // chosen warehouse location (syncTotal = false — the total is set here).
-        $stockSvc = new WarehouseStockService($this->conn, $this->settings);
-        if ($type === 'in') {
-            $this->conn->query("UPDATE `product_list` SET `stock_quantity` = `stock_quantity` + {$qty} WHERE id = '{$product_id}'");
-            $stockSvc->adjustLocation($product_id, $warehouse_id, $qty, false);
-        } elseif ($type === 'out') {
-            $this->conn->query("UPDATE `product_list` SET `stock_quantity` = `stock_quantity` - {$qty} WHERE id = '{$product_id}'");
-            $stockSvc->adjustLocation($product_id, $warehouse_id, -$qty, false);
-        } elseif ($type === 'adjustment') {
-            if (isset($is_absolute) && $is_absolute == 1) {
-                $this->conn->query("UPDATE `product_list` SET `stock_quantity` = '{$qty}' WHERE id = '{$product_id}'");
-                // Set the chosen location to the absolute count without re-touching the total.
-                $curLoc = $stockSvc->quantityAt($product_id, $warehouse_id);
-                $stockSvc->adjustLocation($product_id, $warehouse_id, round($qty - $curLoc, 4), false);
-            } else {
-                $this->conn->query("UPDATE `product_list` SET `stock_quantity` = `stock_quantity` + {$qty} WHERE id = '{$product_id}'");
-                $stockSvc->adjustLocation($product_id, $warehouse_id, $qty, false);
+        // Total, location and movement log change together or not at all. The total can never be driven below zero.
+        $logType = $type;
+        $this->conn->begin_transaction();
+        try {
+            $ok = (bool)$this->conn->query("UPDATE `product_list` SET `stock_quantity` = `stock_quantity` + ({$delta})
+                WHERE id = '{$product_id}' AND tenant_id = '{$tenant_id}' AND `stock_quantity` + ({$delta}) >= 0");
+            if (!$ok || $this->conn->affected_rows !== 1) {
+                throw new \RuntimeException('Stock changed while this was being saved.');
             }
+            if (!$stockSvc->adjustLocation($product_id, $warehouse_id, $delta, false)) {
+                throw new \RuntimeException($this->conn->error);
+            }
+            if ($absolute) {
+                $logType = 'adjustment';
+            }
+            $saved = $this->conn->query("INSERT INTO `inventory_logs` SET
+				`tenant_id` = '{$tenant_id}',
+				`product_id` = '{$product_id}',
+				`warehouse_id` = '{$warehouse_id}',
+				`type` = '{$logType}',
+				`qty` = '{$qty}',
+				`unit_cost` = '{$unit_cost}',
+				`reference` = '{$reference}',
+				`notes` = '{$notes}',
+				" . ($journalId > 0 ? "`journal_id` = '{$journalId}'," : '') . "
+				`created_by` = '{$user_id}'");
+            if (!$saved) {
+                throw new \RuntimeException($this->conn->error);
+            }
+            $this->conn->commit();
+        } catch (\Throwable $e) {
+            $this->conn->rollback();
+            if ($journalId > 0) {
+                // Do not leave a stock value in the ledger for a movement that did not happen.
+                (new JournalService($this->conn, $this->settings))->reverseJournal($journalId, date('Y-m-d'), true);
+            }
+            return json_encode(['status' => 'failed', 'msg' => 'The stock adjustment could not be saved. Nothing was changed.']);
         }
 
-        $save_log = $this->conn->query("INSERT INTO `inventory_logs` SET
-			`tenant_id` = '{$tenant_id}',
-			`product_id` = '{$product_id}',
-			`warehouse_id` = '{$warehouse_id}',
-			`type` = '{$type}',
-			`qty` = '{$qty}',
-			`unit_cost` = '{$unit_cost}',
-			`reference` = '{$reference}',
-			`notes` = '{$notes}',
-			" . ($journalId > 0 ? "`journal_id` = '{$journalId}'," : '') . "
-			`created_by` = '{$user_id}'");
-
-        if ($save_log) {
-            $resp['status'] = 'success';
-            $resp['msg'] = " Stock adjustment saved successfully.";
-            $this->settings->set_flashdata('success', $resp['msg']);
-        } else {
-            $resp['status'] = 'failed';
-            $resp['msg'] = "An error occurred while saving stock adjustment.";
-            $resp['err'] = $this->conn->error;
-        }
-
+        $resp['status'] = 'success';
+        $resp['msg'] = " Stock adjustment saved successfully.";
+        $this->settings->set_flashdata('success', $resp['msg']);
         return json_encode($resp);
     }
 }
