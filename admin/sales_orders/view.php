@@ -76,6 +76,9 @@ $title_label = $order['type'] === 'proforma' ? 'PROFORMA INVOICE' : 'SALES ORDER
                 <i class="fa fa-check-circle"></i> Confirm Sale & Auto Stock Adjust
             </button>
             <?php endif; ?>
+            <?php if (!empty($order['delivery_mode'])): ?>
+            <a href="./?page=delivery_notes" class="btn btn-sm btn-info"><i class="fa fa-truck"></i> Deliveries &amp; invoicing</a>
+            <?php endif; ?>
             <button onclick="window.print()" class="btn btn-sm btn-secondary">
                 <i class="fa fa-print"></i> Print Document
             </button>

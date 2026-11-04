@@ -94,6 +94,7 @@ class DBConnection{
                 $this->check_pricing_migrations();
                 $this->check_credit_control_migrations();
                 $this->check_quotation_migrations();
+                $this->check_delivery_migrations();
             }
 
             // Run versioned migrations
@@ -1312,6 +1313,60 @@ class DBConnection{
             $dups = @$this->conn->query("SELECT 1 FROM `{$table}` GROUP BY tenant_id, `{$def[1]}` HAVING COUNT(*) > 1 LIMIT 1");
             if ($dups && $dups->num_rows == 0) {
                 @$this->conn->query("ALTER TABLE `{$table}` ADD UNIQUE KEY `{$def[0]}` (`tenant_id`, `{$def[1]}`)");
+            }
+        }
+    }
+
+    public function check_delivery_migrations(){
+        if (!$this->conn) return;
+        // Delivery notes and partial fulfilment of sales orders (see DeliveryService).
+        if (!$this->table_exists('sales_order_list') || !$this->table_exists('sales_order_items')) return;
+        @$this->conn->query("CREATE TABLE IF NOT EXISTS `delivery_notes` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `tenant_id` int(30) NOT NULL,
+          `dn_no` varchar(50) NOT NULL,
+          `sales_order_id` int(30) NOT NULL,
+          `party_id` int(30) NOT NULL,
+          `delivery_date` date NOT NULL,
+          `warehouse_id` int(30) NOT NULL DEFAULT 0,
+          `status` enum('delivered','cancelled') NOT NULL DEFAULT 'delivered',
+          `stock_journal_id` int(30) DEFAULT NULL,
+          `notes` varchar(500) DEFAULT NULL,
+          `created_by` int(30) DEFAULT NULL,
+          `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+          PRIMARY KEY (`id`),
+          UNIQUE KEY `dn_tenant_no` (`tenant_id`, `dn_no`),
+          KEY `sales_order_id` (`sales_order_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        $this->add_tenant_fk('delivery_notes');
+        @$this->conn->query("CREATE TABLE IF NOT EXISTS `delivery_note_items` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `delivery_note_id` int(30) NOT NULL,
+          `order_item_id` int(30) NOT NULL,
+          `product_id` int(30) DEFAULT NULL,
+          `item_name` varchar(250) NOT NULL,
+          `qty` decimal(12,4) NOT NULL DEFAULT 0.0000,
+          `unit_cost` decimal(14,4) DEFAULT NULL,
+          `invoice_id` int(30) DEFAULT NULL,
+          PRIMARY KEY (`id`),
+          KEY `delivery_note_id` (`delivery_note_id`),
+          KEY `order_item_id` (`order_item_id`),
+          KEY `invoice_id` (`invoice_id`),
+          CONSTRAINT `dni_note_fk` FOREIGN KEY (`delivery_note_id`) REFERENCES `delivery_notes` (`id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        $cols = array(
+            'sales_order_list'  => array('delivery_mode' => "ALTER TABLE `sales_order_list` ADD COLUMN `delivery_mode` tinyint(1) NOT NULL DEFAULT 0"),
+            'sales_order_items' => array(
+                'delivered_qty' => "ALTER TABLE `sales_order_items` ADD COLUMN `delivered_qty` decimal(12,4) NOT NULL DEFAULT 0.0000",
+                'invoiced_qty'  => "ALTER TABLE `sales_order_items` ADD COLUMN `invoiced_qty` decimal(12,4) NOT NULL DEFAULT 0.0000",
+            ),
+        );
+        foreach ($cols as $table => $defs) {
+            foreach ($defs as $col => $sql) {
+                $res = @$this->conn->query("SHOW COLUMNS FROM `{$table}` LIKE '{$col}'");
+                if ($res && $res->num_rows == 0) {
+                    @$this->conn->query($sql);
+                }
             }
         }
     }

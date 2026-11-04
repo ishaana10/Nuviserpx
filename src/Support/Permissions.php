@@ -481,6 +481,10 @@ final class Permissions
         'revise_quote'          => ['sales_orders', 'edit'],
         'decline_quote'         => ['sales_orders', 'edit'],
         'extend_quote'          => ['sales_orders', 'edit'],
+        'confirm_for_delivery'  => ['sales_orders', 'edit'],
+        'save_delivery_note'    => ['sales_orders', 'edit'],
+        'cancel_delivery_note'  => ['sales_orders', 'edit'],
+        'invoice_delivered'     => ['invoices', 'save'],
         // Purchases
         'save_purchase_order'   => ['purchases', 'save'],
         'delete_purchase_order' => ['purchases', 'delete'],
@@ -649,6 +653,7 @@ final class Permissions
         'parties'           => 'parties_view',
         'payments'          => 'payments_view',
         'sales_orders'      => 'sales_orders_view',
+        'delivery_notes'    => 'sales_orders_view',
         'products'          => 'products_view',
         'stock_adjustments' => 'stock_view',
         'warehouses'        => 'warehouses_view',

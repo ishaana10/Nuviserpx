@@ -86,6 +86,9 @@ class InvoiceService
             if ($problem = self::editProblem((string)$cur['status'])) {
                 return json_encode(['status' => 'failed', 'msg' => $problem]);
             }
+            if ($status !== InvoiceStatus::CANCELLED->value && (new DeliveryService($this->conn, $this->settings))->linkedToInvoice((int)$id)) {
+                return json_encode(['status' => 'failed', 'msg' => 'This invoice was raised from delivery notes, so its lines cannot be edited. Cancel it and invoice the deliveries again.']);
+            }
             // Cancelling is its own action: it reverses the invoice in the ledger and returns its stock.
             if ($status === InvoiceStatus::CANCELLED->value) {
                 return $this->cancelInvoice((int)$id, (int)$tenant_id, $cur);
@@ -168,7 +171,8 @@ class InvoiceService
             $held = $this->issuedStock((int)$id, (int)$tenant_id);
         }
         $issued = ['ok' => true, 'msg' => '', 'journal_id' => 0, 'costs' => []];
-        $need = $status === InvoiceStatus::CANCELLED->value || $status === 'draft'
+        // An invoice raised from delivery notes does not issue stock: the deliveries already did.
+        $need = $status === InvoiceStatus::CANCELLED->value || $status === 'draft' || !empty($post['stock_by_delivery'])
             ? [] : InventoryAccountingService::aggregate($stockLines);
         $returning = array_map(fn ($i) => $i['qty'], $held['items']);
         // Stock already issued by this invoice is always taken back first (even if inventory accounting has since
@@ -407,6 +411,8 @@ class InvoiceService
             }
         }
         $this->conn->query("UPDATE `invoice_list` SET `status` = 'cancelled', `balance` = 0 WHERE id = '{$id}' AND tenant_id = '{$tenantId}'");
+        // Goods delivered on this invoice become invoiceable again.
+        (new DeliveryService($this->conn, $this->settings))->releaseInvoice($id);
         $this->settings->log_audit('Cancelled invoice', 'Invoices', (string)$cur['invoice_no']);
         $this->emit(\App\Support\IntegrationEvents::INVOICE_CANCELLED, ['invoice_id' => $id, 'invoice_no' => $cur['invoice_no'], 'total' => 0], $tenantId);
         $msg = ' Invoice cancelled and reversed.' . $warning;
@@ -569,6 +575,7 @@ class InvoiceService
             }
         }
         // A cancelled invoice's journal was reversed when it was cancelled; both stay in the ledger as the record.
+        (new DeliveryService($this->conn, $this->settings))->releaseInvoice($id);
 
         $del = $this->conn->query("DELETE FROM `invoice_list` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'");
         if ($del) {
