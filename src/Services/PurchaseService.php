@@ -417,6 +417,15 @@ class PurchaseService
         // GL accounts: Dr Purchases/Inventory/Expense, Cr Accounts Payable.
         $ap_acc_id = $this->findAccount(['payable', 'liabilit'], 3, (int)$tenant_id);
         $exp_acc_id = $this->findAccount(['purchase', 'inventory', 'cost of goods', 'expense'], 5, (int)$tenant_id);
+        // With inventory accounting on, the part of the bill that buys stock products is an asset (Inventory), not
+        // an expense: the cost reaches the profit and loss only when the goods are sold.
+        $invSvc = new InventoryAccountingService($this->conn, $this->settings);
+        $invAcc = 0;
+        $stockNet = 0.0;
+        if ($invSvc->isEnabled()) {
+            $invAcc = $invSvc->config()['inventory_account_id'];
+            $stockNet = $this->stockNet($post, $invSvc);
+        }
 
         $vendorName = $vendor['name'] ?? '';
         $description = $this->conn->real_escape_string("Vendor Bill {$bill_no} from {$vendorName} - Total: \${$total}");
@@ -432,7 +441,7 @@ class PurchaseService
             $journal_id = $this->conn->insert_id;
 
             // group_id mirrors the chart-of-accounts group used in InvoiceService (expense=5-ish / liability=3).
-            $this->postBillLines((int)$journal_id, (int)$ap_acc_id, (int)$exp_acc_id, (float)$total, (float)$tax_amount);
+            $this->postBillLines((int)$journal_id, (int)$ap_acc_id, (int)$exp_acc_id, (float)$total, (float)$tax_amount, $invAcc, $stockNet);
 
             $sql = "INSERT INTO `vendor_bill_list` SET
 				`tenant_id` = '{$tenant_id}',
@@ -465,7 +474,7 @@ class PurchaseService
                 $trailBefore = $trail->snapshot((int)$journal_id);
                 $this->conn->query("UPDATE `journal_entries` SET `description` = '{$description}', `journal_date` = '{$journal_date}' WHERE id = '{$journal_id}'");
                 $this->conn->query("DELETE FROM `journal_items` WHERE journal_id = '{$journal_id}'");
-                $this->postBillLines((int)$journal_id, (int)$ap_acc_id, (int)$exp_acc_id, (float)$total, (float)$tax_amount);
+                $this->postBillLines((int)$journal_id, (int)$ap_acc_id, (int)$exp_acc_id, (float)$total, (float)$tax_amount, $invAcc, $stockNet);
                 $trail->record((int)$journal_id, 'vendor_bill_list', (int)$id, "Bill {$bill_no}", $trailBefore);
             }
 
@@ -655,12 +664,32 @@ class PurchaseService
         }
     }
 
-    /** Expense Dr net; VAT Input Dr tax; Payables Cr gross (see TaxService::postingLines). */
-    private function postBillLines(int $journalId, int $apAcc, int $expAcc, float $total, float $tax): void
+    /** Net value of the bill lines that buy stock products (this company's products only). */
+    private function stockNet(array $post, InventoryAccountingService $inv): float
+    {
+        $rows = [];
+        foreach ((array)($post['item_name'] ?? []) as $k => $name) {
+            if (empty($name)) {
+                continue;
+            }
+            $rows[] = [
+                'product_id' => isset($post['product_id'][$k]) && is_numeric($post['product_id'][$k]) ? (int)$post['product_id'][$k] : 0,
+                'qty' => isset($post['item_qty'][$k]) ? (float)$post['item_qty'][$k] : 1.0,
+                'unit_price' => isset($post['item_price'][$k]) ? (float)$post['item_price'][$k] : 0.0,
+            ];
+        }
+        $known = $inv->products(array_column($rows, 'product_id'));
+        $rows = array_filter($rows, fn ($r) => isset($known[$r['product_id']]));
+        return InventoryAccountingService::stockNet($rows);
+    }
+
+    /** Expense Dr net (stock products to Inventory when that is on); VAT Input Dr tax; Payables Cr gross (see TaxService::postingLines). */
+    private function postBillLines(int $journalId, int $apAcc, int $expAcc, float $total, float $tax, int $invAcc = 0, float $stockNet = 0.0): void
     {
         $taxSvc = new TaxService($this->conn, $this->settings);
         $taxAcc = $tax > 0 ? $taxSvc->controlAccount('input') : 0;
         $lines = TaxService::postingLines('purchase', $total, $tax, $expAcc, $taxAcc, $apAcc);
+        $lines = InventoryAccountingService::splitPurchaseLines($lines, $expAcc, $invAcc, $stockNet);
         if (!$taxSvc->writeLines($journalId, $lines)) {
             // Never leave a half-posted journal: fall back to a single unsplit pair.
             $this->conn->query("DELETE FROM `journal_items` WHERE journal_id = " . (int)$journalId);
