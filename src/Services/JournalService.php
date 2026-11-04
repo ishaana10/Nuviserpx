@@ -13,6 +13,7 @@ class JournalService
     private const SOURCES = [
         'invoice_list' => ['label' => 'invoice', 'ref' => 'invoice_no'],
         'invoice_cogs' => ['table' => 'invoice_list', 'col' => 'cogs_journal_id', 'label' => 'cost of sales for invoice', 'ref' => 'invoice_no'],
+        'credit_note_stock' => ['table' => 'credit_notes', 'col' => 'stock_journal_id', 'label' => 'stock returned on credit note', 'ref' => 'note_no'],
         'stock_movement' => ['table' => 'inventory_logs', 'label' => 'stock movement', 'ref' => 'reference'],
         'inventory_opening' => ['table' => 'inventory_settings', 'col' => 'opening_journal_id', 'label' => 'opening inventory from', 'ref' => 'enabled_on'],
         'payment_list' => ['label' => 'payment', 'ref' => 'payment_no'],

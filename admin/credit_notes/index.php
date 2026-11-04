@@ -116,7 +116,7 @@ $accounts = $conn->query("SELECT id, name FROM `account_list` WHERE tenant_id = 
                     <small class="text-muted" id="doc_hint"></small></div>
                 <div class="form-group"><label class="font-weight-bold">Date</label><input type="date" name="note_date" class="form-control" value="<?= date('Y-m-d') ?>" required style="max-width:200px"></div>
                 <table class="table table-sm mb-1" id="note_lines">
-                    <thead><tr><th>What is being credited</th><th width="14%" class="text-right">Qty</th><th width="20%" class="text-right">Price</th><th width="14%" class="text-right">Tax %</th><th width="6%"></th></tr></thead>
+                    <thead><tr><th>What is being credited</th><th width="12%" class="text-right">Qty</th><th width="16%" class="text-right">Price</th><th width="10%" class="text-right">Tax %</th><th width="30%" class="stock-col">Goods back in stock</th><th width="4%"></th></tr></thead>
                     <tbody></tbody>
                 </table>
                 <button type="button" class="btn btn-xs btn-outline-secondary mb-2" id="add_line"><i class="fas fa-plus"></i> Add line</button>
@@ -145,9 +145,23 @@ $(function () {
             $('<td>').append($('<input>', { type: 'number', name: 'line_qty[]', 'class': 'form-control form-control-sm text-right ln', step: 'any', min: '0', value: '1' })),
             $('<td>').append($('<input>', { type: 'number', name: 'line_price[]', 'class': 'form-control form-control-sm text-right ln', step: '0.01', min: '0' })),
             $('<td>').append($('<input>', { type: 'number', name: 'line_tax[]', 'class': 'form-control form-control-sm text-right ln', step: 'any', min: '0', max: '100', value: rate || 0 })),
+            $('<td class="stock-col">').append(
+                $('<select>', { name: 'line_product[]', 'class': 'form-control form-control-sm mb-1 ln-product' }),
+                $('<input>', { type: 'number', name: 'line_return[]', 'class': 'form-control form-control-sm text-right ln-return', step: 'any', min: '0', placeholder: 'Qty returned' })
+            ),
             $('<td>').append($('<button>', { type: 'button', 'class': 'btn btn-xs btn-link text-danger rm-line', html: '&times;' }))
         );
         $('#note_lines tbody').append(tr);
+        fillProducts(tr);
+    };
+    var currentDoc = function () { return (docs[$('#note_type').val()] || []).find(function (x) { return String(x.id) === $('#document_id').val(); }); };
+    // Only invoices that sold stock offer products to return, and only when inventory accounting is on.
+    var fillProducts = function (tr) {
+        var d = currentDoc(), items = (d && d.items) || [], sel = tr.find('.ln-product').empty();
+        sel.append($('<option>').val('').text('— not returned to stock —'));
+        items.forEach(function (i) { sel.append($('<option>').val(i.product_id).text(i.name + ' (up to ' + i.left + ')')); });
+        tr.find('.stock-col').toggle(items.length > 0);
+        $('#note_lines thead .stock-col').toggle(items.length > 0);
     };
     var total = function () {
         var net = 0, tax = 0;
@@ -165,6 +179,7 @@ $(function () {
         if (d) {
             $('#doc_hint').text('Can still be credited: ' + (d.currency ? d.currency + ' ' : '') + Number(d.outstanding).toFixed(2) + (d.currency ? ' — enter this note in ' + d.currency + '; it is recorded at the invoice rate.' : ''));
             $('#note_lines tbody tr:first [name="line_tax[]"]').val(d.tax_rate);
+            $('#note_lines tbody tr').each(function () { fillProducts($(this)); });
         }
         total();
     };
