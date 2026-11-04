@@ -1363,143 +1363,96 @@ class Master extends DBConnection
     {
         $tenant_id = $this->settings->active_tenant_id();
         $user_id = $this->settings->userdata('id');
+        $this->confirm_error = '';
 
         $order_qry = $this->conn->query("SELECT * FROM `sales_order_list` WHERE id = '{$sales_order_id}' AND tenant_id = '{$tenant_id}'");
         if (!$order_qry || $order_qry->num_rows == 0) return false;
 
         $order = $order_qry->fetch_assoc();
+        if ($order['stock_adjusted'] != 0) {
+            return true; // already confirmed
+        }
 
-        if ($order['stock_adjusted'] == 0) {
-            // Confirming books the invoice and the stock movement, so it must fall in an open period.
-            if ($lockMsg = \App\Services\PeriodLockService::guard($this->conn, (int)$tenant_id, (string)$order['order_date'])) {
-                $this->confirm_error = $lockMsg;
+        // Confirming books the invoice and the stock movement, so it must fall in an open period.
+        if ($lockMsg = \App\Services\PeriodLockService::guard($this->conn, (int)$tenant_id, (string)$order['order_date'])) {
+            $this->confirm_error = $lockMsg;
+            return false;
+        }
+        $wh = isset($order['warehouse_id']) ? max(0, (int)$order['warehouse_id']) : 0;
+        $inventoryOn = $this->container->make(\App\Services\InventoryAccountingService::class)->isEnabled();
+
+        // The invoice is raised through InvoiceService, exactly as if it had been typed in: VAT is split out to the
+        // output account, the period lock and numbering apply, integrations fire, and (with inventory accounting
+        // on) it issues the stock and books the cost of sales. It goes first so a refusal leaves nothing half done.
+        $invoice_id = (int)($order['invoice_id'] ?? 0);
+        $hadInvoice = $invoice_id !== 0;
+        if (!$hadInvoice) {
+            $post = [
+                'invoice_no'   => 'INV-' . str_replace(['SO-', 'PRO-'], '', (string)$order['order_no']),
+                'party_id'     => (int)$order['party_id'],
+                'invoice_date' => (string)$order['order_date'],
+                'due_date'     => date('Y-m-d', strtotime($order['order_date'] . ' +30 days')),
+                'subtotal'     => (float)$order['subtotal'],
+                'tax_amount'   => (float)$order['tax_amount'],
+                'discount'     => (float)$order['discount'],
+                'total'        => (float)$order['total'],
+                'notes'        => (string)$order['notes'],
+                'status'       => 'unpaid',
+                'stock_warehouse_id' => $wh,
+                'item_name' => [], 'item_desc' => [], 'item_qty' => [], 'item_price' => [], 'item_tax_rate' => [], 'product_id' => [],
+            ];
+            $lines = $this->conn->query("SELECT * FROM `sales_order_items` WHERE sales_order_id = '{$sales_order_id}' ORDER BY id");
+            while ($lines && ($ln = $lines->fetch_assoc())) {
+                $post['item_name'][] = $ln['item_name'];
+                $post['item_desc'][] = $ln['description'];
+                $post['item_qty'][] = $ln['qty'];
+                $post['item_price'][] = $ln['unit_price'];
+                $post['item_tax_rate'][] = $ln['tax_rate'];
+                $post['product_id'][] = (int)$ln['product_id'] > 0 ? $ln['product_id'] : '';
+            }
+            $res = json_decode($this->container->make(\App\Services\InvoiceService::class)->saveInvoice($post), true);
+            if (($res['status'] ?? '') !== 'success' || empty($res['id'])) {
+                $this->confirm_error = (string)($res['msg'] ?? 'The invoice could not be created.');
                 return false;
             }
-            // With inventory accounting on, issue the stock through the service: it checks availability, posts the
-            // cost of sales and moves stock atomically. Otherwise the long-standing units-only deduction runs.
-            $stockSvc = $this->container->make(\App\Services\InventoryAccountingService::class);
-            $issued = ['ok' => true, 'msg' => '', 'journal_id' => 0, 'costs' => []];
-            $wh = isset($order['warehouse_id']) ? max(0, (int)$order['warehouse_id']) : 0;
-            if ($stockSvc->isEnabled()) {
-                $rows = [];
-                $lines = $this->conn->query("SELECT product_id, qty FROM `sales_order_items` WHERE sales_order_id = '{$sales_order_id}'");
-                while ($lines && ($ln = $lines->fetch_assoc())) {
-                    $rows[] = $ln;
+            $invoice_id = (int)$res['id'];
+        }
+
+        // Without inventory accounting the long-standing units-only deduction runs (the invoice does not move stock).
+        if (!$inventoryOn || $hadInvoice) {
+            $items = $this->conn->query("SELECT * FROM `sales_order_items` WHERE sales_order_id = '{$sales_order_id}'");
+            while ($items && ($item = $items->fetch_assoc())) {
+                $pid = (int)$item['product_id'];
+                $qty = (float)$item['qty'];
+                if ($pid <= 0 || $qty <= 0) continue;
+
+                $prod = $this->conn->query("SELECT cost_price FROM `product_list` WHERE id = '{$pid}' AND tenant_id = '{$tenant_id}'")->fetch_assoc();
+                $cost = isset($prod['cost_price']) ? (float)$prod['cost_price'] : 0.0;
+                $this->conn->query("UPDATE `product_list` SET `stock_quantity` = `stock_quantity` - {$qty} WHERE id = '{$pid}' AND tenant_id = '{$tenant_id}'");
+
+                // Draw the sold quantity down from the order's warehouse location.
+                // syncTotal = false because the product total was just decremented above.
+                try {
+                    $this->container->make(\App\Services\WarehouseStockService::class)->adjustLocation($pid, $wh, -$qty, false);
+                } catch (\Throwable $e) {
+                    // location tracking must not block the sale
                 }
-                $issued = $stockSvc->issue(\App\Services\InventoryAccountingService::aggregate($rows), (string)$order['order_date'], (string)$order['order_no'], $wh);
-                if (!$issued['ok']) {
-                    $this->confirm_error = $issued['msg'];
-                    return false;
-                }
-            }
-            $items = $stockSvc->isEnabled() ? false : $this->conn->query("SELECT * FROM `sales_order_items` WHERE sales_order_id = '{$sales_order_id}'");
-            if ($items) {
-                while ($item = $items->fetch_assoc()) {
-                    $pid = (int)$item['product_id'];
-                    $qty = (float)$item['qty'];
 
-                    if ($pid > 0 && $qty > 0) {
-                        $prod = $this->conn->query("SELECT cost_price, stock_quantity FROM `product_list` WHERE id = '{$pid}'")->fetch_assoc();
-                        $cost = isset($prod['cost_price']) ? (float)$prod['cost_price'] : 0.0;
-                        $wh = isset($order['warehouse_id']) ? max(0, (int)$order['warehouse_id']) : 0;
-
-                        $this->conn->query("UPDATE `product_list` SET `stock_quantity` = `stock_quantity` - {$qty} WHERE id = '{$pid}'");
-
-                        // Draw the sold quantity down from the order's warehouse location.
-                        // syncTotal = false because the product total was just decremented above.
-                        try {
-                            $this->container->make(\App\Services\WarehouseStockService::class)
-                                ->adjustLocation($pid, $wh, -$qty, false);
-                        } catch (\Throwable $e) {
-                            // location tracking must not block the sale
-                        }
-
-                        $orderNoEsc = $this->conn->real_escape_string((string)$order['order_no']);
-                        $this->conn->query("INSERT INTO `inventory_logs` SET
-							`tenant_id` = '{$tenant_id}',
-							`product_id` = '{$pid}',
-							`warehouse_id` = '{$wh}',
-							`type` = 'out',
-							`qty` = '{$qty}',
-							`unit_cost` = '{$cost}',
-							`reference` = '{$orderNoEsc}',
-							`notes` = 'Auto stock deduction on sales order confirmation',
-							`created_by` = '{$user_id}'");
-                    }
-                }
-            }
-
-            $this->conn->query("UPDATE `sales_order_list` SET `stock_adjusted` = 1, `status` = 'confirmed' WHERE id = '{$sales_order_id}'");
-
-            if (empty($order['invoice_id'])) {
-                $inv_no = 'INV-' . str_replace(['SO-', 'PRO-'], '', $order['order_no']);
-
-                $ar_acc = $this->conn->query("SELECT id FROM `account_list` WHERE (`name` LIKE '%receivable%' OR `name` LIKE '%asset%') AND tenant_id = '{$tenant_id}' AND delete_flag = 0 LIMIT 1");
-                $ar_acc_id = ($ar_acc && $ar_acc->num_rows > 0) ? $ar_acc->fetch_assoc()['id'] : 1;
-
-                $rev_acc = $this->conn->query("SELECT id FROM `account_list` WHERE (`name` LIKE '%sales%' OR `name` LIKE '%revenue%') AND tenant_id = '{$tenant_id}' AND delete_flag = 0 LIMIT 1");
-                $rev_acc_id = ($rev_acc && $rev_acc->num_rows > 0) ? $rev_acc->fetch_assoc()['id'] : 2;
-
-                $journal_code = \App\Services\SequenceService::journalCode($this->conn, (int)$tenant_id);
-                $journal_date = $order['order_date'];
-                $description = $this->conn->real_escape_string("Sales Invoice {$inv_no} from Order {$order['order_no']}");
-
-                $j_sql = "INSERT INTO `journal_entries` (`tenant_id`, `code`, `journal_date`, `description`, `user_id`) VALUES ('{$tenant_id}', '{$journal_code}', '{$journal_date}', '{$description}', '{$user_id}')";
-                $this->conn->query($j_sql);
-                $journal_id = $this->conn->insert_id;
-
-                $j_items = "INSERT INTO `journal_items` (`journal_id`, `account_id`, `group_id`, `amount`) VALUES
-					('{$journal_id}', '{$ar_acc_id}', '1', '{$order['total']}'),
-					('{$journal_id}', '{$rev_acc_id}', '2', '{$order['total']}')";
-                $this->conn->query($j_items);
-
-                $dueDate = date('Y-m-d', strtotime($order['order_date'] . ' +30 days'));
-                $notesEsc = $this->conn->real_escape_string((string)$order['notes']);
-                $inv_sql = "INSERT INTO `invoice_list` SET
+                $orderNoEsc = $this->conn->real_escape_string((string)$order['order_no']);
+                $this->conn->query("INSERT INTO `inventory_logs` SET
 					`tenant_id` = '{$tenant_id}',
-					`invoice_no` = '{$inv_no}',
-					`party_id` = '{$order['party_id']}',
-					`invoice_date` = '{$order['order_date']}',
-					`due_date` = '{$dueDate}',
-					`subtotal` = '{$order['subtotal']}',
-					`tax_amount` = '{$order['tax_amount']}',
-					`discount` = '{$order['discount']}',
-					`total` = '{$order['total']}',
-					`paid_amount` = '0.00',
-					`balance` = '{$order['total']}',
-					`status` = 'unpaid',
-					`notes` = '{$notesEsc}',
-					`journal_id` = '{$journal_id}',
-					`cogs_journal_id` = " . ((int)$issued['journal_id'] > 0 ? (int)$issued['journal_id'] : 'NULL') . ",
-					`stock_warehouse_id` = '{$wh}',
-					`created_by` = '{$user_id}'";
-                $this->conn->query($inv_sql);
-                $invoice_id = $this->conn->insert_id;
-
-                $items2 = $this->conn->query("SELECT * FROM `sales_order_items` WHERE sales_order_id = '{$sales_order_id}'");
-                if ($items2) {
-                    while ($it2 = $items2->fetch_assoc()) {
-                        $itNameEsc = $this->conn->real_escape_string((string)$it2['item_name']);
-                        $itDescEsc = $this->conn->real_escape_string((string)$it2['description']);
-                        $itPid = (int)($it2['product_id'] ?? 0);
-                        $itCost = ($itPid > 0 && isset($issued['costs'][$itPid])) ? "'" . number_format((float)$issued['costs'][$itPid], 4, '.', '') . "'" : 'NULL';
-                        $this->conn->query("INSERT INTO `invoice_items` SET
-							`invoice_id` = '{$invoice_id}',
-							`product_id` = " . ($itPid > 0 ? $itPid : 'NULL') . ",
-							`unit_cost` = {$itCost},
-							`item_name` = '{$itNameEsc}',
-							`description` = '{$itDescEsc}',
-							`qty` = '{$it2['qty']}',
-							`unit_price` = '{$it2['unit_price']}',
-							`tax_rate` = '{$it2['tax_rate']}',
-							`tax_amount` = '{$it2['tax_amount']}',
-							`amount` = '{$it2['amount']}'");
-                    }
-                }
-
-                $this->conn->query("UPDATE `sales_order_list` SET `invoice_id` = '{$invoice_id}', `status` = 'converted_to_invoice' WHERE id = '{$sales_order_id}'");
+					`product_id` = '{$pid}',
+					`warehouse_id` = '{$wh}',
+					`type` = 'out',
+					`qty` = '{$qty}',
+					`unit_cost` = '{$cost}',
+					`reference` = '{$orderNoEsc}',
+					`notes` = 'Auto stock deduction on sales order confirmation',
+					`created_by` = '{$user_id}'");
             }
         }
+
+        $this->conn->query("UPDATE `sales_order_list` SET `stock_adjusted` = 1, `invoice_id` = '{$invoice_id}', `status` = 'converted_to_invoice' WHERE id = '{$sales_order_id}' AND tenant_id = '{$tenant_id}'");
         return true;
     }
 

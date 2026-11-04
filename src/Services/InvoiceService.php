@@ -111,7 +111,7 @@ class InvoiceService
         // the company has inventory accounting on. Everything that can fail is done before the invoice is written.
         $stockSvc = new InventoryAccountingService($this->conn, $this->settings);
         $stockLines = $this->productLines($post, $stockSvc);
-        $held = ['items' => [], 'journal' => 0, 'warehouse' => 0];
+        $held = ['items' => [], 'journal' => 0, 'warehouse' => max(0, (int)($post['stock_warehouse_id'] ?? 0))];
         if (!empty($id)) {
             $held = $this->issuedStock((int)$id, (int)$tenant_id);
         }
@@ -166,6 +166,7 @@ class InvoiceService
 				`notes` = '{$notes}',
 				`journal_id` = '{$journal_id}',
 				`cogs_journal_id` = " . ($cogsJournalId > 0 ? $cogsJournalId : 'NULL') . ",
+				`stock_warehouse_id` = '{$held['warehouse']}',
 				`created_by` = '{$user_id}'";
             $save = $this->conn->query($sql);
             $invoice_id = $this->conn->insert_id;
@@ -235,6 +236,7 @@ class InvoiceService
             }
 
             $resp['status'] = 'success';
+            $resp['id'] = (int)$invoice_id;
             $resp['msg'] = empty($id) ? " Invoice created successfully." : " Invoice updated successfully.";
             $this->settings->set_flashdata('success', $resp['msg']);
 
