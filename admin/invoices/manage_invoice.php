@@ -267,7 +267,7 @@ while($ac = $accounts_qry->fetch_assoc()){
                             <td><input type="text" name="item_desc[]" class="form-control form-control-modern" placeholder="Description" value="<?php echo htmlspecialchars($item['description']) ?>"></td>
                             <td><input type="number" step="any" name="item_qty[]" class="form-control form-control-modern text-center calc-item qty" value="<?php echo $item['qty'] ?>" required></td>
                             <td><input type="number" step="any" name="item_price[]" class="form-control form-control-modern text-right calc-item price" value="<?php echo $item['unit_price'] ?>" required></td>
-                            <td><input type="number" step="any" name="item_discount_pct[]" class="form-control form-control-modern text-center calc-item disc_pct" value="0.00"></td>
+                            <td><input type="number" step="any" name="item_discount_pct[]" class="form-control form-control-modern text-center calc-item disc_pct" value="<?php echo number_format((float)($item['discount_pct'] ?? 0), 2, '.', '') ?>"></td>
                             <td>
                                 <select name="item_account_id[]" class="form-control form-control-modern">
                                     <?php foreach($accounts as $ac): ?>
@@ -628,6 +628,40 @@ while($ac = $accounts_qry->fetch_assoc()){
                 calculate_invoice_totals();
             }
         });
+
+        // Customer price lists: fill each product line with the price the customer's list gives for that quantity.
+        // A price the user has typed is left alone; a line the list no longer prices goes back to the normal price.
+        function apply_list_prices(){
+            var party = $('#party_id').val();
+            if(!party) return;
+            var lines = {}, rows = {};
+            $('#items-table tbody tr.item-row').each(function(i){
+                var pid = $(this).find('.product-select').val();
+                if(pid && pid !== '__new_item__' && !$(this).find('.price').data('manual')){
+                    lines[i] = { product_id: pid, qty: parseFloat($(this).find('.qty').val()) || 1 };
+                    rows[i] = $(this);
+                }
+            });
+            if($.isEmptyObject(lines)) return;
+            $.post(_base_url_ + 'classes/Master.php?f=lookup_prices', { party_id: party, lines: lines }, function(r){
+                if(!r || r.status !== 'success') return;
+                $.each(r.prices, function(i, price){
+                    var tr = rows[i], inp = tr.find('.price');
+                    if(price !== null){
+                        inp.val(parseFloat(price).toFixed(2)).data('listed', true);
+                    } else if(inp.data('listed')){
+                        var d = tr.find('.product-select option:selected').data('price');
+                        if(d !== undefined) inp.val(d);
+                        inp.data('listed', false);
+                    }
+                });
+                calculate_invoice_totals();
+            }, 'json');
+        }
+        $(document).on('input', '#items-table .price', function(){ $(this).data('manual', true); });
+        $(document).on('change', '.product-select', function(){ $(this).closest('tr').find('.price').data('manual', false); setTimeout(apply_list_prices, 0); });
+        $(document).on('change', '#items-table .qty', apply_list_prices);
+        $('#party_id').on('change', function(){ $('#items-table .price').data('manual', false); apply_list_prices(); });
 
         $('#btn_open_product_modal').click(function(){
             active_row_for_new_item = $('#items-table tbody tr.item-row').last();

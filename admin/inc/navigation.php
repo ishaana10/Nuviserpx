@@ -227,6 +227,14 @@ if($t_qry && $t_qry->num_rows > 0){
                                     </li>
                                     <?php if ($_settings->can_access('settings_manage')): ?>
                                     <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=price_lists" class="nav-link nav-price_lists tree-item">
+                                            <i class="nav-icon fas fa-tags"></i>
+                                            <p>Price Lists</p>
+                                        </a>
+                                    </li>
+                                    <?php endif; ?>
+                                    <?php if ($_settings->can_access('settings_manage')): ?>
+                                    <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=stock_adjustments/accounting" class="nav-link nav-stock_adjustments_accounting tree-item">
                                             <i class="nav-icon fas fa-balance-scale"></i>
                                             <p>Inventory Accounting</p>

@@ -1084,6 +1084,36 @@ class Master extends DBConnection
         return $this->container->make(\App\Services\ApprovalService::class)->savePolicy($_POST);
     }
 
+    public function save_price_list()
+    {
+        return $this->container->make(\App\Services\PriceListService::class)->saveList($_POST);
+    }
+
+    public function delete_price_list()
+    {
+        return $this->container->make(\App\Services\PriceListService::class)->deleteList((int)($_POST['id'] ?? 0));
+    }
+
+    public function save_price_list_item()
+    {
+        return $this->container->make(\App\Services\PriceListService::class)->saveItem($_POST);
+    }
+
+    public function delete_price_list_item()
+    {
+        return $this->container->make(\App\Services\PriceListService::class)->deleteItem((int)($_POST['id'] ?? 0));
+    }
+
+    public function assign_price_list()
+    {
+        return $this->container->make(\App\Services\PriceListService::class)->assign((int)($_POST['id'] ?? 0), (array)($_POST['party_ids'] ?? []));
+    }
+
+    public function lookup_prices()
+    {
+        return $this->container->make(\App\Services\PriceListService::class)->lookup($_POST);
+    }
+
     public function save_default_accounts()
     {
         return $this->container->make(\App\Services\AccountDefaultsService::class)->save($_POST);
@@ -2064,6 +2094,24 @@ switch ($action) {
         break;
     case 'save_approval_policy':
         echo $Master->save_approval_policy();
+        break;
+    case 'save_price_list':
+        echo $Master->save_price_list();
+        break;
+    case 'delete_price_list':
+        echo $Master->delete_price_list();
+        break;
+    case 'save_price_list_item':
+        echo $Master->save_price_list_item();
+        break;
+    case 'delete_price_list_item':
+        echo $Master->delete_price_list_item();
+        break;
+    case 'assign_price_list':
+        echo $Master->assign_price_list();
+        break;
+    case 'lookup_prices':
+        echo $Master->lookup_prices();
         break;
     case 'save_default_accounts':
         echo $Master->save_default_accounts();
