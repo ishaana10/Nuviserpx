@@ -513,6 +513,47 @@ class InventoryAccountingService
     }
 
     /**
+     * Units-only issue for companies without inventory accounting: take the quantities off the shelf (never below
+     * zero), at the location, and log them at the product's current cost. No journal. Nothing is changed if any
+     * product is short.
+     *
+     * @param array<int,float> $need
+     * @return array{ok:bool,msg:string,costs:array<int,float>}
+     */
+    public function issueUnits(array $need, string $reference, int $warehouseId, string $note): array
+    {
+        if (!$need) {
+            return ['ok' => true, 'msg' => '', 'costs' => []];
+        }
+        if ($msg = $this->shortageMessage($need)) {
+            return ['ok' => false, 'msg' => $msg, 'costs' => []];
+        }
+        $t = $this->tenantId();
+        $prods = $this->products(array_keys($need));
+        $taken = [];
+        $costs = [];
+        foreach ($need as $pid => $qty) {
+            $q = $qty;
+            $p = $pid;
+            $stmt = $this->conn->prepare("UPDATE product_list SET stock_quantity = stock_quantity - ? WHERE id = ? AND tenant_id = ? AND stock_quantity >= ?");
+            $stmt->bind_param('diid', $q, $p, $t, $q);
+            if (!$stmt->execute() || $stmt->affected_rows !== 1) {
+                foreach ($taken as $tp => $tq) {
+                    $this->conn->query("UPDATE product_list SET stock_quantity = stock_quantity + {$tq} WHERE id = {$tp} AND tenant_id = {$t}");
+                }
+                return ['ok' => false, 'msg' => 'Stock changed while the delivery was being saved. Please try again.', 'costs' => []];
+            }
+            $taken[$pid] = $qty;
+            $costs[$pid] = $prods[$pid]['cost'] ?? 0.0;
+        }
+        foreach ($need as $pid => $qty) {
+            $this->locate($pid, $warehouseId, -$qty);
+            $this->log($pid, $warehouseId, 'out', $qty, $costs[$pid], $reference, $note, 0);
+        }
+        return ['ok' => true, 'msg' => '', 'costs' => $costs];
+    }
+
+    /**
      * Take a sale back: reverse its cost journal and return the stock at the cost it left at. Fails, changing
      * nothing, if the journal cannot be reversed (for example the period is closed).
      *
@@ -577,6 +618,24 @@ class InventoryAccountingService
             $cur['qty'] = round($cur['qty'] + $q, 4);
             $cur['cost'] = $cur['qty'] > 0 ? round($value[$pid] / $cur['qty'], 4) : 0.0;
             $out['sold'][$pid] = $cur;
+        }
+        // Goods invoiced from delivery notes were issued by the delivery, at the delivery's cost.
+        $dn = @$this->conn->prepare("SELECT x.product_id, SUM(x.qty) q, SUM(x.qty * x.unit_cost) v, p.name
+            FROM delivery_note_items x INNER JOIN delivery_notes n ON n.id = x.delivery_note_id AND n.tenant_id = ? AND n.status = 'delivered'
+            LEFT JOIN product_list p ON p.id = x.product_id
+            WHERE x.invoice_id = ? AND x.product_id IS NOT NULL AND x.unit_cost IS NOT NULL GROUP BY x.product_id, p.name");
+        if ($dn) {
+            $dn->bind_param('ii', $t, $invoiceId);
+            $dn->execute();
+            foreach ($dn->get_result()->fetch_all(MYSQLI_ASSOC) as $r) {
+                $pid = (int)$r['product_id'];
+                $q = round((float)$r['q'], 4);
+                $cur = $out['sold'][$pid] ?? ['qty' => 0.0, 'cost' => 0.0, 'name' => (string)($r['name'] ?? '')];
+                $total = $cur['qty'] * $cur['cost'] + (float)$r['v'];
+                $cur['qty'] = round($cur['qty'] + $q, 4);
+                $cur['cost'] = $cur['qty'] > 0 ? round($total / $cur['qty'], 4) : 0.0;
+                $out['sold'][$pid] = $cur;
+            }
         }
         $ret = $this->conn->prepare("SELECT l.product_id, SUM(l.return_qty) q
             FROM credit_note_lines l INNER JOIN credit_notes n ON n.id = l.note_id

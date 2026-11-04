@@ -1141,6 +1141,25 @@ class Master extends DBConnection
     {
         return $this->container->make(\App\Services\QuotationService::class)->extend((int)($_POST['id'] ?? 0), (string)($_POST['valid_until'] ?? ''));
     }
+    public function confirm_for_delivery()
+    {
+        return $this->container->make(\App\Services\DeliveryService::class)->confirmForDelivery((int)($_POST['id'] ?? 0));
+    }
+
+    public function save_delivery_note()
+    {
+        return $this->container->make(\App\Services\DeliveryService::class)->createDelivery($_POST);
+    }
+
+    public function cancel_delivery_note()
+    {
+        return $this->container->make(\App\Services\DeliveryService::class)->cancelDelivery((int)($_POST['id'] ?? 0));
+    }
+
+    public function invoice_delivered()
+    {
+        return $this->container->make(\App\Services\DeliveryService::class)->invoiceDelivered((int)($_POST['id'] ?? 0));
+    }
 
     public function save_default_accounts()
     {
@@ -1320,6 +1339,9 @@ class Master extends DBConnection
         $tenant_id = $this->settings->active_tenant_id();
         $user_id = $this->settings->userdata('id');
         $id = !empty($id) ? $this->conn->real_escape_string((string)$id) : '';
+        if ($id !== '' && $this->container->make(\App\Services\DeliveryService::class)->hasDeliveries((int)$id)) {
+            return json_encode(['status' => 'failed', 'msg' => 'Deliveries have been recorded against this order, so it can no longer be edited. Cancel the deliveries first.']);
+        }
 
         $order_no = !empty($order_no) ? $this->conn->real_escape_string((string)$order_no) : 'SO-' . date('Ym') . '-' . rand(1000, 9999);
         $party_id = $this->conn->real_escape_string((string)($party_id ?? 0));
@@ -1457,6 +1479,10 @@ class Master extends DBConnection
         if ($order['stock_adjusted'] != 0) {
             return true; // already confirmed
         }
+        if (!empty($order['delivery_mode'])) {
+            $this->confirm_error = 'This order is fulfilled by delivery notes. Record each delivery, then invoice what was delivered.';
+            return false;
+        }
 
         // A superseded, declined, cancelled or expired quote cannot be confirmed.
         if ($problem = \App\Services\QuotationService::acceptProblem($order, date('Y-m-d'))) {
@@ -1585,6 +1611,9 @@ class Master extends DBConnection
         $tenant_id = $this->settings->active_tenant_id();
 
         $order = $this->conn->query("SELECT * FROM `sales_order_list` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'")->fetch_assoc();
+        if ($order && $this->container->make(\App\Services\DeliveryService::class)->hasDeliveries((int)$id)) {
+            return json_encode(['status' => 'failed', 'msg' => 'Deliveries have been recorded against this order. Cancel the deliveries (and any invoice raised from them) before deleting it.']);
+        }
         if ($order && !empty($order['invoice_id'])) {
             // The invoice's cost of sales and stock are tied to it: cancel or delete the invoice instead.
             $iss = $this->conn->query("SELECT 1 FROM `invoice_items` WHERE invoice_id = '" . (int)$order['invoice_id'] . "' AND unit_cost IS NOT NULL LIMIT 1");
@@ -2177,6 +2206,18 @@ switch ($action) {
         break;
     case 'extend_quote':
         echo $Master->extend_quote();
+        break;
+    case 'confirm_for_delivery':
+        echo $Master->confirm_for_delivery();
+        break;
+    case 'save_delivery_note':
+        echo $Master->save_delivery_note();
+        break;
+    case 'cancel_delivery_note':
+        echo $Master->cancel_delivery_note();
+        break;
+    case 'invoice_delivered':
+        echo $Master->invoice_delivered();
         break;
     case 'save_default_accounts':
         echo $Master->save_default_accounts();

@@ -92,6 +92,12 @@
 				                    <?php if($isQuote && in_array($row['status'], ['proforma','draft','declined'], true)): ?>
 				                    <a class="dropdown-item revise_quote" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>"><span class="fa fa-code-branch text-primary"></span> Revise (new version)</a>
 				                    <?php endif; ?>
+				                    <?php if(in_array($row['status'], ['proforma','draft'], true) || ($row['status'] == 'confirmed' && empty($row['delivery_mode']) && empty($row['invoice_id']))): ?>
+				                    <a class="dropdown-item confirm_delivery" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>"><span class="fa fa-truck text-info"></span> Confirm for delivery (partial deliveries)</a>
+				                    <?php elseif($row['status'] == 'confirmed' && !empty($row['delivery_mode'])): ?>
+				                    <a class="dropdown-item" href="./?page=delivery_notes/new&order_id=<?php echo $row['id'] ?>"><span class="fa fa-truck text-info"></span> Record delivery</a>
+				                    <a class="dropdown-item" href="./?page=delivery_notes"><span class="fa fa-file-invoice text-success"></span> Deliveries &amp; invoicing</a>
+				                    <?php endif; ?>
 				                    <div class="dropdown-divider"></div>
 				                    <a class="dropdown-item delete_data" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>"><span class="fa fa-trash text-danger"></span> Delete</a>
 				                  </div>
@@ -126,6 +132,16 @@
 		$('.extend_quote').click(function(){
 			var id = $(this).data('id'), d = window.prompt('New valid-until date (YYYY-MM-DD):');
 			if(d){ quoteAction('extend_quote', {id: id, valid_until: d}); }
+		});
+		$('.confirm_delivery').click(function(){
+			var id = $(this).data('id');
+			if(window.confirm('Fulfil this order by delivery notes? No stock moves and no invoice is raised until you record deliveries.')){
+				start_loader();
+				$.post(_base_url_ + 'classes/Master.php?f=confirm_for_delivery', {id: id}, function(r){
+					if(r && r.status === 'success'){ location.reload(); }
+					else { alert_toast((r && r.msg) || 'An error occurred.', 'error'); end_loader(); }
+				}, 'json').fail(function(){ alert_toast('An error occurred.', 'error'); end_loader(); });
+			}
 		});
 		$('.confirm_order').click(function(){
 			_conf("Confirm this sale? Stock quantity will be automatically deducted and a Sales Invoice will be raised.","confirm_sales_order",[$(this).attr('data-id')])
