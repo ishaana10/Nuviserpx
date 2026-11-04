@@ -152,11 +152,15 @@ while($ac = $accounts_qry->fetch_assoc()){
                         $parties = $conn->query("SELECT * FROM `party_list` WHERE tenant_id = '{$tenant_id}' AND delete_flag = 0 ORDER BY name ASC");
                         while($p = $parties->fetch_assoc()):
                         ?>
-                        <option value="<?php echo $p['id'] ?>" <?php echo isset($party_id) && $party_id == $p['id'] ? 'selected' : '' ?>>
+                        <option value="<?php echo $p['id'] ?>" data-limit="<?php echo isset($p['credit_limit']) ? htmlspecialchars((string)$p['credit_limit']) : '' ?>" data-terms="<?php echo isset($p['payment_terms_days']) ? (int)$p['payment_terms_days'] : '' ?>" <?php echo isset($party_id) && $party_id == $p['id'] ? 'selected' : '' ?>>
                             <?php echo htmlspecialchars($p['name']) . ($p['party_code'] ? ' ('.$p['party_code'].')' : '') ?>
                         </option>
                         <?php endwhile; ?>
                     </select>
+                    <small class="text-muted d-block" id="credit_hint"></small>
+                    <?php if ($_settings->can_access('settings_manage')): ?>
+                    <label class="text-sm mt-1 mb-0 d-none" id="credit_override_box"><input type="checkbox" name="credit_override" value="1"> Allow over credit limit</label>
+                    <?php endif; ?>
                 </div>
 
                 <!-- Issue Date -->
@@ -628,6 +632,25 @@ while($ac = $accounts_qry->fetch_assoc()){
                 calculate_invoice_totals();
             }
         });
+
+        // Customer terms: due date follows the customer's payment terms (until the user sets one), and the credit limit is shown.
+        function apply_customer_terms(fromCustomer){
+            var opt = $('#party_id option:selected'), terms = opt.data('terms'), limit = opt.data('limit');
+            $('#credit_hint').text(limit !== undefined && limit !== '' ? 'Credit limit: ' + parseFloat(limit).toFixed(2) : '');
+            $('#credit_override_box').toggleClass('d-none', limit === undefined || limit === '');
+            if(terms !== undefined && terms !== '' && $('#invoice_date').val() && (fromCustomer || !$('#due_date').data('manual'))){
+                if(!$('#due_date').data('manual')){
+                    var d = new Date($('#invoice_date').val() + 'T00:00:00');
+                    d.setDate(d.getDate() + parseInt(terms, 10));
+                    $('#due_date').val(d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2));
+                }
+            }
+        }
+        $('#due_date').on('input', function(){ $(this).data('manual', true); });
+        $('#party_id').on('change', function(){ apply_customer_terms(true); });
+        $('#invoice_date').on('change', function(){ apply_customer_terms(false); });
+        $('#credit_hint').text($('#party_id option:selected').data('limit') ? 'Credit limit: ' + parseFloat($('#party_id option:selected').data('limit')).toFixed(2) : '');
+        $('#credit_override_box').toggleClass('d-none', !$('#party_id option:selected').data('limit'));
 
         // Customer price lists: fill each product line with the price the customer's list gives for that quantity.
         // A price the user has typed is left alone; a line the list no longer prices goes back to the normal price.

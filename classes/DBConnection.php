@@ -92,6 +92,7 @@ class DBConnection{
                 $this->check_sales_account_migrations();
                 $this->check_sales_return_migrations();
                 $this->check_pricing_migrations();
+                $this->check_credit_control_migrations();
             }
 
             // Run versioned migrations
@@ -1310,6 +1311,22 @@ class DBConnection{
             $dups = @$this->conn->query("SELECT 1 FROM `{$table}` GROUP BY tenant_id, `{$def[1]}` HAVING COUNT(*) > 1 LIMIT 1");
             if ($dups && $dups->num_rows == 0) {
                 @$this->conn->query("ALTER TABLE `{$table}` ADD UNIQUE KEY `{$def[0]}` (`tenant_id`, `{$def[1]}`)");
+            }
+        }
+    }
+
+    public function check_credit_control_migrations(){
+        if (!$this->conn) return;
+        // Customer credit limit and default payment terms (see CreditControlService).
+        if (!$this->table_exists('party_list')) return;
+        $cols = array(
+            'credit_limit'       => "ALTER TABLE `party_list` ADD COLUMN `credit_limit` decimal(18,2) DEFAULT NULL",
+            'payment_terms_days' => "ALTER TABLE `party_list` ADD COLUMN `payment_terms_days` int(11) DEFAULT NULL",
+        );
+        foreach ($cols as $col => $sql) {
+            $res = @$this->conn->query("SHOW COLUMNS FROM `party_list` LIKE '{$col}'");
+            if ($res && $res->num_rows == 0) {
+                @$this->conn->query($sql);
             }
         }
     }

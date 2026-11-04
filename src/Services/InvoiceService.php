@@ -114,6 +114,15 @@ class InvoiceService
             $discount = FxService::toBase($discount, $docRate);
             $total = FxService::toBase($total, $docRate);
         }
+        // Credit limit: an invoice that would take the customer over their limit needs a manager's say-so.
+        if ($status !== 'draft' && $status !== InvoiceStatus::CANCELLED->value && $total > 0) {
+            $over = (new CreditControlService($this->conn, $this->settings))->check(
+                (int)$party_id, (string)($party['name'] ?? 'The customer'), (float)$total, (int)$id, !empty($post['credit_override'])
+            );
+            if ($over !== null) {
+                return json_encode(['status' => 'failed', 'msg' => $over]);
+            }
+        }
         $fxSql = $isForeign
             ? "`currency` = '" . $this->conn->real_escape_string($docCurrency) . "', `fx_rate` = '" . number_format($docRate, 8, '.', '') . "', `total_fc` = '" . number_format((float)$total_fc, 4, '.', '') . "',"
             : "`currency` = NULL, `fx_rate` = NULL, `total_fc` = NULL,";
