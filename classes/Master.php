@@ -1384,6 +1384,19 @@ class Master extends DBConnection
         // The invoice is raised through InvoiceService, exactly as if it had been typed in: VAT is split out to the
         // output account, the period lock and numbering apply, integrations fire, and (with inventory accounting
         // on) it issues the stock and books the cost of sales. It goes first so a refusal leaves nothing half done.
+        // Units can never go below zero, with or without inventory accounting (which checks again when it issues).
+        $need = [];
+        $needRows = $this->conn->query("SELECT product_id, qty FROM `sales_order_items` WHERE sales_order_id = '{$sales_order_id}'");
+        while ($needRows && ($nr = $needRows->fetch_assoc())) {
+            $need[] = $nr;
+        }
+        $shortage = $this->container->make(\App\Services\InventoryAccountingService::class)
+            ->shortageMessage(\App\Services\InventoryAccountingService::aggregate($need));
+        if ($shortage !== null) {
+            $this->confirm_error = $shortage;
+            return false;
+        }
+
         $invoice_id = (int)($order['invoice_id'] ?? 0);
         $hadInvoice = $invoice_id !== 0;
         if (!$hadInvoice) {
@@ -1428,7 +1441,10 @@ class Master extends DBConnection
 
                 $prod = $this->conn->query("SELECT cost_price FROM `product_list` WHERE id = '{$pid}' AND tenant_id = '{$tenant_id}'")->fetch_assoc();
                 $cost = isset($prod['cost_price']) ? (float)$prod['cost_price'] : 0.0;
-                $this->conn->query("UPDATE `product_list` SET `stock_quantity` = `stock_quantity` - {$qty} WHERE id = '{$pid}' AND tenant_id = '{$tenant_id}'");
+                $this->conn->query("UPDATE `product_list` SET `stock_quantity` = `stock_quantity` - {$qty} WHERE id = '{$pid}' AND tenant_id = '{$tenant_id}' AND `stock_quantity` >= {$qty}");
+                if ($this->conn->affected_rows !== 1) {
+                    continue; // someone else took the stock since the check above; never go below zero
+                }
 
                 // Draw the sold quantity down from the order's warehouse location.
                 // syncTotal = false because the product total was just decremented above.

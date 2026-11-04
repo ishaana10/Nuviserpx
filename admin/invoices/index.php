@@ -91,7 +91,7 @@
 <script>
 	$(document).ready(function(){
 		$('.delete_data').click(function(){
-			_conf("Are you sure to delete this invoice permanently? Associated journal entry will also be removed.","delete_invoice",[$(this).attr('data-id')])
+			_conf("Delete this invoice? Only draft and cancelled invoices can be deleted; cancel a posted invoice first (this reverses it in the ledger and returns its stock).","delete_invoice",[$(this).attr('data-id')])
 		})
 		$('.send_email').click(function(){
 			var id = $(this).attr('data-id');

@@ -48,7 +48,17 @@ class InvoiceService
         $docRate = null;
         $total_fc = null;
         if (!empty($id)) {
-            $cur = $this->conn->query("SELECT currency, fx_rate, total_fc, paid_amount, credited_amount FROM `invoice_list` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'")->fetch_assoc() ?: [];
+            $cur = $this->conn->query("SELECT currency, fx_rate, total_fc, paid_amount, credited_amount, status, invoice_no, journal_id, invoice_date FROM `invoice_list` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'")->fetch_assoc() ?: [];
+            if (!$cur) {
+                return json_encode(['status' => 'failed', 'msg' => 'Invoice not found.']);
+            }
+            if ($problem = self::editProblem((string)$cur['status'])) {
+                return json_encode(['status' => 'failed', 'msg' => $problem]);
+            }
+            // Cancelling is its own action: it reverses the invoice in the ledger and returns its stock.
+            if ($status === InvoiceStatus::CANCELLED->value) {
+                return $this->cancelInvoice((int)$id, (int)$tenant_id, $cur);
+            }
             $wasForeign = !empty($cur['currency']);
             $hasSettlement = (float)($cur['paid_amount'] ?? 0) + (float)($cur['credited_amount'] ?? 0) > 0;
             if ($hasSettlement && ($wasForeign !== $isForeign || ($wasForeign && $docCurrency !== strtoupper((string)$cur['currency'])))) {
@@ -287,6 +297,78 @@ class InvoiceService
         return json_encode($resp);
     }
 
+    /** Why a cancelled invoice cannot be edited, or null. */
+    public static function editProblem(string $status): ?string
+    {
+        return $status === InvoiceStatus::CANCELLED->value ? 'A cancelled invoice cannot be changed. Raise a new invoice instead.' : null;
+    }
+
+    /** Why an invoice cannot be cancelled, or null. Money settled against it must be undone first. */
+    public static function cancelProblem(float $paid, float $credited): ?string
+    {
+        return ($paid + $credited) > 0.004
+            ? 'This invoice has receipts or credit notes against it. Reverse or delete those first, then cancel it.'
+            : null;
+    }
+
+    /**
+     * Why an invoice cannot be deleted, or null. A posted invoice is cancelled (which reverses it and leaves the
+     * trail), never deleted; only drafts and already-cancelled invoices can be removed.
+     */
+    public static function deleteProblem(string $status, float $paid, float $credited): ?string
+    {
+        if (($paid + $credited) > 0.004) {
+            return 'This invoice has receipts or credit notes against it, so it cannot be deleted.';
+        }
+        if (!in_array($status, ['draft', InvoiceStatus::CANCELLED->value], true)) {
+            return 'A posted invoice cannot be deleted. Cancel it first (which reverses it in the ledger and returns its stock), then delete the cancelled invoice if you need to.';
+        }
+        return null;
+    }
+
+    /**
+     * Cancel an invoice: reverse its journal, take back its stock and cost of sales, and mark it cancelled with
+     * nothing owing. Nothing is erased, so the ledger shows the invoice and its reversal.
+     */
+    private function cancelInvoice(int $id, int $tenantId, array $cur): string
+    {
+        if ($cur['status'] === InvoiceStatus::CANCELLED->value) {
+            return json_encode(['status' => 'success', 'id' => $id, 'msg' => ' Invoice is already cancelled.']);
+        }
+        if ($problem = self::cancelProblem((float)$cur['paid_amount'], (float)$cur['credited_amount'])) {
+            return json_encode(['status' => 'failed', 'msg' => $problem]);
+        }
+        $date = date('Y-m-d');
+        if ($lockMsg = \App\Services\PeriodLockService::guard($this->conn, $tenantId, $date)) {
+            return json_encode(['status' => 'failed', 'msg' => $lockMsg]);
+        }
+        if (!empty($cur['journal_id'])) {
+            $jdate = (string)($this->conn->query("SELECT journal_date FROM journal_entries WHERE id = '" . (int)$cur['journal_id'] . "'")->fetch_assoc()['journal_date'] ?? '');
+            $res = json_decode((new JournalService($this->conn, $this->settings))->reverseJournal((int)$cur['journal_id'], $jdate !== '' && $date < $jdate ? $jdate : $date, true), true);
+            if (($res['status'] ?? '') !== 'success') {
+                return json_encode(['status' => 'failed', 'msg' => 'The invoice could not be reversed: ' . ($res['msg'] ?? 'unknown error')]);
+            }
+        }
+        $warning = '';
+        $held = $this->issuedStock($id, $tenantId);
+        if ($held['items'] || $held['journal']) {
+            $back = (new InventoryAccountingService($this->conn, $this->settings))->restore($held['items'], $held['journal'], $date, (string)$cur['invoice_no'], $held['warehouse']);
+            if ($back['ok']) {
+                // Stock is back: forget the issue so it can never be returned twice.
+                $this->conn->query("UPDATE `invoice_items` SET `unit_cost` = NULL WHERE invoice_id = '{$id}'");
+                $this->conn->query("UPDATE `invoice_list` SET `cogs_journal_id` = NULL WHERE id = '{$id}' AND tenant_id = '{$tenantId}'");
+            } else {
+                $warning = ' The invoice was reversed but its stock could not be returned: ' . $back['msg'];
+            }
+        }
+        $this->conn->query("UPDATE `invoice_list` SET `status` = 'cancelled', `balance` = 0 WHERE id = '{$id}' AND tenant_id = '{$tenantId}'");
+        $this->settings->log_audit('Cancelled invoice', 'Invoices', (string)$cur['invoice_no']);
+        $this->emit(\App\Support\IntegrationEvents::INVOICE_CANCELLED, ['invoice_id' => $id, 'invoice_no' => $cur['invoice_no'], 'total' => 0], $tenantId);
+        $msg = ' Invoice cancelled and reversed.' . $warning;
+        $this->settings->set_flashdata('success', $msg);
+        return json_encode(['status' => 'success', 'id' => $id, 'msg' => $msg]);
+    }
+
     /**
      * The invoice's lines as [product_id, qty] by position, keeping only products that belong to this company.
      *
@@ -359,25 +441,31 @@ class InvoiceService
     public function deleteInvoice(int $id): string
     {
         $tenant_id = $this->settings->active_tenant_id();
-        if ($lockMsg = \App\Services\PeriodLockService::guardDocument($this->conn, (int)$tenant_id, null, 'invoice_list', $id)) {
-            return json_encode(['status' => 'failed', 'msg' => $lockMsg]);
-        }
-
-        $inv = $this->conn->query("SELECT invoice_no, journal_id FROM `invoice_list` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'")->fetch_assoc();
+        $inv = $this->conn->query("SELECT invoice_no, journal_id, status, paid_amount, credited_amount FROM `invoice_list` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'")->fetch_assoc();
         if (!$inv) {
             return json_encode(['status' => 'failed', 'msg' => 'Invoice not found.']);
         }
-        // Take back any stock the invoice issued (and its cost of sales) before the invoice disappears.
-        $held = $this->issuedStock($id, (int)$tenant_id);
-        if ($held['items'] || $held['journal']) {
-            $back = (new InventoryAccountingService($this->conn, $this->settings))->restore($held['items'], $held['journal'], date('Y-m-d'), (string)$inv['invoice_no'], $held['warehouse']);
-            if (!$back['ok']) {
-                return json_encode(['status' => 'failed', 'msg' => 'This invoice issued stock that could not be taken back: ' . $back['msg']]);
+        if ($problem = self::deleteProblem((string)$inv['status'], (float)$inv['paid_amount'], (float)$inv['credited_amount'])) {
+            return json_encode(['status' => 'failed', 'msg' => $problem]);
+        }
+        $isDraft = $inv['status'] === 'draft';
+        if ($isDraft) {
+            // A draft never counted, but it still has a journal row and possibly stock: tidy both.
+            if ($lockMsg = \App\Services\PeriodLockService::guardDocument($this->conn, (int)$tenant_id, null, 'invoice_list', $id)) {
+                return json_encode(['status' => 'failed', 'msg' => $lockMsg]);
+            }
+            $held = $this->issuedStock($id, (int)$tenant_id);
+            if ($held['items'] || $held['journal']) {
+                $back = (new InventoryAccountingService($this->conn, $this->settings))->restore($held['items'], $held['journal'], date('Y-m-d'), (string)$inv['invoice_no'], $held['warehouse']);
+                if (!$back['ok']) {
+                    return json_encode(['status' => 'failed', 'msg' => 'This invoice issued stock that could not be taken back: ' . $back['msg']]);
+                }
+            }
+            if (!empty($inv['journal_id'])) {
+                $this->conn->query("DELETE FROM `journal_entries` WHERE id = '{$inv['journal_id']}' AND tenant_id = '{$tenant_id}'");
             }
         }
-        if (!empty($inv['journal_id'])) {
-            $this->conn->query("DELETE FROM `journal_entries` WHERE id = '{$inv['journal_id']}'");
-        }
+        // A cancelled invoice's journal was reversed when it was cancelled; both stay in the ledger as the record.
 
         $del = $this->conn->query("DELETE FROM `invoice_list` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'");
         if ($del) {
