@@ -89,6 +89,7 @@ class DBConnection{
                 $this->check_2026_statutory_migrations();
                 $this->check_integrity_hardening_migrations();
                 $this->check_inventory_accounting_migrations();
+                $this->check_sales_account_migrations();
             }
 
             // Run versioned migrations
@@ -1284,6 +1285,29 @@ class DBConnection{
             $res = @$this->conn->query("SHOW COLUMNS FROM `payroll_remittances` LIKE '{$c}'");
             if ($res && $res->num_rows == 0) {
                 @$this->conn->query($sql);
+            }
+        }
+    }
+
+    public function check_sales_account_migrations(){
+        if (!$this->conn) return;
+        // The accounts invoices, receipts and credit notes post to (see AccountDefaultsService).
+        @$this->conn->query("CREATE TABLE IF NOT EXISTS `account_defaults` (
+          `tenant_id` int(30) NOT NULL,
+          `role` varchar(30) NOT NULL,
+          `account_id` int(30) NOT NULL,
+          `date_updated` datetime DEFAULT NULL ON UPDATE current_timestamp(),
+          PRIMARY KEY (`tenant_id`,`role`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        $this->add_tenant_fk('account_defaults');
+
+        // Document numbers must not repeat within a company. Added only where the existing data already satisfies it,
+        // so a company that has duplicates keeps working (the app refuses new duplicates either way).
+        foreach (array('invoice_list' => array('uniq_invoice_no', 'invoice_no'), 'payment_list' => array('uniq_payment_no', 'payment_no')) as $table => $def) {
+            if (!$this->table_exists($table) || $this->index_exists($table, $def[0])) continue;
+            $dups = @$this->conn->query("SELECT 1 FROM `{$table}` GROUP BY tenant_id, `{$def[1]}` HAVING COUNT(*) > 1 LIMIT 1");
+            if ($dups && $dups->num_rows == 0) {
+                @$this->conn->query("ALTER TABLE `{$table}` ADD UNIQUE KEY `{$def[0]}` (`tenant_id`, `{$def[1]}`)");
             }
         }
     }

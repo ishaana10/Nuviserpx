@@ -23,7 +23,7 @@ class PaymentService
         $user_id = $this->settings->userdata('id');
         $id = !empty($id) ? $this->conn->real_escape_string((string)$id) : '';
 
-        $payment_no = !empty($payment_no) ? $this->conn->real_escape_string((string)$payment_no) : 'REC-' . date('Ym') . '-' . rand(1000, 9999);
+        $payment_no = '';
         $type = !empty($type) ? $this->conn->real_escape_string((string)$type) : 'receipt';
         $party_id = isset($party_id) ? $this->conn->real_escape_string((string)$party_id) : '0';
         $bank_account_id = !empty($bank_account_id) ? (int)$bank_account_id : null;
@@ -60,180 +60,251 @@ class PaymentService
             }
         }
 
-        // Accounts for Journal Entry (Cash/Bank Dr, Accounts Receivable Cr)
-        $cash_acc = $this->conn->query("SELECT id FROM `account_list` WHERE `name` LIKE '%cash%' AND tenant_id = '{$tenant_id}' AND delete_flag = 0 LIMIT 1");
-        $cash_acc_id = !empty($bank_account_id) ? $bank_account_id : (($cash_acc && $cash_acc->num_rows > 0) ? $cash_acc->fetch_assoc()['id'] : 1);
+        // A receipt is money in from a customer; supplier payments are made from Bill Payments.
+        if ($type !== 'receipt') {
+            return json_encode(['status' => 'failed', 'msg' => 'Only customer receipts can be recorded here. Pay suppliers from Bill Payments.']);
+        }
+        if ($amount <= 0) {
+            return json_encode(['status' => 'failed', 'msg' => 'Enter the amount received.']);
+        }
+        $payId = (int)$id;
+        if ($problem = $this->existingReceiptProblem($payId, (int)$tenant_id)) {
+            return json_encode(['status' => 'failed', 'msg' => $problem]);
+        }
+        [$payment_no, $noProblem] = $this->receiptNumber((string)($post['payment_no'] ?? ''), $payId, (int)$tenant_id);
+        if ($noProblem) {
+            return json_encode(['status' => 'failed', 'msg' => $noProblem]);
+        }
 
-        $ar_acc = $this->conn->query("SELECT id FROM `account_list` WHERE (`name` LIKE '%receivable%' OR `name` LIKE '%asset%') AND tenant_id = '{$tenant_id}' AND delete_flag = 0 LIMIT 1");
-        $ar_acc_id = ($ar_acc && $ar_acc->num_rows > 0) ? $ar_acc->fetch_assoc()['id'] : 1;
+        // Accounts: the company's chosen defaults; a receipt is never posted to a guessed account.
+        $defaults = new AccountDefaultsService($this->conn, $this->settings);
+        $ar_acc_id = $defaults->resolve('receivable');
+        if ($ar_acc_id <= 0) {
+            return json_encode(['status' => 'failed', 'msg' => AccountDefaultsService::missing('receivable')]);
+        }
+        if ($bank_account_id) {
+            $bk = $this->conn->query("SELECT 1 FROM `account_list` WHERE id = '" . (int)$bank_account_id . "' AND tenant_id = '{$tenant_id}' AND delete_flag = 0 LIMIT 1");
+            if (!$bk || $bk->num_rows === 0) {
+                return json_encode(['status' => 'failed', 'msg' => 'Choose a bank or cash account from this company.']);
+            }
+        }
+        $cash_acc_id = $bank_account_id ?: $defaults->resolve('cash');
+        if ($cash_acc_id <= 0) {
+            return json_encode(['status' => 'failed', 'msg' => AccountDefaultsService::missing('cash')]);
+        }
 
-        // Create/Update Journal
-        $journal_code = \App\Services\SequenceService::journalCode($this->conn, (int)$tenant_id);
+        // Allocations: only this customer's open invoices, never more than each has left or than was received.
+        $alloc = [];
+        foreach ((array)($post['invoice_alloc'] ?? []) as $invId => $amt) {
+            $amt = round((float)$amt, 2);
+            if ($amt > 0) {
+                $alloc[(int)$invId] = $amt;
+            }
+        }
+        if ($problems = self::allocationProblems($amount, $alloc, $this->allocationRoom(array_keys($alloc), $payId, (int)$tenant_id), (int)$party_id)) {
+            return json_encode(['status' => 'failed', 'msg' => implode(' ', $problems)]);
+        }
+
         $journal_date = $payment_date;
-        if ($lockMsg = \App\Services\PeriodLockService::guardDocument($this->conn, (int)$tenant_id, $journal_date, 'payment_list', (int)$id)) {
+        if ($lockMsg = \App\Services\PeriodLockService::guardDocument($this->conn, (int)$tenant_id, $journal_date, 'payment_list', $payId)) {
             return json_encode(['status' => 'failed', 'msg' => $lockMsg]);
         }
         $partyName = $party['name'] ?? '';
-        $description = $this->conn->real_escape_string("Payment Receipt {$payment_no} from {$partyName} - Amount: \${$amount}");
+        $description = $this->conn->real_escape_string("Payment Receipt {$payment_no} from {$partyName} - Amount: " . number_format($amount, 2));
+        // A receipt: Dr cash/bank, Cr receivable.
+        $lines = [[(int)$cash_acc_id, TaxService::DEBIT, round($amount, 2)], [(int)$ar_acc_id, TaxService::CREDIT, round($amount, 2)]];
+        $tax = new TaxService($this->conn, $this->settings);
 
-        if (empty($id)) {
-            $j_sql = "INSERT INTO `journal_entries` (`tenant_id`, `code`, `journal_date`, `description`, `user_id`) VALUES ('{$tenant_id}', '{$journal_code}', '{$journal_date}', '{$description}', '{$user_id}')";
-            $this->conn->query($j_sql);
-            $journal_id = $this->conn->insert_id;
-
-            $j_items = "INSERT INTO `journal_items` (`journal_id`, `account_id`, `group_id`, `amount`) VALUES
-				('{$journal_id}', '{$cash_acc_id}', '1', '{$amount}'),
-				('{$journal_id}', '{$ar_acc_id}', '2', '{$amount}')";
-            $this->conn->query($j_items);
-
-            $bank_account_sql = $bank_account_id ? "'{$bank_account_id}'" : "NULL";
-
-            $sql = "INSERT INTO `payment_list` SET
-				`tenant_id` = '{$tenant_id}',
-				`payment_no` = '{$payment_no}',
-				`type` = '{$type}',
-				`party_id` = '{$party_id}',
-				`bank_account_id` = {$bank_account_sql},
-				`payment_date` = '{$payment_date}',
-				`amount` = '{$amount}',
-				`method` = '{$method}',
-				`reference` = '{$reference}',
-				`notes` = '{$notes}',
-				`status` = '{$status}',
-				`currency` = '{$currency}',
-				`journal_id` = '{$journal_id}',
-				`created_by` = '{$user_id}'";
-            $save = $this->conn->query($sql);
-            $payment_id = $this->conn->insert_id;
-        } else {
-            $existing = $this->conn->query("SELECT journal_id FROM `payment_list` WHERE id = '{$id}'")->fetch_assoc();
-            $journal_id = isset($existing['journal_id']) ? $existing['journal_id'] : null;
-            if ($journal_id) {
+        // Journal, receipt and allocations are one unit: all saved or none.
+        $affected = [];
+        $this->conn->begin_transaction();
+        try {
+            $journal_id = 0;
+            $trail = null;
+            $trailBefore = null;
+            if ($payId > 0) {
+                $journal_id = (int)($this->conn->query("SELECT journal_id FROM `payment_list` WHERE id = '{$payId}' AND tenant_id = '{$tenant_id}'")->fetch_assoc()['journal_id'] ?? 0);
+            }
+            if ($journal_id > 0) {
                 $trail = new JournalTrail($this->conn, $this->settings);
-                $trailBefore = $trail->snapshot((int)$journal_id);
-                $this->conn->query("UPDATE `journal_entries` SET `description` = '{$description}', `journal_date` = '{$journal_date}' WHERE id = '{$journal_id}'");
+                $trailBefore = $trail->snapshot($journal_id);
+                $this->conn->query("UPDATE `journal_entries` SET `description` = '{$description}', `journal_date` = '{$journal_date}' WHERE id = '{$journal_id}' AND tenant_id = '{$tenant_id}'");
                 $this->conn->query("DELETE FROM `journal_items` WHERE journal_id = '{$journal_id}'");
-                $j_items = "INSERT INTO `journal_items` (`journal_id`, `account_id`, `group_id`, `amount`) VALUES
-					('{$journal_id}', '{$cash_acc_id}', '1', '{$amount}'),
-					('{$journal_id}', '{$ar_acc_id}', '2', '{$amount}')";
-                $this->conn->query($j_items);
-                $trail->record((int)$journal_id, 'payment_list', (int)$id, "Receipt {$payment_no}", $trailBefore);
+            } else {
+                $journal_code = \App\Services\SequenceService::journalCode($this->conn, (int)$tenant_id);
+                $this->conn->query("INSERT INTO `journal_entries` (`tenant_id`, `code`, `journal_date`, `description`, `user_id`) VALUES ('{$tenant_id}', '{$journal_code}', '{$journal_date}', '{$description}', '{$user_id}')");
+                $journal_id = (int)$this->conn->insert_id;
+            }
+            if ($journal_id <= 0 || !$tax->writeLines($journal_id, $lines)) {
+                throw new \RuntimeException('The receipt journal could not be posted.');
+            }
+            if ($trail !== null) {
+                $trail->record($journal_id, 'payment_list', $payId, "Receipt {$payment_no}", $trailBefore);
             }
 
-            $bank_account_sql = $bank_account_id ? "'{$bank_account_id}'" : "NULL";
-
-            $sql = "UPDATE `payment_list` SET
-				`payment_no` = '{$payment_no}',
-				`type` = '{$type}',
-				`party_id` = '{$party_id}',
-				`bank_account_id` = {$bank_account_sql},
-				`payment_date` = '{$payment_date}',
-				`amount` = '{$amount}',
-				`method` = '{$method}',
-				`reference` = '{$reference}',
-				`notes` = '{$notes}',
-				`status` = '{$status}',
-				`currency` = '{$currency}',
-				`amount_fc` = NULL,
-				`fx_rate` = NULL
-				WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'";
-            $save = $this->conn->query($sql);
-            $payment_id = $id;
+            $bank_account_sql = $bank_account_id ? "'" . (int)$bank_account_id . "'" : 'NULL';
+            $set = "`payment_no` = '{$payment_no}', `type` = 'receipt', `party_id` = '" . (int)$party_id . "', `bank_account_id` = {$bank_account_sql},
+                `payment_date` = '{$payment_date}', `amount` = '{$amount}', `method` = '{$method}', `reference` = '{$reference}', `notes` = '{$notes}',
+                `status` = 'posted', `currency` = '{$currency}', `amount_fc` = NULL, `fx_rate` = NULL, `journal_id` = '{$journal_id}'";
+            if ($payId > 0) {
+                $ok = $this->conn->query("UPDATE `payment_list` SET {$set} WHERE id = '{$payId}' AND tenant_id = '{$tenant_id}'");
+                $old = $this->conn->query("SELECT invoice_id FROM `payment_allocations` WHERE payment_id = '{$payId}'");
+                while ($old && ($oa = $old->fetch_assoc())) {
+                    $affected[] = (int)$oa['invoice_id'];
+                }
+                $this->conn->query("DELETE FROM `payment_allocations` WHERE payment_id = '{$payId}'");
+            } else {
+                $ok = $this->conn->query("INSERT INTO `payment_list` SET `tenant_id` = '{$tenant_id}', {$set}, `created_by` = '{$user_id}'");
+                $payId = (int)$this->conn->insert_id;
+            }
+            if (!$ok || $payId <= 0) {
+                throw new \RuntimeException($this->conn->error ?: 'The receipt could not be saved.');
+            }
+            foreach ($alloc as $invId => $amt) {
+                $affected[] = $invId;
+                if (!$this->conn->query("INSERT INTO `payment_allocations` SET `payment_id` = '{$payId}', `invoice_id` = '{$invId}', `amount` = '" . number_format($amt, 2, '.', '') . "'")) {
+                    throw new \RuntimeException($this->conn->error);
+                }
+            }
+            foreach (array_unique($affected) as $invId) {
+                $this->refreshInvoice((int)$invId);
+            }
+            $this->conn->commit();
+        } catch (\Throwable $e) {
+            $this->conn->rollback();
+            return json_encode(['status' => 'failed', 'msg' => 'The receipt could not be saved. Nothing was changed.']);
         }
 
-        if ($save) {
-            // Clear old allocations & recalculate affected invoice balances
-            $old_allocs = $this->conn->query("SELECT invoice_id FROM `payment_allocations` WHERE payment_id = '{$payment_id}'");
-            $affected_invoices = [];
-            if ($old_allocs) {
-                while ($oa = $old_allocs->fetch_assoc()) {
-                    $affected_invoices[] = $oa['invoice_id'];
-                }
-            }
-            $this->conn->query("DELETE FROM `payment_allocations` WHERE payment_id = '{$payment_id}'");
-
-            // Save Payment Allocations across invoice(s)
-            if (isset($invoice_alloc) && is_array($invoice_alloc)) {
-                foreach ($invoice_alloc as $inv_id => $alloc_amt) {
-                    $alloc_amt = (float)$alloc_amt;
-                    if ($alloc_amt <= 0) continue;
-
-                    $inv_id = (int)$inv_id;
-                    $affected_invoices[] = $inv_id;
-
-                    $alloc_sql = "INSERT INTO `payment_allocations` SET
-						`payment_id` = '{$payment_id}',
-						`invoice_id` = '{$inv_id}',
-						`amount` = '{$alloc_amt}'";
-                    $this->conn->query($alloc_sql);
-                }
-            }
-
-            // Update total paid and balance for all affected invoices
-            $affected_invoices = array_unique($affected_invoices);
-            foreach ($affected_invoices as $inv_id) {
-                $sum_alloc = $this->conn->query("SELECT SUM(amount) as total_paid FROM `payment_allocations` WHERE invoice_id = '{$inv_id}'")->fetch_assoc();
-                $tot_paid = isset($sum_alloc['total_paid']) ? (float)$sum_alloc['total_paid'] : 0.0;
-
-                $inv_data = $this->conn->query("SELECT total, credited_amount FROM `invoice_list` WHERE id = '{$inv_id}'")->fetch_assoc();
-                $inv_credit = isset($inv_data['credited_amount']) ? (float)$inv_data['credited_amount'] : 0.0;
-                $inv_total = isset($inv_data['total']) ? (float)$inv_data['total'] : 0.0;
-
-                $new_bal = CreditNoteService::outstanding($inv_total, $tot_paid, $inv_credit);
-                $new_status = 'unpaid';
-                if ($tot_paid + $inv_credit >= $inv_total && $inv_total > 0) {
-                    $new_status = 'paid';
-                } elseif ($tot_paid + $inv_credit > 0 && $tot_paid + $inv_credit < $inv_total) {
-                    $new_status = 'partially_paid';
-                }
-
-                $this->conn->query("UPDATE `invoice_list` SET `paid_amount` = '{$tot_paid}', `balance` = '{$new_bal}', `status` = '{$new_status}' WHERE id = '{$inv_id}'");
-
-                // Emit invoice payment-state events.
-                if ($new_status === 'paid' || $new_status === 'partially_paid') {
-                    $inv_row = $this->conn->query("SELECT i.invoice_no, i.total, p.name AS party_name, p.email AS party_email FROM `invoice_list` i INNER JOIN `party_list` p ON i.party_id = p.id WHERE i.id = '{$inv_id}'");
-                    $inv_row = $inv_row ? $inv_row->fetch_assoc() : [];
-                    $evt = $new_status === 'paid'
-                        ? \App\Support\IntegrationEvents::INVOICE_PAID
-                        : \App\Support\IntegrationEvents::INVOICE_PARTIALLY_PAID;
-                    $this->emit($evt, [
-                        'invoice_id'  => (int)$inv_id,
-                        'invoice_no'  => $inv_row['invoice_no'] ?? '',
-                        'party_id'    => (int)$party_id,
-                        'party_name'  => $inv_row['party_name'] ?? '',
-                        'party_email' => $inv_row['party_email'] ?? '',
-                        'total'       => (float)($inv_row['total'] ?? 0),
-                        'paid_amount' => (float)$tot_paid,
-                        'balance'     => (float)$new_bal,
-                        'status'      => $new_status,
-                    ], (int)$tenant_id);
-                }
-            }
-
-            $resp['status'] = 'success';
-            $resp['msg'] = empty($id) ? " Payment Receipt created and allocated successfully." : " Payment details updated successfully.";
-            $this->settings->set_flashdata('success', $resp['msg']);
-
-            // Emit the payment-received event.
-            if (empty($id)) {
-                $this->emit(\App\Support\IntegrationEvents::PAYMENT_RECEIVED, [
-                    'payment_id'  => (int)$payment_id,
-                    'payment_no'  => $payment_no,
+        // Tell integrations about invoices that are now paid or part paid, and about a new receipt.
+        foreach (array_unique($affected) as $inv_id) {
+            $row = $this->conn->query("SELECT i.invoice_no, i.total, i.paid_amount, i.balance, i.status, p.name AS party_name, p.email AS party_email FROM `invoice_list` i INNER JOIN `party_list` p ON i.party_id = p.id WHERE i.id = '" . (int)$inv_id . "' AND i.tenant_id = '{$tenant_id}'");
+            $row = $row ? $row->fetch_assoc() : null;
+            if ($row && in_array($row['status'], ['paid', 'partially_paid'], true)) {
+                $this->emit($row['status'] === 'paid' ? \App\Support\IntegrationEvents::INVOICE_PAID : \App\Support\IntegrationEvents::INVOICE_PARTIALLY_PAID, [
+                    'invoice_id'  => (int)$inv_id,
+                    'invoice_no'  => $row['invoice_no'],
                     'party_id'    => (int)$party_id,
-                    'party_name'  => $party['name'] ?? '',
-                    'party_email' => $party['email'] ?? '',
-                    'amount'      => (float)$amount,
-                    'method'      => $method,
-                    'payment_date'=> $payment_date,
+                    'party_name'  => $row['party_name'] ?? '',
+                    'party_email' => $row['party_email'] ?? '',
+                    'total'       => (float)$row['total'],
+                    'paid_amount' => (float)$row['paid_amount'],
+                    'balance'     => (float)$row['balance'],
+                    'status'      => $row['status'],
                 ], (int)$tenant_id);
             }
-        } else {
-            $resp['status'] = 'failed';
-            $resp['msg'] = "An error occurred while saving payment.";
-            $resp['err'] = $this->conn->error;
+        }
+        if (empty($id)) {
+            $this->emit(\App\Support\IntegrationEvents::PAYMENT_RECEIVED, [
+                'payment_id'  => (int)$payId,
+                'payment_no'  => $payment_no,
+                'party_id'    => (int)$party_id,
+                'party_name'  => $party['name'] ?? '',
+                'party_email' => $party['email'] ?? '',
+                'amount'      => (float)$amount,
+                'method'      => $method,
+                'payment_date'=> $payment_date,
+            ], (int)$tenant_id);
         }
 
+        $resp = ['status' => 'success', 'id' => (int)$payId];
+        $resp['msg'] = empty($id) ? " Payment Receipt created and allocated successfully." : " Payment details updated successfully.";
+        $this->settings->set_flashdata('success', $resp['msg']);
         return json_encode($resp);
+    }
+
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * Problems with how a receipt is allocated across invoices; empty when fine. Pure.
+     *
+     * @param array<int,float> $alloc invoice id => amount
+     * @param array<int,array{party_id:int,status:string,invoice_no:string,available:float}> $room what each invoice can still take
+     * @return string[]
+     */
+    public static function allocationProblems(float $received, array $alloc, array $room, int $partyId): array
+    {
+        $errors = [];
+        $sum = 0.0;
+        foreach ($alloc as $invId => $amt) {
+            $r = $room[$invId] ?? null;
+            if ($r === null || (int)$r['party_id'] !== $partyId) {
+                $errors[] = 'One of the invoices could not be found for this customer.';
+                continue;
+            }
+            if (in_array($r['status'], ['cancelled', 'draft'], true)) {
+                $errors[] = "Invoice {$r['invoice_no']} is {$r['status']} and cannot be paid.";
+                continue;
+            }
+            if ($amt > (float)$r['available'] + 0.005) {
+                $errors[] = "Invoice {$r['invoice_no']} has only " . number_format(max(0.0, (float)$r['available']), 2) . ' left to pay.';
+            }
+            $sum += $amt;
+        }
+        if ($sum > $received + 0.005) {
+            $errors[] = 'More has been allocated to invoices than was received.';
+        }
+        return array_values(array_unique($errors));
+    }
+
+    /**
+     * What each invoice can still take: total, less credit notes, less what other receipts have paid.
+     *
+     * @param  int[] $ids
+     * @return array<int,array{party_id:int,status:string,invoice_no:string,available:float}>
+     */
+    private function allocationRoom(array $ids, int $excludePaymentId, int $tenantId): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids))));
+        if (!$ids) {
+            return [];
+        }
+        $in = implode(',', $ids);
+        $res = $this->conn->query("SELECT i.id, i.party_id, i.status, i.invoice_no, i.total, i.credited_amount,
+                COALESCE((SELECT SUM(a.amount) FROM payment_allocations a WHERE a.invoice_id = i.id AND a.payment_id <> {$excludePaymentId}), 0) other
+            FROM invoice_list i WHERE i.tenant_id = {$tenantId} AND i.id IN ({$in})");
+        $out = [];
+        while ($res && ($r = $res->fetch_assoc())) {
+            $out[(int)$r['id']] = [
+                'party_id' => (int)$r['party_id'],
+                'status' => (string)$r['status'],
+                'invoice_no' => (string)$r['invoice_no'],
+                'available' => round((float)$r['total'] - (float)$r['credited_amount'] - (float)$r['other'], 2),
+            ];
+        }
+        return $out;
+    }
+
+    /** Why an existing receipt cannot be saved over (not found, or cancelled); null for a new one. */
+    private function existingReceiptProblem(int $payId, int $tenantId): ?string
+    {
+        if ($payId <= 0) {
+            return null;
+        }
+        $row = $this->conn->query("SELECT status FROM `payment_list` WHERE id = '{$payId}' AND tenant_id = '{$tenantId}'")->fetch_assoc();
+        if (!$row) {
+            return 'Receipt not found.';
+        }
+        return $row['status'] === 'cancelled' ? 'A cancelled receipt cannot be changed. Record a new one.' : null;
+    }
+
+    /**
+     * The receipt number to use: the next in the company's series when none is given, else the one typed, which
+     * must not already belong to another receipt.
+     *
+     * @return array{0:string,1:?string} [number, problem]
+     */
+    private function receiptNumber(string $given, int $payId, int $tenantId): array
+    {
+        $given = trim($given);
+        if ($given === '') {
+            return [SequenceService::documentNo($this->conn, $tenantId, 'payment_list', 'payment_no', 'REC-' . date('Ym') . '-', 'receipt-' . date('Ym')), null];
+        }
+        $esc = $this->conn->real_escape_string($given);
+        $dup = $this->conn->query("SELECT 1 FROM `payment_list` WHERE tenant_id = '{$tenantId}' AND payment_no = '{$esc}' AND id <> '{$payId}' LIMIT 1");
+        if ($dup && $dup->num_rows > 0) {
+            return [$esc, "Receipt number {$given} is already used. Leave it blank to take the next number."];
+        }
+        return [$esc, null];
     }
 
     /**
@@ -243,7 +314,6 @@ class PaymentService
      */
     private function saveForeignReceipt(array $post, FxService $fx, string $currency, string $id, int $tenant_id, int $user_id, array $party): string
     {
-        $payment_no = !empty($post['payment_no']) ? $this->conn->real_escape_string((string)$post['payment_no']) : 'REC-' . date('Ym') . '-' . rand(1000, 9999);
         $party_id = (int)($post['party_id'] ?? 0);
         $bank_account_id = !empty($post['bank_account_id']) ? (int)$post['bank_account_id'] : null;
         $payment_date = !empty($post['payment_date']) ? $this->conn->real_escape_string((string)$post['payment_date']) : date('Y-m-d');
@@ -251,7 +321,7 @@ class PaymentService
         $method = !empty($post['method']) ? $this->conn->real_escape_string((string)$post['method']) : 'cash';
         $reference = $this->conn->real_escape_string((string)($post['reference'] ?? ''));
         $notes = $this->conn->real_escape_string((string)($post['notes'] ?? ''));
-        $status = !empty($post['status']) ? $this->conn->real_escape_string((string)$post['status']) : PaymentStatus::POSTED->value;
+        $status = PaymentStatus::POSTED->value; // a receipt is either posted or cancelled (cancelling is its own action)
         $fail = static fn(string $m): string => json_encode(['status' => 'failed', 'msg' => $m]);
 
         if ($amountFc <= 0) {
@@ -262,6 +332,13 @@ class PaymentService
             return $fail("No exchange rate for {$currency} on {$payment_date}. Add one under Exchange rates, or type the rate on the receipt.");
         }
         $payId = (int)$id;
+        if ($problem = $this->existingReceiptProblem($payId, $tenant_id)) {
+            return $fail($problem);
+        }
+        [$payment_no, $noProblem] = $this->receiptNumber((string)($post['payment_no'] ?? ''), $payId, $tenant_id);
+        if ($noProblem) {
+            return $fail($noProblem);
+        }
         if ($lockMsg = PeriodLockService::guardDocument($this->conn, $tenant_id, $payment_date, 'payment_list', $payId)) {
             return $fail($lockMsg);
         }
@@ -310,10 +387,21 @@ class PaymentService
             $arTotal = round($sumAr + FxService::toBase($unallocFc, $rate), 2);
 
             // Accounts
-            $cashQ = $this->conn->query("SELECT id FROM `account_list` WHERE `name` LIKE '%cash%' AND tenant_id = '{$tenant_id}' AND delete_flag = 0 LIMIT 1");
-            $cashAcc = $bank_account_id ?: (($cashQ && $cashQ->num_rows > 0) ? (int)$cashQ->fetch_assoc()['id'] : 1);
-            $arQ = $this->conn->query("SELECT id FROM `account_list` WHERE (`name` LIKE '%receivable%' OR `name` LIKE '%asset%') AND tenant_id = '{$tenant_id}' AND delete_flag = 0 LIMIT 1");
-            $arAcc = ($arQ && $arQ->num_rows > 0) ? (int)$arQ->fetch_assoc()['id'] : 1;
+            $defaults = new AccountDefaultsService($this->conn, $this->settings);
+            $arAcc = $defaults->resolve('receivable');
+            if ($arAcc <= 0) {
+                throw new \RuntimeException(AccountDefaultsService::missing('receivable'));
+            }
+            if ($bank_account_id) {
+                $bk = $this->conn->query("SELECT 1 FROM `account_list` WHERE id = '" . (int)$bank_account_id . "' AND tenant_id = '{$tenant_id}' AND delete_flag = 0 LIMIT 1");
+                if (!$bk || $bk->num_rows === 0) {
+                    throw new \RuntimeException('Choose a bank or cash account from this company.');
+                }
+            }
+            $cashAcc = $bank_account_id ?: $defaults->resolve('cash');
+            if ($cashAcc <= 0) {
+                throw new \RuntimeException(AccountDefaultsService::missing('cash'));
+            }
             $fxAcc = 0;
             if (round($cashBase - $arTotal, 2) != 0.0) {
                 $fxAcc = $fx->realisedAccount();
@@ -412,57 +500,55 @@ class PaymentService
         $this->conn->query("UPDATE `invoice_list` SET `paid_amount` = '{$paid}', `paid_fc` = '{$fc}', `balance` = '{$bal}', `status` = '{$status}' WHERE id = '{$invId}'");
     }
 
+    /**
+     * "Deleting" a receipt cancels it: its journal is reversed (both stay in the ledger), its allocations are
+     * released so the invoices owe the money again, and the receipt stays on record marked cancelled.
+     */
     public function deletePayment(int $id): string
     {
-        $tenant_id = $this->settings->active_tenant_id();
-        if ($lockMsg = \App\Services\PeriodLockService::guardDocument($this->conn, (int)$tenant_id, null, 'payment_list', $id)) {
+        $tenant_id = (int)$this->settings->active_tenant_id();
+        $pay = $this->conn->query("SELECT journal_id, status, payment_no, payment_date FROM `payment_list` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'")->fetch_assoc();
+        if (!$pay) {
+            return json_encode(['status' => 'failed', 'msg' => 'Receipt not found.']);
+        }
+        if ($pay['status'] === 'cancelled') {
+            return json_encode(['status' => 'success', 'msg' => ' Receipt is already cancelled.']);
+        }
+        if ($lockMsg = \App\Services\PeriodLockService::guardDocument($this->conn, $tenant_id, null, 'payment_list', $id)) {
             return json_encode(['status' => 'failed', 'msg' => $lockMsg]);
         }
 
-        // Get affected invoices before deleting
-        $old_allocs = $this->conn->query("SELECT invoice_id FROM `payment_allocations` WHERE payment_id = '{$id}'");
-        $affected_invoices = [];
-        if ($old_allocs) {
-            while ($oa = $old_allocs->fetch_assoc()) {
-                $affected_invoices[] = $oa['invoice_id'];
-            }
-        }
-
-        $pay = $this->conn->query("SELECT journal_id FROM `payment_list` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'")->fetch_assoc();
         if (!empty($pay['journal_id'])) {
-            $this->conn->query("DELETE FROM `journal_entries` WHERE id = '{$pay['journal_id']}'");
-        }
-
-        $del = $this->conn->query("DELETE FROM `payment_list` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'");
-        if ($del) {
-            // Recalculate invoice balances
-            foreach (array_unique($affected_invoices) as $inv_id) {
-                $sum_alloc = $this->conn->query("SELECT SUM(amount) as total_paid FROM `payment_allocations` WHERE invoice_id = '{$inv_id}'")->fetch_assoc();
-                $tot_paid = isset($sum_alloc['total_paid']) ? (float)$sum_alloc['total_paid'] : 0.0;
-
-                $inv_data = $this->conn->query("SELECT total, credited_amount FROM `invoice_list` WHERE id = '{$inv_id}'")->fetch_assoc();
-                $inv_credit = isset($inv_data['credited_amount']) ? (float)$inv_data['credited_amount'] : 0.0;
-                $inv_total = isset($inv_data['total']) ? (float)$inv_data['total'] : 0.0;
-
-                $new_bal = CreditNoteService::outstanding($inv_total, $tot_paid, $inv_credit);
-                $new_status = 'unpaid';
-                if ($tot_paid + $inv_credit >= $inv_total && $inv_total > 0) {
-                    $new_status = 'paid';
-                } elseif ($tot_paid + $inv_credit > 0 && $tot_paid + $inv_credit < $inv_total) {
-                    $new_status = 'partially_paid';
-                }
-
-                $this->conn->query("UPDATE `invoice_list` SET `paid_amount` = '{$tot_paid}', `balance` = '{$new_bal}', `status` = '{$new_status}' WHERE id = '{$inv_id}'");
-                $this->conn->query("UPDATE `invoice_list` SET `paid_fc` = (SELECT COALESCE(SUM(amount_fc), 0) FROM `payment_allocations` WHERE invoice_id = '{$inv_id}') WHERE id = '{$inv_id}'");
+            $today = date('Y-m-d');
+            $date = $today < (string)$pay['payment_date'] ? (string)$pay['payment_date'] : $today;
+            $res = json_decode((new JournalService($this->conn, $this->settings))->reverseJournal((int)$pay['journal_id'], $date, true), true);
+            if (($res['status'] ?? '') !== 'success') {
+                return json_encode(['status' => 'failed', 'msg' => 'The receipt could not be reversed: ' . ($res['msg'] ?? 'unknown error')]);
             }
-
-            $resp['status'] = 'success';
-            $this->settings->set_flashdata('success', " Payment receipt deleted successfully.");
-        } else {
-            $resp['status'] = 'failed';
-            $resp['error'] = $this->conn->error;
         }
-        return json_encode($resp);
+
+        $affected = [];
+        $old = $this->conn->query("SELECT invoice_id FROM `payment_allocations` WHERE payment_id = '{$id}'");
+        while ($old && ($oa = $old->fetch_assoc())) {
+            $affected[] = (int)$oa['invoice_id'];
+        }
+        $this->conn->begin_transaction();
+        try {
+            if (!$this->conn->query("DELETE FROM `payment_allocations` WHERE payment_id = '{$id}'")
+                || !$this->conn->query("UPDATE `payment_list` SET `status` = 'cancelled' WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'")) {
+                throw new \RuntimeException($this->conn->error);
+            }
+            foreach (array_unique($affected) as $invId) {
+                $this->refreshInvoice($invId);
+            }
+            $this->conn->commit();
+        } catch (\Throwable $e) {
+            $this->conn->rollback();
+            return json_encode(['status' => 'failed', 'msg' => 'The receipt was reversed in the ledger but its invoices could not be updated. Please contact support before trying again.']);
+        }
+        $this->settings->log_audit('Cancelled receipt', 'Payments', (string)$pay['payment_no']);
+        $this->settings->set_flashdata('success', ' Receipt cancelled and reversed.');
+        return json_encode(['status' => 'success', 'msg' => ' Receipt cancelled and reversed.']);
     }
 
     public function emailPaymentReceipt(int $id, ?string $custom_email = null): string

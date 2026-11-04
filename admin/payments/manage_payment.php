@@ -54,7 +54,7 @@ $preset_invoice_id = isset($_GET['invoice_id']) ? (int)$_GET['invoice_id'] : 0;
 				</div>
 				<div class="col-md-3 form-group">
 					<label for="payment_no" class="control-label">Receipt Number</label>
-					<input type="text" name="payment_no" id="payment_no" class="form-control form-control-sm rounded-0" value="<?php echo isset($payment_no) ? $payment_no : 'REC-'.date('Ym').'-'.rand(1000,9999); ?>" required/>
+					<input type="text" name="payment_no" id="payment_no" class="form-control form-control-sm rounded-0" value="<?php echo isset($payment_no) ? $payment_no : ''; ?>" placeholder="Automatic (next number)"/>
 				</div>
 				<div class="col-md-2 form-group">
 					<label for="payment_date" class="control-label">Payment Date</label>
@@ -115,8 +115,6 @@ $preset_invoice_id = isset($_GET['invoice_id']) ? (int)$_GET['invoice_id'] : 0;
 					<label for="status" class="control-label">Status</label>
 					<select name="status" id="status" class="form-control form-control-sm rounded-0" required>
 						<option value="posted" <?php echo !isset($status) || $status == 'posted' ? 'selected' : '' ?>>Posted</option>
-						<option value="draft" <?php echo isset($status) && $status == 'draft' ? 'selected' : '' ?>>Draft</option>
-						<option value="cancelled" <?php echo isset($status) && $status == 'cancelled' ? 'selected' : '' ?>>Cancelled</option>
 					</select>
 				</div>
 			</div>

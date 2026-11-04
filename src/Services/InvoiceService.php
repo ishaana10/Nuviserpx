@@ -23,7 +23,7 @@ class InvoiceService
         $user_id = $this->settings->userdata('id');
         $id = !empty($id) ? $this->conn->real_escape_string((string)$id) : '';
 
-        $invoice_no = !empty($invoice_no) ? $this->conn->real_escape_string((string)$invoice_no) : 'INV-' . date('Ym') . '-' . rand(1000, 9999);
+        $invoice_no = !empty($invoice_no) ? $this->conn->real_escape_string(trim((string)$invoice_no)) : '';
         $party_id = isset($party_id) ? $this->conn->real_escape_string((string)$party_id) : '0';
         $invoice_date = !empty($invoice_date) ? $this->conn->real_escape_string((string)$invoice_date) : date('Y-m-d');
         $due_date = !empty($due_date) ? $this->conn->real_escape_string((string)$due_date) : date('Y-m-d', strtotime('+30 days'));
@@ -40,6 +40,16 @@ class InvoiceService
             return json_encode(['status' => 'failed', 'msg' => 'Selected Customer / Party not found.']);
         }
         $party = $party_qry->fetch_assoc();
+
+        // Numbering: the next number in the company's series when none is typed, and never a number already used.
+        if ($invoice_no === '') {
+            $invoice_no = SequenceService::documentNo($this->conn, (int)$tenant_id, 'invoice_list', 'invoice_no', 'INV-' . date('Ym') . '-', 'invoice-' . date('Ym'));
+        } else {
+            $dup = $this->conn->query("SELECT 1 FROM `invoice_list` WHERE tenant_id = '{$tenant_id}' AND invoice_no = '{$invoice_no}' AND id <> " . (int)$id . " LIMIT 1");
+            if ($dup && $dup->num_rows > 0) {
+                return json_encode(['status' => 'failed', 'msg' => "Invoice number {$invoice_no} is already used. Leave it blank to take the next number."]);
+            }
+        }
 
         // Foreign currency: the form's amounts are in the invoice currency; the ledger and every total are kept in base.
         $fx = new FxService($this->conn, $this->settings);
@@ -103,12 +113,14 @@ class InvoiceService
             $status = InvoiceStatus::PARTIALLY_PAID->value;
         }
 
-        // Accounts for Journal Entry (Accounts Receivable Dr, Sales Revenue Cr)
-        $ar_acc = $this->conn->query("SELECT id FROM `account_list` WHERE (`name` LIKE '%receivable%' OR `name` LIKE '%asset%') AND tenant_id = '{$tenant_id}' AND delete_flag = 0 LIMIT 1");
-        $ar_acc_id = ($ar_acc && $ar_acc->num_rows > 0) ? $ar_acc->fetch_assoc()['id'] : 1;
-
-        $rev_acc = $this->conn->query("SELECT id FROM `account_list` WHERE (`name` LIKE '%sales%' OR `name` LIKE '%revenue%') AND tenant_id = '{$tenant_id}' AND delete_flag = 0 LIMIT 1");
-        $rev_acc_id = ($rev_acc && $rev_acc->num_rows > 0) ? $rev_acc->fetch_assoc()['id'] : 2;
+        // Accounts for the journal (Accounts Receivable Dr, Sales Revenue Cr): the company's chosen defaults.
+        // An invoice is never posted to a guessed account.
+        $defaults = new AccountDefaultsService($this->conn, $this->settings);
+        $ar_acc_id = $defaults->resolve('receivable');
+        $rev_acc_id = $defaults->resolve('revenue');
+        if ($ar_acc_id <= 0 || $rev_acc_id <= 0) {
+            return json_encode(['status' => 'failed', 'msg' => AccountDefaultsService::missing($ar_acc_id <= 0 ? 'receivable' : 'revenue')]);
+        }
 
         // Create/Update Journal
         $journal_code = \App\Services\SequenceService::journalCode($this->conn, (int)$tenant_id);

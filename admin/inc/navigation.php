@@ -349,6 +349,14 @@ if($t_qry && $t_qry->num_rows > 0){
                                             <p>Chart of Accounts</p>
                                         </a>
                                     </li>
+                                    <?php if ($_settings->can_access('settings_manage')): ?>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=accounts/default_accounts" class="nav-link nav-accounts_default_accounts tree-item">
+                                            <i class="nav-icon fas fa-link"></i>
+                                            <p>Default Accounts</p>
+                                        </a>
+                                    </li>
+                                    <?php endif; ?>
                                     <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=assets" class="nav-link nav-assets tree-item">
                                             <i class="nav-icon fas fa-boxes"></i>
