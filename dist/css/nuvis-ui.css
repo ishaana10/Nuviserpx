@@ -503,6 +503,31 @@ table.nv-table.dtr-inline.collapsed > tbody > tr > th.dtr-control::before {
   .content-wrapper .card.card-outline > .card-header > .card-tools { margin-left: 0; width: 100%; }
 }
 
+/* --------------------------------------------------------------------------
+   Phone shell: the AdminLTE "mini sidebar" rule reserves a 4.6rem rail on the content AND the top bar below
+   992px. On a phone the rail is hidden (the menu button opens it over the page), so that margin was only an empty
+   gutter, and it pushed the top bar wider than the screen. The top bar is also kept to one compact row.
+   -------------------------------------------------------------------------- */
+@media (max-width: 767.98px) {
+  .sidebar-mini-md .content-wrapper, .sidebar-mini-md .content-wrapper::before,
+  .sidebar-mini-md .main-footer, .sidebar-mini-md .main-footer::before,
+  .sidebar-mini-md .main-header, .sidebar-mini-md .main-header::before { margin-left: 0 !important; }
+
+  .main-header.navbar { flex-wrap: nowrap; height: 3.5rem; padding: 0 .35rem; }
+  .main-header .navbar-nav { flex-wrap: nowrap; min-width: 0; }
+  .main-header .navbar-nav.ml-auto { flex: 0 1 auto; min-width: 0; }
+  .main-header .nav-link { padding-left: .55rem; padding-right: .55rem; }
+  .main-header .nav-item.mr-2 { margin-right: .3rem !important; }
+  .main-header #tenant-switcher { max-width: 112px; text-overflow: ellipsis; }
+  .main-header .user-name { display: none; }
+  .main-header .user-img { position: static; left: auto; top: auto; height: 32px; width: 32px; display: block; }
+  .main-header .btn-rounded { padding: 2px; }
+  .main-header .btn-group.nav-link { padding-left: .25rem; padding-right: .25rem; }
+  .content-wrapper { padding-top: .5rem !important; }
+  .content-wrapper > .content { padding: 0 .25rem; }
+  .content-wrapper .container-fluid { padding-left: .5rem; padding-right: .5rem; }
+}
+
 @media print {
   .nv-dt-toolbar, .nv-dt-footer, table.nv-table td:last-child .dropdown-menu { display: none !important; }
 }

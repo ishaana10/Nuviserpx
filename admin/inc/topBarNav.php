@@ -85,7 +85,7 @@ if(preg_match_all('/class="dropdown-item[^"]*"/', $__create_html) > 0) echo $__c
           <li class="nav-item mr-2">
             <div class="input-group input-group-sm">
               <div class="input-group-prepend">
-                <span class="input-group-text bg-primary text-white border-0"><i class="fas fa-building mr-1"></i> Tenant:</span>
+                <span class="input-group-text bg-primary text-white border-0" title="Company"><i class="fas fa-building"></i><span class="d-none d-sm-inline ml-1">Tenant:</span></span>
               </div>
               <select id="tenant-switcher" class="form-control form-control-sm border-primary" style="max-width: 220px;">
                 <?php
@@ -122,9 +122,9 @@ if(preg_match_all('/class="dropdown-item[^"]*"/', $__create_html) > 0) echo $__c
           <!-- Messages Dropdown Menu -->
           <li class="nav-item">
             <div class="btn-group nav-link">
-                  <button type="button" class="btn btn-rounded badge badge-light dropdown-toggle dropdown-icon" data-toggle="dropdown">
+                  <button type="button" class="btn btn-rounded badge badge-light dropdown-toggle dropdown-icon" data-toggle="dropdown" aria-label="Account menu">
                     <span><img src="<?php echo validate_image($_settings->userdata('avatar')) ?>" class="img-circle elevation-2 user-img" alt="User Image"></span>
-                    <span class="ml-3"><?php echo ucwords($_settings->userdata('firstname').' '.$_settings->userdata('lastname')) ?></span>
+                    <span class="ml-3 user-name"><?php echo ucwords($_settings->userdata('firstname').' '.$_settings->userdata('lastname')) ?></span>
                     <span class="sr-only">Toggle Dropdown</span>
                   </button>
                   <div class="dropdown-menu" role="menu">
