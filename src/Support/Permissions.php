@@ -523,6 +523,10 @@ final class Permissions
         // EmployeeService, because an assigned approver may only hold leaves_view.
         'update_leave_status'   => ['leaves', 'view'],
         'cancel_leave'          => ['leaves', 'view'],
+        'save_leave_policy'     => ['leaves', 'edit'],
+        'save_leave_adjustment' => ['leaves', 'edit'],
+        'leave_balance_info'    => ['leaves', 'view'],
+        'leave_payout_suggestion' => ['payroll', 'edit'],
         // Payroll
         'save_payroll_rules'    => ['settings_manage'],
         'reset_payroll_rules'   => ['settings_manage'],

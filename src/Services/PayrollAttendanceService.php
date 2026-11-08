@@ -86,6 +86,28 @@ class PayrollAttendanceService
         return self::workingDays(max($from, date('Y-m-d', strtotime($terminationDate . ' +1 day'))), $to, $daysPerWeek);
     }
 
+    /**
+     * Pure: working days in the period that fall before the employee's joining date. Pay starts on the joining date,
+     * so each such day is unpaid. A blank or invalid date means no proration.
+     */
+    public static function daysBeforeJoining(string $from, string $to, ?string $joiningDate, int $daysPerWeek = 5): array
+    {
+        if ($joiningDate === null || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $joiningDate) || !strtotime($joiningDate) || $joiningDate === '0000-00-00') {
+            return [];
+        }
+        return self::workingDays($from, min($to, date('Y-m-d', strtotime($joiningDate . ' -1 day'))), $daysPerWeek);
+    }
+
+    /**
+     * Pure: should this period be prorated for a late start? Only when the joining date falls inside the period
+     * (a period wholly before the joining date is a back-dated run, not a starter) and the employee has no earlier
+     * payroll. The second test protects records whose joining date was just the day they were typed in.
+     */
+    public static function prorateJoiner(string $from, string $to, ?string $joiningDate, bool $hasEarlierPayroll, bool $enabled = true): bool
+    {
+        return $enabled && !$hasEarlierPayroll && $joiningDate !== null && $joiningDate > $from && $joiningDate <= $to;
+    }
+
     /** Pure: pay for one working day. */
     public static function dailyRate(float $basic, int $periodsPerYear, float $weeksPerYear, int $daysPerWeek): float
     {
@@ -100,13 +122,26 @@ class PayrollAttendanceService
     }
 
     /** Unpaid days for an employee in a period, from approved leave and logged attendance. */
-    public function unpaidDaysFor(int $employeeId, string $from, string $to, int $daysPerWeek): float
+    public function unpaidDaysFor(int $employeeId, string $from, string $to, int $daysPerWeek, bool $prorateJoiners = true): float
     {
         $t = (int)$this->settings->active_tenant_id();
-        $eq = $this->conn->prepare("SELECT termination_date FROM employee_list WHERE id = ? AND tenant_id = ?");
+        $eq = $this->conn->prepare("SELECT termination_date, date_of_joining FROM employee_list WHERE id = ? AND tenant_id = ?");
         $eq->bind_param('ii', $employeeId, $t);
         $eq->execute();
-        $after = self::daysAfterTermination($from, $to, $eq->get_result()->fetch_assoc()['termination_date'] ?? null, $daysPerWeek);
+        $emp = $eq->get_result()->fetch_assoc() ?: [];
+        $after = self::daysAfterTermination($from, $to, $emp['termination_date'] ?? null, $daysPerWeek);
+        $join = !empty($emp['date_of_joining']) ? (string)$emp['date_of_joining'] : null;
+        if ($join !== null) {
+            $pq = $this->conn->prepare("SELECT 1 FROM payroll_list WHERE tenant_id = ? AND employee_id = ? AND status NOT IN ('rejected','voided')
+                AND COALESCE(period_start, pay_date) < ? LIMIT 1");
+            $pq->bind_param('iis', $t, $employeeId, $from);
+            $pq->execute();
+            $earlier = $pq->get_result()->num_rows > 0;
+            if (self::prorateJoiner($from, $to, $join, $earlier, $prorateJoiners)) {
+                // A day can be both before joining and after leaving only in a one-off period: count it once.
+                $after = array_values(array_unique(array_merge($after, self::daysBeforeJoining($from, $to, $join, $daysPerWeek))));
+            }
+        }
         $lq = $this->conn->prepare("SELECT leave_type, start_date, end_date FROM leave_list
             WHERE tenant_id = ? AND employee_id = ? AND status = 'approved' AND start_date <= ? AND end_date >= ?");
         $aq = $this->conn->prepare("SELECT attendance_date, status FROM attendance_list

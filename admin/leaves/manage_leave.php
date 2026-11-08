@@ -66,6 +66,7 @@ if(isset($_GET['id']) && $_GET['id'] > 0){
 				<input type="date" name="end_date" id="end_date" class="form-control form-control-sm rounded-0" value="<?php echo isset($end_date) ? $end_date : date('Y-m-d'); ?>" required/>
 			</div>
 		</div>
+		<div class="alert alert-light border py-2 text-sm" id="leave-balance-hint" style="display:none"></div>
 		<div class="form-group">
 			<label for="reason" class="control-label">Reason</label>
 			<textarea name="reason" id="reason" rows="3" class="form-control form-control-sm rounded-0" required><?php echo isset($reason) ? $reason : ''; ?></textarea>
@@ -92,6 +93,20 @@ if(isset($_GET['id']) && $_GET['id'] > 0){
 			width:'100%',
 			dropdownParent:$('#uni_modal')
 		})
+		function refreshBalance(){
+			var emp = $('#leave-form [name=employee_id]').val();
+			var box = $('#leave-balance-hint');
+			if(!$('#leave_type').val() || !$('#start_date').val() || !$('#end_date').val()){ box.hide(); return; }
+			$.post(_base_url_+"classes/Master.php?f=leave_balance_info", {employee_id: emp, leave_type: $('#leave_type').val(), start_date: $('#start_date').val(), end_date: $('#end_date').val(), id: $('#leave-form [name=id]').val()}, function(r){
+				if(r.status !== 'success'){ box.hide(); return; }
+				var t = [];
+				if(r.days !== null) t.push('This request: <b>' + r.days + '</b> working day' + (r.days == 1 ? '' : 's'));
+				if(r.tracked) t.push('Balance by ' + $('#end_date').val() + ': <b>' + parseFloat(r.balance).toFixed(2) + '</b> days');
+				if(t.length){ box.html(t.join(' &middot; ')).show(); } else { box.hide(); }
+			}, 'json');
+		}
+		$('#leave-form').on('change', '[name=employee_id], #leave_type, #start_date, #end_date', refreshBalance);
+		refreshBalance();
 		$('#leave-form').submit(function(e){
 			e.preventDefault();
             var _this = $(this)

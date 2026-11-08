@@ -28,9 +28,9 @@ class EmployeeService
                     $dataStr .= " `approver_id`=NULL ";
                     continue;
                 }
-                if ($k === 'termination_date' && ($v === '' || $v === null)) {
+                if (in_array($k, ['termination_date', 'date_of_joining'], true) && ($v === '' || $v === null)) {
                     if (!empty($dataStr)) $dataStr .= ",";
-                    $dataStr .= " `termination_date`=NULL ";
+                    $dataStr .= " `{$k}`=NULL ";
                     continue;
                 }
                 if (!is_numeric($v)) {
@@ -185,6 +185,20 @@ class EmployeeService
                 return json_encode(['status' => 'failed', 'msg' => 'Invalid employee.']);
             }
         }
+        $dateOk = fn($d) => preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$d) === 1 && strtotime((string)$d) !== false;
+        if (!$dateOk($post['start_date'] ?? '') || !$dateOk($post['end_date'] ?? '') || $post['end_date'] < $post['start_date']) {
+            return json_encode(['status' => 'failed', 'msg' => 'Enter a start date and an end date that is not before it.']);
+        }
+        if (!in_array((string)($post['leave_type'] ?? ''), ['casual', 'sick', 'paid', 'unpaid'], true)) {
+            return json_encode(['status' => 'failed', 'msg' => 'Choose a leave type.']);
+        }
+        // A request that would overdraw a tracked leave balance is refused up front.
+        if (($post['status'] ?? 'pending') !== 'rejected') {
+            $short = (new LeaveBalanceService($this->conn, $this->settings))->check((int)$post['employee_id'], (string)$post['leave_type'], (string)$post['start_date'], (string)$post['end_date'], $id);
+            if ($short !== null) {
+                return json_encode(['status' => 'failed', 'msg' => $short]);
+            }
+        }
         $dataStr = "";
         foreach ($post as $k => $v) {
             if (!in_array($k, ['id'])) {
@@ -230,7 +244,7 @@ class EmployeeService
             return json_encode(['status' => 'failed', 'msg' => 'Invalid status.']);
         }
 
-        $q = $this->conn->query("SELECT l.id, l.status, l.employee_id, e.approver_id FROM `leave_list` l INNER JOIN `employee_list` e ON l.employee_id = e.id WHERE l.id = '{$id}' AND l.tenant_id = '{$tenant_id}'");
+        $q = $this->conn->query("SELECT l.id, l.status, l.employee_id, l.leave_type, l.start_date, l.end_date, e.approver_id FROM `leave_list` l INNER JOIN `employee_list` e ON l.employee_id = e.id WHERE l.id = '{$id}' AND l.tenant_id = '{$tenant_id}'");
         if (!$q || $q->num_rows === 0) {
             return json_encode(['status' => 'failed', 'msg' => 'Leave request not found.']);
         }
@@ -249,6 +263,12 @@ class EmployeeService
         }
         if (strtolower($leave['status']) !== 'pending') {
             return json_encode(['status' => 'failed', 'msg' => 'This leave request has already been processed.']);
+        }
+        if ($status === 'approved') {
+            $short = (new LeaveBalanceService($this->conn, $this->settings))->check((int)$leave['employee_id'], (string)$leave['leave_type'], (string)$leave['start_date'], (string)$leave['end_date'], (int)$leave['id']);
+            if ($short !== null) {
+                return json_encode(['status' => 'failed', 'msg' => $short]);
+            }
         }
 
         $update = $this->conn->query("UPDATE `leave_list` set `status` = '{$status}' where id = '{$id}' and tenant_id = '{$tenant_id}'");
