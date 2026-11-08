@@ -1007,7 +1007,10 @@
         if (!$('#nvDash').length) { return; }
         var saved = null;
         try { saved = window.localStorage.getItem('nv-dash-theme'); } catch (e) { /* private mode */ }
-        setTheme(saved === 'dark' ? 'dark' : 'light');
+        // With no choice of its own the dashboard follows the app's colour scheme.
+        var appDark = document.documentElement.getAttribute('data-nv-eff') === 'dark';
+        setTheme(saved ? (saved === 'dark' ? 'dark' : 'light') : (appDark ? 'dark' : 'light'));
+        $(document).on('nuvis:theme', function (e, prefs, eff) { setTheme(eff === 'dark' ? 'dark' : 'light'); });
         bind();
         load();
     });

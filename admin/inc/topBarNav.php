@@ -119,6 +119,11 @@ if(preg_match_all('/class="dropdown-item[^"]*"/', $__create_html) > 0) echo $__c
               </form>
             </div>
           </li> -->
+          <?php if(isset($__ui)): ?>
+          <li class="nav-item">
+            <a class="nav-link" href="#" data-nv-open="personalise" role="button" title="Personalise theme and menu" aria-label="Personalise theme and menu"><i class="fas fa-palette"></i></a>
+          </li>
+          <?php endif; ?>
           <!-- Messages Dropdown Menu -->
           <li class="nav-item">
             <div class="btn-group nav-link">
@@ -129,6 +134,7 @@ if(preg_match_all('/class="dropdown-item[^"]*"/', $__create_html) > 0) echo $__c
                   </button>
                   <div class="dropdown-menu" role="menu">
                     <a class="dropdown-item" href="<?php echo base_url.'admin/?page=user' ?>"><span class="fa fa-user"></span> My Account</a>
+                    <?php if(isset($__ui)): ?><a class="dropdown-item" href="#" data-nv-open="personalise"><span class="fa fa-palette"></span> Personalise</a><?php endif; ?>
                     <div class="dropdown-divider"></div>
                     <a class="dropdown-item" href="<?php echo base_url.'admin/?page=user/change_password' ?>"><span class="fas fa-key"></span> Change Password</a>
                     <div class="dropdown-divider"></div>

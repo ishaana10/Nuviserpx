@@ -51,7 +51,12 @@
     <!-- <script src="<?php echo base_url ?>plugins/overlayScrollbars/js/jquery.overlayScrollbars.min.js"></script> -->
     <!-- AdminLTE App -->
     <script src="<?php echo base_url ?>dist/js/adminlte.js?v=<?php echo class_exists('AppVersion') ? urlencode(AppVersion::get('commit')) : '1.0' ?>"></script>
+    <?php if(isset($__ui)): ?>
+    <!-- Personal theme: side menu search/pins, Personalise panel -->
+    <script src="<?php echo base_url ?>dist/js/nuvis-theme.js?v=<?php echo class_exists('AppVersion') ? urlencode(AppVersion::get('commit')) : '1.0' ?>"></script>
+    <?php endif; ?>
   </div>   
+    <?php require_once(__DIR__ . '/personalise.php'); ?>
     <div class="daterangepicker ltr show-ranges opensright">
       <div class="ranges">
         <ul>

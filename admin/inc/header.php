@@ -38,6 +38,19 @@
     <link rel="stylesheet" href="<?php echo base_url ?>dist/css/adminlte.css?v=<?php echo $assetVer ?>">
     <link rel="stylesheet" href="<?php echo base_url ?>dist/css/custom.css?v=<?php echo $assetVer ?>">
     <link rel="stylesheet" href="<?php echo base_url ?>dist/css/nuvis-ui.css?v=<?php echo $assetVer ?>">
+    <?php if(isset($__ui)): ?>
+    <!-- Personal theme: accent colour, side menu style, dark mode (must load after the other Nuvis CSS) -->
+    <style id="nv-accent-vars"><?php echo \App\Services\UiPrefsService::cssVars($__ui) ?></style>
+    <link rel="stylesheet" href="<?php echo base_url ?>dist/css/nuvis-theme.css?v=<?php echo $assetVer ?>">
+    <script>
+      window.NUVIS_UID = <?php echo (int)($_SESSION['userdata']['id'] ?? 0) ?>;
+      window.NUVIS_UI = <?php echo json_encode($__ui, JSON_HEX_TAG | JSON_HEX_AMP) ?>;
+      // Settle "auto" before first paint so there is no flash of the wrong colour scheme.
+      (function(){ var r = document.documentElement;
+        if (window.NUVIS_UI.mode === 'auto') { r.setAttribute('data-nv-eff', window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); }
+      })();
+    </script>
+    <?php endif; ?>
     <!-- overlayScrollbars -->
     <link rel="stylesheet" href="<?php echo base_url ?>plugins/overlayScrollbars/css/OverlayScrollbars.min.css">
     <!-- Daterange picker -->

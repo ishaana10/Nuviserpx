@@ -16,100 +16,6 @@ if($t_qry && $t_qry->num_rows > 0){
 }
 ?>
 
-<style>
-/* Xero-inspired Navigation Sidebar - High Contrast White Text */
-.main-sidebar {
-    background-color: #0f172a !important;
-    border-right: 1px solid #1e293b;
-}
-
-.main-sidebar .brand-link {
-    background-color: #0f172a !important;
-    border-bottom: 1px solid #1e293b;
-    padding: 14px 16px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.tenant-avatar-badge {
-    width: 32px;
-    height: 32px;
-    border-radius: 6px;
-    background-color: #ef4444;
-    color: #ffffff;
-    font-weight: 700;
-    font-size: 0.95rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.tenant-title-text {
-    font-size: 0.95rem;
-    font-weight: 700;
-    color: #ffffff;
-    line-height: 1.2;
-}
-
-.main-sidebar .nav-sidebar .nav-item > .nav-link {
-    color: #ffffff !important;
-    border-radius: 6px;
-    margin: 3px 8px;
-    font-weight: 500;
-    font-size: 0.92rem;
-    padding: 9px 12px;
-    transition: all 0.15s ease;
-}
-
-.main-sidebar .nav-sidebar .nav-item > .nav-link:hover {
-    background-color: rgba(255, 255, 255, 0.12) !important;
-    color: #ffffff !important;
-}
-
-.main-sidebar .nav-sidebar .nav-item > .nav-link.active {
-    background-color: #e2e8f0 !important;
-    color: #0f172a !important;
-    font-weight: 700;
-}
-
-.main-sidebar .nav-sidebar .nav-icon {
-    color: rgba(255, 255, 255, 0.85) !important;
-    width: 20px;
-    margin-right: 10px;
-    text-align: center;
-}
-
-.main-sidebar .nav-sidebar .nav-link.active .nav-icon {
-    color: #2563eb !important;
-}
-
-.main-sidebar .nav-sidebar .right {
-    color: rgba(255, 255, 255, 0.7) !important;
-}
-
-.main-sidebar .nav-sidebar .nav-link.active .right {
-    color: #0f172a !important;
-}
-
-.main-sidebar .nav-treeview .nav-link {
-    padding-left: 2.2rem !important;
-    font-size: 0.88rem;
-    color: rgba(255, 255, 255, 0.8) !important;
-}
-
-.main-sidebar .nav-treeview .nav-link:hover {
-    color: #ffffff !important;
-    background-color: rgba(255, 255, 255, 0.1) !important;
-}
-
-.main-sidebar .nav-treeview .nav-link.active {
-    color: #2563eb !important;
-    background-color: #ffffff !important;
-    font-weight: 700;
-}
-</style>
-
 <!-- Main Sidebar Container -->
 <aside class="main-sidebar elevation-1 sidebar-no-expand">
     <!-- Brand / Tenant Active Badge Header -->
@@ -130,6 +36,17 @@ if($t_qry && $t_qry->num_rows > 0){
                 <div class="os-content" style="padding: 0px; height: 100%; width: 100%;">
 
                     <!-- Xero-inspired Nav Menu Structure -->
+                    <!-- Find a menu item fast; pinned items sit above the full menu -->
+                    <div class="nv-side-search" id="nvSideSearch" role="search">
+                        <i class="fas fa-search" aria-hidden="true"></i>
+                        <input type="search" id="nvSideSearchInput" placeholder="Search menu&hellip; ( / )" autocomplete="off" aria-label="Search menu">
+                        <button type="button" class="nv-side-clear" id="nvSideClear" aria-label="Clear search"><i class="fas fa-times"></i></button>
+                    </div>
+                    <div class="nv-pinned-block is-empty" id="nvPinned">
+                        <div class="nv-side-label">Pinned</div>
+                        <ul class="nav nav-pills nav-sidebar flex-column text-sm nav-flat" id="nvPinnedList"></ul>
+                    </div>
+                    <div class="nv-side-empty" id="nvSideEmpty" role="status">No menu items match.</div>
                     <nav class="mt-2">
 <?php ob_start(); ?>
                         <ul class="nav nav-pills nav-sidebar flex-column text-sm <?= $sidenav_compact ?> nav-flat nav-child-indent" data-widget="treeview" role="menu" data-accordion="<?= $sidenav_mode == 'accordion' ? 'true' : 'false' ?>">
