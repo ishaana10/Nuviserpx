@@ -83,4 +83,30 @@ foreach (['save_leave_policy', 'save_leave_adjustment', 'leave_balance_info', 'l
 $mig = $read('database/migrations/020_leave_balances.sql');
 check('migration: tables, cancelled status, no semicolons in comments', strpos($mig, 'leave_policies') !== false && strpos($mig, 'leave_adjustments') !== false && strpos($mig, "'cancelled'") !== false && !preg_match('/^--.*;/m', $mig));
 check('base SQL carries leave tables and cancelled', strpos($read('database/nuviserpx.sql'), 'CREATE TABLE `leave_policies`') !== false && strpos($read('database/nuviserpx.sql'), "enum('pending','approved','rejected','cancelled')") !== false);
+
+// ---- public holidays, half days, individual entitlements
+$hol = ['2026-12-25', '2026-12-28'];
+$t = L::takenByYear([['start_date' => '2026-12-24', 'end_date' => '2026-12-29']], 5, $hol);
+check('holidays are not leave days (Thu 24, Tue 29 only)', $t[2026] == 2);
+check('request days exclude holidays', L::daysInRequest('2026-12-24', '2026-12-29', 5, $hol) == 2.0);
+check('half day counts 0.5', L::daysInRequest('2026-12-01', '2026-12-01', 5, []) == 1.0 && L::daysInRequest('2026-12-01', '2026-12-01', 5, [], 0.5) == 0.5);
+check('half day on a holiday uses nothing', L::daysInRequest('2026-12-25', '2026-12-25', 5, $hol, 0.5) == 0.0);
+check('fraction normalised', L::fraction('0.50') === 0.5 && L::fraction(1) === 1.0 && L::fraction('0.25') === 1.0 && L::fraction(null) === 1.0);
+check('half day only on one date', L::fractionError('2026-12-01', '2026-12-02', 0.5) !== null && L::fractionError('2026-12-01', '2026-12-01', 0.5) === null && L::fractionError('2026-12-01', '2026-12-02', 1) === null);
+$t = L::takenByYear([['start_date' => '2026-03-02', 'end_date' => '2026-03-02', 'day_fraction' => '0.50'], ['start_date' => '2026-03-02', 'end_date' => '2026-03-03', 'day_fraction' => '1.00']]);
+check('overlap counts the larger share once', $t[2026] == 2.0);
+check('a half day of unpaid leave is half a day unpaid', A::unpaidDays([['leave_type' => 'unpaid', 'start_date' => '2026-03-02', 'end_date' => '2026-03-02', 'day_fraction' => '0.50']], [], '2026-03-01', '2026-03-31') == 0.5);
+check('a holiday inside unpaid leave is not unpaid', A::unpaidDays([['leave_type' => 'unpaid', 'start_date' => '2026-12-24', 'end_date' => '2026-12-29']], [], '2026-12-01', '2026-12-31', 5, $hol) == 2.0);
+check('a holiday absence is not unpaid', A::unpaidDays([], [['attendance_date' => '2026-12-25', 'status' => 'absent']], '2026-12-01', '2026-12-31', 5, $hol) == 0.0);
+$lb = $read('src/Services/LeaveBalanceService.php');
+check('individual entitlement overrides the policy days', strpos($lb, "\$p['annual_days'] = \$own[\$type]") !== false);
+check('attendance service loads holidays', strpos($read('src/Services/PayrollAttendanceService.php'), 'public_holidays') !== false);
+check('leave save validates the day fraction', strpos($es, 'fractionError') !== false && strpos($es, "'day_fraction'") !== false);
+foreach (['save_public_holiday', 'delete_public_holiday', 'save_leave_entitlement'] as $a) {
+    check("$a is permission-mapped and routed", strpos($perm, "'$a'") !== false && strpos($read('classes/Master.php'), "case '$a':") !== false);
+}
+$m2 = $read('database/migrations/021_leave_extras.sql');
+check('migration 021: tables and day_fraction, no semicolons in comments', strpos($m2, 'public_holidays') !== false && strpos($m2, 'employee_leave_entitlements') !== false && strpos($m2, 'ADD COLUMN `day_fraction`') !== false && !preg_match('/^--.*;/m', $m2));
+$base = $read('database/nuviserpx.sql');
+check('base SQL carries holidays, entitlements and day_fraction', strpos($base, 'CREATE TABLE `public_holidays`') !== false && strpos($base, 'CREATE TABLE `employee_leave_entitlements`') !== false && preg_match('/CREATE TABLE `leave_list`.*?`day_fraction`/s', $base) === 1);
 exit($fail ? 1 : 0);

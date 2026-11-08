@@ -9,6 +9,11 @@ $h = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
 $n = fn($v) => number_format((float)$v, 2);
 $policies = $svc->policies();
 $employees = $svc->employees($scope === null ? null : (int)$scope);
+$holidayRows = [];
+$hq = $conn->prepare("SELECT id, holiday_date, name FROM public_holidays WHERE tenant_id = ? AND holiday_date >= ? ORDER BY holiday_date");
+$tid = (int)$_settings->active_tenant_id();
+$from = date('Y-01-01');
+if ($hq) { $hq->bind_param('is', $tid, $from); $hq->execute(); $holidayRows = $hq->get_result()->fetch_all(MYSQLI_ASSOC); }
 ?>
 <div class="card card-outline card-primary">
 	<div class="card-header">
@@ -37,7 +42,7 @@ $employees = $svc->employees($scope === null ? null : (int)$scope);
 					<?php foreach ($policies as $type => $p): $b = $bals[$type] ?? null; ?>
 					<td class="text-right">
 						<?php if ($b): ?>
-						<b class="<?= $b['balance'] < 0 ? 'text-danger' : '' ?>"><?= $n($b['balance']) ?></b>
+						<b class="<?= $b['balance'] < 0 ? 'text-danger' : '' ?>"><?= $n($b['balance']) ?></b><?= !empty($b['custom']) ? ' <span class="text-info" title="Individual entitlement: ' . $h($n($b['policy']['annual_days'])) . ' days a year">*</span>' : '' ?>
 						<small class="d-block text-muted"><?= $n($b['opening']) ?> + <?= $n($b['accrued']) ?> <?= $b['adjusted'] != 0 ? ($b['adjusted'] > 0 ? '+ ' : '- ') . $n(abs($b['adjusted'])) : '' ?> - <?= $n($b['taken']) ?><?= $b['lapsed'] > 0 ? ' (lapsed ' . $n($b['lapsed']) . ')' : '' ?></small>
 						<?php endif; ?>
 					</td>
@@ -49,7 +54,7 @@ $employees = $svc->employees($scope === null ? null : (int)$scope);
 			</tbody>
 		</table>
 		</div>
-		<small class="text-muted">Leave years are calendar years. Days accrue daily from the joining date (set it on the employee record) and stop on the last day of employment. Only approved leave counts as taken.</small>
+		<small class="text-muted">Leave years are calendar years. Days accrue daily from the joining date (set it on the employee record) and stop on the last day of employment. Only approved leave counts as taken. Public holidays are not leave days, and * marks an individual entitlement.</small>
 		<?php endif; ?>
 	</div>
 </div>
@@ -104,6 +109,52 @@ $employees = $svc->employees($scope === null ? null : (int)$scope);
 		</div>
 	</div>
 </div>
+<div class="row">
+	<div class="col-lg-7">
+		<div class="card card-outline card-success">
+			<div class="card-header"><h3 class="card-title">Public holidays</h3></div>
+			<div class="card-body">
+				<form id="hol-form" class="form-inline mb-3">
+					<input type="date" name="holiday_date" class="form-control form-control-sm mr-2" required>
+					<input type="text" name="name" maxlength="120" class="form-control form-control-sm mr-2" placeholder="Holiday name" required>
+					<button class="btn btn-success btn-sm">Add</button>
+				</form>
+				<table class="table table-sm mb-0">
+					<tbody>
+					<?php foreach ($holidayRows as $hr): ?>
+						<tr><td style="width:140px"><?= $h(date('D, M d, Y', strtotime($hr['holiday_date']))) ?></td><td><?= $h($hr['name']) ?></td>
+						<td class="text-right"><button class="btn btn-xs btn-outline-danger del-hol" data-id="<?= (int)$hr['id'] ?>"><i class="fa fa-trash"></i></button></td></tr>
+					<?php endforeach; if (!$holidayRows): ?>
+						<tr><td class="text-muted">No holidays added for this year onwards.</td></tr>
+					<?php endif; ?>
+					</tbody>
+				</table>
+			</div>
+			<div class="card-footer text-sm text-muted">Holidays are paid days. They are not counted as leave taken, and no unpaid-day deduction applies to them.</div>
+		</div>
+	</div>
+	<div class="col-lg-5">
+		<div class="card card-outline card-secondary">
+			<div class="card-header"><h3 class="card-title">Individual entitlement</h3></div>
+			<div class="card-body">
+				<form id="ent-form">
+					<div class="form-group"><label>Employee</label><select name="employee_id" class="form-control form-control-sm" required>
+						<option value="">Select</option>
+						<?php foreach ($employees as $e): ?><option value="<?= (int)$e['id'] ?>"><?= $h($e['code'] . ' - ' . $e['name']) ?></option><?php endforeach; ?>
+					</select></div>
+					<div class="row">
+						<div class="col-6 form-group"><label>Leave type</label><select name="leave_type" class="form-control form-control-sm" required>
+							<?php foreach (LeaveBalanceService::TYPES as $type => $label): ?><option value="<?= $h($type) ?>"><?= $h($label) ?></option><?php endforeach; ?>
+						</select></div>
+						<div class="col-6 form-group"><label>Days / year</label><input type="number" step="0.01" min="0" max="366" name="annual_days" class="form-control form-control-sm" placeholder="standard"></div>
+					</div>
+					<button class="btn btn-secondary btn-sm">Save</button>
+					<small class="text-muted d-block mt-2">Overrides the policy for this person. Leave the days blank to go back to the standard entitlement.</small>
+				</form>
+			</div>
+		</div>
+	</div>
+</div>
 <script>
 $(function(){
 	$('.save-policy').click(function(){
@@ -119,6 +170,17 @@ $(function(){
 			else { alert_toast(resp.msg || 'An error occurred', 'error'); }
 		}, 'json').fail(function(){ end_loader(); alert_toast('An error occurred', 'error'); });
 	});
+	function post(f, data){
+		start_loader();
+		$.post(_base_url_+"classes/Master.php?f="+f, data, function(resp){
+			end_loader();
+			if(resp.status == 'success'){ alert_toast(resp.msg, 'success'); setTimeout(function(){ location.reload(); }, 600); }
+			else { alert_toast(resp.msg || 'An error occurred', 'error'); }
+		}, 'json').fail(function(){ end_loader(); alert_toast('An error occurred', 'error'); });
+	}
+	$('#hol-form').submit(function(e){ e.preventDefault(); post('save_public_holiday', $(this).serialize()); });
+	$('#ent-form').submit(function(e){ e.preventDefault(); post('save_leave_entitlement', $(this).serialize()); });
+	$('.del-hol').click(function(){ if(confirm('Remove this holiday?')){ post('delete_public_holiday', {id: $(this).data('id')}); } });
 	$('#adj-form').submit(function(e){
 		e.preventDefault();
 		start_loader();

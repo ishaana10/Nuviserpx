@@ -1822,6 +1822,21 @@ class Master extends DBConnection
         return (new \App\Services\LeaveBalanceService($this->conn, $this->settings))->saveAdjustment($_POST);
     }
 
+    public function save_public_holiday()
+    {
+        return (new \App\Services\LeaveBalanceService($this->conn, $this->settings))->saveHoliday($_POST);
+    }
+
+    public function delete_public_holiday()
+    {
+        return (new \App\Services\LeaveBalanceService($this->conn, $this->settings))->deleteHoliday((int)($_POST['id'] ?? 0));
+    }
+
+    public function save_leave_entitlement()
+    {
+        return (new \App\Services\LeaveBalanceService($this->conn, $this->settings))->saveEntitlement($_POST);
+    }
+
     /** Balance and request length for the leave form. A self-service user only sees their own. */
     public function leave_balance_info()
     {
@@ -1835,7 +1850,7 @@ class Master extends DBConnection
         $bal = $emp > 0 && $ok($end) ? ($svc->forEmployee($emp, $end, (int)($_POST['id'] ?? 0))[$type] ?? null) : null;
         return json_encode(['status' => 'success', 'tracked' => $bal !== null,
             'balance' => $bal['balance'] ?? null,
-            'days' => ($ok($start) && $ok($end) && $end >= $start) ? $svc->requestDays($start, $end) : null]);
+            'days' => ($ok($start) && $ok($end) && $end >= $start) ? $svc->requestDays($start, $end, $_POST['day_fraction'] ?? 1) : null]);
     }
 
     /** Leave days payable on exit and their value at the employee's daily rate. */
@@ -2351,6 +2366,15 @@ switch ($action) {
         break;
     case 'delete_employee':
         echo $Master->delete_employee();
+        break;
+    case 'save_public_holiday':
+        echo $Master->save_public_holiday();
+        break;
+    case 'delete_public_holiday':
+        echo $Master->delete_public_holiday();
+        break;
+    case 'save_leave_entitlement':
+        echo $Master->save_leave_entitlement();
         break;
     case 'save_leave_policy':
         echo $Master->save_leave_policy();

@@ -50,25 +50,49 @@ class LeaveBalanceService
     }
 
     /**
-     * Working days of approved leave per calendar year (each date counted once).
+     * Working days of approved leave per calendar year. Public holidays are not leave days, each date counts once
+     * (the largest share if requests overlap) and a half-day request counts 0.5.
      *
-     * @param array<int,array{start_date:string,end_date:string}> $leaves
+     * @param array<int,array{start_date:string,end_date:string,day_fraction?:mixed}> $leaves
+     * @param string[] $holidays Y-m-d dates that are not working days
      * @return array<int,float> year => days
      */
-    public static function takenByYear(array $leaves, int $daysPerWeek = 5): array
+    public static function takenByYear(array $leaves, int $daysPerWeek = 5, array $holidays = []): array
     {
         $seen = [];
         foreach ($leaves as $l) {
-            foreach (PayrollAttendanceService::workingDays((string)$l['start_date'], (string)$l['end_date'], $daysPerWeek) as $d) {
-                $seen[$d] = true;
+            $frac = self::fraction($l['day_fraction'] ?? 1);
+            foreach (array_diff(PayrollAttendanceService::workingDays((string)$l['start_date'], (string)$l['end_date'], $daysPerWeek), $holidays) as $d) {
+                $seen[$d] = max($seen[$d] ?? 0.0, $frac);
             }
         }
         $out = [];
-        foreach (array_keys($seen) as $d) {
+        foreach ($seen as $d => $f) {
             $y = (int)substr($d, 0, 4);
-            $out[$y] = ($out[$y] ?? 0) + 1;
+            $out[$y] = ($out[$y] ?? 0) + $f;
         }
         return $out;
+    }
+
+    /** Pure: a leave day fraction is 0.5 or 1, anything else counts as a full day. */
+    public static function fraction($v): float
+    {
+        return is_numeric($v) && abs((float)$v - 0.5) < 0.001 ? 0.5 : 1.0;
+    }
+
+    /** Pure: the days a request uses: working days in the range, less holidays, times the day fraction. */
+    public static function daysInRequest(string $start, string $end, int $daysPerWeek, array $holidays, $fraction = 1): float
+    {
+        return count(array_diff(PayrollAttendanceService::workingDays($start, $end, $daysPerWeek), $holidays)) * self::fraction($fraction);
+    }
+
+    /** Pure: an error for a bad day fraction (a half day needs a single date), else null. */
+    public static function fractionError(string $start, string $end, $fraction): ?string
+    {
+        if ($fraction === null || $fraction === '' || self::fraction($fraction) === 1.0) {
+            return null;
+        }
+        return $start === $end ? null : 'A half day can only be taken on a single date.';
     }
 
     /**
@@ -233,6 +257,97 @@ class LeaveBalanceService
         }
     }
 
+    /** @var string[]|null */
+    private ?array $holidayCache = null;
+
+    /** Every public holiday date for the active company (Y-m-d). */
+    public function holidays(): array
+    {
+        if ($this->holidayCache === null) {
+            $t = (int)$this->settings->active_tenant_id();
+            $q = $this->conn->prepare("SELECT holiday_date FROM public_holidays WHERE tenant_id = ?");
+            $this->holidayCache = [];
+            if ($q) {
+                $q->bind_param('i', $t);
+                $q->execute();
+                foreach ($q->get_result()->fetch_all(MYSQLI_ASSOC) as $r) {
+                    $this->holidayCache[] = $r['holiday_date'];
+                }
+            }
+        }
+        return $this->holidayCache;
+    }
+
+    public function saveHoliday(array $post): string
+    {
+        $t = (int)$this->settings->active_tenant_id();
+        $date = (string)($post['holiday_date'] ?? '');
+        $name = trim((string)($post['name'] ?? ''));
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) || !strtotime($date)) return $this->fail('Enter the holiday date.');
+        if ($name === '' || strlen($name) > 120) return $this->fail('Enter a name (up to 120 characters).');
+        $s = $this->conn->prepare("INSERT INTO public_holidays (tenant_id, holiday_date, name) VALUES (?,?,?) ON DUPLICATE KEY UPDATE name = VALUES(name)");
+        $s->bind_param('iss', $t, $date, $name);
+        if (!$s->execute()) return $this->fail('The holiday could not be saved.');
+        $this->settings->log_audit('Saved public holiday', 'Leave', "{$date} {$name}");
+        return json_encode(['status' => 'success', 'msg' => 'Holiday saved.']);
+    }
+
+    public function deleteHoliday(int $id): string
+    {
+        $t = (int)$this->settings->active_tenant_id();
+        $s = $this->conn->prepare("DELETE FROM public_holidays WHERE id = ? AND tenant_id = ?");
+        $s->bind_param('ii', $id, $t);
+        $s->execute();
+        if ($s->affected_rows < 1) return $this->fail('Holiday not found.');
+        $this->settings->log_audit('Deleted public holiday', 'Leave', "#{$id}");
+        return json_encode(['status' => 'success', 'msg' => 'Holiday removed.']);
+    }
+
+    /** Set (or with a blank value, clear) one employee's own annual entitlement for a type. */
+    public function saveEntitlement(array $post): string
+    {
+        $t = (int)$this->settings->active_tenant_id();
+        $emp = (int)($post['employee_id'] ?? 0);
+        $type = (string)($post['leave_type'] ?? '');
+        if (!isset(self::TYPES[$type])) return $this->fail('Choose a leave type.');
+        $e = $this->conn->prepare("SELECT id FROM employee_list WHERE id = ? AND tenant_id = ? AND delete_flag = 0");
+        $e->bind_param('ii', $emp, $t);
+        $e->execute();
+        if (!$e->get_result()->fetch_assoc()) return $this->fail('Employee not found.');
+        $raw = $post['annual_days'] ?? '';
+        if ($raw === '' || $raw === null) {
+            $d = $this->conn->prepare("DELETE FROM employee_leave_entitlements WHERE tenant_id = ? AND employee_id = ? AND leave_type = ?");
+            $d->bind_param('iis', $t, $emp, $type);
+            $d->execute();
+            $this->settings->log_audit('Cleared individual leave entitlement', 'Leave', "Employee #{$emp} {$type}");
+            return json_encode(['status' => 'success', 'msg' => 'Back to the standard entitlement.']);
+        }
+        if (!is_numeric($raw) || $raw < 0 || $raw > 366) return $this->fail('Enter days from 0 to 366, or leave blank to use the standard entitlement.');
+        $days = round((float)$raw, 2);
+        $s = $this->conn->prepare("INSERT INTO employee_leave_entitlements (tenant_id, employee_id, leave_type, annual_days) VALUES (?,?,?,?)
+            ON DUPLICATE KEY UPDATE annual_days = VALUES(annual_days)");
+        $s->bind_param('iisd', $t, $emp, $type, $days);
+        if (!$s->execute()) return $this->fail('The entitlement could not be saved.');
+        $this->settings->log_audit('Set individual leave entitlement', 'Leave', "Employee #{$emp} {$type} {$days}");
+        return json_encode(['status' => 'success', 'msg' => 'Individual entitlement saved.']);
+    }
+
+    /** employee id => type => annual days, for people with their own entitlement. */
+    public function entitlements(): array
+    {
+        $t = (int)$this->settings->active_tenant_id();
+        $q = $this->conn->prepare("SELECT employee_id, leave_type, annual_days FROM employee_leave_entitlements WHERE tenant_id = ?");
+        $out = [];
+        if ($q) {
+            $q->bind_param('i', $t);
+            $q->execute();
+            foreach ($q->get_result()->fetch_all(MYSQLI_ASSOC) as $r) {
+                $out[(int)$r['employee_id']][$r['leave_type']] = (float)$r['annual_days'];
+            }
+        }
+        return $out;
+    }
+
     /** Balances for one employee, keyed by tracked leave type. */
     public function forEmployee(int $employeeId, ?string $asOf = null, int $excludeLeaveId = 0): array
     {
@@ -252,36 +367,42 @@ class LeaveBalanceService
         $join = !empty($emp['date_of_joining']) && $emp['date_of_joining'] !== '0000-00-00' ? $emp['date_of_joining'] : null;
         $term = !empty($emp['termination_date']) ? $emp['termination_date'] : null;
         $dpw = $this->daysPerWeek($asOf);
+        $own = $this->entitlements()[$employeeId] ?? [];
+        $holidays = $this->holidays();
         $out = [];
         foreach ($policies as $type => $p) {
-            $lq = $this->conn->prepare("SELECT start_date, end_date FROM leave_list WHERE tenant_id = ? AND employee_id = ? AND leave_type = ? AND status = 'approved' AND id <> ?");
+            $custom = array_key_exists($type, $own);
+            if ($custom) {
+                $p['annual_days'] = $own[$type];
+            }
+            $lq = $this->conn->prepare("SELECT start_date, end_date, day_fraction FROM leave_list WHERE tenant_id = ? AND employee_id = ? AND leave_type = ? AND status = 'approved' AND id <> ?");
             $lq->bind_param('iisi', $t, $employeeId, $type, $excludeLeaveId);
             $lq->execute();
             $aq = $this->conn->prepare("SELECT effective_date, days FROM leave_adjustments WHERE tenant_id = ? AND employee_id = ? AND leave_type = ?");
             $aq->bind_param('iis', $t, $employeeId, $type);
             $aq->execute();
-            $bal = self::balance($p, $join, $term, $asOf, self::takenByYear($lq->get_result()->fetch_all(MYSQLI_ASSOC), $dpw), $aq->get_result()->fetch_all(MYSQLI_ASSOC));
-            $out[$type] = $bal + ['policy' => $p, 'label' => self::TYPES[$type]];
+            $bal = self::balance($p, $join, $term, $asOf, self::takenByYear($lq->get_result()->fetch_all(MYSQLI_ASSOC), $dpw, $holidays), $aq->get_result()->fetch_all(MYSQLI_ASSOC));
+            $out[$type] = $bal + ['policy' => $p, 'label' => self::TYPES[$type], 'custom' => $custom];
         }
         return $out;
     }
 
     /** Error message if this request would overdraw a tracked balance, else null. */
-    public function check(int $employeeId, string $type, string $start, string $end, int $excludeLeaveId = 0): ?string
+    public function check(int $employeeId, string $type, string $start, string $end, int $excludeLeaveId = 0, $fraction = 1): ?string
     {
         $p = $this->policies()[$type] ?? null;
         if ($p === null || $end < $start) {
             return null;
         }
-        $days = count(PayrollAttendanceService::workingDays($start, $end, $this->daysPerWeek($end)));
+        $days = self::daysInRequest($start, $end, $this->daysPerWeek($end), $this->holidays(), $fraction);
         $bal = $this->forEmployee($employeeId, $end, $excludeLeaveId)[$type] ?? null;
         return $bal ? self::shortfall((float)$days, (float)$bal['balance'], $p['allow_negative'], self::TYPES[$type]) : null;
     }
 
-    /** Working days a request covers. */
-    public function requestDays(string $start, string $end): int
+    /** Leave days a request uses: working days less public holidays, halved for a half day. */
+    public function requestDays(string $start, string $end, $fraction = 1): float
     {
-        return count(PayrollAttendanceService::workingDays($start, $end, $this->daysPerWeek($end)));
+        return self::daysInRequest($start, $end, $this->daysPerWeek($end), $this->holidays(), $fraction);
     }
 
     /** Days payable on exit: the positive balance of every type marked payable, as of $asOf. */

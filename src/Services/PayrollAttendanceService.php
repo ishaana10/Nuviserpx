@@ -54,7 +54,7 @@ class PayrollAttendanceService
         foreach ($leaves as $l) {
             foreach (array_diff(self::workingDays(max($from, (string)$l['start_date']), min($to, (string)$l['end_date']), $daysPerWeek), $skipDates) as $d) {
                 if (($l['leave_type'] ?? '') === 'unpaid') {
-                    $unpaid[$d] = 1.0;
+                    $unpaid[$d] = max($unpaid[$d] ?? 0.0, (isset($l['day_fraction']) && abs((float)$l['day_fraction'] - 0.5) < 0.001) ? 0.5 : 1.0);
                 } else {
                     $covered[$d] = true;
                 }
@@ -142,7 +142,7 @@ class PayrollAttendanceService
                 $after = array_values(array_unique(array_merge($after, self::daysBeforeJoining($from, $to, $join, $daysPerWeek))));
             }
         }
-        $lq = $this->conn->prepare("SELECT leave_type, start_date, end_date FROM leave_list
+        $lq = $this->conn->prepare("SELECT leave_type, start_date, end_date, day_fraction FROM leave_list
             WHERE tenant_id = ? AND employee_id = ? AND status = 'approved' AND start_date <= ? AND end_date >= ?");
         $aq = $this->conn->prepare("SELECT attendance_date, status FROM attendance_list
             WHERE tenant_id = ? AND employee_id = ? AND attendance_date BETWEEN ? AND ? AND status IN ('absent','half_day')");
@@ -153,7 +153,16 @@ class PayrollAttendanceService
         $lq->execute();
         $aq->bind_param('iiss', $t, $employeeId, $from, $to);
         $aq->execute();
-        // Days after the last day are unpaid whatever the leave or attendance records say, and never counted twice.
-        return round(self::unpaidDays($lq->get_result()->fetch_all(MYSQLI_ASSOC), $aq->get_result()->fetch_all(MYSQLI_ASSOC), $from, $to, $daysPerWeek, $after) + count($after), 2);
+        // Public holidays are paid days: no leave, absence or deduction applies to them.
+        $hq = $this->conn->prepare("SELECT holiday_date FROM public_holidays WHERE tenant_id = ? AND holiday_date BETWEEN ? AND ?");
+        $holidays = [];
+        if ($hq) {
+            $hq->bind_param('iss', $t, $from, $to);
+            $hq->execute();
+            $holidays = array_column($hq->get_result()->fetch_all(MYSQLI_ASSOC), 'holiday_date');
+        }
+        // Days after the last day (or before joining) are unpaid whatever the records say, and never counted twice.
+        $unpaidAfter = array_diff($after, $holidays);
+        return round(self::unpaidDays($lq->get_result()->fetch_all(MYSQLI_ASSOC), $aq->get_result()->fetch_all(MYSQLI_ASSOC), $from, $to, $daysPerWeek, array_merge($after, $holidays)) + count($unpaidAfter), 2);
     }
 }

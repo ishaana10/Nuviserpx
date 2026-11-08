@@ -523,6 +523,31 @@ CREATE TABLE `leave_adjustments` (
 
 -- --------------------------------------------------------
 
+CREATE TABLE `public_holidays` (
+  `id` int(30) NOT NULL AUTO_INCREMENT,
+  `tenant_id` int(30) NOT NULL DEFAULT 1,
+  `holiday_date` date NOT NULL,
+  `name` varchar(120) NOT NULL,
+  `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `tenant_date` (`tenant_id`, `holiday_date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+CREATE TABLE `employee_leave_entitlements` (
+  `id` int(30) NOT NULL AUTO_INCREMENT,
+  `tenant_id` int(30) NOT NULL DEFAULT 1,
+  `employee_id` int(30) NOT NULL,
+  `leave_type` enum('casual','sick','paid') NOT NULL,
+  `annual_days` decimal(6,2) NOT NULL,
+  `date_updated` datetime DEFAULT NULL ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `tenant_employee_type` (`tenant_id`, `employee_id`, `leave_type`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
 CREATE TABLE `leave_list` (
   `id` int(30) NOT NULL AUTO_INCREMENT,
   `tenant_id` int(30) NOT NULL DEFAULT 1,
@@ -531,6 +556,7 @@ CREATE TABLE `leave_list` (
   `start_date` date NOT NULL,
   `end_date` date NOT NULL,
   `reason` text DEFAULT NULL,
+  `day_fraction` decimal(3,2) NOT NULL DEFAULT 1.00,
   `status` enum('pending','approved','rejected','cancelled') NOT NULL DEFAULT 'pending',
   `date_created` datetime NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),

@@ -526,6 +526,9 @@ final class Permissions
         'save_leave_policy'     => ['leaves', 'edit'],
         'save_leave_adjustment' => ['leaves', 'edit'],
         'leave_balance_info'    => ['leaves', 'view'],
+        'save_public_holiday'   => ['leaves', 'edit'],
+        'delete_public_holiday' => ['leaves', 'edit'],
+        'save_leave_entitlement' => ['leaves', 'edit'],
         'leave_payout_suggestion' => ['payroll', 'edit'],
         // Payroll
         'save_payroll_rules'    => ['settings_manage'],
