@@ -40,7 +40,7 @@ elseif(isset($_GET['po_id']) && is_numeric($_GET['po_id']) && $_GET['po_id'] > 0
     }
 }
 
-if (!isset($bill_no) || empty($bill_no)) { $bill_no = 'BILL-' . date('Ym') . '-' . rand(1000, 9999); }
+if (!isset($bill_no)) { $bill_no = ''; }   // numbered automatically when saved
 if (empty($prefill_items)) {
     $prefill_items[] = ['product_id'=>null,'item_name'=>'','description'=>'','qty'=>1,'unit_price'=>'0.00','tax_rate'=>$default_tax_rate,'amount'=>'0.00'];
 }
@@ -79,7 +79,7 @@ while($p = $products_qry->fetch_assoc()){ $products_data[$p['id']] = $p; }
 				</div>
 				<div class="col-md-2 col-6 form-group">
 					<label class="control-label">Bill No</label>
-					<input type="text" name="bill_no" class="form-control form-control-sm rounded-0" value="<?php echo htmlspecialchars($bill_no) ?>" required>
+					<input type="text" name="bill_no" class="form-control form-control-sm rounded-0" value="<?php echo htmlspecialchars($bill_no) ?>" placeholder="Automatic">
 				</div>
 				<div class="col-md-2 col-6 form-group">
 					<label class="control-label">Vendor Ref</label>

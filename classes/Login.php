@@ -15,8 +15,18 @@ class Login extends DBConnection {
 	public function index(){
 		echo "<h1>Access Denied</h1> <a href='".base_url."'>Go Back.</a>";
 	}
+	private function throttle(){
+		return new \App\Services\AuthThrottleService($this->conn);
+	}
 	public function login(){
-		extract($_POST);
+		$username = trim((string)($_POST['username'] ?? ''));
+		$password = (string)($_POST['password'] ?? '');
+		$throttle = $this->throttle();
+		$wait = $throttle->check('login', $username);
+		if($wait > 0){
+			return json_encode(array('status'=>'locked', 'retry_after'=>$wait,
+				'msg'=>'Too many failed attempts. Try again in ' . \App\Services\AuthThrottleService::waitText($wait) . '.'));
+		}
 		$stmt = $this->conn->prepare("SELECT * FROM users WHERE username = ? LIMIT 1");
 		$stmt->bind_param('s', $username);
 		$stmt->execute();
@@ -50,6 +60,7 @@ class Login extends DBConnection {
 					}
 				}
 				$this->settings->set_userdata('login_type', 1);
+				$throttle->clear('login', $username);
 
 				// Update last_login timestamp
 				$this->conn->query("UPDATE `users` SET `last_login` = NOW() WHERE id = '{$res['id']}'");
@@ -64,8 +75,13 @@ class Login extends DBConnection {
 		if(!empty($username)){
 			$this->settings->log_audit("Failed Login Attempt", "Authentication", "Failed login attempt for username: " . htmlspecialchars($username));
 		}
+		// Unknown usernames cost the same time as wrong passwords, and both count towards the limit.
+		if($qry->num_rows == 0){
+			password_verify($password, '$2y$10$4atYI/I54Zf2duldz2eoGeLt85rsTV2yvoQVc7oLbm1JwmpyG6aDK');
+		}
+		$throttle->record('login', $username);
 
-		return json_encode(array('status'=>'incorrect', 'error'=>$this->conn->error));
+		return json_encode(array('status'=>'incorrect'));
 	}
 	public function logout(){
 		$u_name = $this->settings->userdata('username') ?: 'User';
@@ -114,54 +130,90 @@ class Login extends DBConnection {
 		}
 	}
 
+	/** Password reset step 1. The answer is the same whether or not the account exists. */
 	public function request_otp(){
-		extract($_POST);
-		$email = $this->conn->real_escape_string($email);
-		$qry = $this->conn->query("SELECT * FROM `users` WHERE `username` = '{$email}' LIMIT 1");
+		$username = trim((string)($_POST['email'] ?? ''));
+		$generic = ['status' => 'success', 'msg' => 'If an account exists for that address, a 6-digit code has been sent to it. It is valid for 15 minutes.'];
+		if($username === ''){
+			return json_encode(['status' => 'failed', 'msg' => 'Enter your username / email.']);
+		}
+		$throttle = $this->throttle();
+		$wait = $throttle->check('otp_request', $username);
+		if($wait > 0){
+			return json_encode(['status' => 'failed', 'msg' => 'Too many requests. Try again in ' . \App\Services\AuthThrottleService::waitText($wait) . '.']);
+		}
+		$throttle->record('otp_request', $username);
 
-		if(!$qry || $qry->num_rows == 0){
-			return json_encode(['status' => 'failed', 'msg' => 'No user account found with that username / email.']);
+		$stmt = $this->conn->prepare("SELECT id, firstname, username, status FROM `users` WHERE `username` = ? LIMIT 1");
+		$stmt->bind_param('s', $username);
+		$stmt->execute();
+		$user = $stmt->get_result()->fetch_assoc();
+		if(!$user || (int)$user['status'] !== 1 || !filter_var($user['username'], FILTER_VALIDATE_EMAIL)){
+			return json_encode($generic);
 		}
 
-		$user = $qry->fetch_assoc();
-		$user_id = $user['id'];
-		$otp_code = sprintf("%06d", rand(100000, 999999));
+		$user_id = (int)$user['id'];
+		$otp_code = sprintf("%06d", random_int(0, 999999));
+		$otp_hash = hash('sha256', $otp_code);
 		$expires_at = date("Y-m-d H:i:s", strtotime("+15 minutes"));
+		$to = $user['username'];
 
 		$this->conn->query("UPDATE `otp_tokens` SET `status` = 1 WHERE `user_id` = '{$user_id}'");
-		$ins = $this->conn->query("INSERT INTO `otp_tokens` (`user_id`, `email`, `otp_code`, `expires_at`, `status`) VALUES ('{$user_id}', '{$email}', '{$otp_code}', '{$expires_at}', 0)");
-
-		if($ins){
+		$ins = $this->conn->prepare("INSERT INTO `otp_tokens` (`user_id`, `email`, `otp_code`, `expires_at`, `status`) VALUES (?, ?, ?, ?, 0)");
+		$ins->bind_param('isss', $user_id, $to, $otp_hash, $expires_at);
+		if($ins->execute()){
 			require_once(__DIR__ . '/Emailer.php');
-			Emailer::send_auth_otp($email, $user['firstname'], $otp_code);
-
-			return json_encode([
-				'status' => 'success',
-				'msg' => 'An OTP code has been sent to your email address.',
-				'user_id' => $user_id
-			]);
-		} else {
-			return json_encode(['status' => 'failed', 'msg' => 'Failed to generate OTP code.']);
+			Emailer::send_auth_otp($to, $user['firstname'], $otp_code);
+			$this->settings->log_audit("Password Reset Requested", "Authentication", "Reset code requested for '" . htmlspecialchars($to) . "'.");
 		}
+		return json_encode($generic);
 	}
 
+	/** Password reset step 2: the username, the emailed code and a new password. Five wrong codes kill the code. */
 	public function reset_password_otp(){
-		extract($_POST);
-		$user_id = $this->conn->real_escape_string($user_id);
-		$otp_code = $this->conn->real_escape_string($otp_code);
-		$new_password = password_hash($password, PASSWORD_BCRYPT);
+		$username = trim((string)($_POST['email'] ?? ''));
+		$otp_code = trim((string)($_POST['otp_code'] ?? ''));
+		$password = (string)($_POST['password'] ?? '');
+		$bad = ['status' => 'failed', 'msg' => 'Invalid or expired code.'];
 
-		$qry = $this->conn->query("SELECT * FROM `otp_tokens` WHERE `user_id` = '{$user_id}' AND `otp_code` = '{$otp_code}' AND `status` = 0 AND `expires_at` >= NOW() ORDER BY id DESC LIMIT 1");
-
-		if($qry && $qry->num_rows > 0){
-			$token = $qry->fetch_assoc();
-			$this->conn->query("UPDATE `users` SET `password` = '{$new_password}' WHERE `id` = '{$user_id}'");
-			$this->conn->query("UPDATE `otp_tokens` SET `status` = 1 WHERE `id` = '{$token['id']}'");
-
-			return json_encode(['status' => 'success', 'msg' => 'Password reset successfully! You can now log in with your new password.']);
-		} else {
-			return json_encode(['status' => 'failed', 'msg' => 'Invalid or expired OTP code.']);
+		if(strlen($password) < 8 || strlen($password) > 72){
+			return json_encode(['status' => 'failed', 'msg' => 'Choose a password of 8 to 72 characters.']);
 		}
+		$throttle = $this->throttle();
+		$wait = $throttle->check('otp_verify', $username);
+		if($wait > 0){
+			return json_encode(['status' => 'failed', 'msg' => 'Too many attempts. Try again in ' . \App\Services\AuthThrottleService::waitText($wait) . '.']);
+		}
+
+		$stmt = $this->conn->prepare("SELECT id FROM `users` WHERE `username` = ? AND `status` = 1 LIMIT 1");
+		$stmt->bind_param('s', $username);
+		$stmt->execute();
+		$user = $stmt->get_result()->fetch_assoc();
+		$token = null;
+		if($user){
+			$uid = (int)$user['id'];
+			$tq = $this->conn->query("SELECT id, otp_code, attempts FROM `otp_tokens` WHERE `user_id` = '{$uid}' AND `status` = 0 AND `expires_at` >= NOW() ORDER BY id DESC LIMIT 1");
+			$token = $tq ? $tq->fetch_assoc() : null;
+		}
+		if(!$user || !$token || !preg_match('/^\d{6}$/', $otp_code) || !hash_equals((string)$token['otp_code'], hash('sha256', $otp_code))){
+			$throttle->record('otp_verify', $username);
+			if($token){
+				$tid = (int)$token['id'];
+				// Fifth wrong guess: the code is dead and a new one has to be requested.
+				$this->conn->query("UPDATE `otp_tokens` SET `attempts` = `attempts` + 1, `status` = IF(`attempts` >= 5, 1, `status`) WHERE `id` = '{$tid}'");
+			}
+			return json_encode($bad);
+		}
+
+		$new_password = password_hash($password, PASSWORD_BCRYPT);
+		$up = $this->conn->prepare("UPDATE `users` SET `password` = ? WHERE `id` = ?");
+		$up->bind_param('si', $new_password, $uid);
+		$up->execute();
+		$this->conn->query("UPDATE `otp_tokens` SET `status` = 1 WHERE `user_id` = '{$uid}'");
+		$throttle->clear('otp_verify', $username);
+		$throttle->clear('login', $username);
+		$this->settings->log_audit("Password Reset", "Authentication", "Password reset by emailed code for '" . htmlspecialchars($username) . "'.");
+		return json_encode(['status' => 'success', 'msg' => 'Password reset successfully! You can now sign in with your new password.']);
 	}
 }
 $action = !isset($_GET['f']) ? 'none' : strtolower($_GET['f']);

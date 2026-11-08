@@ -234,6 +234,24 @@ INSERT INTO `system_info` (`id`, `meta_field`, `meta_value`) VALUES
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `auth_attempts`
+--
+
+CREATE TABLE `auth_attempts` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `scope` varchar(20) NOT NULL,
+  `identifier` varchar(190) NOT NULL,
+  `ip` varchar(45) NOT NULL,
+  `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `scope_identifier` (`scope`, `identifier`, `date_created`),
+  KEY `scope_ip` (`scope`, `ip`, `date_created`),
+  KEY `date_created` (`date_created`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `otp_tokens`
 --
 
@@ -241,8 +259,9 @@ CREATE TABLE `otp_tokens` (
   `id` int(30) NOT NULL AUTO_INCREMENT,
   `user_id` int(50) NOT NULL,
   `email` varchar(150) NOT NULL,
-  `otp_code` varchar(10) NOT NULL,
+  `otp_code` varchar(64) NOT NULL,
   `expires_at` datetime NOT NULL,
+  `attempts` tinyint(3) NOT NULL DEFAULT 0,
   `status` tinyint(1) NOT NULL DEFAULT 0 COMMENT '0 = Pending, 1 = Used',
   `date_created` datetime NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
