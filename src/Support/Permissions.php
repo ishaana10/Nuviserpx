@@ -509,6 +509,13 @@ final class Permissions
         // Expenses
         'save_expense_claim'    => ['expenses', 'save'],
         'approve_expense_claim' => ['expenses', 'edit'],
+        'reject_expense_claim'  => ['expenses', 'edit'],
+        // Owner-or-manager is enforced in ExpenseClaimService, so staff can withdraw their own pending claim.
+        'cancel_expense_claim'  => ['expenses', 'view'],
+        'void_expense_claim'    => ['expenses', 'edit'],
+        'reimburse_expense_claims' => ['expenses', 'edit'],
+        'reverse_expense_reimbursement' => ['expenses', 'edit'],
+        'save_expense_category' => ['expenses', 'edit'],
         // Employees / attendance / leaves
         'save_employee'         => ['employees', 'save'],
         'delete_employee'       => ['employees', 'delete'],

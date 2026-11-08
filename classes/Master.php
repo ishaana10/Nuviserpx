@@ -520,64 +520,69 @@ class Master extends DBConnection
     }
 
     /* Dolibarr Inspired Employee Expense Claim Methods */
+    private function expenses(): \App\Services\ExpenseClaimService
+    {
+        return new \App\Services\ExpenseClaimService($this->conn, $this->settings);
+    }
+
     public function save_expense_claim()
     {
-        $tenant_id = $this->settings->active_tenant_id();
-        extract($_POST);
-
-        $emp_id = intval($employee_id ?? 0);
-        $c_amount = floatval($amount ?? 0);
-
-        if ($emp_id <= 0 || $c_amount <= 0 || empty($claim_date)) {
-            return json_encode(['status' => 'failed', 'msg' => 'Employee, Date, and Amount are required.']);
-        }
-
-        $c_no = 'EXP-' . sprintf('%05d', rand(100, 99999));
-        $data = " `tenant_id` = '{$tenant_id}' ";
-        $data .= ", `claim_no` = '{$c_no}' ";
-        $data .= ", `employee_id` = '{$emp_id}' ";
-        $data .= ", `claim_date` = '{$this->conn->real_escape_string($claim_date)}' ";
-        $data .= ", `category` = '{$this->conn->real_escape_string($category ?? 'Travel & Meals')}' ";
-        $data .= ", `amount` = '{$c_amount}' ";
-        $data .= ", `description` = '{$this->conn->real_escape_string($description ?? '')}' ";
-        $data .= ", `status` = 'pending' ";
-
-        if (isset($_FILES['attachment']) && $_FILES['attachment']['tmp_name'] != '') {
-            $ext = strtolower(pathinfo($_FILES['attachment']['name'], PATHINFO_EXTENSION));
-            $allowed_exts = ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'xls', 'xlsx', 'txt'];
-            if (!in_array($ext, $allowed_exts)) {
+        $path = null;
+        if (isset($_FILES['attachment']) && ($_FILES['attachment']['tmp_name'] ?? '') != '') {
+            $f = $_FILES['attachment'];
+            $ext = strtolower(pathinfo((string)$f['name'], PATHINFO_EXTENSION));
+            if (!in_array($ext, ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'xls', 'xlsx', 'txt'], true)) {
                 return json_encode(['status' => 'failed', 'msg' => 'Invalid receipt attachment format. Allowed: PDF, Images, Documents.']);
             }
-            $fname = 'uploads/expenses/claim_' . $tenant_id . '_' . time() . '.' . $ext;
-            $dir_path = base_app . 'uploads/expenses';
-            if (!is_dir($dir_path)) {
-                mkdir($dir_path, 0777, true);
+            if (($f['size'] ?? 0) > 10 * 1024 * 1024) {
+                return json_encode(['status' => 'failed', 'msg' => 'The receipt is larger than 10MB.']);
             }
-            if (move_uploaded_file($_FILES['attachment']['tmp_name'], base_app . $fname)) {
-                $data .= ", `attachment_path` = '{$fname}' ";
+            $tenant_id = (int)$this->settings->active_tenant_id();
+            $dir = base_app . 'uploads/expenses';
+            if (!is_dir($dir)) {
+                mkdir($dir, 0755, true);
+            }
+            $rel = 'uploads/expenses/claim_' . $tenant_id . '_' . bin2hex(random_bytes(8)) . '.' . $ext;
+            if (move_uploaded_file($f['tmp_name'], base_app . $rel)) {
+                $path = $rel;
             }
         }
-
-        $save = $this->conn->query("INSERT INTO `expense_reports` SET {$data}");
-        if ($save) {
-            $this->settings->log_audit("Submitted Expense Claim", "Expense Claims", "Claim #{$c_no}, Amount: {$c_amount}");
-            return json_encode(['status' => 'success', 'id' => $this->conn->insert_id, 'msg' => 'Expense claim submitted successfully.']);
-        }
-        return json_encode(['status' => 'failed', 'msg' => 'Failed to submit expense claim. ' . $this->conn->error]);
+        return $this->expenses()->submit($_POST, $path);
     }
 
     public function approve_expense_claim()
     {
-        $tenant_id = $this->settings->active_tenant_id();
-        $user_id = $this->settings->userdata('id');
-        $id = intval($_POST['id'] ?? 0);
+        return $this->expenses()->approve((int)($_POST['id'] ?? 0), (int)($_POST['account_id'] ?? 0), (string)($_POST['note'] ?? ''));
+    }
 
-        $save = $this->conn->query("UPDATE `expense_reports` SET `status` = 'approved', `approved_by` = '{$user_id}' WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'");
-        if ($save) {
-            $this->settings->log_audit("Approved Expense Claim", "Expense Claims", "Claim ID #{$id}");
-            return json_encode(['status' => 'success', 'msg' => 'Expense claim approved successfully.']);
-        }
-        return json_encode(['status' => 'failed', 'msg' => 'Failed to approve expense claim.']);
+    public function reject_expense_claim()
+    {
+        return $this->expenses()->reject((int)($_POST['id'] ?? 0), (string)($_POST['reason'] ?? ''));
+    }
+
+    public function cancel_expense_claim()
+    {
+        return $this->expenses()->cancel((int)($_POST['id'] ?? 0));
+    }
+
+    public function void_expense_claim()
+    {
+        return $this->expenses()->void((int)($_POST['id'] ?? 0), (string)($_POST['reason'] ?? ''));
+    }
+
+    public function reimburse_expense_claims()
+    {
+        return $this->expenses()->reimburse((array)($_POST['ids'] ?? []), (int)($_POST['bank_account_id'] ?? 0), (string)($_POST['pay_date'] ?? ''), (string)($_POST['reference'] ?? ''));
+    }
+
+    public function reverse_expense_reimbursement()
+    {
+        return $this->expenses()->reversePayment((int)($_POST['id'] ?? 0));
+    }
+
+    public function save_expense_category()
+    {
+        return $this->expenses()->saveCategory($_POST);
     }
 
     public function save_module_settings()
@@ -2660,6 +2665,24 @@ switch ($action) {
         break;
     case 'approve_expense_claim':
         echo $Master->approve_expense_claim();
+        break;
+    case 'reject_expense_claim':
+        echo $Master->reject_expense_claim();
+        break;
+    case 'cancel_expense_claim':
+        echo $Master->cancel_expense_claim();
+        break;
+    case 'void_expense_claim':
+        echo $Master->void_expense_claim();
+        break;
+    case 'reimburse_expense_claims':
+        echo $Master->reimburse_expense_claims();
+        break;
+    case 'reverse_expense_reimbursement':
+        echo $Master->reverse_expense_reimbursement();
+        break;
+    case 'save_expense_category':
+        echo $Master->save_expense_category();
         break;
     case 'save_module_settings':
         echo $Master->save_module_settings();
