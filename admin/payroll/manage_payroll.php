@@ -34,7 +34,8 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
 				<div class="row">
 					<div class="col-md-3 form-group">
 						<label for="payroll_run_ref" class="control-label">Run Reference</label>
-						<input type="text" name="payroll_run_ref" id="payroll_run_ref" class="form-control form-control-sm rounded-0" value="RUN-<?php echo date('Ym') . '-' . rand(100,999) ?>" required/>
+						<input type="text" name="payroll_run_ref" id="payroll_run_ref" class="form-control form-control-sm rounded-0" value="" placeholder="Automatic (next number)"/>
+						<small class="text-muted">Leave blank to number the run automatically.</small>
 					</div>
 					<div class="col-md-3 form-group">
 						<label for="salary_month" class="control-label">Salary Period / Month</label>
@@ -255,7 +256,7 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
 			</div>
 			<div class="col-md-4 form-group">
 				<label for="payroll_run_ref" class="control-label">Payroll Run Reference</label>
-				<input type="text" name="payroll_run_ref" id="payroll_run_ref" class="form-control form-control-sm rounded-0" value="<?php echo isset($payroll_run_ref) ? $payroll_run_ref : 'RUN-'.date('Ym').'-'.rand(100,999); ?>" />
+				<input type="text" name="payroll_run_ref" id="payroll_run_ref" class="form-control form-control-sm rounded-0" value="<?php echo isset($payroll_run_ref) ? htmlspecialchars($payroll_run_ref) : ''; ?>" placeholder="Automatic (next number)" />
 			</div>
 		</div>
 

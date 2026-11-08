@@ -12,6 +12,13 @@ if ($scope !== null) {
     $scope_id = intval($scope);
     $where .= " AND id = '{$scope_id}'";
 }
+
+$portal_status = [];
+try {
+    $portal_status = (new \App\Services\EmployeePortalService($conn, $_settings))->statusMap();
+} catch (\Throwable $e) {
+    $portal_status = [];
+}
 ?>
 <?php if($_settings->chk_flashdata('success')): ?>
 <script>
@@ -77,6 +84,12 @@ if ($scope !== null) {
                                 <?php else: ?>
                                     <span class="badge badge-danger px-3 rounded-pill">Inactive</span>
                                 <?php endif; ?>
+                                <?php $ps = $portal_status[(int)$row['id']] ?? ''; ?>
+                                <?php if($ps === 'active'): ?>
+                                    <small class="d-block text-success"><i class="fa fa-user-check"></i> Self-service on</small>
+                                <?php elseif($ps === 'invited'): ?>
+                                    <small class="d-block text-warning"><i class="fa fa-envelope"></i> Invited</small>
+                                <?php endif; ?>
                             </td>
 							<?php if($can_edit || $can_delete): ?>
 							<td align="center">
@@ -87,6 +100,10 @@ if ($scope !== null) {
 				                  <div class="dropdown-menu" role="menu">
 				                    <?php if($can_edit): ?>
 				                    <a class="dropdown-item edit_data" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>"><span class="fa fa-edit text-primary"></span> Edit</a>
+				                    <a class="dropdown-item invite_portal" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>"><span class="fa fa-envelope text-info"></span> <?php echo ($portal_status[(int)$row['id']] ?? '') === '' ? 'Invite to self-service' : 'Resend invitation' ?></a>
+				                    <?php if(isset($portal_status[(int)$row['id']])): ?>
+				                    <a class="dropdown-item revoke_portal" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>"><span class="fa fa-user-slash text-warning"></span> Remove self-service access</a>
+				                    <?php endif; ?>
 				                    <?php endif; ?>
 				                    <?php if($can_edit && $can_delete): ?><div class="dropdown-divider"></div><?php endif; ?>
 				                    <?php if($can_delete): ?>
@@ -115,6 +132,21 @@ if ($scope !== null) {
 		})
 		<?php endif; ?>
 		<?php if($can_edit): ?>
+		function portal_call(f, id, ask){
+			if(ask && !confirm(ask)) return;
+			start_loader();
+			$.ajax({
+				url:_base_url_+"classes/Master.php?f="+f, method:"POST", data:{employee_id:id}, dataType:"json",
+				error:function(){ alert_toast("An error occurred.",'error'); end_loader(); },
+				success:function(resp){
+					end_loader();
+					if(resp.status=='success'){ alert(resp.msg); location.reload(); }
+					else { alert(resp.msg || "An error occurred."); }
+				}
+			})
+		}
+		$('.invite_portal').click(function(){ portal_call('invite_employee_portal', $(this).attr('data-id'), null) })
+		$('.revoke_portal').click(function(){ portal_call('revoke_employee_portal', $(this).attr('data-id'), 'Remove this employee\'s self-service access?') })
 		$('.edit_data').click(function(){
 			uni_modal("<i class='fa fa-edit'></i> Edit Employee","employees/manage_employee.php?id="+$(this).attr('data-id'), 'large')
 		})

@@ -199,7 +199,11 @@ class PayrollService
         extract($post);
         $tenant_id = $this->settings->active_tenant_id();
 
-        $payroll_run_ref = !empty($payroll_run_ref) ? $this->conn->real_escape_string((string)$payroll_run_ref) : 'RUN-' . date('Ym') . '-' . rand(100, 999);
+        try {
+            $payroll_run_ref = !empty($payroll_run_ref) ? $this->conn->real_escape_string((string)$payroll_run_ref) : (new PayrollRunRefService($this->conn))->next((int)$tenant_id);
+        } catch (\RuntimeException $e) {
+            return json_encode(['status' => 'failed', 'msg' => $e->getMessage()]);
+        }
         $salary_month = !empty($salary_month) ? $this->conn->real_escape_string((string)$salary_month) : date('F Y');
         $pay_frequency = !empty($pay_frequency) ? $this->conn->real_escape_string((string)$pay_frequency) : 'Monthly';
         $pay_date = !empty($pay_date) ? $this->conn->real_escape_string((string)$pay_date) : date('Y-m-d');
@@ -511,7 +515,11 @@ class PayrollService
             }
         }
         if (empty($run['payroll_run_ref'])) {
-            $run['payroll_run_ref'] = 'RUN-' . date('Ym') . '-' . random_int(100, 999);
+            try {
+                $run['payroll_run_ref'] = (new PayrollRunRefService($this->conn))->next((int)$this->settings->active_tenant_id());
+            } catch (\RuntimeException $e) {
+                return json_encode(['status' => 'failed', 'msg' => $e->getMessage()]);
+            }
         }
         $month = $this->conn->real_escape_string((string)($run['salary_month'] ?? date('F Y')));
 
