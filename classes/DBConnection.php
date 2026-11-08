@@ -1220,6 +1220,32 @@ class DBConnection{
             }
         }
 
+        // Payroll status: installs from the base SQL have a tinyint here, so the enum above was never added.
+        // Convert once (legacy numeric values count as posted) and allow 'voided' for reversed payroll.
+        $st = @$this->conn->query("SHOW COLUMNS FROM `payroll_list` LIKE 'status'");
+        $stType = $st && ($stRow = $st->fetch_assoc()) ? strtolower((string)$stRow['Type']) : '';
+        if ($stType !== '' && strpos($stType, 'voided') === false) {
+            if (strpos($stType, 'enum') === false) {
+                @$this->conn->query("ALTER TABLE `payroll_list` MODIFY `status` varchar(20) NOT NULL DEFAULT 'posted'");
+                @$this->conn->query("UPDATE `payroll_list` SET `status` = 'posted' WHERE `status` NOT IN ('posted','pending_approval','rejected')");
+            }
+            @$this->conn->query("ALTER TABLE `payroll_list` MODIFY `status` enum('posted','pending_approval','rejected','voided') NOT NULL DEFAULT 'posted'");
+        }
+
+        // Unpaid leave / absence and salary components paid on a payroll (deductions column holds the total of other deductions).
+        $pc = array(
+            'unpaid_days'          => "ALTER TABLE `payroll_list` ADD COLUMN `unpaid_days` decimal(6,2) NOT NULL DEFAULT 0.00",
+            'unpaid_deduction'     => "ALTER TABLE `payroll_list` ADD COLUMN `unpaid_deduction` decimal(12,2) NOT NULL DEFAULT 0.00",
+            'component_earnings'   => "ALTER TABLE `payroll_list` ADD COLUMN `component_earnings` decimal(12,2) NOT NULL DEFAULT 0.00",
+            'component_deductions' => "ALTER TABLE `payroll_list` ADD COLUMN `component_deductions` decimal(12,2) NOT NULL DEFAULT 0.00",
+        );
+        foreach ($pc as $c => $sql) {
+            $res = @$this->conn->query("SHOW COLUMNS FROM `payroll_list` LIKE '{$c}'");
+            if ($res && $res->num_rows == 0) {
+                @$this->conn->query($sql);
+            }
+        }
+
         // Payroll rules belong to each company, not the installation.
         @$this->conn->query("CREATE TABLE IF NOT EXISTS `payroll_rule_sets` (
           `tenant_id` int(30) NOT NULL,
@@ -2159,6 +2185,35 @@ class DBConnection{
         @$this->conn->query($sql2);
         @$this->conn->query($sql3);
         @$this->conn->query($sql4);
+
+        // Components assigned to employees, and the snapshot each payroll keeps of the lines it paid.
+        @$this->conn->query("CREATE TABLE IF NOT EXISTS `employee_salary_components` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `tenant_id` int(30) NOT NULL DEFAULT 1,
+          `employee_id` int(30) NOT NULL,
+          `component_id` int(30) NOT NULL,
+          `amount` decimal(12,2) DEFAULT NULL,
+          `start_date` date DEFAULT NULL,
+          `end_date` date DEFAULT NULL,
+          `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+          PRIMARY KEY (`id`),
+          KEY `tenant_id` (`tenant_id`),
+          KEY `employee_id` (`employee_id`),
+          KEY `component_id` (`component_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        $items = array(
+            'code' => "ALTER TABLE `payroll_component_items` ADD COLUMN `code` varchar(50) NOT NULL DEFAULT ''",
+            'name' => "ALTER TABLE `payroll_component_items` ADD COLUMN `name` varchar(150) NOT NULL DEFAULT ''",
+            'type' => "ALTER TABLE `payroll_component_items` ADD COLUMN `type` enum('earning','deduction') NOT NULL DEFAULT 'earning'",
+            'is_taxable' => "ALTER TABLE `payroll_component_items` ADD COLUMN `is_taxable` tinyint(1) NOT NULL DEFAULT 1",
+            'is_fnpf_subject' => "ALTER TABLE `payroll_component_items` ADD COLUMN `is_fnpf_subject` tinyint(1) NOT NULL DEFAULT 1",
+        );
+        foreach ($items as $c => $sql) {
+            $res = @$this->conn->query("SHOW COLUMNS FROM `payroll_component_items` LIKE '{$c}'");
+            if ($res && $res->num_rows == 0) {
+                @$this->conn->query($sql);
+            }
+        }
     }
 
     public function check_frcs_accreditation_migrations(){

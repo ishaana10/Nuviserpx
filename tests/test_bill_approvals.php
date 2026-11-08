@@ -18,7 +18,7 @@ check(A::approvalBlock(5, 6, false, false) !== null, 'approving needs the permis
 
 foreach (['approve_bill', 'reject_bill'] as $a) { check(Permissions::forAction($a) === 'bills_approve', "$a needs bills_approve"); }
 check(in_array('bills_approve', Permissions::keys(), true), 'bills_approve is a grantable permission');
-foreach (['admin/reports/ap_aging.php', 'admin/reports/purchases_by_vendor.php', 'admin/tax/report.php'] as $f) {
+foreach (['admin/reports/ap_aging.php', 'admin/reports/purchases_by_vendor.php', 'src/Services/TaxReturnService.php'] as $f) {
     $s = file_get_contents(__DIR__ . '/../' . $f);
     check(strpos($s, "'pending_approval'") !== false, "$f leaves pending bills out");
 }

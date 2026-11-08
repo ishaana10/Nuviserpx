@@ -13,7 +13,7 @@ $qry = $conn->query("SELECT * FROM `salary_components` WHERE tenant_id = '{$tena
     </div>
     <div class="card-body">
         <div class="alert alert-info border-info text-sm mb-4">
-            <i class="fas fa-info-circle mr-2"></i> Configure custom earnings, allowances, and deductions. Set statutory flags for PAYE Tax and FNPF Provident Fund inclusion.
+            <i class="fas fa-info-circle mr-2"></i> Configure custom earnings, allowances, and deductions, then assign them to employees below. Every new payroll picks up the employee's active components: earnings follow their PAYE and pension flags, deductions come off net pay (after tax and pension). Payroll already run keeps the lines it paid.
         </div>
 
         <div class="table-responsive">
@@ -77,6 +77,49 @@ $qry = $conn->query("SELECT * FROM `salary_components` WHERE tenant_id = '{$tena
                 </tbody>
             </table>
         </div>
+    </div>
+</div>
+
+<?php
+$__svc = new \App\Services\PayrollComponentService($conn, $_settings);
+$__assign = $__svc->assignments();
+$__emps = $conn->query("SELECT id, employee_code, concat(firstname, ' ', lastname) name FROM `employee_list` WHERE tenant_id = '{$tenant_id}' AND status = 1 AND delete_flag = 0 ORDER BY firstname");
+$__comps = $conn->query("SELECT id, code, name, type FROM `salary_components` WHERE tenant_id = '{$tenant_id}' AND status = 1 ORDER BY name");
+?>
+<div class="card card-outline card-info shadow-sm rounded-0 mt-3">
+    <div class="card-header"><h3 class="card-title font-weight-bold"><i class="fas fa-user-tag text-info mr-2"></i> Assigned to Employees</h3></div>
+    <div class="card-body">
+        <form id="assign-form" class="form-row align-items-end mb-3">
+            <div class="col-md-3 form-group"><label class="text-sm font-weight-bold">Employee</label>
+                <select name="employee_id" class="form-control form-control-sm" required>
+                    <option value="">Select...</option>
+                    <?php while($__emps && $e = $__emps->fetch_assoc()): ?><option value="<?= (int)$e['id'] ?>"><?= htmlspecialchars($e['employee_code'] . ' - ' . $e['name']) ?></option><?php endwhile; ?>
+                </select></div>
+            <div class="col-md-3 form-group"><label class="text-sm font-weight-bold">Component</label>
+                <select name="component_id" class="form-control form-control-sm" required>
+                    <option value="">Select...</option>
+                    <?php while($__comps && $c = $__comps->fetch_assoc()): ?><option value="<?= (int)$c['id'] ?>"><?= htmlspecialchars($c['code'] . ' - ' . $c['name'] . ($c['type'] === 'deduction' ? ' (deduction)' : '')) ?></option><?php endwhile; ?>
+                </select></div>
+            <div class="col-md-2 form-group"><label class="text-sm font-weight-bold">Amount</label><input type="number" step="0.01" min="0" name="amount" class="form-control form-control-sm text-right" placeholder="default"></div>
+            <div class="col-md-2 form-group"><label class="text-sm font-weight-bold">From</label><input type="date" name="start_date" class="form-control form-control-sm"></div>
+            <div class="col-md-2 form-group"><label class="text-sm font-weight-bold">To</label><input type="date" name="end_date" class="form-control form-control-sm"></div>
+            <div class="col-12 form-group"><button type="submit" class="btn btn-sm btn-info btn-flat"><i class="fas fa-link mr-1"></i> Assign</button></div>
+        </form>
+        <table class="table table-sm table-bordered table-striped">
+            <thead><tr><th>Employee</th><th>Component</th><th class="text-right">Amount</th><th>From</th><th>To</th><th></th></tr></thead>
+            <tbody>
+            <?php foreach($__assign as $a): ?>
+                <tr>
+                    <td><?= htmlspecialchars($a['employee_code'] . ' - ' . $a['emp_name']) ?></td>
+                    <td><?= htmlspecialchars($a['code'] . ' - ' . $a['comp_name']) ?> <?= $a['type'] === 'deduction' ? '<span class="badge badge-danger">Deduction</span>' : '' ?></td>
+                    <td class="text-right"><?= number_format((float)($a['amount'] ?? $a['default_amount']), 2) ?><?= $a['amount'] === null ? ' <small class="text-muted">default</small>' : '' ?></td>
+                    <td><?= htmlspecialchars((string)($a['start_date'] ?? '')) ?></td>
+                    <td><?= htmlspecialchars((string)($a['end_date'] ?? '')) ?></td>
+                    <td class="text-center"><button type="button" class="btn btn-xs btn-outline-danger btn-flat unassign_component" data-id="<?= (int)$a['id'] ?>"><i class="fas fa-unlink"></i></button></td>
+                </tr>
+            <?php endforeach; if(!$__assign): ?><tr><td colspan="6" class="text-center text-muted py-3">No components assigned yet.</td></tr><?php endif; ?>
+            </tbody>
+        </table>
     </div>
 </div>
 
@@ -148,6 +191,19 @@ function add_component_modal(){
 
 $(document).ready(function(){
     $('#components-table').dataTable();
+
+    function post_assign(fn, data){
+        start_loader();
+        $.ajax({url: _base_url_ + "classes/Master.php?f=" + fn, method: "POST", data: data, dataType: "json",
+            error: function(){ alert_toast("An error occurred.", "error"); end_loader(); },
+            success: function(resp){
+                if(resp.status == 'success'){ location.reload(); }
+                else { alert_toast(resp.msg || "Failed.", "error"); end_loader(); }
+            }});
+    }
+    $('#assign-form').submit(function(e){ e.preventDefault(); post_assign('assign_salary_component', $(this).serialize()); });
+    $('.unassign_component').click(function(){ var id = $(this).data('id'); _conf("Remove this assignment? Payroll already run is not changed.", "unassign_component_do", [id]); });
+    window.unassign_component_do = function(id){ post_assign('unassign_salary_component', {id: id}); };
 
     $('#comp-form').submit(function(e){
         e.preventDefault();

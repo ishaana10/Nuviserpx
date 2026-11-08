@@ -46,6 +46,8 @@ class PayrollEngine {
                     ['key' => 'ot_2_0', 'label' => 'Double time', 'multiplier' => 2.0],
                 ],
             ],
+            // Days worked per week (5 = Mon-Fri, 6 = Mon-Sat, 7 = every day): sets the daily rate for unpaid days.
+            'attendance' => ['working_days_per_week' => 5],
             'employer_levies' => [
                 ['key' => 'workcare_levy', 'label' => 'Employer levy 1', 'rate' => 0.01],
                 ['key' => 'training_levy', 'label' => 'Employer levy 2', 'rate' => 0.01],
@@ -120,6 +122,11 @@ class PayrollEngine {
                 if ($label !== '') $rules['overtime']['tiers'][$i]['label'] = $label;
             }
         }
+        if (isset($custom['attendance']['working_days_per_week']) && is_numeric($custom['attendance']['working_days_per_week'])
+            && (int)$custom['attendance']['working_days_per_week'] == $custom['attendance']['working_days_per_week']
+            && $custom['attendance']['working_days_per_week'] >= 1 && $custom['attendance']['working_days_per_week'] <= 7) {
+            $rules['attendance']['working_days_per_week'] = (int)$custom['attendance']['working_days_per_week'];
+        }
         if (isset($custom['employer_levies']) && is_array($custom['employer_levies'])) {
             $levies = [];
             foreach ($custom['employer_levies'] as $l) {
@@ -184,6 +191,9 @@ class PayrollEngine {
             if (trim((string)($t['label'] ?? '')) === '') $err[] = "Overtime tier $row: enter a name.";
             if (!isset($t['multiplier']) || !is_numeric($t['multiplier']) || $t['multiplier'] < 1 || $t['multiplier'] > 10) $err[] = "Overtime tier $row: multiplier must be between 1 and 10.";
         }
+
+        $wd = $r['attendance']['working_days_per_week'] ?? null;
+        if ($wd !== null && (!is_numeric($wd) || (int)$wd != $wd || $wd < 1 || $wd > 7)) $err[] = 'Working days per week must be a whole number from 1 to 7.';
 
         $seen = [];
         foreach (($r['employer_levies'] ?? []) as $i => $l) {
@@ -449,8 +459,28 @@ class PayrollEngine {
         // Additional employer pension, entered as a percentage (e.g. 2 = 2%).
         $emprExtraPct = (float)($input['fnpf_employer_voluntary'] ?? 0.00);
 
-        $gross = round($basic + $overtime + $allowances + $otherEarnings + $lumpSum + $redundancy, 2);
-        $pensionBase = round($basic + $overtime + $allowances + $otherEarnings + $lumpSum, 2);
+        // Unpaid leave / absence reduces the basic actually earned. The hourly overtime rate stays on contract basic.
+        $unpaidDeduction = round(min(max(0.0, (float)($input['unpaid_deduction'] ?? 0)), max(0.0, $basic)), 2);
+        $basicEarned     = round($basic - $unpaidDeduction, 2);
+
+        // Salary components: earnings follow their own tax / pension flags; deductions come off net pay.
+        $compEarn = $compPension = $compTaxable = $compDed = 0.0;
+        foreach ((array)($input['components'] ?? []) as $c) {
+            $amt = round((float)($c['amount'] ?? 0), 2);
+            if ($amt <= 0) continue;
+            if (($c['type'] ?? 'earning') === 'deduction') {
+                $compDed += $amt;
+                continue;
+            }
+            $compEarn += $amt;
+            if (!empty($c['is_fnpf_subject'])) $compPension += $amt;
+            if (!empty($c['is_taxable'])) $compTaxable += $amt;
+        }
+        $compEarn = round($compEarn, 2); $compPension = round($compPension, 2);
+        $compTaxable = round($compTaxable, 2); $compDed = round($compDed, 2);
+
+        $gross = round($basicEarned + $overtime + $allowances + $otherEarnings + $lumpSum + $redundancy + $compEarn, 2);
+        $pensionBase = round($basicEarned + $overtime + $allowances + $otherEarnings + $lumpSum + $compPension, 2);
 
         $employeePension = round($pensionBase * $empRate, 2);
         $employerMandatory = round($pensionBase * $emprRate, 2);
@@ -462,7 +492,7 @@ class PayrollEngine {
             'pay_period_n' => intval($input['pay_period_n'] ?? 1),
             'g_ytd_prior' => floatval($input['g_ytd_prior'] ?? 0),
             't_ytd_prior' => floatval($input['t_ytd_prior'] ?? 0),
-            'regular_pay' => $basic + $allowances,
+            'regular_pay' => $basicEarned + $allowances + $compTaxable,
             'overtime_pay' => $overtime + $otherEarnings,
             'lump_sum_pay' => $lumpSum,
             'redundancy_pay' => $redundancy,
@@ -486,7 +516,8 @@ class PayrollEngine {
         }
         $levyTotal = round($levyTotal, 2);
 
-        $netSalary = round($gross - $employeePension - $incomeTax - $deductions, 2);
+        $deductionsTotal = round($deductions + $compDed, 2);
+        $netSalary = round($gross - $employeePension - $incomeTax - $deductionsTotal, 2);
         $employerCost = round($gross + $employerPensionTotal + $levyTotal, 2);
 
         return [
@@ -508,13 +539,17 @@ class PayrollEngine {
             'employer_pension'=> $employerPensionTotal,
             'fnpf_er_mandatory' => $employerMandatory,
             'fnpf_er_voluntary_excess' => $employerExtra,
-            'taxable_income'  => $gross,
+            'taxable_income'  => round($gross - ($compEarn - $compTaxable), 2),
             'paye_tax'        => $incomeTax,
             'income_tax'      => $incomeTax,
             'paye_normal'     => $tax['paye_normal'],
             'paye_lump_sum'   => $tax['paye_lump'],
             'srt_tax'         => 0.00,
-            'deductions'      => $deductions,
+            'deductions'      => $deductionsTotal,
+            'typed_deductions' => $deductions,
+            'component_earnings' => $compEarn,
+            'component_deductions' => $compDed,
+            'unpaid_deduction' => $unpaidDeduction,
             'net_salary'      => $netSalary,
             'workcare_levy'   => $levyOut['workcare_levy'],
             'training_levy'   => $levyOut['training_levy'],

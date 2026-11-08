@@ -15,6 +15,8 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
         foreach($qry->fetch_assoc() as $k => $v){
             $$k=$v;
         }
+        // The stored deductions include salary-component deductions; the field is only the typed amount.
+        if(isset($deductions)) $deductions = max(0, round((float)$deductions - (float)($component_deductions ?? 0), 2));
     }
 }
 ?>
@@ -86,6 +88,7 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
 							<th width="110">Allowances</th>
 							<th width="110">Other Earnings</th>
 							<th width="110">Deductions</th>
+							<th width="110" title="Leave blank to use approved unpaid leave and logged absences">Unpaid days</th>
 						</tr>
 					</thead>
 					<tbody>
@@ -122,6 +125,9 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
 							</td>
 							<td>
 								<input type="number" step="any" name="emp_deductions[<?php echo $eid ?>]" class="form-control form-control-sm text-right rounded-0" value="0">
+							</td>
+							<td>
+								<input type="number" step="0.5" min="0" name="emp_unpaid_days[<?php echo $eid ?>]" class="form-control form-control-sm text-right rounded-0" placeholder="auto">
 							</td>
 						</tr>
 						<?php endwhile; ?>
@@ -217,10 +223,16 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
 			<div class="col-md-6 form-group"><small class="text-muted d-block mt-4">Overtime hours are paid at the company's standard hourly rate (basic salary &divide; standard hours) times each tier's multiplier, and are added to any overtime amount typed above.</small></div>
 		</div>
 
+		<div class="row"><div class="col-12"><small class="text-muted d-block mb-2" id="pay_adjust_notes"></small></div></div>
 		<div class="row">
 			<div class="col-md-4 form-group">
 				<label for="deductions" class="control-label">Other Deductions</label>
 				<input type="number" step="any" name="deductions" id="deductions" class="form-control form-control-sm rounded-0 text-right calc-trigger" value="<?php echo isset($deductions) ? $deductions : 0; ?>" />
+			</div>
+			<div class="col-md-4 form-group">
+				<label for="unpaid_days" class="control-label">Unpaid days</label>
+				<input type="number" step="0.5" min="0" name="unpaid_days" id="unpaid_days" class="form-control form-control-sm rounded-0 text-right calc-trigger" placeholder="auto" value="<?php echo isset($unpaid_days) && (float)$unpaid_days > 0 ? $unpaid_days : '' ?>" />
+				<small class="text-muted">Blank = approved unpaid leave and logged absences in the period.</small>
 			</div>
 			<div class="col-md-4 form-group">
 				<label for="is_resident" class="control-label">Residency Status</label>
@@ -295,6 +307,9 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
 				allowances: allowances,
 				other_earnings: other,
 				deductions: deductions,
+				period_start: $('#period_start').val() || '',
+				period_end: $('#period_end').val() || '',
+				unpaid_days: $('#unpaid_days').val(),
 				pay_frequency: frequency,
 				is_resident: resident
 			},
@@ -308,6 +323,10 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
 					$('#lbl_deductions').text((parseFloat(d.employee_fnpf) + parseFloat(d.paye_tax) + parseFloat(d.deductions)).toFixed(2));
 					$('#lbl_net').text(parseFloat(d.net_salary).toFixed(2));
 					$('#lbl_empr_fnpf').text(parseFloat(d.employer_fnpf).toFixed(2));
+					var notes = [];
+					if(parseFloat(d.unpaid_days) > 0) notes.push('Unpaid leave: ' + d.unpaid_days + ' day(s), -' + parseFloat(d.unpaid_deduction).toFixed(2));
+					(d.component_lines || []).forEach(function(c){ notes.push($('<span>').text(c.name).html() + ': ' + (c.type == 'deduction' ? '-' : '+') + parseFloat(c.amount).toFixed(2)); });
+					$('#pay_adjust_notes').html(notes.length ? notes.join('<br>') : '');
 				}
 			}
 		});
