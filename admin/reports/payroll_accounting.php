@@ -35,6 +35,8 @@ $tot_employer_cost = 0;
 
 $rows = [];
 while($r = $qry->fetch_assoc()){
+    // All employer levies (what the ledger holds), not just the first payslip levy column.
+    $r['levies_total'] = round((float)$r['employer_cost'] - (float)$r['gross_salary'] - (float)$r['employer_fnpf'], 2);
     $rows[] = $r;
     $tot_gross += (float)$r['gross_salary'];
     $tot_emp_fnpf += (float)$r['employee_fnpf'];
@@ -43,7 +45,7 @@ while($r = $qry->fetch_assoc()){
     $tot_deductions += (float)$r['deductions'];
     $tot_net += (float)$r['net_salary'];
     $tot_empr_fnpf += (float)$r['employer_fnpf'];
-    $tot_workcare += (float)$r['workcare_levy'];
+    $tot_workcare += $r['levies_total'];
     $tot_employer_cost += (float)$r['employer_cost'];
 }
 ?>
@@ -68,6 +70,28 @@ while($r = $qry->fetch_assoc()){
             </form>
         </div>
 
+        <?php
+        $recon = (new \App\Services\PayrollReconciliationService($conn, $_settings))->check($month);
+        ?>
+        <div class="container-fluid mb-3 d-print-none">
+            <?php if(!$recon['problems']): ?>
+            <div class="alert alert-success py-2 mb-0"><i class="fas fa-check-circle mr-1"></i> Ledger check: all <?= (int)$recon['checked'] ?> posted payroll record<?= $recon['checked'] == 1 ? '' : 's' ?> for <?= htmlspecialchars($month) ?> agree with their journals.</div>
+            <?php else: ?>
+            <div class="alert alert-danger mb-0">
+                <b><i class="fas fa-exclamation-triangle mr-1"></i> Ledger check: <?= count($recon['problems']) ?> of <?= (int)$recon['checked'] ?> payroll record<?= $recon['checked'] == 1 ? '' : 's' ?> do not agree with the ledger.</b>
+                <table class="table table-sm table-bordered bg-white mt-2 mb-0">
+                    <thead><tr><th>Run</th><th>Employee</th><th>Account</th><th>Side</th><th class="text-right">Record says</th><th class="text-right">Ledger has</th><th class="text-right">Difference</th></tr></thead>
+                    <tbody>
+                    <?php foreach($recon['problems'] as $pr): foreach($pr['issues'] as [$acc, $sd, $exp, $got, $diff]): ?>
+                        <tr><td><?= htmlspecialchars((string)$pr['ref']) ?></td><td><?= htmlspecialchars($pr['employee']) ?></td><td><?= htmlspecialchars($acc) ?></td><td><?= htmlspecialchars($sd) ?></td>
+                            <td class="text-right"><?= format_num($exp) ?></td><td class="text-right"><?= format_num($got) ?></td><td class="text-right text-danger font-weight-bold"><?= format_num($diff) ?></td></tr>
+                    <?php endforeach; endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <?php endif; ?>
+        </div>
+
         <div class="container-fluid" id="outprint">
             <div class="text-center mb-4">
 		<h3 class="font-weight-bold m-0"><?= htmlspecialchars($tenant_name) ?></h3>
@@ -87,7 +111,7 @@ while($r = $qry->fetch_assoc()){
 					<th>Income Tax</th>
 					<th>Net Salary</th>
 					<th>Pension (Employer)</th>
-					<th>Employer Levy 1</th>
+					<th>Employer Levies</th>
 					<th>Total Employer Cost</th>
 				</tr>
 			</thead>
@@ -104,7 +128,7 @@ while($r = $qry->fetch_assoc()){
 					<td class="text-right text-warning">$<?= format_num($row['paye_tax']) ?></td>
 					<td class="text-right font-weight-bold text-success">$<?= format_num($row['net_salary']) ?></td>
 					<td class="text-right text-primary">$<?= format_num($row['employer_fnpf']) ?></td>
-					<td class="text-right">$<?= format_num($row['workcare_levy']) ?></td>
+					<td class="text-right">$<?= format_num($row['levies_total']) ?></td>
 					<td class="text-right font-weight-bold">$<?= format_num($row['employer_cost']) ?></td>
 				</tr>
 				<?php endforeach; else: ?>

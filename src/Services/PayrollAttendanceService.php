@@ -46,13 +46,13 @@ class PayrollAttendanceService
      * @param array<int,array{leave_type:string,start_date:string,end_date:string}> $leaves approved leave only
      * @param array<int,array{attendance_date:string,status:string}> $attendance
      */
-    public static function unpaidDays(array $leaves, array $attendance, string $from, string $to, int $daysPerWeek = 5): float
+    public static function unpaidDays(array $leaves, array $attendance, string $from, string $to, int $daysPerWeek = 5, array $skipDates = []): float
     {
-        $work = array_flip(self::workingDays($from, $to, $daysPerWeek));
+        $work = array_flip(array_diff(self::workingDays($from, $to, $daysPerWeek), $skipDates));
         $unpaid = [];
         $covered = [];
         foreach ($leaves as $l) {
-            foreach (self::workingDays(max($from, (string)$l['start_date']), min($to, (string)$l['end_date']), $daysPerWeek) as $d) {
+            foreach (array_diff(self::workingDays(max($from, (string)$l['start_date']), min($to, (string)$l['end_date']), $daysPerWeek), $skipDates) as $d) {
                 if (($l['leave_type'] ?? '') === 'unpaid') {
                     $unpaid[$d] = 1.0;
                 } else {
@@ -74,6 +74,18 @@ class PayrollAttendanceService
         return round(array_sum($unpaid), 2);
     }
 
+    /**
+     * Pure: working days in the period that fall after the employee's last day. Pay stops after that date, so each
+     * such day is unpaid. A blank or invalid termination date means the employee has not left.
+     */
+    public static function daysAfterTermination(string $from, string $to, ?string $terminationDate, int $daysPerWeek = 5): array
+    {
+        if ($terminationDate === null || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $terminationDate) || !strtotime($terminationDate)) {
+            return [];
+        }
+        return self::workingDays(max($from, date('Y-m-d', strtotime($terminationDate . ' +1 day'))), $to, $daysPerWeek);
+    }
+
     /** Pure: pay for one working day. */
     public static function dailyRate(float $basic, int $periodsPerYear, float $weeksPerYear, int $daysPerWeek): float
     {
@@ -91,6 +103,10 @@ class PayrollAttendanceService
     public function unpaidDaysFor(int $employeeId, string $from, string $to, int $daysPerWeek): float
     {
         $t = (int)$this->settings->active_tenant_id();
+        $eq = $this->conn->prepare("SELECT termination_date FROM employee_list WHERE id = ? AND tenant_id = ?");
+        $eq->bind_param('ii', $employeeId, $t);
+        $eq->execute();
+        $after = self::daysAfterTermination($from, $to, $eq->get_result()->fetch_assoc()['termination_date'] ?? null, $daysPerWeek);
         $lq = $this->conn->prepare("SELECT leave_type, start_date, end_date FROM leave_list
             WHERE tenant_id = ? AND employee_id = ? AND status = 'approved' AND start_date <= ? AND end_date >= ?");
         $aq = $this->conn->prepare("SELECT attendance_date, status FROM attendance_list
@@ -102,6 +118,7 @@ class PayrollAttendanceService
         $lq->execute();
         $aq->bind_param('iiss', $t, $employeeId, $from, $to);
         $aq->execute();
-        return self::unpaidDays($lq->get_result()->fetch_all(MYSQLI_ASSOC), $aq->get_result()->fetch_all(MYSQLI_ASSOC), $from, $to, $daysPerWeek);
+        // Days after the last day are unpaid whatever the leave or attendance records say, and never counted twice.
+        return round(self::unpaidDays($lq->get_result()->fetch_all(MYSQLI_ASSOC), $aq->get_result()->fetch_all(MYSQLI_ASSOC), $from, $to, $daysPerWeek, $after) + count($after), 2);
     }
 }

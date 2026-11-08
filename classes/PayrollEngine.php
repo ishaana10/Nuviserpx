@@ -445,7 +445,9 @@ class PayrollEngine {
 
         $allowances     = (float)($input['allowances'] ?? 0);
         $otherEarnings  = (float)($input['other_earnings'] ?? 0);
-        $lumpSum        = (float)($input['lump_sum_payments'] ?? $input['lump_sum'] ?? 0);
+        // Leave paid out on leaving is taxed as a lump sum, like back pay.
+        $leavePayout    = max(0.0, (float)($input['leave_payout'] ?? 0));
+        $lumpSum        = (float)($input['lump_sum_payments'] ?? $input['lump_sum'] ?? 0) + $leavePayout;
         $redundancy     = (float)($input['redundancy_payments'] ?? $input['redundancy'] ?? 0);
         $deductions     = (float)($input['deductions'] ?? 0);
 
@@ -464,12 +466,13 @@ class PayrollEngine {
         $basicEarned     = round($basic - $unpaidDeduction, 2);
 
         // Salary components: earnings follow their own tax / pension flags; deductions come off net pay.
-        $compEarn = $compPension = $compTaxable = $compDed = 0.0;
+        $compEarn = $compPension = $compTaxable = $compDed = $loanRec = 0.0;
         foreach ((array)($input['components'] ?? []) as $c) {
             $amt = round((float)($c['amount'] ?? 0), 2);
             if ($amt <= 0) continue;
             if (($c['type'] ?? 'earning') === 'deduction') {
                 $compDed += $amt;
+                if ((int)($c['loan_id'] ?? 0) > 0) $loanRec += $amt; // staff loan recovery: booked against the loan, not "other deductions"
                 continue;
             }
             $compEarn += $amt;
@@ -477,7 +480,7 @@ class PayrollEngine {
             if (!empty($c['is_taxable'])) $compTaxable += $amt;
         }
         $compEarn = round($compEarn, 2); $compPension = round($compPension, 2);
-        $compTaxable = round($compTaxable, 2); $compDed = round($compDed, 2);
+        $compTaxable = round($compTaxable, 2); $compDed = round($compDed, 2); $loanRec = round($loanRec, 2);
 
         $gross = round($basicEarned + $overtime + $allowances + $otherEarnings + $lumpSum + $redundancy + $compEarn, 2);
         $pensionBase = round($basicEarned + $overtime + $allowances + $otherEarnings + $lumpSum + $compPension, 2);
@@ -549,6 +552,8 @@ class PayrollEngine {
             'typed_deductions' => $deductions,
             'component_earnings' => $compEarn,
             'component_deductions' => $compDed,
+            'loan_recovery' => $loanRec,
+            'leave_payout' => $leavePayout,
             'unpaid_deduction' => $unpaidDeduction,
             'net_salary'      => $netSalary,
             'workcare_levy'   => $levyOut['workcare_levy'],

@@ -20,6 +20,7 @@ class JournalService
         'payroll_list' => ['label' => 'payroll record', 'ref' => 'payroll_run_ref'],
         'payroll_payments' => ['label' => 'salary payment', 'ref' => 'reference'],
         'payroll_remittances' => ['label' => 'payroll remittance', 'ref' => 'reference'],
+        'employee_loans' => ['label' => 'staff loan', 'ref' => 'description'],
     ];
 
     public function __construct(

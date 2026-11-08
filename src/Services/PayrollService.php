@@ -31,7 +31,8 @@ class PayrollService
     {
         $t = (int)$this->settings->active_tenant_id();
         $components = new PayrollComponentService($this->conn, $this->settings);
-        $lines = $editId > 0 ? $components->forPayroll($editId) : $components->assignedFor($employeeId, $payDate);
+        $lines = $editId > 0 ? $components->forPayroll($editId)
+            : array_merge($components->assignedFor($employeeId, $payDate), (new PayrollLoanService($this->conn, $this->settings))->dueFor($employeeId, $to));
 
         $dpw = (int)($rules['attendance']['working_days_per_week'] ?? 5);
         if ($override !== null && $override !== '' && is_numeric($override)) {
@@ -46,6 +47,20 @@ class PayrollService
         }
         $daily = PayrollAttendanceService::dailyRate($basic, (int)PayrollEngine::get_periods_per_year($frequency), (float)($rules['overtime']['weeks_per_year'] ?? 52), $dpw);
         return [$lines, $days, PayrollAttendanceService::deduction($days, $daily, $basic)];
+    }
+
+    /**
+     * Run the engine; if deductions would push net pay below zero, take the shortfall off loan recoveries (last first)
+     * and run it again (new payroll only). $input['components'] is updated to the lines actually used.
+     */
+    private function calculateCapped(array &$input, bool $cap = true): array
+    {
+        $calc = PayrollEngine::calculate($input);
+        if ($cap && $calc['net_salary'] < 0 && (float)$calc['loan_recovery'] > 0) {
+            $input['components'] = PayrollLoanService::capToShortfall((array)$input['components'], -(float)$calc['net_salary']);
+            $calc = PayrollEngine::calculate($input);
+        }
+        return $calc;
     }
 
     public function calculatePayrollAjax(array $post): string
@@ -65,7 +80,9 @@ class PayrollService
                 (int)$post['employee_id'], (int)($post['id'] ?? 0), $payDate, $from, $to,
                 (string)($post['pay_frequency'] ?? 'Monthly'), (float)($post['basic_salary'] ?? 0), $post['rules'], $post['unpaid_days'] ?? null);
         }
-        $calc = PayrollEngine::calculate($post);
+        $post['leave_payout'] = (float)($post['leave_payout'] ?? 0);
+        $post['redundancy_payments'] = (float)($post['redundancy_pay'] ?? 0);
+        $calc = $this->calculateCapped($post);
         $calc['unpaid_days'] = $unpaidDays ?? 0.0;
         $calc['component_lines'] = $post['components'] ?? [];
         return json_encode(['status' => 'success', 'data' => $calc]);
@@ -204,6 +221,13 @@ class PayrollService
         $other_earnings = isset($other_earnings) ? (float)$other_earnings : 0.0;
         $deductions = isset($deductions) ? (float)$deductions : 0.0;
         $is_resident = isset($is_resident) ? (int)$is_resident : (int)($emp_data['is_resident'] ?? 1);
+        // Final pay: leave paid out (taxed as a lump sum) and redundancy / severance (exempt up to the cap, then flat rate).
+        $leave_payout = isset($leave_payout) && $leave_payout !== '' ? max(0.0, (float)$leave_payout) : 0.0;
+        $redundancy_pay = isset($redundancy_pay) && $redundancy_pay !== '' ? max(0.0, (float)$redundancy_pay) : 0.0;
+
+        if ((int)($post['id'] ?? 0) === 0 && !empty($emp_data['termination_date']) && $period_start > $emp_data['termination_date']) {
+            return json_encode(['status' => 'failed', 'msg' => "{$emp_data['name']} left on {$emp_data['termination_date']}, so no pay is due for a period that starts after that."]);
+        }
 
         // Retroactive pay: a new payroll picks up the employee's pending adjustments; an edit keeps what it already paid.
         $adjustments = new PayrollAdjustmentService($this->conn, $this->settings);
@@ -225,7 +249,7 @@ class PayrollService
             (int)$employee_id, $editId, $pay_date, $period_start, $period_end, $pay_frequency, $basic_salary, $pay_rules, $unpaid_days ?? null);
 
         // Calculate Payroll
-        $calc = PayrollEngine::calculate([
+        $calcInput = [
             'lump_sum_payments' => $retro_pay,
             'basic_salary' => $basic_salary,
             'overtime' => $overtime,
@@ -233,6 +257,8 @@ class PayrollService
             'other_earnings' => $other_earnings,
             'deductions' => $deductions,
             'components' => $compLines,
+            'leave_payout' => $leave_payout,
+            'redundancy_payments' => $redundancy_pay,
             'unpaid_deduction' => $unpaid_deduction,
             'is_resident' => $is_resident,
             'pay_frequency' => $pay_frequency,
@@ -242,7 +268,10 @@ class PayrollService
             'g_ytd_prior' => $ytd_g,
             't_ytd_prior' => $ytd_t,
             'rules' => $pay_rules
-        ]);
+        ];
+        // An edit keeps the recoveries already taken off the loans, so only a new payroll may trim them.
+        $calc = $this->calculateCapped($calcInput, $editId === 0);
+        $compLines = $calcInput['components'];
         $overtime = (float)$calc['overtime']; // typed amount plus hours-based tiers
 
         $gross_salary = $calc['gross_salary'];
@@ -259,6 +288,7 @@ class PayrollService
         $deductions = $calc['deductions']; // typed deductions plus salary-component deductions
         $comp_earnings = $calc['component_earnings'];
         $comp_deductions = $calc['component_deductions'];
+        $loan_recovery = $calc['loan_recovery'];
         $paye_lump = $calc['paye_lump_sum'];
 
         $tin = $this->conn->real_escape_string((string)($emp_data['tin'] ?? ''));
@@ -336,6 +366,9 @@ class PayrollService
 				`unpaid_deduction` = '{$unpaid_deduction}',
 				`component_earnings` = '{$comp_earnings}',
 				`component_deductions` = '{$comp_deductions}',
+				`loan_recovery` = '{$loan_recovery}',
+				`leave_payout` = '{$leave_payout}',
+				`redundancy_pay` = '{$redundancy_pay}',
 				`gross_salary` = '{$gross_salary}',
 				`fnpf_base` = '{$fnpf_base}',
 				`employee_fnpf` = '{$employee_fnpf}',
@@ -385,6 +418,9 @@ class PayrollService
 				`unpaid_deduction` = '{$unpaid_deduction}',
 				`component_earnings` = '{$comp_earnings}',
 				`component_deductions` = '{$comp_deductions}',
+				`loan_recovery` = '{$loan_recovery}',
+				`leave_payout` = '{$leave_payout}',
+				`redundancy_pay` = '{$redundancy_pay}',
 				`gross_salary` = '{$gross_salary}',
 				`fnpf_base` = '{$fnpf_base}',
 				`employee_fnpf` = '{$employee_fnpf}',
@@ -415,6 +451,7 @@ class PayrollService
         $this->lastPayrollId = $payrollId;
         if (empty($id)) {
             (new PayrollComponentService($this->conn, $this->settings))->saveItems($payrollId, $compLines);
+            (new PayrollLoanService($this->conn, $this->settings))->apply($payrollId, $compLines);
         }
         if (empty($id) && $pendingAdj) {
             $adjustments->markApplied(array_column($pendingAdj, 'id'), $payrollId);
@@ -491,6 +528,12 @@ class PayrollService
                     throw new \RuntimeException("Employee #{$eid} was not found in this company.");
                 }
                 $name = $emp->fetch_assoc()['name'];
+                $lv = $this->conn->query("SELECT termination_date FROM `employee_list` WHERE id = '{$eid}' AND tenant_id = '{$tenant_id}'");
+                $left = $lv ? ($lv->fetch_assoc()['termination_date'] ?? null) : null;
+                if ($left && isset($run['period_start']) && $run['period_start'] > $left) {
+                    $skipped[] = $name . ' (left ' . $left . ')';
+                    continue;
+                }
                 $dup = $this->conn->query("SELECT id FROM `payroll_list` WHERE employee_id = '{$eid}' AND salary_month = '{$month}' AND tenant_id = '{$tenant_id}' AND status NOT IN ('rejected','voided') LIMIT 1");
                 if ($dup && $dup->num_rows > 0) {
                     $skipped[] = $name;
@@ -534,7 +577,7 @@ class PayrollService
             $msg .= ' The run is waiting for approval and will not appear in reports until approved.';
         }
         if ($skipped) {
-            $msg .= ' Skipped (already paid this period): ' . implode(', ', $skipped) . '.';
+            $msg .= ' Skipped (already paid this period, or left before it): ' . implode(', ', $skipped) . '.';
         }
         $this->settings->log_audit('Processed Batch Payroll', 'Payroll', "{$run['payroll_run_ref']}: {$processed} employees");
         $this->settings->set_flashdata('success', $msg);
@@ -589,6 +632,7 @@ class PayrollService
                 return json_encode(['status' => 'failed', 'msg' => 'The journal was reversed but the payroll could not be marked void. Contact support before retrying.']);
             }
             (new PayrollAdjustmentService($this->conn, $this->settings))->release($id);
+            (new PayrollLoanService($this->conn, $this->settings))->release($id);
             $this->settings->log_audit('Voided payroll', 'Payroll', "Payroll {$id} ({$existing['payroll_run_ref']}) voided; journal {$journalId} reversed by {$res['code']}.");
             $msg = 'Payroll voided and its journal reversed (' . ($res['code'] ?? 'no journal') . ').';
             $this->settings->set_flashdata('success', $msg);
@@ -600,6 +644,7 @@ class PayrollService
             $this->conn->query("DELETE FROM `journal_entries` WHERE id = '{$journalId}' and tenant_id = '{$tenant_id}'");
         }
         (new PayrollAdjustmentService($this->conn, $this->settings))->release($id);
+        (new PayrollLoanService($this->conn, $this->settings))->release($id);
         $del = $this->conn->query("DELETE FROM `payroll_list` WHERE id = '{$id}' and tenant_id = '{$tenant_id}'");
         if ($del) {
             $this->settings->log_audit('Deleted payroll', 'Payroll', "Payroll {$id} ({$existing['payroll_run_ref']}) deleted before posting.");

@@ -1238,11 +1238,61 @@ class DBConnection{
             'unpaid_deduction'     => "ALTER TABLE `payroll_list` ADD COLUMN `unpaid_deduction` decimal(12,2) NOT NULL DEFAULT 0.00",
             'component_earnings'   => "ALTER TABLE `payroll_list` ADD COLUMN `component_earnings` decimal(12,2) NOT NULL DEFAULT 0.00",
             'component_deductions' => "ALTER TABLE `payroll_list` ADD COLUMN `component_deductions` decimal(12,2) NOT NULL DEFAULT 0.00",
+            'leave_payout'         => "ALTER TABLE `payroll_list` ADD COLUMN `leave_payout` decimal(12,2) NOT NULL DEFAULT 0.00",
+            'redundancy_pay'       => "ALTER TABLE `payroll_list` ADD COLUMN `redundancy_pay` decimal(12,2) NOT NULL DEFAULT 0.00",
+            'loan_recovery'        => "ALTER TABLE `payroll_list` ADD COLUMN `loan_recovery` decimal(12,2) NOT NULL DEFAULT 0.00",
         );
         foreach ($pc as $c => $sql) {
             $res = @$this->conn->query("SHOW COLUMNS FROM `payroll_list` LIKE '{$c}'");
             if ($res && $res->num_rows == 0) {
                 @$this->conn->query($sql);
+            }
+        }
+
+        // Leavers, and staff loans / advances recovered through payroll.
+        $res = @$this->conn->query("SHOW COLUMNS FROM `employee_list` LIKE 'termination_date'");
+        if ($res && $res->num_rows == 0) {
+            @$this->conn->query("ALTER TABLE `employee_list` ADD COLUMN `termination_date` date DEFAULT NULL");
+        }
+        @$this->conn->query("CREATE TABLE IF NOT EXISTS `employee_loans` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `tenant_id` int(30) NOT NULL DEFAULT 1,
+          `employee_id` int(30) NOT NULL,
+          `kind` enum('loan','advance') NOT NULL DEFAULT 'loan',
+          `description` varchar(200) DEFAULT NULL,
+          `principal` decimal(18,4) NOT NULL DEFAULT 0,
+          `installment` decimal(18,4) NOT NULL DEFAULT 0,
+          `start_date` date NOT NULL,
+          `balance` decimal(18,4) NOT NULL DEFAULT 0,
+          `status` enum('active','paid','cancelled') NOT NULL DEFAULT 'active',
+          `journal_id` int(30) DEFAULT NULL,
+          `created_by` int(30) DEFAULT NULL,
+          `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+          PRIMARY KEY (`id`),
+          KEY `tenant_id` (`tenant_id`),
+          KEY `employee_id` (`employee_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        @$this->conn->query("CREATE TABLE IF NOT EXISTS `loan_repayments` (
+          `id` int(30) NOT NULL AUTO_INCREMENT,
+          `tenant_id` int(30) NOT NULL DEFAULT 1,
+          `loan_id` int(30) NOT NULL,
+          `payroll_id` int(30) NOT NULL,
+          `amount` decimal(18,4) NOT NULL DEFAULT 0,
+          `date_created` datetime NOT NULL DEFAULT current_timestamp(),
+          PRIMARY KEY (`id`),
+          UNIQUE KEY `loan_payroll` (`loan_id`, `payroll_id`),
+          KEY `payroll_id` (`payroll_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        $res = @$this->conn->query("SHOW COLUMNS FROM `payroll_component_items` LIKE 'loan_id'");
+        if ($res && $res->num_rows == 0) {
+            @$this->conn->query("ALTER TABLE `payroll_component_items` ADD COLUMN `loan_id` int(30) DEFAULT NULL");
+        }
+
+        // Payroll amounts are held at the same precision as the ledger (DECIMAL(18,4)); the engine still rounds to the cent.
+        foreach (array('basic_salary','overtime','allowances','other_earnings','retro_pay','gross_salary','fnpf_base','employee_fnpf','employer_fnpf','taxable_income','paye_tax','paye_lump','srt_tax','deductions','net_salary','workcare_levy','training_levy','employer_cost','unpaid_deduction','component_earnings','component_deductions','leave_payout','redundancy_pay','loan_recovery') as $mc) {
+            $res = @$this->conn->query("SHOW COLUMNS FROM `payroll_list` LIKE '{$mc}'");
+            if ($res && ($mr = $res->fetch_assoc()) && stripos((string)$mr['Type'], 'decimal(12,2)') !== false) {
+                @$this->conn->query("ALTER TABLE `payroll_list` MODIFY `{$mc}` decimal(18,4) NOT NULL DEFAULT 0");
             }
         }
 
