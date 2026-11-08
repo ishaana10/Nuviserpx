@@ -45,6 +45,10 @@ class EmployeeService
         } else {
             $sql = "UPDATE `employee_list` set {$dataStr} where id = '{$id}' and tenant_id = '{$tenant_id}' ";
         }
+        $emailVal = trim((string)($post['email'] ?? ''));
+        if ($emailVal !== '' && !EmployeePortalService::validEmail($emailVal)) {
+            return json_encode(['status' => 'failed', 'msg' => ' Enter a valid email address.']);
+        }
         $empCode = isset($employee_code) ? $this->conn->real_escape_string((string)$employee_code) : '';
         $check = $this->conn->query("SELECT * FROM `employee_list` where `employee_code` = '{$empCode}' and tenant_id = '{$tenant_id}' and delete_flag = 0 " . ($id > 0 ? " and id != '{$id}'" : ""))->num_rows;
         if ($check > 0) {
@@ -62,6 +66,15 @@ class EmployeeService
             }
         }
         if ($resp['status'] === 'success') {
+            if ($id > 0 && $emailVal !== '') {
+                // Keep a portal account's sign-in address in step with the employee record.
+                $pe = $this->conn->prepare("UPDATE employee_portal_users SET email = ? WHERE employee_id = ? AND tenant_id = ?");
+                if ($pe) {
+                    $tid = (int)$tenant_id;
+                    $pe->bind_param('sii', $emailVal, $id, $tid);
+                    $pe->execute();
+                }
+            }
             $this->settings->set_flashdata('success', $resp['msg']);
         }
         return json_encode($resp);

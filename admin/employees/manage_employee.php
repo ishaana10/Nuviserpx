@@ -53,9 +53,15 @@ $readonly = isset($id) && !$can_edit && $scope !== null;
 		</div>
 		<div class="row">
 			<div class="col-md-6 form-group">
+				<label for="email" class="control-label">Email <small class="text-muted">(used for payslip self-service)</small></label>
+				<input type="email" name="email" id="email" maxlength="150" class="form-control form-control-sm rounded-0" value="<?php echo isset($email) ? htmlspecialchars($email) : ''; ?>" />
+			</div>
+			<div class="col-md-6 form-group">
 				<label for="phone" class="control-label">Phone</label>
 				<input type="text" name="phone" id="phone" class="form-control form-control-sm rounded-0" value="<?php echo isset($phone) ? $phone : ''; ?>" />
 			</div>
+		</div>
+		<div class="row">
 			<div class="col-md-6 form-group">
 				<label for="salary" class="control-label">Basic Monthly Salary<?php echo $_settings->currency_tag() ?></label>
 				<input type="number" step="any" name="salary" id="salary" class="form-control form-control-sm rounded-0 text-right" value="<?php echo isset($salary) ? $salary : 0; ?>" required/>

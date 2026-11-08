@@ -1812,6 +1812,42 @@ class Master extends DBConnection
         return $this->container->make(EmployeeService::class)->saveEmployee($_POST);
     }
 
+    public function invite_employee_portal()
+    {
+        return $this->container->make(\App\Services\EmployeePortalService::class)->invite((int)($_POST['employee_id'] ?? 0));
+    }
+
+    public function revoke_employee_portal()
+    {
+        return $this->container->make(\App\Services\EmployeePortalService::class)->revoke((int)($_POST['employee_id'] ?? 0));
+    }
+
+    private function employee_portal_start(array $r): string
+    {
+        if (empty($r['ok'])) {
+            return json_encode(['status' => 'failed', 'msg' => $r['msg']]);
+        }
+        session_regenerate_id(true);
+        $_SESSION['employee_portal'] = $r['session'];
+        return json_encode(['status' => 'success', 'msg' => $r['msg']]);
+    }
+
+    public function employee_portal_login()
+    {
+        $svc = new \App\Services\EmployeePortalService($this->conn, $this->settings);
+        return $this->employee_portal_start($svc->login((string)($_POST['email'] ?? ''), (string)($_POST['password'] ?? ''), (string)($_SERVER['REMOTE_ADDR'] ?? '')));
+    }
+
+    public function employee_portal_activate()
+    {
+        $svc = new \App\Services\EmployeePortalService($this->conn, $this->settings);
+        $pw = (string)($_POST['password'] ?? '');
+        if ($pw !== (string)($_POST['confirm'] ?? '')) {
+            return json_encode(['status' => 'failed', 'msg' => 'The two passwords do not match.']);
+        }
+        return $this->employee_portal_start($svc->activate((string)($_POST['token'] ?? ''), $pw, (string)($_SERVER['REMOTE_ADDR'] ?? '')));
+    }
+
     public function delete_employee()
     {
         return $this->container->make(EmployeeService::class)->deleteEmployee(intval($_POST['id'] ?? 0));
@@ -2274,6 +2310,18 @@ switch ($action) {
         break;
     case 'delete_employee':
         echo $Master->delete_employee();
+        break;
+    case 'invite_employee_portal':
+        echo $Master->invite_employee_portal();
+        break;
+    case 'revoke_employee_portal':
+        echo $Master->revoke_employee_portal();
+        break;
+    case 'employee_portal_login':
+        echo $Master->employee_portal_login();
+        break;
+    case 'employee_portal_activate':
+        echo $Master->employee_portal_activate();
         break;
     case 'save_attendance':
         echo $Master->save_attendance();

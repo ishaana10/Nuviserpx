@@ -293,6 +293,25 @@ class Emailer {
         return self::send_email($to, $subject, $html);
     }
 
+    public static function send_employee_portal_invitation($to, $employee_name, $invite_url, $sys_info = []) {
+        $company_name = $sys_info['name'] ?? 'Nuvis ERPX';
+        $subject = "Employee Self-Service Access - " . $company_name;
+
+        $body = "
+        <h3>Dear " . htmlspecialchars($employee_name) . ",</h3>
+        <p>You have been invited to the Employee Self-Service portal, where you can view and print your payslips online.</p>
+
+        <div style='text-align: center; margin: 30px 0;'>
+            <a href='" . htmlspecialchars($invite_url) . "' style='background-color: #0284c7; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px; display: inline-block;'>Set Up My Account &rarr;</a>
+        </div>
+
+        <p style='font-size: 13px; color: #666;'>Or copy and paste this URL into your browser:<br><a href='" . htmlspecialchars($invite_url) . "'>" . htmlspecialchars($invite_url) . "</a></p>
+        <p style='font-size: 13px; color: #666;'>This link is valid for 7 days and can be used once. If you did not expect this email, you can ignore it.</p>";
+
+        $html = self::wrap_template("Employee Self-Service Invitation", $body, $company_name);
+        return self::send_email($to, $subject, $html);
+    }
+
     public static function send_payslip_email($to, $payroll, $sys_info = []) {
         $company_name = $sys_info['name'] ?? 'Nuvis ERPX';
         $subject = "Confidential Salary Slip - " . $payroll['salary_month'] . " (" . $company_name . ")";
