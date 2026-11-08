@@ -148,7 +148,11 @@
 }
 .nv-w-btn:hover, .nv-w-btn[aria-expanded="true"] { background: #f1f5f9; color: #0f172a; }
 .nv-w-btn.danger:hover { background: #fee2e2; color: #dc2626; }
-.nv-w-handle { cursor: grab; display: none; }
+.nv-w-handle { cursor: grab; display: none; touch-action: none; -webkit-user-select: none; user-select: none; }
+.nv-w-handle.ui-sortable-handle, .nv-w-handle:active { touch-action: none; }
+.nv-w-order { gap: 0; }
+.nv-w-order .nv-w-btn { color: #64748b; }
+.nv-w-order .nv-w-btn:disabled { opacity: .3; pointer-events: none; }
 .nv-w-handle:active { cursor: grabbing; }
 .nv-w .nv-edit-only { display: none !important; }
 .nv-dash-editing .nv-w .nv-edit-only { display: inline-flex !important; }
@@ -291,11 +295,38 @@
 .nv-gallery-item .btn { height: 30px; font-size: .8rem; display: inline-flex; align-items: center; gap: 5px; }
 
 @media (max-width: 575.98px) {
-  .nv-dash-actions { width: 100%; }
-  .nv-dash-actions .nv-range-wrap { flex: 1; }
-  .nv-dash-actions .custom-select { width: 100%; min-width: 0; }
+  .nv-dash { padding-bottom: 88px; }
+  .nv-dash-head { gap: 10px; margin-bottom: 10px; }
+  .nv-dash-title { font-size: 1.3rem; line-height: 1.2; }
+  .nv-dash-sub { font-size: .8rem; gap: 2px 6px; }
+  /* Controls: date range on its own row, then refresh, theme, Customize, New invoice. */
+  .nv-dash-actions { width: 100%; display: grid; grid-template-columns: 44px 44px 1fr 1fr; gap: 8px; }
+  .nv-dash-actions .nv-range-wrap { grid-column: 1 / -1; }
+  .nv-dash-actions .custom-select { width: 100%; min-width: 0; height: 44px; }
+  .nv-dash-actions .btn { height: 44px; justify-content: center; padding-left: 8px; padding-right: 8px; white-space: nowrap; }
+  .nv-dash-actions .btn#nvRefresh, .nv-dash-actions .btn#nvThemeBtn { padding: 0; }
   .nv-save-state { display: none; }
-  .nv-kpi-value { font-size: 1.45rem; }
+  .nv-dash-tabs { margin-left: -4px; margin-right: -4px; -webkit-mask-image: linear-gradient(to right, #000 90%, transparent); mask-image: linear-gradient(to right, #000 90%, transparent); }
+  .nv-dash-tab { padding: 11px 12px; }
+  .nv-notice { font-size: .8rem; padding: 8px 10px; align-items: flex-start; }
+  /* Small widgets (metrics) sit two to a row instead of one huge card each. */
+  .nv-dash-grid { margin-left: -5px; margin-right: -5px; }
+  .nv-dash-grid > .nv-w-col { padding-left: 5px; padding-right: 5px; margin-bottom: 10px; }
+  .nv-w-head { padding: 10px 8px 0 12px; gap: 8px; }
+  .nv-w-col.col-6 .nv-w-icon { display: none; }
+  .nv-w-col.col-6 .nv-w-meta { display: none; }
+  .nv-w-col.col-6 .nv-w-title { font-size: .8rem; }
+  .nv-kpi-value { font-size: 1.3rem; }
+  .nv-w-btn { width: 36px; height: 36px; }
+  /* Customising: the bar stays under the top bar, short text, big buttons. */
+  .nv-dash-editing .nv-edit-banner { position: sticky; top: 3.5rem; z-index: 1019; padding: 8px; box-shadow: 0 6px 16px -8px rgba(15, 23, 42, .3); }
+  .nv-edit-banner > span:first-child { font-size: .8rem; line-height: 1.3; }
+  .nv-edit-banner > span.d-flex { width: 100%; gap: 6px !important; }
+  .nv-edit-banner > span.d-flex .btn { flex: 1; height: 40px; padding-left: 4px; padding-right: 4px; }
+  .nv-w-col .nv-w-handle { width: 40px; height: 40px; }
+}
+@media (hover: none) and (pointer: coarse) {
+  .nv-w-btn, .nv-tab-tool { min-width: 36px; min-height: 36px; }
 }
 .nv-dash-editing .nv-view-btn { display: none !important; }
 .nv-dash-editing .nv-w-col.col-xl-3 .nv-w-icon { display: none; }

@@ -12,7 +12,7 @@
     var store = (window.NuvisUI && window.NuvisUI.store) || { get: function (k, d) { return d; }, set: function () {} };
 
     var SIZE_CLASS = {
-        sm: 'col-12 col-sm-6 col-xl-3',
+        sm: 'col-6 col-sm-6 col-xl-3',
         md: 'col-12 col-md-6 col-xl-4',
         lg: 'col-12 col-xl-6',
         xl: 'col-12 col-xl-8',
@@ -363,6 +363,10 @@
         var head =
             '<header class="nv-w-head">' +
             '<button type="button" class="nv-w-btn nv-w-handle nv-edit-only" title="Drag to move" aria-label="Drag to move"><i class="fas fa-grip-vertical"></i></button>' +
+            '<span class="nv-w-order nv-edit-only">' +
+            '<button type="button" class="nv-w-btn" data-act="move" data-val="-1" title="Move earlier" aria-label="Move earlier"><i class="fas fa-arrow-up"></i></button>' +
+            '<button type="button" class="nv-w-btn" data-act="move" data-val="1" title="Move later" aria-label="Move later"><i class="fas fa-arrow-down"></i></button>' +
+            '</span>' +
             '<span class="nv-w-icon"><i class="' + esc(d.icon) + '"></i></span>' +
             '<h3 class="nv-w-title" title="' + esc(titleOf(item)) + '">' + esc(titleOf(item)) + '</h3>' +
             '<span class="nv-w-meta nv-view-only"></span>' +
@@ -703,7 +707,7 @@
         $('#nvDash').toggleClass('nv-dash-editing', S.editing);
         $('#nvEditBtn').html(S.editing ? '<i class="fas fa-check"></i> Done' : '<i class="fas fa-th-large"></i> Customize');
         renderTabs();
-        if (S.editing) { enableSorting(); } else if ($('#nvGrid').hasClass('ui-sortable')) { $('#nvGrid').sortable('destroy'); }
+        if (S.editing) { enableSorting(); syncOrderButtons(); } else if ($('#nvGrid').hasClass('ui-sortable')) { $('#nvGrid').sortable('destroy'); }
     }
 
     function enableSorting() {
@@ -727,8 +731,48 @@
                 $.each(layout(), function (_, it) { byUid[it.uid] = it; });
                 S.active.layout = $.map(order, function (u) { return byUid[u] || null; });
                 saveLayout();
+                syncOrderButtons();
                 resizeCharts();
             }
+        });
+    }
+
+    /** The first widget can't move earlier and the last can't move later. */
+    function syncOrderButtons() {
+        var $cols = $('#nvGrid > .nv-w-col');
+        $cols.find('[data-act="move"]').prop('disabled', false);
+        $cols.first().find('.nv-w-order [data-val="-1"]').prop('disabled', true);
+        $cols.last().find('.nv-w-order [data-val="1"]').prop('disabled', true);
+    }
+
+    /**
+     * jQuery UI sortable only listens for the mouse, so on a phone or tablet the drag handle did nothing. Replay a
+     * finger on a handle as the equivalent mouse events (the same idea as jquery-ui-touch-punch, kept to the handle
+     * so scrolling the page anywhere else is untouched).
+     */
+    function enableTouchDrag() {
+        var active = false;
+        function fire(type, t) {
+            var ev = document.createEvent('MouseEvents');
+            ev.initMouseEvent(type, true, true, window, 1, t.screenX, t.screenY, t.clientX, t.clientY, false, false, false, false, 0, null);
+            t.target.dispatchEvent(ev);
+        }
+        $(document).on('touchstart', '.nv-dash-editing .nv-w-handle', function (e) {
+            var o = e.originalEvent;
+            if (!o.touches || o.touches.length > 1) { return; }
+            active = true;
+            var t = o.changedTouches[0];
+            fire('mouseover', t); fire('mousemove', t); fire('mousedown', t);
+        });
+        $(document).on('touchmove', function (e) {
+            if (!active) { return; }
+            fire('mousemove', e.originalEvent.changedTouches[0]);
+        });
+        $(document).on('touchend touchcancel', function (e) {
+            if (!active) { return; }
+            active = false;
+            var t = e.originalEvent.changedTouches[0];
+            fire('mouseup', t); fire('mouseout', t);
         });
     }
 
@@ -815,6 +859,8 @@
                 S.active.layout.splice(to, 0, item);
                 var $c = colEl(item);
                 if (Number(val) < 0) { $c.prev('.nv-w-col').before($c); } else { $c.next('.nv-w-col').after($c); }
+                if ($c[0] && $c[0].scrollIntoView) { $c[0].scrollIntoView({ block: 'center', behavior: REDUCED_MOTION ? 'auto' : 'smooth' }); }
+                syncOrderButtons();
                 resizeCharts();
                 break;
             case 'remove':
@@ -924,6 +970,7 @@
 
         $('#nvRefresh').on('click', function () { S.data = {}; fetchData(); });
         $('#nvEditBtn, #nvDoneBtn').on('click', function () { setEditing(!S.editing); });
+        enableTouchDrag();
         $('#nvAddBtn').on('click', openGallery);
         $('#nvResetBtn').on('click', resetLayout);
 

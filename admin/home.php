@@ -53,7 +53,7 @@ $asset_v = class_exists('AppVersion') ? urlencode(AppVersion::get('commit')) : '
     <div class="nv-notice" id="nvNotice" role="status" style="display:none"></div>
 
     <div class="nv-edit-banner">
-        <span><i class="fas fa-arrows-alt mr-2"></i>Drag widgets by their handle to rearrange. Use each widget's menu to resize, rename or change the chart. Changes save automatically.</span>
+        <span><i class="fas fa-arrows-alt mr-2"></i>Move a widget with its <b>&uarr; &darr;</b> arrows, or hold the <i class="fas fa-grip-vertical"></i> handle and drag. The <b>&hellip;</b> menu resizes, renames or changes the chart. Changes save automatically for you.</span>
         <span class="d-flex" style="gap:8px">
             <button type="button" class="btn btn-sm btn-default" id="nvResetBtn"><i class="fas fa-undo"></i> Reset to default</button>
             <button type="button" class="btn btn-sm btn-default" id="nvAddBtn"><i class="fas fa-plus"></i> Add widget</button>
