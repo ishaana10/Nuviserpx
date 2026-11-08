@@ -4,7 +4,7 @@
 $file_content = file_get_contents(__DIR__ . '/../admin/employees/manage_employee.php');
 
 if (strpos($file_content, '$id_clean = intval($_GET[\'id\']);') !== false &&
-    strpos($file_content, 'where id = \'{$id_clean}\'') !== false) {
+    strpos($file_content, '$where = "id = \'{$id_clean}\' AND tenant_id') !== false) {
     echo "VERIFICATION SUCCESS: admin/employees/manage_employee.php safely casts \$_GET['id'] to intval().\n";
     exit(0);
 } else {
