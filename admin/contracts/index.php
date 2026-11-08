@@ -1,6 +1,7 @@
 <?php
 require_once(__DIR__ . '/../../config.php');
 $tenant_id = $_settings->active_tenant_id();
+$billing = new \App\Services\ContractBillingService($conn, $_settings);
 
 $qry = $conn->query("
     SELECT c.*, p.name as party_name
@@ -71,7 +72,8 @@ while($row = $qry->fetch_assoc()){
                         <th class="text-right">Recurring Rate</th>
                         <th>Start / End Date</th>
                         <th class="text-center">Status</th>
-                        <th class="text-center" style="width: 10%;">Action</th>
+                        <th>Next Invoice</th>
+                        <th class="text-center" style="width: 14%;">Action</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -85,7 +87,7 @@ while($row = $qry->fetch_assoc()){
                         <td class="align-middle font-weight-bold"><?= htmlspecialchars($row['title']) ?></td>
                         <td class="align-middle"><?= htmlspecialchars($row['party_name']) ?></td>
                         <td class="align-middle text-capitalize"><?= htmlspecialchars($row['billing_frequency']) ?></td>
-                        <td class="align-middle text-right font-weight-bold">$<?= number_format($row['amount'], 2) ?></td>
+                        <td class="align-middle text-right font-weight-bold"><?= $_settings->currency_tag() ?><?= number_format($row['amount'], 2) ?></td>
                         <td class="align-middle text-xs">
                             <?= date("d M Y", strtotime($row['start_date'])) ?>
                             <?= $row['end_date'] ? ' to ' . date("d M Y", strtotime($row['end_date'])) : ' (Ongoing)' ?>
@@ -95,14 +97,16 @@ while($row = $qry->fetch_assoc()){
                                 <?= $row['status'] ?>
                             </span>
                         </td>
+                        <td class="align-middle text-xs"><?php $nd = $billing->nextDue($row); echo $nd ? htmlspecialchars(date('d M Y', strtotime($nd))) : '&mdash;'; ?></td>
                         <td class="text-center align-middle">
+                            <?php if ($row['status'] == 'active'): ?><button type="button" class="btn btn-xs btn-outline-success btn-flat bill_contract" data-id="<?= $row['id'] ?>" title="Raise any invoice that is due"><i class="fas fa-file-invoice"></i></button><?php endif; ?>
                             <button type="button" class="btn btn-xs btn-outline-primary btn-flat edit_contract" data-id="<?= $row['id'] ?>" onclick="uni_modal('Edit Contract Details', 'contracts/manage_contract.php?id=<?= $row['id'] ?>', 'mid-large')"><i class="fas fa-edit mr-1"></i> Edit</button>
                         </td>
                     </tr>
                     <?php endforeach; ?>
                     <?php if(empty($contracts_list)): ?>
                     <tr>
-                        <td colspan="9" class="text-center py-4 text-muted">No contracts or subscriptions found.</td>
+                        <td colspan="10" class="text-center py-4 text-muted">No contracts or subscriptions found.</td>
                     </tr>
                     <?php endif; ?>
                 </tbody>
@@ -117,6 +121,15 @@ $(document).ready(function(){
         $('#contracts-table').DataTable().destroy();
     }
     $('#contracts-table').dataTable();
+    $(document).on('click', '.bill_contract', function(){
+        if (!confirm('Raise the invoice(s) that are due on this contract now?')) return;
+        start_loader();
+        $.post(_base_url_ + "classes/Master.php?f=generate_contract_invoices", {id: $(this).data('id')}, function(resp){
+            alert_toast(resp.msg, resp.status == 'success' ? 'success' : 'error');
+            end_loader();
+            if (resp.status == 'success') setTimeout(function(){ location.reload(); }, 900);
+        }, 'json').fail(function(){ alert_toast('An error occurred.', 'error'); end_loader(); });
+    });
 
 });
 </script>

@@ -48,7 +48,7 @@ if($id > 0){
 
         <div class="row">
             <div class="col-md-4 form-group">
-                <label for="amount" class="font-weight-bold text-dark text-sm">Recurring Amount ($) <span class="text-danger">*</span></label>
+                <label for="amount" class="font-weight-bold text-dark text-sm">Recurring Amount<?= $_settings->currency_tag() ?> <span class="text-danger">*</span></label>
                 <input type="number" step="any" id="amount" name="amount" class="form-control form-control-sm text-right" placeholder="0.00" value="<?= isset($amount) ? $amount : '' ?>" required>
             </div>
             <div class="col-md-4 form-group">
@@ -59,6 +59,21 @@ if($id > 0){
                 <label for="end_date" class="font-weight-bold text-dark text-sm">End Date <small class="text-muted font-weight-normal">(optional)</small></label>
                 <input type="date" id="end_date" name="end_date" class="form-control form-control-sm" value="<?= isset($end_date) ? $end_date : '' ?>">
             </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-4 form-group">
+                <label for="tax_rate" class="font-weight-bold text-dark text-sm">Tax rate (%)</label>
+                <input type="number" step="0.01" min="0" max="100" id="tax_rate" name="tax_rate" class="form-control form-control-sm text-right" value="<?= isset($tax_rate) ? htmlspecialchars((string)$tax_rate) : '0' ?>">
+            </div>
+            <div class="col-md-4 form-group">
+                <label for="tax_type" class="font-weight-bold text-dark text-sm">Amount is</label>
+                <select name="tax_type" id="tax_type" class="form-control form-control-sm">
+                    <option value="exclusive" <?= (!isset($tax_type) || $tax_type != 'inclusive') ? 'selected' : '' ?>>Tax exclusive</option>
+                    <option value="inclusive" <?= (isset($tax_type) && $tax_type == 'inclusive') ? 'selected' : '' ?>>Tax inclusive</option>
+                </select>
+            </div>
+            <div class="col-md-4 form-group"><small class="text-muted d-block mt-4">Invoices are raised automatically each billing period while the contract is active.</small></div>
         </div>
 
         <div class="row">

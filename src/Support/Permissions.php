@@ -570,6 +570,7 @@ final class Permissions
         'save_ticket'           => ['tickets', 'save'],
         'reply_ticket'          => ['tickets', 'edit'],
         'save_contract'         => ['contracts', 'save'],
+        'generate_contract_invoices' => ['invoices', 'save'],
         // Settings & configuration (tenant-admin: settings_manage)
         'save_currency'         => ['settings_manage'],
         'delete_currency'       => ['settings_manage'],
