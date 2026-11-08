@@ -229,6 +229,8 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
 				<label for="leave_payout" class="control-label">Leave payout (final pay)</label>
 				<input type="number" step="any" min="0" name="leave_payout" id="leave_payout" class="form-control form-control-sm rounded-0 text-right calc-trigger" value="<?php echo isset($leave_payout) ? $leave_payout : 0; ?>" />
 				<small class="text-muted">Unused leave paid out on leaving. Taxed as a lump sum.</small>
+				<button type="button" class="btn btn-xs btn-outline-info mt-1" id="use-leave-balance"><i class="fa fa-calculator"></i> Use leave balance</button>
+				<small class="text-info d-block" id="leave-balance-note"></small>
 			</div>
 			<div class="col-md-4 form-group">
 				<label for="redundancy_pay" class="control-label">Redundancy / severance</label>
@@ -457,5 +459,15 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
 				}
 			})
 		});
+	});
+
+	$('#use-leave-balance').click(function(){
+		var emp = $('#employee_id').val();
+		if(!emp){ alert_toast('Choose the employee first.', 'warning'); return; }
+		$.post(_base_url_+"classes/Master.php?f=leave_payout_suggestion", {employee_id: emp, as_of: $('#pay_date').val(), basic_salary: $('#basic_salary').val(), pay_frequency: $('#pay_frequency').val()}, function(r){
+			if(r.status !== 'success'){ return; }
+			$('#leave_payout').val(parseFloat(r.amount).toFixed(2)).trigger('input').trigger('change');
+			$('#leave-balance-note').text(r.days > 0 ? (parseFloat(r.days).toFixed(2) + ' days x ' + parseFloat(r.daily_rate).toFixed(2) + ' per day') : 'No payable leave balance. Set a leave policy to track it.');
+		}, 'json');
 	});
 </script>

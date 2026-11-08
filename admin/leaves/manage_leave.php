@@ -66,6 +66,13 @@ if(isset($_GET['id']) && $_GET['id'] > 0){
 				<input type="date" name="end_date" id="end_date" class="form-control form-control-sm rounded-0" value="<?php echo isset($end_date) ? $end_date : date('Y-m-d'); ?>" required/>
 			</div>
 		</div>
+		<div class="form-group" id="half-day-box" style="display:none">
+			<div class="custom-control custom-checkbox">
+				<input type="checkbox" class="custom-control-input" id="half_day" name="day_fraction" value="0.5" <?php echo isset($day_fraction) && (float)$day_fraction == 0.5 ? 'checked' : '' ?>>
+				<label class="custom-control-label" for="half_day">Half day</label>
+			</div>
+		</div>
+		<div class="alert alert-light border py-2 text-sm" id="leave-balance-hint" style="display:none"></div>
 		<div class="form-group">
 			<label for="reason" class="control-label">Reason</label>
 			<textarea name="reason" id="reason" rows="3" class="form-control form-control-sm rounded-0" required><?php echo isset($reason) ? $reason : ''; ?></textarea>
@@ -92,6 +99,26 @@ if(isset($_GET['id']) && $_GET['id'] > 0){
 			width:'100%',
 			dropdownParent:$('#uni_modal')
 		})
+		function toggleHalf(){
+			var single = $('#start_date').val() && $('#start_date').val() === $('#end_date').val();
+			$('#half-day-box').toggle(!!single);
+			if(!single){ $('#half_day').prop('checked', false); }
+		}
+		function refreshBalance(){
+			toggleHalf();
+			var emp = $('#leave-form [name=employee_id]').val();
+			var box = $('#leave-balance-hint');
+			if(!$('#leave_type').val() || !$('#start_date').val() || !$('#end_date').val()){ box.hide(); return; }
+			$.post(_base_url_+"classes/Master.php?f=leave_balance_info", {employee_id: emp, leave_type: $('#leave_type').val(), start_date: $('#start_date').val(), end_date: $('#end_date').val(), day_fraction: $('#half_day').is(':checked') ? 0.5 : 1, id: $('#leave-form [name=id]').val()}, function(r){
+				if(r.status !== 'success'){ box.hide(); return; }
+				var t = [];
+				if(r.days !== null) t.push('This request: <b>' + r.days + '</b> working day' + (r.days == 1 ? '' : 's'));
+				if(r.tracked) t.push('Balance by ' + $('#end_date').val() + ': <b>' + parseFloat(r.balance).toFixed(2) + '</b> days');
+				if(t.length){ box.html(t.join(' &middot; ')).show(); } else { box.hide(); }
+			}, 'json');
+		}
+		$('#leave-form').on('change', '[name=employee_id], #leave_type, #start_date, #end_date, #half_day', refreshBalance);
+		refreshBalance();
 		$('#leave-form').submit(function(e){
 			e.preventDefault();
             var _this = $(this)

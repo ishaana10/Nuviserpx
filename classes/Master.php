@@ -1812,6 +1812,62 @@ class Master extends DBConnection
         return $this->container->make(EmployeeService::class)->saveEmployee($_POST);
     }
 
+    public function save_leave_policy()
+    {
+        return (new \App\Services\LeaveBalanceService($this->conn, $this->settings))->savePolicy($_POST);
+    }
+
+    public function save_leave_adjustment()
+    {
+        return (new \App\Services\LeaveBalanceService($this->conn, $this->settings))->saveAdjustment($_POST);
+    }
+
+    public function save_public_holiday()
+    {
+        return (new \App\Services\LeaveBalanceService($this->conn, $this->settings))->saveHoliday($_POST);
+    }
+
+    public function delete_public_holiday()
+    {
+        return (new \App\Services\LeaveBalanceService($this->conn, $this->settings))->deleteHoliday((int)($_POST['id'] ?? 0));
+    }
+
+    public function save_leave_entitlement()
+    {
+        return (new \App\Services\LeaveBalanceService($this->conn, $this->settings))->saveEntitlement($_POST);
+    }
+
+    /** Balance and request length for the leave form. A self-service user only sees their own. */
+    public function leave_balance_info()
+    {
+        $svc = new \App\Services\LeaveBalanceService($this->conn, $this->settings);
+        $scope = $this->settings->employee_scope('leaves');
+        $emp = $scope === null ? (int)($_POST['employee_id'] ?? 0) : (int)$scope;
+        $type = (string)($_POST['leave_type'] ?? '');
+        $start = (string)($_POST['start_date'] ?? '');
+        $end = (string)($_POST['end_date'] ?? '');
+        $ok = fn($d) => preg_match('/^\d{4}-\d{2}-\d{2}$/', $d) === 1;
+        $bal = $emp > 0 && $ok($end) ? ($svc->forEmployee($emp, $end, (int)($_POST['id'] ?? 0))[$type] ?? null) : null;
+        return json_encode(['status' => 'success', 'tracked' => $bal !== null,
+            'balance' => $bal['balance'] ?? null,
+            'days' => ($ok($start) && $ok($end) && $end >= $start) ? $svc->requestDays($start, $end, $_POST['day_fraction'] ?? 1) : null]);
+    }
+
+    /** Leave days payable on exit and their value at the employee's daily rate. */
+    public function leave_payout_suggestion()
+    {
+        require_once(base_app . 'classes/PayrollEngine.php');
+        $emp = (int)($_POST['employee_id'] ?? 0);
+        $asOf = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_POST['as_of'] ?? '')) ? (string)$_POST['as_of'] : date('Y-m-d');
+        $basic = max(0.0, (float)($_POST['basic_salary'] ?? 0));
+        $freq = (string)($_POST['pay_frequency'] ?? 'Monthly');
+        $rules = \PayrollEngine::load_rules($this->settings, $asOf);
+        $days = (new \App\Services\LeaveBalanceService($this->conn, $this->settings))->payoutDays($emp, $asOf);
+        $daily = \App\Services\PayrollAttendanceService::dailyRate($basic, (int)\PayrollEngine::get_periods_per_year($freq),
+            (float)($rules['overtime']['weeks_per_year'] ?? 52), (int)($rules['attendance']['working_days_per_week'] ?? 5));
+        return json_encode(['status' => 'success', 'days' => $days, 'daily_rate' => $daily, 'amount' => round($days * $daily, 2)]);
+    }
+
     public function invite_employee_portal()
     {
         return $this->container->make(\App\Services\EmployeePortalService::class)->invite((int)($_POST['employee_id'] ?? 0));
@@ -2310,6 +2366,27 @@ switch ($action) {
         break;
     case 'delete_employee':
         echo $Master->delete_employee();
+        break;
+    case 'save_public_holiday':
+        echo $Master->save_public_holiday();
+        break;
+    case 'delete_public_holiday':
+        echo $Master->delete_public_holiday();
+        break;
+    case 'save_leave_entitlement':
+        echo $Master->save_leave_entitlement();
+        break;
+    case 'save_leave_policy':
+        echo $Master->save_leave_policy();
+        break;
+    case 'save_leave_adjustment':
+        echo $Master->save_leave_adjustment();
+        break;
+    case 'leave_balance_info':
+        echo $Master->leave_balance_info();
+        break;
+    case 'leave_payout_suggestion':
+        echo $Master->leave_payout_suggestion();
         break;
     case 'invite_employee_portal':
         echo $Master->invite_employee_portal();
