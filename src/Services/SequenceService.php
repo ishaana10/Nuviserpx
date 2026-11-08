@@ -89,6 +89,15 @@ class SequenceService
         return $no;
     }
 
+    /** True when another document in the company already uses this number. $table and $column are fixed names from the caller. */
+    public static function numberTaken(mysqli $conn, int $tenantId, string $table, string $column, string $number, int $exceptId = 0): bool
+    {
+        $stmt = $conn->prepare("SELECT 1 FROM `{$table}` WHERE tenant_id = ? AND `{$column}` = ? AND id <> ? LIMIT 1");
+        $stmt->bind_param('isi', $tenantId, $number, $exceptId);
+        $stmt->execute();
+        return $stmt->get_result()->num_rows > 0;
+    }
+
     /** "INV-202611-0042" from a prefix and a number (at least four digits). */
     public static function formatDoc(string $prefix, int $n): string
     {

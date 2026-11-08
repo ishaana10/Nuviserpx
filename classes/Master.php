@@ -380,7 +380,7 @@ class Master extends DBConnection
 
         $target_id = !empty($id) ? intval($id) : 0;
         if ($target_id <= 0) {
-            $code = 'TCK-' . sprintf('%05d', rand(100, 99999));
+            $code = \App\Services\SequenceService::documentNo($this->conn, (int)$tenant_id, 'tickets', 'ticket_code', 'TCK-' . date('Ym') . '-', 'ticket-' . date('Ym'));
             $data = " `tenant_id` = '{$tenant_id}' ";
             $data .= ", `ticket_code` = '{$code}' ";
             $data .= ", `subject` = '{$this->conn->real_escape_string($subject)}' ";
@@ -451,7 +451,7 @@ class Master extends DBConnection
 
         $target_id = !empty($id) ? intval($id) : 0;
         if ($target_id <= 0) {
-            $c_no = 'CTR-' . sprintf('%05d', rand(100, 99999));
+            $c_no = \App\Services\SequenceService::documentNo($this->conn, (int)$tenant_id, 'contracts', 'contract_no', 'CTR-' . date('Ym') . '-', 'contract-' . date('Ym'));
             $data = " `tenant_id` = '{$tenant_id}' ";
             $data .= ", `contract_no` = '{$c_no}' ";
             $data .= ", `title` = '{$this->conn->real_escape_string($title)}' ";
@@ -532,7 +532,7 @@ class Master extends DBConnection
             return json_encode(['status' => 'failed', 'msg' => 'Employee, Date, and Amount are required.']);
         }
 
-        $c_no = 'EXP-' . sprintf('%05d', rand(100, 99999));
+        $c_no = \App\Services\SequenceService::documentNo($this->conn, (int)$tenant_id, 'expense_reports', 'claim_no', 'EXP-' . date('Ym') . '-', 'expense-' . date('Ym'));
         $data = " `tenant_id` = '{$tenant_id}' ";
         $data .= ", `claim_no` = '{$c_no}' ";
         $data .= ", `employee_id` = '{$emp_id}' ";
@@ -1366,7 +1366,17 @@ class Master extends DBConnection
             return json_encode(['status' => 'failed', 'msg' => 'Deliveries have been recorded against this order, so it can no longer be edited. Cancel the deliveries first.']);
         }
 
-        $order_no = !empty($order_no) ? $this->conn->real_escape_string((string)$order_no) : 'SO-' . date('Ym') . '-' . rand(1000, 9999);
+        $order_no = trim((string)($order_no ?? ''));
+        if ($order_no === '' && $id !== '') {
+            $order_no = (string)($this->conn->query("SELECT order_no FROM `sales_order_list` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'")->fetch_assoc()['order_no'] ?? '');
+        }
+        if ($order_no !== '' && \App\Services\SequenceService::numberTaken($this->conn, (int)$tenant_id, 'sales_order_list', 'order_no', $order_no, (int)$id)) {
+            return json_encode(['status' => 'failed', 'msg' => "Order number {$order_no} is already used. Leave it blank to number it automatically."]);
+        }
+        if ($order_no === '') {
+            $order_no = \App\Services\SequenceService::documentNo($this->conn, (int)$tenant_id, 'sales_order_list', 'order_no', 'SO-' . date('Ym') . '-', 'so-' . date('Ym'));
+        }
+        $order_no = $this->conn->real_escape_string($order_no);
         $party_id = $this->conn->real_escape_string((string)($party_id ?? 0));
         $order_date = !empty($order_date) ? $this->conn->real_escape_string((string)$order_date) : date('Y-m-d');
         $type = !empty($type) ? $this->conn->real_escape_string((string)$type) : 'proforma';
@@ -1541,7 +1551,7 @@ class Master extends DBConnection
         $hadInvoice = $invoice_id !== 0;
         if (!$hadInvoice) {
             $post = [
-                'invoice_no'   => 'INV-' . str_replace(['SO-', 'PRO-'], '', (string)$order['order_no']),
+                'invoice_no'   => '',   // numbered from the invoice series, never derived from the order number
                 'party_id'     => (int)$order['party_id'],
                 'invoice_date' => (string)$order['order_date'],
                 'due_date'     => date('Y-m-d', strtotime($order['order_date'] . ' +30 days')),

@@ -13,8 +13,8 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
     }
 }
 
-if (!isset($po_no) || empty($po_no)) {
-    $po_no = 'PO-' . date('Ym') . '-' . rand(1000, 9999);
+if (!isset($po_no)) {
+    $po_no = '';   // numbered automatically when saved
 }
 
 // Preload active product catalog
@@ -68,7 +68,7 @@ if($wh_q){
 				</div>
 				<div class="col-md-3 col-6 form-group">
 					<label for="po_no" class="control-label">Purchase Order No</label>
-					<input type="text" name="po_no" id="po_no" class="form-control form-control-sm rounded-0" value="<?php echo htmlspecialchars($po_no); ?>" required/>
+					<input type="text" name="po_no" id="po_no" class="form-control form-control-sm rounded-0" value="<?php echo htmlspecialchars($po_no); ?>" placeholder="Automatic"/>
 				</div>
 				<div class="col-md-2 col-6 form-group">
 					<label for="order_date" class="control-label">Order Date</label>
