@@ -95,6 +95,7 @@ class DBConnection{
                 $this->check_credit_control_migrations();
                 $this->check_quotation_migrations();
                 $this->check_delivery_migrations();
+                $this->check_ui_pref_migrations();
             }
 
             // Run versioned migrations
@@ -1315,6 +1316,17 @@ class DBConnection{
                 @$this->conn->query("ALTER TABLE `{$table}` ADD UNIQUE KEY `{$def[0]}` (`tenant_id`, `{$def[1]}`)");
             }
         }
+    }
+
+    public function check_ui_pref_migrations(){
+        if (!$this->conn) return;
+        // Per-user look and feel (see UiPrefsService).
+        @$this->conn->query("CREATE TABLE IF NOT EXISTS `user_ui_prefs` (
+          `user_id` int(30) NOT NULL,
+          `prefs` text NOT NULL,
+          `date_updated` datetime DEFAULT NULL ON UPDATE current_timestamp(),
+          PRIMARY KEY (`user_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     }
 
     public function check_delivery_migrations(){
