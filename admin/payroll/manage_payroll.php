@@ -223,6 +223,18 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
 			<div class="col-md-6 form-group"><small class="text-muted d-block mt-4">Overtime hours are paid at the company's standard hourly rate (basic salary &divide; standard hours) times each tier's multiplier, and are added to any overtime amount typed above.</small></div>
 		</div>
 
+		<div class="row">
+			<div class="col-md-4 form-group">
+				<label for="leave_payout" class="control-label">Leave payout (final pay)</label>
+				<input type="number" step="any" min="0" name="leave_payout" id="leave_payout" class="form-control form-control-sm rounded-0 text-right calc-trigger" value="<?php echo isset($leave_payout) ? $leave_payout : 0; ?>" />
+				<small class="text-muted">Unused leave paid out on leaving. Taxed as a lump sum.</small>
+			</div>
+			<div class="col-md-4 form-group">
+				<label for="redundancy_pay" class="control-label">Redundancy / severance</label>
+				<input type="number" step="any" min="0" name="redundancy_pay" id="redundancy_pay" class="form-control form-control-sm rounded-0 text-right calc-trigger" value="<?php echo isset($redundancy_pay) ? $redundancy_pay : 0; ?>" />
+				<small class="text-muted">Exempt up to the cap in the payroll rules, then the flat rate.</small>
+			</div>
+		</div>
 		<div class="row"><div class="col-12"><small class="text-muted d-block mb-2" id="pay_adjust_notes"></small></div></div>
 		<div class="row">
 			<div class="col-md-4 form-group">
@@ -310,6 +322,8 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
 				period_start: $('#period_start').val() || '',
 				period_end: $('#period_end').val() || '',
 				unpaid_days: $('#unpaid_days').val(),
+				leave_payout: parseFloat($('#leave_payout').val()) || 0,
+				redundancy_pay: parseFloat($('#redundancy_pay').val()) || 0,
 				pay_frequency: frequency,
 				is_resident: resident
 			},
@@ -324,8 +338,10 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
 					$('#lbl_net').text(parseFloat(d.net_salary).toFixed(2));
 					$('#lbl_empr_fnpf').text(parseFloat(d.employer_fnpf).toFixed(2));
 					var notes = [];
-					if(parseFloat(d.unpaid_days) > 0) notes.push('Unpaid leave: ' + d.unpaid_days + ' day(s), -' + parseFloat(d.unpaid_deduction).toFixed(2));
+					if(parseFloat(d.unpaid_days) > 0) notes.push('Unpaid days: ' + d.unpaid_days + ' day(s), -' + parseFloat(d.unpaid_deduction).toFixed(2));
 					(d.component_lines || []).forEach(function(c){ notes.push($('<span>').text(c.name).html() + ': ' + (c.type == 'deduction' ? '-' : '+') + parseFloat(c.amount).toFixed(2)); });
+					if(parseFloat(d.leave_payout) > 0) notes.push('Leave payout: +' + parseFloat(d.leave_payout).toFixed(2));
+					if(parseFloat(d.redundancy_payments) > 0) notes.push('Redundancy: +' + parseFloat(d.redundancy_payments).toFixed(2));
 					$('#pay_adjust_notes').html(notes.length ? notes.join('<br>') : '');
 				}
 			}

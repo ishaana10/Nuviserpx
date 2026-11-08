@@ -458,6 +458,12 @@ if($t_qry && $t_qry->num_rows > 0){
                                         </a>
                                     </li>
                                     <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=payroll/loans" class="nav-link nav-payroll_loans tree-item">
+                                            <i class="nav-icon fas fa-hand-holding-usd"></i>
+                                            <p>Staff Loans</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=payroll/fnpf_schedule" class="nav-link nav-payroll_fnpf_schedule tree-item">
                                             <i class="nav-icon fas fa-file-contract"></i>
                                             <p>FNPF CS3 Schedule</p>

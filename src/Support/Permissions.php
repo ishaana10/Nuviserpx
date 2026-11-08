@@ -542,6 +542,8 @@ final class Permissions
         'email_payslip'         => ['payroll', 'view'],
         'save_salary_component' => ['payroll', 'edit'],
         'delete_salary_component'=> ['payroll', 'delete'],
+        'issue_staff_loan'          => ['payroll_pay'],
+        'cancel_staff_loan'         => ['payroll_pay'],
         'assign_salary_component'   => ['payroll', 'edit'],
         'unassign_salary_component' => ['payroll', 'edit'],
         'save_shift_type'       => ['payroll', 'edit'],

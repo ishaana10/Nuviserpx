@@ -128,6 +128,11 @@ $readonly = isset($id) && !$can_edit && $scope !== null;
 				<label for="date_of_joining" class="control-label">Date of Joining</label>
 				<input type="date" name="date_of_joining" id="date_of_joining" class="form-control form-control-sm rounded-0" value="<?php echo isset($date_of_joining) ? $date_of_joining : date('Y-m-d'); ?>" />
 			</div>
+			<div class="col-md-4 form-group">
+				<label for="termination_date" class="control-label">Last Day of Employment</label>
+				<input type="date" name="termination_date" id="termination_date" class="form-control form-control-sm rounded-0" value="<?php echo !empty($termination_date) ? htmlspecialchars($termination_date) : ''; ?>" />
+				<small class="text-muted">Leave blank while employed. Pay stops after this date; the last payroll is part-paid, and leave payout and redundancy can be added to it.</small>
+			</div>
 		</div>
 
 		<hr class="my-3">

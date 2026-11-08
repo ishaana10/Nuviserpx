@@ -37,6 +37,7 @@ class PayrollComponentService
             }
             $out[] = [
                 'component_id' => (int)($r['component_id'] ?? 0),
+                'loan_id' => (int)($r['loan_id'] ?? 0),
                 'code' => (string)($r['code'] ?? ''),
                 'name' => (string)($r['name'] ?? ''),
                 'type' => ($r['type'] ?? 'earning') === 'deduction' ? 'deduction' : 'earning',
@@ -68,7 +69,7 @@ class PayrollComponentService
     /** The lines stored with a payroll. */
     public function forPayroll(int $payrollId): array
     {
-        $q = $this->conn->prepare("SELECT i.component_id, i.amount, i.code, i.name, i.type, i.is_taxable, i.is_fnpf_subject
+        $q = $this->conn->prepare("SELECT i.component_id, i.loan_id, i.amount, i.code, i.name, i.type, i.is_taxable, i.is_fnpf_subject
             FROM payroll_component_items i JOIN payroll_list p ON p.id = i.payroll_id AND p.tenant_id = ? WHERE i.payroll_id = ? ORDER BY i.id");
         if (!$q) {
             return [];
@@ -85,11 +86,11 @@ class PayrollComponentService
         $d = $this->conn->prepare("DELETE FROM payroll_component_items WHERE payroll_id = ?");
         $d->bind_param('i', $payrollId);
         $d->execute();
-        $i = $this->conn->prepare("INSERT INTO payroll_component_items (payroll_id, component_id, code, name, type, is_taxable, is_fnpf_subject, amount) VALUES (?,?,?,?,?,?,?,?)");
+        $i = $this->conn->prepare("INSERT INTO payroll_component_items (payroll_id, component_id, loan_id, code, name, type, is_taxable, is_fnpf_subject, amount) VALUES (?,?,?,?,?,?,?,?,?)");
         foreach ($lines as $l) {
-            $cid = (int)$l['component_id']; $code = (string)$l['code']; $name = (string)$l['name']; $type = (string)$l['type'];
+            $cid = (int)$l['component_id']; $loanId = (int)($l['loan_id'] ?? 0) ?: null; $code = (string)$l['code']; $name = (string)$l['name']; $type = (string)$l['type'];
             $tax = (int)$l['is_taxable']; $fn = (int)$l['is_fnpf_subject']; $amt = (string)$l['amount'];
-            $i->bind_param('iisssiis', $payrollId, $cid, $code, $name, $type, $tax, $fn, $amt);
+            $i->bind_param('iiisssiis', $payrollId, $cid, $loanId, $code, $name, $type, $tax, $fn, $amt);
             if (!$i->execute()) {
                 throw new \RuntimeException('Salary component lines could not be saved.');
             }

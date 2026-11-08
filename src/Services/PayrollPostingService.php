@@ -17,6 +17,7 @@ use SystemSettings;
  *       Cr Income Tax Withheld Payable  income tax withheld (owed to the tax authority)
  *       Cr Employer Levies Payable      employer levies
  *       Cr Other Payroll Deductions Payable   other deductions taken from pay
+ *       Cr Staff Loans Receivable       loan / advance instalments recovered from pay
  *       Cr Net Salaries Payable         net pay owed to employees (cleared to the bank when salaries are paid)
  *
  * Paying the salaries is a separate step (PayrollPaymentService): Dr Net Salaries Payable, Cr Bank.
@@ -34,6 +35,7 @@ class PayrollPostingService
         'levies'     => ['Employer Levies Payable', 'Current Liability', 'Employer payroll levies owed'],
         'net'        => ['Net Salaries Payable', 'Current Liability', 'Net pay owed to employees until it is paid'],
         'other'      => ['Other Payroll Deductions Payable', 'Current Liability', 'Deductions taken from pay and owed to others'],
+        'loans'      => ['Staff Loans Receivable', 'Current Asset', 'Loans and advances to employees, recovered from pay'],
     ];
 
     public function __construct(
@@ -51,14 +53,18 @@ class PayrollPostingService
         $erP     = round((float)$p['employer_pension'], 2);
         $tax     = round((float)$p['income_tax'], 2);
         $levies  = round((float)$p['levies'], 2);
-        $other   = round((float)$p['deductions'], 2);
+        $loan    = round((float)($p['loan_recovery'] ?? 0), 2);
+        $other   = round((float)$p['deductions'] - $loan, 2); // loan instalments are credited to the loan account, not here
+        if ($other < 0) {
+            throw new \RuntimeException('Loan recovery is more than the deductions taken from pay.');
+        }
         $net     = round((float)$p['net'], 2);
 
         $debits = [
             ['wages', $gross], ['er_pension', $erP], ['er_levies', $levies],
         ];
         $credits = [
-            ['pension', round($empP + $erP, 2)], ['tax', $tax], ['levies', $levies], ['other', $other], ['net', $net],
+            ['pension', round($empP + $erP, 2)], ['tax', $tax], ['levies', $levies], ['other', $other], ['loans', $loan], ['net', $net],
         ];
         $dr = round(array_sum(array_column($debits, 1)), 2);
         $cr = round(array_sum(array_column($credits, 1)), 2);
@@ -85,6 +91,7 @@ class PayrollPostingService
             'income_tax' => (float)$calc['paye_tax'] + (float)($calc['srt_tax'] ?? 0),
             'levies' => $calc['employer_levies_total'] ?? 0,
             'deductions' => $calc['deductions'],
+            'loan_recovery' => $calc['loan_recovery'] ?? 0,
             'net' => $calc['net_salary'],
         ];
     }

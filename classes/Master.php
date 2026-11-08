@@ -12,6 +12,7 @@ use App\Services\PaymentService;
 use App\Services\PlanService;
 use App\Services\PayrollService;
 use App\Services\PayrollComponentService;
+use App\Services\PayrollLoanService;
 use App\Services\PurchaseService;
 use App\Services\BankReconciliationService;
 use App\Services\CrmService;
@@ -837,6 +838,16 @@ class Master extends DBConnection
     public function unassign_salary_component()
     {
         return $this->container->make(PayrollComponentService::class)->unassign(intval($_POST['id'] ?? 0));
+    }
+
+    public function issue_staff_loan()
+    {
+        return $this->container->make(PayrollLoanService::class)->issue($_POST);
+    }
+
+    public function cancel_staff_loan()
+    {
+        return $this->container->make(PayrollLoanService::class)->cancel(intval($_POST['id'] ?? 0));
     }
 
     public function delete_salary_component()
@@ -2566,6 +2577,12 @@ switch ($action) {
         break;
     case 'delete_salary_component':
         echo $Master->delete_salary_component();
+        break;
+    case 'issue_staff_loan':
+        echo $Master->issue_staff_loan();
+        break;
+    case 'cancel_staff_loan':
+        echo $Master->cancel_staff_loan();
         break;
     case 'assign_salary_component':
         echo $Master->assign_salary_component();

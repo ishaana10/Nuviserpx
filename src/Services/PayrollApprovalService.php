@@ -183,8 +183,10 @@ class PayrollApprovalService
             }
             // Retroactive pay that was in these payslips becomes payable again
             $adj = new PayrollAdjustmentService($this->conn, $this->settings);
+            $loans = new PayrollLoanService($this->conn, $this->settings);
             foreach ($ids as $pid) {
                 $adj->release($pid);
+                $loans->release($pid);
             }
             $this->conn->commit();
         } catch (\Throwable $e) {

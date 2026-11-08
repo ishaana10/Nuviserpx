@@ -100,9 +100,21 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
                                     <td class="text-right"><?php echo number_format($pc['amount'], 2) ?></td>
                                 </tr>
                                 <?php endforeach; ?>
+                                <?php if (!empty($leave_payout) && (float)$leave_payout > 0): ?>
+                                <tr>
+                                    <td>Leave payout</td>
+                                    <td class="text-right"><?php echo number_format($leave_payout, 2) ?></td>
+                                </tr>
+                                <?php endif; ?>
+                                <?php if (!empty($redundancy_pay) && (float)$redundancy_pay > 0): ?>
+                                <tr>
+                                    <td>Redundancy / severance</td>
+                                    <td class="text-right"><?php echo number_format($redundancy_pay, 2) ?></td>
+                                </tr>
+                                <?php endif; ?>
                                 <?php if (!empty($unpaid_deduction) && (float)$unpaid_deduction > 0): ?>
                                 <tr>
-                                    <td>Unpaid leave (<?php echo rtrim(rtrim(number_format((float)$unpaid_days, 2), '0'), '.') ?> day<?php echo (float)$unpaid_days == 1.0 ? '' : 's' ?>)</td>
+                                    <td>Unpaid days (<?php echo rtrim(rtrim(number_format((float)$unpaid_days, 2), '0'), '.') ?> day<?php echo (float)$unpaid_days == 1.0 ? '' : 's' ?>)</td>
                                     <td class="text-right text-danger">-<?php echo number_format($unpaid_deduction, 2) ?></td>
                                 </tr>
                                 <?php endif; ?>

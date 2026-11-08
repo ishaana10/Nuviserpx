@@ -28,6 +28,11 @@ class EmployeeService
                     $dataStr .= " `approver_id`=NULL ";
                     continue;
                 }
+                if ($k === 'termination_date' && ($v === '' || $v === null)) {
+                    if (!empty($dataStr)) $dataStr .= ",";
+                    $dataStr .= " `termination_date`=NULL ";
+                    continue;
+                }
                 if (!is_numeric($v)) {
                     $v = $this->conn->real_escape_string((string)$v);
                 }
