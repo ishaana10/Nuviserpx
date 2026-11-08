@@ -127,14 +127,14 @@
         <h5 class="text-white font-weight-bold mb-2">Enter OTP & New Password</h5>
         <p class="text-muted-custom small mb-3">Check your inbox for the 6-digit OTP code.</p>
         <form id="otp-frm" action="" method="post">
-          <input type="hidden" name="user_id" id="otp_user_id" value="">
+          <input type="hidden" name="email" id="otp_email" value="">
           <div class="form-group mb-3">
             <label class="small text-muted-custom mb-1">6-Digit OTP Code</label>
             <input type="text" class="form-control form-control-custom text-center font-weight-bold letter-spacing-2" name="otp_code" maxlength="6" placeholder="000000" required>
           </div>
           <div class="form-group mb-3">
             <label class="small text-muted-custom mb-1">New Password</label>
-            <input type="password" class="form-control form-control-custom" name="password" placeholder="Enter new password" required>
+            <input type="password" class="form-control form-control-custom" name="password" placeholder="New password (8+ characters)" minlength="8" maxlength="72" autocomplete="new-password" required>
           </div>
           <button type="submit" class="btn btn-primary btn-block btn-custom text-white mb-3">Reset Password</button>
           <div class="text-center">
@@ -183,6 +183,9 @@
         success:function(resp){
           if(resp.status == 'success'){
             location.href = _base_url_ + 'admin/';
+          }else if(resp.status == 'locked'){
+            alert_toast(resp.msg || "Too many failed attempts. Try again later.",'error');
+            end_loader();
           }else if(resp.status == 'incorrect'){
             alert_toast("Incorrect username or password.",'error');
             end_loader();
@@ -211,7 +214,7 @@
           end_loader();
           if(resp.status == 'success'){
             alert_toast(resp.msg, 'success');
-            $('#otp_user_id').val(resp.user_id);
+            $('#otp_email').val($('#forgot-frm [name=email]').val());
             $('#forgot-view').slideUp();
             $('#otp-view').slideDown();
           }else{

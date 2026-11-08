@@ -28,9 +28,8 @@ if (!isset($type) || empty($type)) {
 
 $is_po = ($page_type === 'po' || $page_type === 'purchase_order' || (isset($type) && ($type === 'po' || $type === 'purchase_order')));
 
-if (!isset($order_no) || empty($order_no)) {
-    $prefix = $is_po ? 'PO-' : 'SO-';
-    $order_no = $prefix . date('Ym') . '-' . rand(1000, 9999);
+if (!isset($order_no)) {
+    $order_no = '';   // numbered automatically when saved
 }
 
 // Preload active product catalog for fast product select
@@ -77,7 +76,7 @@ while($p = $products_qry->fetch_assoc()){
 				</div>
 				<div class="col-md-3 col-6 form-group">
 					<label for="order_no" class="control-label"><?= $is_po ? 'Purchase Order No' : 'Order / Quote / Proforma No' ?></label>
-					<input type="text" name="order_no" id="order_no" class="form-control form-control-sm rounded-0" value="<?php echo htmlspecialchars($order_no); ?>" required/>
+					<input type="text" name="order_no" id="order_no" class="form-control form-control-sm rounded-0" value="<?php echo htmlspecialchars($order_no); ?>" placeholder="Automatic"/>
 				</div>
 				<div class="col-md-3 col-6 form-group">
 					<label for="order_date" class="control-label">Order Date</label>

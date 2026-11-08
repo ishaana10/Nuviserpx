@@ -38,7 +38,14 @@ class PurchaseService
         $user_id = $this->settings->userdata('id');
         $id = !empty($id) ? $this->conn->real_escape_string((string)$id) : '';
 
-        $po_no = !empty($po_no) ? $this->conn->real_escape_string((string)$po_no) : $this->nextNumber('purchase_order_list', 'po_no', 'PO', (int)$tenant_id);
+        $po_no = trim((string)($po_no ?? ''));
+        if ($po_no === '' && $id !== '') {
+            $po_no = (string)($this->conn->query("SELECT po_no FROM `purchase_order_list` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'")->fetch_assoc()['po_no'] ?? '');
+        }
+        if ($po_no !== '' && SequenceService::numberTaken($this->conn, (int)$tenant_id, 'purchase_order_list', 'po_no', $po_no, (int)$id)) {
+            return json_encode(['status' => 'failed', 'msg' => "Purchase order number {$po_no} is already used. Leave it blank to number it automatically."]);
+        }
+        $po_no = $po_no !== '' ? $this->conn->real_escape_string($po_no) : $this->nextNumber('purchase_order_list', 'po_no', 'PO', (int)$tenant_id);
         $vendor_id = $this->conn->real_escape_string((string)($vendor_id ?? 0));
         $order_date = !empty($order_date) ? $this->conn->real_escape_string((string)$order_date) : date('Y-m-d');
         $expected_date = !empty($expected_date) ? "'" . $this->conn->real_escape_string((string)$expected_date) . "'" : 'NULL';
@@ -349,7 +356,14 @@ class PurchaseService
         $user_id = $this->settings->userdata('id');
         $id = !empty($id) ? $this->conn->real_escape_string((string)$id) : '';
 
-        $bill_no = !empty($bill_no) ? $this->conn->real_escape_string((string)$bill_no) : $this->nextNumber('vendor_bill_list', 'bill_no', 'BILL', (int)$tenant_id);
+        $bill_no = trim((string)($bill_no ?? ''));
+        if ($bill_no === '' && $id !== '') {
+            $bill_no = (string)($this->conn->query("SELECT bill_no FROM `vendor_bill_list` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'")->fetch_assoc()['bill_no'] ?? '');
+        }
+        if ($bill_no !== '' && SequenceService::numberTaken($this->conn, (int)$tenant_id, 'vendor_bill_list', 'bill_no', $bill_no, (int)$id)) {
+            return json_encode(['status' => 'failed', 'msg' => "Bill number {$bill_no} is already used. Leave it blank to number it automatically."]);
+        }
+        $bill_no = $bill_no !== '' ? $this->conn->real_escape_string($bill_no) : $this->nextNumber('vendor_bill_list', 'bill_no', 'BILL', (int)$tenant_id);
         $vendor_ref = isset($vendor_ref) ? $this->conn->real_escape_string((string)$vendor_ref) : '';
         $po_id = !empty($purchase_order_id) ? (int)$purchase_order_id : 'NULL';
         $vendor_id = $this->conn->real_escape_string((string)($vendor_id ?? 0));
@@ -623,23 +637,11 @@ class PurchaseService
     /**
      * Generate the next sequential document number for a tenant, e.g. PO-202611-0001.
      */
+    /** Next PO / bill number, taken under a row lock so two people saving together never get the same one. */
     private function nextNumber(string $table, string $column, string $prefix, int $tenant_id): string
     {
-        $table = preg_replace('/[^a-z_]/', '', $table);
-        $column = preg_replace('/[^a-z_]/', '', $column);
         $ym = date('Ym');
-        $base = "{$prefix}-{$ym}-";
-        $like = $this->conn->real_escape_string($base) . '%';
-        $q = $this->conn->query("SELECT `{$column}` AS n FROM `{$table}`
-			WHERE tenant_id = '{$tenant_id}' AND `{$column}` LIKE '{$like}'
-			ORDER BY `{$column}` DESC LIMIT 1");
-        $seq = 1;
-        if ($q && $q->num_rows > 0) {
-            $last = (string)$q->fetch_assoc()['n'];
-            $tail = (int)substr($last, strrpos($last, '-') + 1);
-            $seq = $tail + 1;
-        }
-        return $base . str_pad((string)$seq, 4, '0', STR_PAD_LEFT);
+        return SequenceService::documentNo($this->conn, $tenant_id, $table, $column, "{$prefix}-{$ym}-", strtolower($prefix) . "-{$ym}");
     }
 
     private function nextJournalCode(int $tenant_id): string
