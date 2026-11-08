@@ -222,7 +222,7 @@ class WorkflowService
             ? $action['priority'] : 'medium';
         $party_id = isset($payload['party_id']) ? (int)$payload['party_id'] : 0;
         $party_sql = $party_id > 0 ? "'{$party_id}'" : 'NULL';
-        $code = 'TKT-' . date('Ym') . '-' . random_int(1000, 9999);
+        $code = SequenceService::documentNo($this->conn, (int)$tenant_id, 'tickets', 'ticket_code', 'TCK-' . date('Ym') . '-', 'ticket-' . date('Ym'));
 
         $ok = $this->conn->query(
             "INSERT INTO `tickets` (`tenant_id`, `ticket_code`, `subject`, `party_id`, `priority`, `status`)
