@@ -11,6 +11,7 @@ use App\Services\PartyService;
 use App\Services\PaymentService;
 use App\Services\PlanService;
 use App\Services\PayrollService;
+use App\Services\PayrollComponentService;
 use App\Services\PurchaseService;
 use App\Services\BankReconciliationService;
 use App\Services\CrmService;
@@ -828,10 +829,21 @@ class Master extends DBConnection
         return json_encode(['status' => 'failed', 'msg' => 'Failed to save salary component. ' . $this->conn->error]);
     }
 
+    public function assign_salary_component()
+    {
+        return $this->container->make(PayrollComponentService::class)->assign($_POST);
+    }
+
+    public function unassign_salary_component()
+    {
+        return $this->container->make(PayrollComponentService::class)->unassign(intval($_POST['id'] ?? 0));
+    }
+
     public function delete_salary_component()
     {
         $tenant_id = $this->settings->active_tenant_id();
         $id = intval($_POST['id'] ?? 0);
+        $this->conn->query("DELETE FROM `employee_salary_components` WHERE component_id = '{$id}' AND tenant_id = '{$tenant_id}'");
 
         $del = $this->conn->query("DELETE FROM `salary_components` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'");
         if ($del) {
@@ -2554,6 +2566,12 @@ switch ($action) {
         break;
     case 'delete_salary_component':
         echo $Master->delete_salary_component();
+        break;
+    case 'assign_salary_component':
+        echo $Master->assign_salary_component();
+        break;
+    case 'unassign_salary_component':
+        echo $Master->unassign_salary_component();
         break;
     case 'terminate_session':
         echo $Master->terminate_session();

@@ -74,7 +74,8 @@
 								<span class="badge badge-light border text-dark"><?php echo !empty($row['payroll_run_ref']) ? $row['payroll_run_ref'] : 'RUN-'.$row['id'] ?></span>
 								<p class="m-0 small font-weight-bold"><?php echo $row['salary_month'] ?>
 									<?php if(($row['status'] ?? 'posted') === 'pending_approval'): ?><span class="badge badge-warning">Waiting for approval</span>
-									<?php elseif(($row['status'] ?? 'posted') === 'rejected'): ?><span class="badge badge-danger" title="<?php echo htmlspecialchars((string)$row['approval_note']) ?>">Returned</span><?php endif; ?></p>
+									<?php elseif(($row['status'] ?? 'posted') === 'rejected'): ?><span class="badge badge-danger" title="<?php echo htmlspecialchars((string)$row['approval_note']) ?>">Returned</span>
+									<?php elseif(($row['status'] ?? 'posted') === 'voided'): ?><span class="badge badge-secondary" title="Journal reversed">Voided</span><?php endif; ?></p>
 							</td>
 							<td>
 								<p class="m-0 font-weight-bold"><?php echo $row['emp_name'] ?></p>
@@ -93,9 +94,10 @@
 				                  <div class="dropdown-menu" role="menu">
 				                    <a class="dropdown-item view_payslip" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>"><span class="fa fa-file-invoice-dollar text-info"></span> Payslip</a>
 				                    <a class="dropdown-item email_payslip" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>"><span class="fa fa-envelope text-warning"></span> Email Payslip</a>
-				                    <?php if($_settings->can_access('payroll_edit')): ?><a class="dropdown-item edit_data" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>"><span class="fa fa-edit text-primary"></span> Edit</a><?php endif; ?>
-				                    <?php if($_settings->can_access('payroll_delete')): ?><div class="dropdown-divider"></div>
-				                    <a class="dropdown-item delete_data" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>"><span class="fa fa-trash text-danger"></span> Delete</a><?php endif; ?>
+				                    <?php $is_voided = ($row['status'] ?? 'posted') === 'voided'; $is_posted = ($row['status'] ?? 'posted') === 'posted'; ?>
+				                    <?php if(!$is_voided && $_settings->can_access('payroll_edit')): ?><a class="dropdown-item edit_data" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>"><span class="fa fa-edit text-primary"></span> Edit</a><?php endif; ?>
+				                    <?php if(!$is_voided && $_settings->can_access('payroll_delete')): ?><div class="dropdown-divider"></div>
+				                    <a class="dropdown-item delete_data" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>" data-posted="<?php echo $is_posted ? 1 : 0 ?>"><span class="fa fa-trash text-danger"></span> <?php echo $is_posted ? 'Void' : 'Delete' ?></a><?php endif; ?>
 				                  </div>
 							</td>
 						</tr>
@@ -108,7 +110,8 @@
 <script>
 	$(document).ready(function(){
 		$('.delete_data').click(function(){
-			_conf("Are you sure to delete this payroll record? Associated journal entries will also be removed.","delete_payroll",[$(this).attr('data-id')])
+			var posted = $(this).attr('data-posted') === '1';
+			_conf(posted ? "Void this payroll? Its journal entry will be reversed (not deleted) and the record kept for audit." : "Delete this payroll record? It has not been posted, so its journal entry will be removed.","delete_payroll",[$(this).attr('data-id')])
 		})
 		$('#process_batch').click(function(){
 			uni_modal("<i class='fa fa-users'></i> Process Batch Payroll","payroll/manage_payroll.php?batch=1", 'extra-large')

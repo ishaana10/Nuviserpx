@@ -72,6 +72,10 @@ foreach ($versions as $v) { if ($v['effective_from'] <= $today) $in_force = $v['
             <div class="col-md-3 form-group"><label class="font-weight-bold">Standard hours per week</label><input type="number" step="0.01" min="1" max="168" class="form-control" id="r-wh"></div>
             <div class="col-md-3 form-group"><label class="font-weight-bold">Weeks per year</label><input type="number" step="0.01" min="1" max="53" class="form-control" id="r-wk"></div>
         </div>
+        <h5 class="font-weight-bold border-bottom pb-2 mt-4">Unpaid leave</h5>
+        <div class="row">
+            <div class="col-md-3 form-group"><label class="font-weight-bold">Working days per week</label><input type="number" step="1" min="1" max="7" class="form-control" id="r-wd"><small class="text-muted">5 = Mon-Fri, 6 = Mon-Sat. Sets the daily rate for unpaid days: annual basic &divide; (weeks per year &times; working days).</small></div>
+        </div>
         <table class="table table-sm table-bordered" style="max-width:560px" id="ot-tiers">
             <thead><tr class="bg-light"><th>Tier name</th><th>Multiplier (x hourly rate)</th></tr></thead>
             <tbody></tbody>
@@ -128,6 +132,7 @@ foreach ($versions as $v) { if ($v['effective_from'] <= $today) $in_force = $v['
     renderBands('non_resident', rules.non_resident_bands);
     $('#r-wh').val(rules.overtime.weekly_hours);
     $('#r-wk').val(rules.overtime.weeks_per_year);
+    $('#r-wd').val((rules.attendance || {}).working_days_per_week || 5);
     rules.overtime.tiers.forEach(function(t){
         $('#ot-tiers tbody').append($('<tr>')
             .append($('<td>').append($('<input type="text" maxlength="40" class="form-control form-control-sm tl">').val(t.label)))
@@ -163,6 +168,7 @@ foreach ($versions as $v) { if ($v['effective_from'] <= $today) $in_force = $v['
                 weekly_hours: parseFloat($('#r-wh').val()), weeks_per_year: parseFloat($('#r-wk').val()),
                 tiers: $('#ot-tiers tbody tr').map(function(){ return {label: $(this).find('.tl').val(), multiplier: parseFloat($(this).find('.tm').val())}; }).get()
             },
+            attendance: {working_days_per_week: parseInt($('#r-wd').val(), 10)},
             employer_levies: $('#levies tbody tr').map(function(){
                 return {label: $(this).find('.lbl').val(), rate: frac($(this).find('.rate').val()), key: $(this).find('.key').val()};
             }).get()

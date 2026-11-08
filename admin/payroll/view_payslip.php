@@ -9,6 +9,7 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
         foreach($qry->fetch_assoc() as $k => $v){
             $$k=$v;
         }
+        $pay_components = (new \App\Services\PayrollComponentService($conn, $_settings))->forPayroll($id);
     }
 }
 ?>
@@ -93,6 +94,18 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
                                     <td>Other Earnings</td>
                                     <td class="text-right"><?php echo number_format($other_earnings, 2) ?></td>
                                 </tr>
+                                <?php foreach (($pay_components ?? []) as $pc): if ($pc['type'] !== 'earning') continue; ?>
+                                <tr>
+                                    <td><?php echo htmlspecialchars($pc['name']) ?></td>
+                                    <td class="text-right"><?php echo number_format($pc['amount'], 2) ?></td>
+                                </tr>
+                                <?php endforeach; ?>
+                                <?php if (!empty($unpaid_deduction) && (float)$unpaid_deduction > 0): ?>
+                                <tr>
+                                    <td>Unpaid leave (<?php echo rtrim(rtrim(number_format((float)$unpaid_days, 2), '0'), '.') ?> day<?php echo (float)$unpaid_days == 1.0 ? '' : 's' ?>)</td>
+                                    <td class="text-right text-danger">-<?php echo number_format($unpaid_deduction, 2) ?></td>
+                                </tr>
+                                <?php endif; ?>
                             </tbody>
                             <tfoot>
                                 <tr class="bg-light">
@@ -128,8 +141,14 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
                                 </tr>
                                 <tr>
                                     <td>Other Deductions</td>
-                                    <td class="text-right text-danger"><?php echo number_format($deductions, 2) ?></td>
+                                    <td class="text-right text-danger"><?php echo number_format(max(0, (float)$deductions - (float)($component_deductions ?? 0)), 2) ?></td>
                                 </tr>
+                                <?php foreach (($pay_components ?? []) as $pc): if ($pc['type'] !== 'deduction') continue; ?>
+                                <tr>
+                                    <td><?php echo htmlspecialchars($pc['name']) ?></td>
+                                    <td class="text-right text-danger"><?php echo number_format($pc['amount'], 2) ?></td>
+                                </tr>
+                                <?php endforeach; ?>
                             </tbody>
                             <tfoot>
                                 <tr class="bg-light">

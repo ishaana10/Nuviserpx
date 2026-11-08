@@ -19,6 +19,35 @@ class PayrollService
         private readonly SystemSettings $settings
     ) {}
 
+    /**
+     * Salary components and unpaid-leave deduction for a payroll.
+     * New payroll: the employee's active components, and unpaid days from approved leave and logged absences (or the
+     * days typed in). Edit: what the payroll already paid, unless unpaid days are typed in.
+     *
+     * @param mixed $override typed unpaid days; blank / null means automatic
+     * @return array{0:array,1:float,2:float} component lines, unpaid days, unpaid deduction
+     */
+    private function payInputs(int $employeeId, int $editId, string $payDate, string $from, string $to, string $frequency, float $basic, array $rules, $override): array
+    {
+        $t = (int)$this->settings->active_tenant_id();
+        $components = new PayrollComponentService($this->conn, $this->settings);
+        $lines = $editId > 0 ? $components->forPayroll($editId) : $components->assignedFor($employeeId, $payDate);
+
+        $dpw = (int)($rules['attendance']['working_days_per_week'] ?? 5);
+        if ($override !== null && $override !== '' && is_numeric($override)) {
+            $days = max(0.0, round((float)$override, 2));
+        } elseif ($editId > 0) {
+            $q = $this->conn->prepare("SELECT unpaid_days FROM payroll_list WHERE id = ? AND tenant_id = ?");
+            $q->bind_param('ii', $editId, $t);
+            $q->execute();
+            $days = (float)($q->get_result()->fetch_assoc()['unpaid_days'] ?? 0);
+        } else {
+            $days = (new PayrollAttendanceService($this->conn, $this->settings))->unpaidDaysFor($employeeId, $from, $to, $dpw);
+        }
+        $daily = PayrollAttendanceService::dailyRate($basic, (int)PayrollEngine::get_periods_per_year($frequency), (float)($rules['overtime']['weeks_per_year'] ?? 52), $dpw);
+        return [$lines, $days, PayrollAttendanceService::deduction($days, $daily, $basic)];
+    }
+
     public function calculatePayrollAjax(array $post): string
     {
         require_once(base_app . 'classes/PayrollEngine.php');
@@ -28,7 +57,17 @@ class PayrollService
             [$post['pay_period_n'], $post['g_ytd_prior'], $post['t_ytd_prior']] =
                 $this->ytdFor((int)$post['employee_id'], $payDate, (string)($post['pay_frequency'] ?? 'Monthly'), (int)($post['id'] ?? 0), $post['rules']);
         }
+        $isDate = fn($d) => preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$d) === 1;
+        $from = $isDate($post['period_start'] ?? '') ? (string)$post['period_start'] : date('Y-m-01', strtotime($payDate));
+        $to = $isDate($post['period_end'] ?? '') ? (string)$post['period_end'] : date('Y-m-t', strtotime($payDate));
+        if (!empty($post['employee_id'])) {
+            [$post['components'], $unpaidDays, $post['unpaid_deduction']] = $this->payInputs(
+                (int)$post['employee_id'], (int)($post['id'] ?? 0), $payDate, $from, $to,
+                (string)($post['pay_frequency'] ?? 'Monthly'), (float)($post['basic_salary'] ?? 0), $post['rules'], $post['unpaid_days'] ?? null);
+        }
         $calc = PayrollEngine::calculate($post);
+        $calc['unpaid_days'] = $unpaidDays ?? 0.0;
+        $calc['component_lines'] = $post['components'] ?? [];
         return json_encode(['status' => 'success', 'data' => $calc]);
     }
 
@@ -44,13 +83,13 @@ class PayrollService
         $taxYear = PayrollEngine::tax_year_start($payDate, $rules['tax_year_start_month']);
         $n = PayrollEngine::period_number($frequency, $taxYear, $payDate);
         $q = $this->conn->prepare("SELECT gross_salary, retro_pay, paye_tax, srt_tax, paye_lump FROM payroll_list
-            WHERE tenant_id = ? AND employee_id = ? AND status <> 'rejected' AND id <> ? AND pay_date >= ? AND pay_date < ?");
+            WHERE tenant_id = ? AND employee_id = ? AND status NOT IN ('rejected','voided') AND id <> ? AND pay_date >= ? AND pay_date < ?");
         $q->bind_param('iiiss', $tenant, $employeeId, $excludeId, $taxYear, $payDate);
         $q->execute();
         $rows = $q->get_result()->fetch_all(MYSQLI_ASSOC);
 
         $og = $ot = 0.0;
-        $f = $this->conn->prepare("SELECT MIN(pay_date) first_pay FROM payroll_list WHERE tenant_id = ? AND employee_id = ? AND status <> 'rejected' AND id <> ? AND pay_date IS NOT NULL");
+        $f = $this->conn->prepare("SELECT MIN(pay_date) first_pay FROM payroll_list WHERE tenant_id = ? AND employee_id = ? AND status NOT IN ('rejected','voided') AND id <> ? AND pay_date IS NOT NULL");
         $f->bind_param('iii', $tenant, $employeeId, $excludeId);
         $f->execute();
         $first = $f->get_result()->fetch_assoc()['first_pay'] ?? null;
@@ -182,6 +221,9 @@ class PayrollService
         $pay_rules = PayrollEngine::load_rules($this->settings, $pay_date);
         [$ytd_n, $ytd_g, $ytd_t] = $this->ytdFor((int)$employee_id, $pay_date, $pay_frequency, $editId, $pay_rules);
 
+        [$compLines, $unpaid_days_used, $unpaid_deduction] = $this->payInputs(
+            (int)$employee_id, $editId, $pay_date, $period_start, $period_end, $pay_frequency, $basic_salary, $pay_rules, $unpaid_days ?? null);
+
         // Calculate Payroll
         $calc = PayrollEngine::calculate([
             'lump_sum_payments' => $retro_pay,
@@ -190,6 +232,8 @@ class PayrollService
             'allowances' => $allowances,
             'other_earnings' => $other_earnings,
             'deductions' => $deductions,
+            'components' => $compLines,
+            'unpaid_deduction' => $unpaid_deduction,
             'is_resident' => $is_resident,
             'pay_frequency' => $pay_frequency,
             'overtime_1_5_hours' => (float)($overtime_1_5_hours ?? 0),
@@ -212,6 +256,9 @@ class PayrollService
         $workcare_levy = $calc['workcare_levy'];
         $training_levy = $calc['training_levy'];
         $employer_cost = $calc['employer_cost'];
+        $deductions = $calc['deductions']; // typed deductions plus salary-component deductions
+        $comp_earnings = $calc['component_earnings'];
+        $comp_deductions = $calc['component_deductions'];
         $paye_lump = $calc['paye_lump_sum'];
 
         $tin = $this->conn->real_escape_string((string)($emp_data['tin'] ?? ''));
@@ -233,9 +280,19 @@ class PayrollService
         }
         if ($id > 0) {
             $st = $this->conn->query("SELECT status FROM `payroll_list` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'");
-            if ($st && ($sr = $st->fetch_assoc()) && $sr['status'] === 'rejected') {
-                return json_encode(['status' => 'failed', 'msg' => 'This payroll was returned by the approver and cannot be edited. Run payroll again for the employee.']);
+            if ($st && ($sr = $st->fetch_assoc())) {
+                if ($sr['status'] === 'rejected') {
+                    return json_encode(['status' => 'failed', 'msg' => 'This payroll was returned by the approver and cannot be edited. Run payroll again for the employee.']);
+                }
+                if ($sr['status'] === 'voided') {
+                    return json_encode(['status' => 'failed', 'msg' => 'This payroll was voided and cannot be edited. Run payroll again for the employee.']);
+                }
             }
+        }
+        // One payroll per employee per salary month, whether it is a single save, an edit that moves the month, or a batch.
+        $dupQ = $this->conn->query("SELECT id FROM `payroll_list` WHERE employee_id = '{$employee_id}' AND salary_month = '{$salary_month}' AND tenant_id = '{$tenant_id}' AND status NOT IN ('rejected','voided') AND id <> '{$id}' LIMIT 1");
+        if ($dupQ && $dupQ->num_rows > 0) {
+            return json_encode(['status' => 'failed', 'msg' => "{$empName} already has payroll for {$salary_month}. Edit that payroll, or void it first if it was run in error."]);
         }
         $ownTx = !$this->inTransaction;
         if ($ownTx) {
@@ -275,6 +332,10 @@ class PayrollService
 				`allowances` = '{$allowances}',
 				`other_earnings` = '{$other_earnings}',
 				`retro_pay` = '{$retro_pay}',
+				`unpaid_days` = '{$unpaid_days_used}',
+				`unpaid_deduction` = '{$unpaid_deduction}',
+				`component_earnings` = '{$comp_earnings}',
+				`component_deductions` = '{$comp_deductions}',
 				`gross_salary` = '{$gross_salary}',
 				`fnpf_base` = '{$fnpf_base}',
 				`employee_fnpf` = '{$employee_fnpf}',
@@ -320,6 +381,10 @@ class PayrollService
 				`overtime` = '{$overtime}',
 				`allowances` = '{$allowances}',
 				`other_earnings` = '{$other_earnings}',
+				`unpaid_days` = '{$unpaid_days_used}',
+				`unpaid_deduction` = '{$unpaid_deduction}',
+				`component_earnings` = '{$comp_earnings}',
+				`component_deductions` = '{$comp_deductions}',
 				`gross_salary` = '{$gross_salary}',
 				`fnpf_base` = '{$fnpf_base}',
 				`employee_fnpf` = '{$employee_fnpf}',
@@ -348,6 +413,9 @@ class PayrollService
         }
         $payrollId = empty($id) ? (int)$this->conn->insert_id : (int)$id;
         $this->lastPayrollId = $payrollId;
+        if (empty($id)) {
+            (new PayrollComponentService($this->conn, $this->settings))->saveItems($payrollId, $compLines);
+        }
         if (empty($id) && $pendingAdj) {
             $adjustments->markApplied(array_column($pendingAdj, 'id'), $payrollId);
         }
@@ -423,7 +491,7 @@ class PayrollService
                     throw new \RuntimeException("Employee #{$eid} was not found in this company.");
                 }
                 $name = $emp->fetch_assoc()['name'];
-                $dup = $this->conn->query("SELECT id FROM `payroll_list` WHERE employee_id = '{$eid}' AND salary_month = '{$month}' AND tenant_id = '{$tenant_id}' AND status <> 'rejected' LIMIT 1");
+                $dup = $this->conn->query("SELECT id FROM `payroll_list` WHERE employee_id = '{$eid}' AND salary_month = '{$month}' AND tenant_id = '{$tenant_id}' AND status NOT IN ('rejected','voided') LIMIT 1");
                 if ($dup && $dup->num_rows > 0) {
                     $skipped[] = $name;
                     continue;
@@ -437,6 +505,7 @@ class PayrollService
                     'allowances'     => (float)($post['emp_allowances'][$eid] ?? 0),
                     'other_earnings' => (float)($post['emp_other_earnings'][$eid] ?? 0),
                     'deductions'     => (float)($post['emp_deductions'][$eid] ?? 0),
+                    'unpaid_days'    => $post['emp_unpaid_days'][$eid] ?? '',
                 ];
                 if (isset($post['emp_basic'][$eid]) && $post['emp_basic'][$eid] !== '') {
                     $row['basic_salary'] = (float)$post['emp_basic'][$eid];
@@ -472,29 +541,96 @@ class PayrollService
         return json_encode(['status' => 'success', 'msg' => $msg, 'processed' => $processed, 'skipped' => $skipped]);
     }
 
+    /**
+     * Remove a payroll. Payroll that never reached the ledger (waiting for approval, or returned) is deleted with its
+     * journal. Posted payroll is voided instead: its journal is reversed, never deleted, and the record stays for audit.
+     * Refused once salary is paid, or once the liabilities it created have been remitted.
+     */
     public function deletePayroll(int $id): string
     {
-        $tenant_id = $this->settings->active_tenant_id();
-        if ($lockMsg = \App\Services\PeriodLockService::guardDocument($this->conn, (int)$tenant_id, null, 'payroll_list', $id)) {
+        $tenant_id = (int)$this->settings->active_tenant_id();
+        if ($lockMsg = \App\Services\PeriodLockService::guardDocument($this->conn, $tenant_id, null, 'payroll_list', $id)) {
             return json_encode(['status' => 'failed', 'msg' => $lockMsg]);
         }
-        $existing = $this->conn->query("SELECT journal_id, payment_status FROM `payroll_list` WHERE id = '{$id}' and tenant_id = '{$tenant_id}'")->fetch_assoc();
-        if (($existing['payment_status'] ?? 'unpaid') === 'paid') {
-            return json_encode(['status' => 'failed', 'msg' => 'This payroll has already been paid. Reverse the salary payment before deleting it.']);
+        $q = $this->conn->prepare("SELECT id, journal_id, payment_status, status, payroll_run_ref FROM `payroll_list` WHERE id = ? AND tenant_id = ?");
+        $q->bind_param('ii', $id, $tenant_id);
+        $q->execute();
+        $existing = $q->get_result()->fetch_assoc();
+        if (!$existing) {
+            return json_encode(['status' => 'failed', 'msg' => 'Payroll not found.']);
         }
-        if (!empty($existing['journal_id'])) {
-            $this->conn->query("DELETE FROM `journal_entries` WHERE id = '{$existing['journal_id']}' and tenant_id = '{$tenant_id}'");
+        if (($existing['payment_status'] ?? 'unpaid') === 'paid') {
+            return json_encode(['status' => 'failed', 'msg' => 'This payroll has already been paid. Reverse the salary payment before voiding it.']);
+        }
+        if (($existing['status'] ?? '') === 'voided') {
+            return json_encode(['status' => 'failed', 'msg' => 'This payroll has already been voided.']);
+        }
+        $journalId = (int)($existing['journal_id'] ?? 0);
+        $res = [];
+
+        if (($existing['status'] ?? '') === 'posted') {
+            if ($journalId > 0) {
+                if ($msg = $this->remittedAgainst($journalId, $tenant_id)) {
+                    return json_encode(['status' => 'failed', 'msg' => $msg]);
+                }
+                $jq = $this->conn->prepare("SELECT journal_date FROM journal_entries WHERE id = ? AND tenant_id = ?");
+                $jq->bind_param('ii', $journalId, $tenant_id);
+                $jq->execute();
+                $jd = (string)($jq->get_result()->fetch_assoc()['journal_date'] ?? '');
+                $date = max(date('Y-m-d'), $jd);
+                $res = json_decode((new JournalService($this->conn, $this->settings))->reverseJournal($journalId, $date, true), true);
+                if (!is_array($res) || ($res['status'] ?? '') !== 'success') {
+                    return json_encode(['status' => 'failed', 'msg' => (string)($res['msg'] ?? 'The payroll journal could not be reversed.')]);
+                }
+            }
+            $u = $this->conn->prepare("UPDATE `payroll_list` SET status = 'voided' WHERE id = ? AND tenant_id = ? AND status = 'posted'");
+            $u->bind_param('ii', $id, $tenant_id);
+            if (!$u->execute() || $u->affected_rows < 1) {
+                return json_encode(['status' => 'failed', 'msg' => 'The journal was reversed but the payroll could not be marked void. Contact support before retrying.']);
+            }
+            (new PayrollAdjustmentService($this->conn, $this->settings))->release($id);
+            $this->settings->log_audit('Voided payroll', 'Payroll', "Payroll {$id} ({$existing['payroll_run_ref']}) voided; journal {$journalId} reversed by {$res['code']}.");
+            $msg = 'Payroll voided and its journal reversed (' . ($res['code'] ?? 'no journal') . ').';
+            $this->settings->set_flashdata('success', $msg);
+            return json_encode(['status' => 'success', 'msg' => $msg]);
+        }
+
+        // Never reached the ledger: safe to remove outright.
+        if ($journalId > 0) {
+            $this->conn->query("DELETE FROM `journal_entries` WHERE id = '{$journalId}' and tenant_id = '{$tenant_id}'");
         }
         (new PayrollAdjustmentService($this->conn, $this->settings))->release($id);
         $del = $this->conn->query("DELETE FROM `payroll_list` WHERE id = '{$id}' and tenant_id = '{$tenant_id}'");
         if ($del) {
-            $resp['status'] = 'success';
-            $this->settings->set_flashdata('success', " Payroll record deleted successfully.");
-        } else {
-            $resp['status'] = 'failed';
-            $resp['error'] = $this->conn->error;
+            $this->settings->log_audit('Deleted payroll', 'Payroll', "Payroll {$id} ({$existing['payroll_run_ref']}) deleted before posting.");
+            $this->settings->set_flashdata('success', ' Payroll record deleted successfully.');
+            return json_encode(['status' => 'success']);
         }
-        return json_encode($resp);
+        return json_encode(['status' => 'failed', 'error' => $this->conn->error]);
+    }
+
+    /** Error message if reversing this payroll journal would take a payroll liability below what is still owed. */
+    private function remittedAgainst(int $journalId, int $tenant_id): ?string
+    {
+        $side = \App\Services\LedgerService::SIDE_SQL;
+        $q = $this->conn->prepare("SELECT a.name, SUM(ji.amount) amt FROM journal_items ji
+            JOIN account_list a ON a.id = ji.account_id
+            LEFT JOIN group_list g ON g.id = ji.group_id
+            WHERE ji.journal_id = ? AND {$side} = 2 GROUP BY a.name");
+        $q->bind_param('i', $journalId);
+        $q->execute();
+        $credits = [];
+        foreach ($q->get_result()->fetch_all(MYSQLI_ASSOC) as $r) {
+            $credits[$r['name']] = (float)$r['amt'];
+        }
+        $remit = new PayrollRemittanceService($this->conn, $this->settings);
+        foreach (PayrollRemittanceService::LIABILITIES as $key => [$label, $accKey]) {
+            $name = PayrollPostingService::ACCOUNTS[$accKey][0];
+            if (isset($credits[$name]) && $remit->outstanding($key) + 0.005 < $credits[$name]) {
+                return "{$label} from this payroll have already been remitted. Reverse the remittance before voiding the payroll.";
+            }
+        }
+        return null;
     }
 
     public function emailPayslip(int $id, ?string $custom_email = null): string

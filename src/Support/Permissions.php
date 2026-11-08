@@ -542,6 +542,8 @@ final class Permissions
         'email_payslip'         => ['payroll', 'view'],
         'save_salary_component' => ['payroll', 'edit'],
         'delete_salary_component'=> ['payroll', 'delete'],
+        'assign_salary_component'   => ['payroll', 'edit'],
+        'unassign_salary_component' => ['payroll', 'edit'],
         'save_shift_type'       => ['payroll', 'edit'],
         'save_shift_assignment' => ['payroll', 'edit'],
         // CRM
