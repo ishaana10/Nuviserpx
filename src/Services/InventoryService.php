@@ -36,6 +36,7 @@ class InventoryService
             return json_encode(['status' => 'failed', 'msg' => 'Product Code already exists.']);
         }
 
+        $before = !empty($id) ? ($this->conn->query("SELECT * FROM `product_list` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'")->fetch_assoc() ?: []) : [];
         if (empty($id)) {
             $sql = "INSERT INTO `product_list` SET
 				`tenant_id` = '{$tenant_id}',
@@ -84,6 +85,13 @@ class InventoryService
         }
 
         if ($save) {
+            $name_raw = (string)($post['name'] ?? '');
+            if (empty($id)) {
+                $this->settings->log_audit('Created Product', 'Inventory', "Created product '{$name_raw}' (#{$product_id}), opening stock {$stock_quantity} at cost {$cost_price}.");
+            } else {
+                $diff = \App\Support\AuditDiff::changes($before, $post, ['product_code', 'name', 'category', 'unit', 'cost_price', 'selling_price', 'reorder_level', 'description', 'status']);
+                $this->settings->log_audit('Updated Product', 'Inventory', "Updated '{$name_raw}' (#{$id}): {$diff}.");
+            }
             $resp['status'] = 'success';
             $resp['msg'] = (empty($id) ? " Product added successfully." : " Product details updated successfully.") . ($openingWarning ?? '');
             $this->settings->set_flashdata('success', $resp['msg']);
@@ -99,8 +107,10 @@ class InventoryService
     public function deleteProduct(int $id): string
     {
         $tenant_id = $this->settings->active_tenant_id();
+        $was = $this->conn->query("SELECT name, product_code, stock_quantity FROM `product_list` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'")->fetch_assoc() ?: [];
         $del = $this->conn->query("UPDATE `product_list` SET `delete_flag` = 1 WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'");
         if ($del) {
+            $this->settings->log_audit('Deleted Product', 'Inventory', "Deleted '{$was['name']}' ({$was['product_code']}), #{$id}, with {$was['stock_quantity']} in stock.");
             $resp['status'] = 'success';
             $this->settings->set_flashdata('success', " Product deleted successfully.");
         } else {
@@ -212,6 +222,7 @@ class InventoryService
             return json_encode(['status' => 'failed', 'msg' => 'The stock adjustment could not be saved. Nothing was changed.']);
         }
 
+        $this->settings->log_audit('Stock Adjustment', 'Inventory', "Product #{$product_id}: " . ($absolute ? "counted {$qty}" : "{$type} {$qty}") . " (change {$delta}) at warehouse #{$warehouse_id}, was {$atLocation}, ref '" . trim((string)($post['reference'] ?? '')) . "'" . ($journalId > 0 ? ", journal #{$journalId}" : '') . '.');
         $resp['status'] = 'success';
         $resp['msg'] = " Stock adjustment saved successfully.";
         $this->settings->set_flashdata('success', $resp['msg']);

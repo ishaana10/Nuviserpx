@@ -43,6 +43,7 @@ class PartyService
             return json_encode(['status' => 'failed', 'msg' => 'Party Code already exists.']);
         }
 
+        $before = !empty($id) ? ($this->conn->query("SELECT * FROM `party_list` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'")->fetch_assoc() ?: []) : [];
         if (empty($id)) {
             $sql = "INSERT INTO `party_list` SET
 				`tenant_id` = '{$tenant_id}',
@@ -72,7 +73,9 @@ class PartyService
         }
 
         $save = $this->conn->query($sql);
+        $savedId = empty($id) ? (int)$this->conn->insert_id : (int)$id;
         if ($save) {
+            $this->auditSave(empty($id), $savedId, $before, $post);
             $resp['status'] = 'success';
             $resp['msg'] = empty($id) ? " Party successfully created." : " Party details updated successfully.";
             $this->settings->set_flashdata('success', $resp['msg']);
@@ -87,9 +90,11 @@ class PartyService
     public function deleteParty(int $id): string
     {
         $tenant_id = $this->settings->active_tenant_id();
+        $was = $this->conn->query("SELECT name, party_code, type FROM `party_list` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'")->fetch_assoc() ?: [];
 
         $del = $this->conn->query("UPDATE `party_list` SET `delete_flag` = 1 WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'");
         if ($del) {
+            $this->settings->log_audit('Deleted Party', 'Customers & Suppliers', "Deleted {$was['type']} '{$was['name']}' ({$was['party_code']}), #{$id}.");
             $resp['status'] = 'success';
             $this->settings->set_flashdata('success', " Party deleted successfully.");
         } else {
@@ -97,5 +102,16 @@ class PartyService
             $resp['error'] = $this->conn->error;
         }
         return json_encode($resp);
+    }
+
+    private function auditSave(bool $created, int $id, array $before, array $post): void
+    {
+        $name = (string)($post['name'] ?? '');
+        if ($created) {
+            $this->settings->log_audit('Created Party', 'Customers & Suppliers', "Created " . ($post['type'] ?? 'customer') . " '{$name}' (#{$id}).");
+            return;
+        }
+        $diff = \App\Support\AuditDiff::changes($before, $post, ['party_code', 'name', 'type', 'email', 'phone', 'tin', 'address', 'credit_limit', 'payment_terms_days', 'status']);
+        $this->settings->log_audit('Updated Party', 'Customers & Suppliers', "Updated '{$name}' (#{$id}): {$diff}.");
     }
 }
