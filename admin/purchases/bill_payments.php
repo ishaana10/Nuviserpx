@@ -11,7 +11,7 @@ $preset_vendor = (int)($_GET['vendor_id'] ?? 0);
 ?>
 <div class="container-fluid py-2">
     <h3 class="font-weight-bold text-navy mb-1">Supplier payments</h3>
-    <p class="text-muted text-sm mb-3">Pay one vendor's open bills. The payment is posted to Accounts Payable and the bank, and the bills show as paid or part-paid. Void a payment to undo it.</p>
+    <p class="text-muted text-sm mb-3">Pay one vendor's open bills. The payment is posted to Accounts Payable and the bank, and the bills show as paid or part-paid. Void a payment to undo it. Where a supplier has a withholding tax rate, the tax is kept back from what the bank pays and held as a liability; see <a href="./?page=purchases/wht_report">Withholding Tax</a>.</p>
 
     <?php if ($can_pay): ?>
     <div class="card card-outline card-success mb-4">
@@ -66,7 +66,7 @@ $preset_vendor = (int)($_GET['vendor_id'] ?? 0);
                         <td><?= htmlspecialchars((string)$p['vendor']) ?></td>
                         <td><?= htmlspecialchars(ucfirst(str_replace('_', ' ', $p['method']))) ?></td>
                         <td><?= htmlspecialchars(implode(', ', array_map(fn($a) => $a['bill_no'] . ' (' . number_format((float)$a['amount'], 2) . ')', $al))) ?></td>
-                        <td class="text-right"><?= number_format((float)$p['amount'], 2) ?></td>
+                        <td class="text-right"><?= number_format((float)$p['amount'], 2) ?><?php if ((float)($p['wht_amount'] ?? 0) > 0): ?><br><small class="text-muted">tax withheld <?= number_format((float)$p['wht_amount'], 2) ?>, paid <?= number_format((float)$p['amount'] - (float)$p['wht_amount'], 2) ?></small><?php endif; ?></td>
                         <td><span class="badge badge-<?= $p['status'] === 'void' ? 'dark' : ($p['status'] === 'pending_approval' ? 'warning' : 'success') ?>"><?= strtoupper(str_replace('_', ' ', $p['status'])) ?></span></td>
                         <td><?php if (in_array($p['status'], ['posted', 'pending_approval'], true) && $can_void): ?><button class="btn btn-xs btn-outline-danger void-bp" data-id="<?= (int)$p['id'] ?>">Void</button><?php endif; ?></td>
                     </tr>

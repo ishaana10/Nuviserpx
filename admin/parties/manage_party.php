@@ -70,6 +70,11 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
 		</div>
 
 		<div class="form-group">
+			<label for="wht_rate" class="control-label">Withholding tax rate <small class="text-muted">(suppliers: % kept back from payments and owed to the tax authority; 0 = none)</small></label>
+			<input type="number" step="0.01" min="0" max="50" name="wht_rate" id="wht_rate" class="form-control form-control-sm rounded-0" value="<?php echo isset($wht_rate) ? htmlspecialchars((string)$wht_rate) : '0'; ?>" />
+		</div>
+
+		<div class="form-group">
 			<label for="address" class="control-label">Address</label>
 			<textarea name="address" id="address" rows="2" class="form-control form-control-sm rounded-0"><?php echo isset($address) ? $address : ''; ?></textarea>
 		</div>

@@ -76,11 +76,52 @@ class BillPaymentService
         ];
     }
 
-    /** Dr Accounts Payable, Cr Bank, as journal lines. */
-    public static function lines(int $apAcc, int $bankAcc, float $amount): array
+    /**
+     * Dr Accounts Payable (the whole amount settled), Cr Bank (what is actually paid), and when tax is withheld
+     * Cr Withholding Tax Payable (what is kept back for the tax authority).
+     */
+    public static function lines(int $apAcc, int $bankAcc, float $amount, int $whtAcc = 0, float $wht = 0.0): array
     {
         $amount = round($amount, 2);
-        return [[$apAcc, TaxService::DEBIT, $amount], [$bankAcc, TaxService::CREDIT, $amount]];
+        $wht = round($wht, 2);
+        if ($wht <= 0 || $whtAcc <= 0) {
+            return [[$apAcc, TaxService::DEBIT, $amount], [$bankAcc, TaxService::CREDIT, $amount]];
+        }
+        return [[$apAcc, TaxService::DEBIT, $amount], [$bankAcc, TaxService::CREDIT, round($amount - $wht, 2)], [$whtAcc, TaxService::CREDIT, $wht]];
+    }
+
+    /** Pure: tax to withhold from a gross payment at a percentage rate, to the cent. */
+    public static function withheld(float $gross, float $ratePercent): float
+    {
+        if ($gross <= 0 || $ratePercent <= 0) {
+            return 0.0;
+        }
+        return round($gross * min($ratePercent, 100.0) / 100, 2);
+    }
+
+    /** Pure: why a withheld amount can't be used, or null. It may be nothing, but never the whole payment or more. */
+    public static function whtError(float $gross, float $wht): ?string
+    {
+        if ($wht < 0) {
+            return 'Tax withheld cannot be negative.';
+        }
+        if ($wht > 0 && round($wht, 2) >= round($gross, 2)) {
+            return 'Tax withheld must be less than the payment.';
+        }
+        return null;
+    }
+
+    /** Pure: a typed withholding rate. Blank is 0; otherwise 0 to 50 percent. Returns [rate, error]. */
+    public static function cleanRate($raw): array
+    {
+        $t = trim(str_replace('%', '', (string)$raw));
+        if ($t === '') {
+            return [0.0, null];
+        }
+        if (!is_numeric($t) || (float)$t < 0 || (float)$t > 50) {
+            return [0.0, 'Withholding tax rate must be between 0 and 50 percent.'];
+        }
+        return [round((float)$t, 2), null];
     }
 
     /* -------------------------------- database ------------------------------- */
@@ -143,6 +184,55 @@ class BillPaymentService
         return 0;
     }
 
+    /** The liability account withheld tax is held in, created the first time it is needed. */
+    private function whtAccount(): int
+    {
+        $t = $this->tenantId();
+        $find = $this->conn->prepare("SELECT id FROM account_list WHERE tenant_id = ? AND delete_flag = 0 AND (name = 'Withholding Tax Payable' OR name LIKE '%withholding%') ORDER BY (name = 'Withholding Tax Payable') DESC, id LIMIT 1");
+        $find->bind_param('i', $t);
+        $find->execute();
+        if ($row = $find->get_result()->fetch_assoc()) {
+            return (int)$row['id'];
+        }
+        $res = json_decode((new AccountService($this->conn, $this->settings))->saveAccount([
+            'name' => 'Withholding Tax Payable', 'type' => 'Current Liability',
+            'description' => 'Tax kept back from supplier payments, owed to the tax authority', 'status' => 1,
+        ]), true);
+        if (($res['status'] ?? '') !== 'success') {
+            return 0;
+        }
+        $find->execute();
+        return (int)($find->get_result()->fetch_assoc()['id'] ?? 0);
+    }
+
+    /**
+     * Payments with tax withheld in a period, for paying it over and for supplier certificates.
+     *
+     * @return array<int,array<string,mixed>>
+     */
+    public function withholdingReport(string $from, string $to): array
+    {
+        $t = $this->tenantId();
+        $stmt = $this->conn->prepare("SELECT p.id, p.payment_no, p.payment_date, p.amount, p.wht_amount, v.name vendor, v.tin
+            FROM bill_payments p LEFT JOIN party_list v ON v.id = p.vendor_id
+            WHERE p.tenant_id = ? AND p.status = 'posted' AND p.wht_amount > 0 AND p.payment_date BETWEEN ? AND ?
+            ORDER BY v.name, p.payment_date, p.id");
+        if (!$stmt) {
+            return [];
+        }
+        $stmt->bind_param('iss', $t, $from, $to);
+        $stmt->execute();
+        return $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    }
+
+    /** The default withholding rate set on a supplier. */
+    public function vendorRate(int $vendorId): float
+    {
+        $t = $this->tenantId();
+        $r = @$this->conn->query("SELECT wht_rate FROM party_list WHERE id = '{$vendorId}' AND tenant_id = '{$t}'");
+        return ($r && ($row = $r->fetch_assoc())) ? round((float)$row['wht_rate'], 2) : 0.0;
+    }
+
     private function nextNumber(string $date): string
     {
         $t = $this->tenantId();
@@ -171,6 +261,10 @@ class BillPaymentService
         $method = mb_substr(trim((string)($post['method'] ?? 'bank_transfer')), 0, 50) ?: 'bank_transfer';
         $reference = mb_substr(trim((string)($post['reference'] ?? '')), 0, 100);
         $notes = mb_substr(trim((string)($post['notes'] ?? '')), 0, 500);
+        $wht = round((float)($post['wht_amount'] ?? 0), 2);
+        if ($err = self::whtError($amount, $wht)) {
+            return $this->fail($err);
+        }
 
         $v = $this->conn->prepare("SELECT id FROM party_list WHERE id = ? AND tenant_id = ?");
         $v->bind_param('ii', $vendorId, $t);
@@ -190,6 +284,13 @@ class BillPaymentService
         }
         if ($apAcc === 0 || $bankAcc === 0) {
             return $this->fail('Set up an Accounts Payable account and a bank or cash account first.');
+        }
+        $whtAcc = 0;
+        if ($wht > 0) {
+            $whtAcc = $this->whtAccount();
+            if ($whtAcc === 0) {
+                return $this->fail('The Withholding Tax Payable account could not be created. Add one under Chart of Accounts.');
+            }
         }
         $allocs = [];
         foreach ((array)($post['alloc'] ?? []) as $billId => $a) {
@@ -229,6 +330,9 @@ class BillPaymentService
             $journalId = (int)$this->conn->insert_id;
             $fx = new FxService($this->conn, $this->settings);
             $bankCur = $fx->bankCurrency($bankAcc);
+            if ($bankCur !== null && $wht > 0) {
+                throw new \RuntimeException('Tax cannot be withheld on a payment from a foreign-currency account. Pay from a base-currency account.');
+            }
             if ($bankCur !== null) {
                 // Paying base-currency bills from a foreign-currency account: take the units out at their carried value.
                 $payRate = $fx->documentRate($bankCur, $date, null);
@@ -243,7 +347,7 @@ class BillPaymentService
                 }
                 $jl = FxService::bankOutflowLines($apAcc, $bankAcc, $fxAcc, $amount, $out, $bankCur);
             } else {
-                $jl = self::lines($apAcc, $bankAcc, $amount);
+                $jl = self::lines($apAcc, $bankAcc, $amount, $whtAcc, $wht);
             }
             if ($journalId <= 0 || !(new TaxService($this->conn, $this->settings))->writeLines($journalId, $jl)) {
                 throw new \RuntimeException('The payment journal could not be posted.');
@@ -258,6 +362,9 @@ class BillPaymentService
             $ins->bind_param('isisssisssii', $t, $no, $vendorId, $date, $amt, $method, $bankAcc, $reference, $notes, $pstatus, $journalId, $userId);
             $ins->execute();
             $paymentId = (int)$this->conn->insert_id;
+            if ($wht > 0 && !$this->conn->query("UPDATE bill_payments SET wht_amount = '{$wht}', wht_account_id = '{$whtAcc}' WHERE id = {$paymentId} AND tenant_id = {$t}")) {
+                throw new \RuntimeException('The withheld tax could not be recorded.');
+            }
 
             $al = $this->conn->prepare("INSERT INTO bill_payment_allocations (payment_id, bill_id, amount) VALUES (?, ?, ?)");
             foreach ($allocs as $billId => $a) {
@@ -271,7 +378,7 @@ class BillPaymentService
             $this->conn->rollback();
             return $this->fail($e instanceof \RuntimeException ? $e->getMessage() : 'The payment could not be saved.');
         }
-        $this->settings->log_audit($pending ? 'Submitted supplier payment for approval' : 'Paid supplier bills', 'Purchases', "{$no}: " . number_format($amount, 2) . ' across ' . count($allocs) . ' bill(s).');
+        $this->settings->log_audit($pending ? 'Submitted supplier payment for approval' : 'Paid supplier bills', 'Purchases', "{$no}: " . number_format($amount, 2) . ' across ' . count($allocs) . ' bill(s)' . ($wht > 0 ? ', tax withheld ' . number_format($wht, 2) . ', paid ' . number_format($amount - $wht, 2) : '') . '.');
         $msg = $pending ? "Payment {$no} recorded and sent for approval. The bills stay unpaid until it is approved." : "Payment {$no} recorded.";
         $this->settings->set_flashdata('success', $msg);
         return json_encode(['status' => 'success', 'msg' => $msg, 'id' => $paymentId, 'pending' => $pending]);

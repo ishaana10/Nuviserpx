@@ -35,6 +35,10 @@ class PartyService
         if (isset($limit['error']) || isset($terms['error'])) {
             return json_encode(['status' => 'failed', 'msg' => $limit['error'] ?? $terms['error']]);
         }
+        [$whtRate, $whtErr] = BillPaymentService::cleanRate($post['wht_rate'] ?? '');
+        if ($whtErr) {
+            return json_encode(['status' => 'failed', 'msg' => $whtErr]);
+        }
         $limitSql = $limit['value'] === null ? 'NULL' : "'" . number_format($limit['value'], 2, '.', '') . "'";
         $termsSql = $terms['value'] === null ? 'NULL' : (string)$terms['value'];
 
@@ -56,6 +60,7 @@ class PartyService
 				`address` = '{$address}',
 				`credit_limit` = {$limitSql},
 				`payment_terms_days` = {$termsSql},
+				`wht_rate` = '{$whtRate}',
 				`status` = '{$status}'";
         } else {
             $sql = "UPDATE `party_list` SET
@@ -68,6 +73,7 @@ class PartyService
 				`address` = '{$address}',
 				`credit_limit` = {$limitSql},
 				`payment_terms_days` = {$termsSql},
+				`wht_rate` = '{$whtRate}',
 				`status` = '{$status}'
 				WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'";
         }
@@ -111,7 +117,7 @@ class PartyService
             $this->settings->log_audit('Created Party', 'Customers & Suppliers', "Created " . ($post['type'] ?? 'customer') . " '{$name}' (#{$id}).");
             return;
         }
-        $diff = \App\Support\AuditDiff::changes($before, $post, ['party_code', 'name', 'type', 'email', 'phone', 'tin', 'address', 'credit_limit', 'payment_terms_days', 'status']);
+        $diff = \App\Support\AuditDiff::changes($before, $post, ['party_code', 'name', 'type', 'email', 'phone', 'tin', 'address', 'credit_limit', 'payment_terms_days', 'wht_rate', 'status']);
         $this->settings->log_audit('Updated Party', 'Customers & Suppliers', "Updated '{$name}' (#{$id}): {$diff}.");
     }
 }
