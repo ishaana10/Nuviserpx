@@ -57,8 +57,12 @@ $items = $conn->query("SELECT * FROM `purchase_order_items` WHERE purchase_order
 							<td>
 								<?php if($outstanding > 0): $has_outstanding = true; ?>
 								<input type="number" step="any" min="0" max="<?php echo $outstanding ?>" name="receive_qty[]" class="form-control form-control-sm rounded-0 text-center" value="<?php echo $outstanding ?>">
+								<input type="text" name="batch_no[]" maxlength="60" class="form-control form-control-sm rounded-0 mt-1" placeholder="Batch / lot (if tracked)">
+								<input type="date" name="expiry_date[]" class="form-control form-control-sm rounded-0 mt-1" title="Expiry date (if tracked)">
 								<?php else: ?>
 								<input type="hidden" name="receive_qty[]" value="0">
+								<input type="hidden" name="batch_no[]" value="">
+								<input type="hidden" name="expiry_date[]" value="">
 								<span class="badge badge-success">Fully received</span>
 								<?php endif; ?>
 							</td>
