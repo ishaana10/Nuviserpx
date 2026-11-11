@@ -483,6 +483,26 @@ class Master extends DBConnection
         return json_encode(['status' => 'success', 'msg' => $msg, 'dry_run' => $dry, 'counts' => $c, 'rows' => array_slice($res['rows'], 0, 500), 'truncated' => count($res['rows']) > 500, 'unknown' => $res['unknown']]);
     }
 
+    public function preview_landed_cost()
+    {
+        $svc = $this->container->make(\App\Services\LandedCostService::class);
+        $grnId = (int)($_POST['grn_id'] ?? 0);
+        if (!$svc->receipt($grnId)) {
+            return json_encode(['status' => 'failed', 'msg' => 'That goods receipt was not found.']);
+        }
+        [$charges, $err] = \App\Services\LandedCostService::cleanCharges((array)($_POST['desc'] ?? []), (array)($_POST['amount'] ?? []));
+        if ($err) {
+            return json_encode(['status' => 'failed', 'msg' => $err]);
+        }
+        $plan = $svc->plan($svc->receiptLines($grnId), round(array_sum(array_column($charges, 'amount')), 2), ($_POST['basis'] ?? 'value') === 'qty' ? 'qty' : 'value');
+        return json_encode(['status' => 'success', 'rows' => array_values($plan['rows']), 'total' => $plan['total'], 'capitalised' => $plan['capitalised']]);
+    }
+
+    public function post_landed_cost()
+    {
+        return $this->container->make(\App\Services\LandedCostService::class)->post($_POST);
+    }
+
     public function import_parties() { return $this->import_csv('parties'); }
     public function import_products() { return $this->import_csv('products'); }
     public function import_accounts() { return $this->import_csv('accounts'); }
@@ -2740,6 +2760,12 @@ switch ($action) {
         break;
     case 'run_payment_reminders':
         echo $Master->run_payment_reminders();
+        break;
+    case 'preview_landed_cost':
+        echo $Master->preview_landed_cost();
+        break;
+    case 'post_landed_cost':
+        echo $Master->post_landed_cost();
         break;
     case 'import_parties':
         echo $Master->import_parties();
