@@ -76,6 +76,7 @@
 							<td>
 								<small><b>From:</b> <?php echo date("M d, Y", strtotime($row['start_date'])) ?></small><br>
 								<small><b>To:</b> <?php echo date("M d, Y", strtotime($row['end_date'])) ?></small>
+								<?php if(isset($row['day_fraction']) && (float)$row['day_fraction'] == 0.5): ?><small class="d-block text-info">Half day</small><?php endif; ?>
 							</td>
 							<td><p class="m-0 text-truncate" style="max-width: 200px;"><?php echo $row['reason'] ?></p></td>
 							<td class="text-center">

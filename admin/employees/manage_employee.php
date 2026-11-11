@@ -132,7 +132,8 @@ $readonly = isset($id) && !$can_edit && $scope !== null;
 			</div>
 			<div class="col-md-4 form-group">
 				<label for="date_of_joining" class="control-label">Date of Joining</label>
-				<input type="date" name="date_of_joining" id="date_of_joining" class="form-control form-control-sm rounded-0" value="<?php echo isset($date_of_joining) ? $date_of_joining : date('Y-m-d'); ?>" />
+				<input type="date" name="date_of_joining" id="date_of_joining" class="form-control form-control-sm rounded-0" value="<?php echo isset($date_of_joining) ? $date_of_joining : ''; ?>" />
+				<small class="text-muted">Used for leave accrual and to pay a new starter only from this date.</small>
 			</div>
 			<div class="col-md-4 form-group">
 				<label for="termination_date" class="control-label">Last Day of Employment</label>

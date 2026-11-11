@@ -43,7 +43,7 @@ class PayrollService
             $q->execute();
             $days = (float)($q->get_result()->fetch_assoc()['unpaid_days'] ?? 0);
         } else {
-            $days = (new PayrollAttendanceService($this->conn, $this->settings))->unpaidDaysFor($employeeId, $from, $to, $dpw);
+            $days = (new PayrollAttendanceService($this->conn, $this->settings))->unpaidDaysFor($employeeId, $from, $to, $dpw, (bool)($rules['attendance']['prorate_joiners'] ?? true));
         }
         $daily = PayrollAttendanceService::dailyRate($basic, (int)PayrollEngine::get_periods_per_year($frequency), (float)($rules['overtime']['weeks_per_year'] ?? 52), $dpw);
         return [$lines, $days, PayrollAttendanceService::deduction($days, $daily, $basic)];

@@ -404,6 +404,12 @@ if($t_qry && $t_qry->num_rows > 0){
                                         </a>
                                     </li>
                                     <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=leaves/balances" class="nav-link nav-leaves_balances tree-item">
+                                            <i class="nav-icon fas fa-calendar-check"></i>
+                                            <p>Leave Balances</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=payroll" class="nav-link nav-payroll tree-item">
                                             <i class="nav-icon fas fa-file-invoice-dollar"></i>
                                             <p>Payroll Processing</p>

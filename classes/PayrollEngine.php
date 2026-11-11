@@ -47,7 +47,7 @@ class PayrollEngine {
                 ],
             ],
             // Days worked per week (5 = Mon-Fri, 6 = Mon-Sat, 7 = every day): sets the daily rate for unpaid days.
-            'attendance' => ['working_days_per_week' => 5],
+            'attendance' => ['working_days_per_week' => 5, 'prorate_joiners' => true],
             'employer_levies' => [
                 ['key' => 'workcare_levy', 'label' => 'Employer levy 1', 'rate' => 0.01],
                 ['key' => 'training_levy', 'label' => 'Employer levy 2', 'rate' => 0.01],
@@ -126,6 +126,9 @@ class PayrollEngine {
             && (int)$custom['attendance']['working_days_per_week'] == $custom['attendance']['working_days_per_week']
             && $custom['attendance']['working_days_per_week'] >= 1 && $custom['attendance']['working_days_per_week'] <= 7) {
             $rules['attendance']['working_days_per_week'] = (int)$custom['attendance']['working_days_per_week'];
+        }
+        if (isset($custom['attendance']['prorate_joiners'])) {
+            $rules['attendance']['prorate_joiners'] = filter_var($custom['attendance']['prorate_joiners'], FILTER_VALIDATE_BOOLEAN);
         }
         if (isset($custom['employer_levies']) && is_array($custom['employer_levies'])) {
             $levies = [];
