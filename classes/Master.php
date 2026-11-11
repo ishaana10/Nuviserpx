@@ -458,6 +458,35 @@ class Master extends DBConnection
         return json_encode(['status' => $res['problems'] && !$res['sent'] && !$res['fees'] ? 'failed' : 'success', 'msg' => $msg]);
     }
 
+    private function import_csv(string $entity)
+    {
+        $f = $_FILES['csv'] ?? null;
+        if (!$f || ($f['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || !is_uploaded_file($f['tmp_name'])) {
+            return json_encode(['status' => 'failed', 'msg' => 'Choose a CSV file to upload.']);
+        }
+        if (!in_array(strtolower(pathinfo((string)$f['name'], PATHINFO_EXTENSION)), ['csv', 'txt'], true)) {
+            return json_encode(['status' => 'failed', 'msg' => 'The file must be a .csv file. In Excel, use Save As and choose CSV.']);
+        }
+        if ((int)$f['size'] > \App\Services\ImportService::MAX_BYTES) {
+            return json_encode(['status' => 'failed', 'msg' => 'The file is larger than 2 MB. Split it into smaller files.']);
+        }
+        @set_time_limit(300);
+        $dry = !empty($_POST['dry_run']);
+        $res = $this->container->make(\App\Services\ImportService::class)->run($entity, (string)file_get_contents($f['tmp_name']), (string)($_POST['mode'] ?? 'skip'), $dry);
+        if ($res['fatal']) {
+            return json_encode(['status' => 'failed', 'msg' => $res['fatal']]);
+        }
+        $c = $res['counts'];
+        $msg = $dry
+            ? "Checked: {$c['new']} new, {$c['update']} to update, {$c['skip']} skipped, {$c['error']} with problems. Nothing has been saved yet."
+            : "Imported: {$c['created']} created, {$c['updated']} updated, {$c['skip']} skipped, " . ($c['error'] + $c['failed']) . ' not imported.';
+        return json_encode(['status' => 'success', 'msg' => $msg, 'dry_run' => $dry, 'counts' => $c, 'rows' => array_slice($res['rows'], 0, 500), 'truncated' => count($res['rows']) > 500, 'unknown' => $res['unknown']]);
+    }
+
+    public function import_parties() { return $this->import_csv('parties'); }
+    public function import_products() { return $this->import_csv('products'); }
+    public function import_accounts() { return $this->import_csv('accounts'); }
+
     public function generate_contract_invoices()
     {
         $id = intval($_POST['id'] ?? 0);
@@ -2711,6 +2740,15 @@ switch ($action) {
         break;
     case 'run_payment_reminders':
         echo $Master->run_payment_reminders();
+        break;
+    case 'import_parties':
+        echo $Master->import_parties();
+        break;
+    case 'import_products':
+        echo $Master->import_products();
+        break;
+    case 'import_accounts':
+        echo $Master->import_accounts();
         break;
     case 'generate_contract_invoices':
         echo $Master->generate_contract_invoices();
