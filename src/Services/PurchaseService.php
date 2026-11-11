@@ -132,6 +132,7 @@ class PurchaseService
         }
 
         $this->settings->set_flashdata('success', empty($id) ? ' Purchase order created successfully.' : ' Purchase order updated successfully.');
+        $this->settings->log_audit(empty($id) ? 'Created Purchase Order' : 'Updated Purchase Order', 'Purchasing', "PO {$po_no} (#{$po_id}) for " . ($vendor['name'] ?? "vendor #{$vendor_id}") . ", total {$total}, status {$status}.");
         $this->emit(
             empty($id) ? \App\Support\IntegrationEvents::PURCHASE_ORDER_CREATED : \App\Support\IntegrationEvents::PURCHASE_ORDER_UPDATED,
             [
@@ -165,6 +166,7 @@ class PurchaseService
         $del = $this->conn->query("DELETE FROM `purchase_order_list` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'");
         if ($del) {
             $this->settings->set_flashdata('success', ' Purchase order deleted successfully.');
+            $this->settings->log_audit('Deleted Purchase Order', 'Purchasing', "Deleted PO {$po_no} (#{$id}).");
             $this->emit(\App\Support\IntegrationEvents::PURCHASE_ORDER_DELETED, [
                 'purchase_order_id' => (int)$id,
                 'po_no'             => $po_no,
@@ -263,6 +265,7 @@ class PurchaseService
         $this->refreshPoReceiptStatus($po_id, (int)$tenant_id);
 
         $this->settings->set_flashdata('success', " Goods receipt {$grn_no} recorded. Stock updated.");
+        $this->settings->log_audit('Received Goods', 'Purchasing', "Goods receipt {$grn_no} (#{$grn_id}) against PO " . ($po['po_no'] ?? "#{$po_id}") . ', received ' . $receipt_date . '.');
         $this->emit(\App\Support\IntegrationEvents::GOODS_RECEIVED, [
             'goods_receipt_id'  => (int)$grn_id,
             'grn_no'            => $grn_no,
@@ -557,6 +560,7 @@ class PurchaseService
         }
 
         $this->settings->set_flashdata('success', empty($id) ? ' Vendor bill created successfully.' : ' Vendor bill updated successfully.');
+        $this->settings->log_audit(empty($id) ? 'Created Vendor Bill' : 'Updated Vendor Bill', 'Purchasing', "Bill {$bill_no} for {$vendorName}, total {$total}.");
         $this->emit(
             empty($id) ? \App\Support\IntegrationEvents::VENDOR_BILL_CREATED : \App\Support\IntegrationEvents::VENDOR_BILL_UPDATED,
             [
@@ -601,6 +605,7 @@ class PurchaseService
         $del = $this->conn->query("DELETE FROM `vendor_bill_list` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'");
         if ($del) {
             $this->settings->set_flashdata('success', ' Vendor bill deleted successfully.');
+            $this->settings->log_audit('Deleted Vendor Bill', 'Purchasing', "Deleted bill " . ($b['bill_no'] ?? "#{$id}") . " (#{$id})" . (!empty($b['journal_id']) ? ", its journal #{$b['journal_id']} was removed" : '') . '.');
             $this->emit(\App\Support\IntegrationEvents::VENDOR_BILL_DELETED, [
                 'vendor_bill_id' => (int)$id,
                 'bill_no'        => $b['bill_no'] ?? '',

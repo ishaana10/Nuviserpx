@@ -39,6 +39,7 @@ class TenantService
         } else {
             $sql = "UPDATE `tenants` set {$dataStr} where id = '{$id}' ";
         }
+        $before = $id > 0 ? ($this->conn->query("SELECT * FROM `tenants` WHERE id = '{$id}'")->fetch_assoc() ?: []) : [];
         $tenantCode = $this->conn->real_escape_string((string)$tenant_code);
         $check = $this->conn->query("SELECT * FROM `tenants` where `tenant_code` = '{$tenantCode}' and delete_flag = 0 " . ($id > 0 ? " and id != '{$id}'" : ""))->num_rows;
         if ($check > 0) {
@@ -47,8 +48,16 @@ class TenantService
         } else {
             $save = $this->conn->query($sql);
             if ($save) {
+                $tid = empty($id) ? (int)$this->conn->insert_id : $id;
                 if (empty($id)) {
-                    ChartProvisioner::provision($this->conn, (int)$this->conn->insert_id);
+                    ChartProvisioner::provision($this->conn, $tid);
+                }
+                if (empty($id)) {
+                    $this->settings->log_audit('Created Tenant', 'Tenants', "Created company '" . ($post['name'] ?? '') . "' (" . ($post['tenant_code'] ?? '') . ", #{$tid}).");
+                } else {
+                    $diff = \App\Support\AuditDiff::changes($before, $post, ['tenant_code', 'name', 'email', 'phone', 'address', 'status']);
+                    $mods = isset($post['modules_submitted']) ? '; ' . \App\Support\AuditDiff::listChanges((string)($before['modules'] ?? ''), implode(',', \App\Support\Permissions::sanitizeTenantModules($post['modules'] ?? []))) . ' (modules)' : '';
+                    $this->settings->log_audit('Updated Tenant', 'Tenants', "Updated company '" . ($before['name'] ?? '') . "' (#{$tid}): {$diff}{$mods}.");
                 }
                 $resp['status'] = 'success';
                 $resp['msg'] = empty($id) ? " Tenant added successfully." : " Tenant details updated successfully.";
@@ -66,8 +75,10 @@ class TenantService
 
     public function deleteTenant(int $id): string
     {
+        $was = $this->conn->query("SELECT name, tenant_code FROM `tenants` WHERE id = '{$id}'")->fetch_assoc() ?: [];
         $del = $this->conn->query("UPDATE `tenants` set delete_flag = 1 where id = '{$id}'");
         if ($del) {
+            $this->settings->log_audit('Deleted Tenant', 'Tenants', "Deleted company '" . ($was['name'] ?? '') . "' (" . ($was['tenant_code'] ?? '') . ", #{$id}).");
             $resp['status'] = 'success';
             $this->settings->set_flashdata('success', " Tenant deleted successfully.");
         } else {

@@ -33,6 +33,7 @@ class RoleService
             return json_encode(['status' => 'failed', 'msg' => 'Role name already exists for this company.']);
         }
 
+        $before = !empty($id) ? ($this->conn->query("SELECT * FROM `roles` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'")->fetch_assoc() ?: []) : [];
         if (empty($id)) {
             $sql = "INSERT INTO `roles` SET
 				`tenant_id` = '{$tenant_id}',
@@ -50,7 +51,9 @@ class RoleService
         }
 
         $save = $this->conn->query($sql);
+        $roleId = empty($id) ? (int)$this->conn->insert_id : (int)$id;
         if ($save) {
+            $this->auditRole(empty($id), $roleId, $before, (string)($post['name'] ?? ''), $permissions, (int)$status);
             $resp['status'] = 'success';
             $resp['msg'] = empty($id) ? " Custom role created successfully." : " Role permissions updated successfully.";
             $this->settings->set_flashdata('success', $resp['msg']);
@@ -67,8 +70,10 @@ class RoleService
     {
         $tenant_id = $this->settings->active_tenant_id();
 
+        $was = $this->conn->query("SELECT name FROM `roles` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'")->fetch_assoc() ?: [];
         $del = $this->conn->query("UPDATE `roles` SET `delete_flag` = 1 WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'");
         if ($del) {
+            $this->settings->log_audit('Deleted Role', 'User Management', "Deleted role '" . ($was['name'] ?? '') . "' (#{$id}).");
             $resp['status'] = 'success';
             $this->settings->set_flashdata('success', " Role deleted successfully.");
         } else {
@@ -117,7 +122,11 @@ class RoleService
         }
 
         $save = $this->conn->query($sql);
+        $keyId = empty($id) ? (int)$this->conn->insert_id : (int)$id;
         if ($save) {
+            // The key and secret are never written to the log.
+            $scope = $permissions === '*' ? 'full access' : (substr_count($permissions, ',') + ($permissions === '' ? 0 : 1)) . ' permission(s)';
+            $this->settings->log_audit(empty($id) ? 'Created API Key' : 'Updated API Key', 'API & Integrations', "API key '" . ($post['name'] ?? '') . "' (#{$keyId}): {$scope}, " . ($status ? 'active' : 'disabled') . '.');
             $resp['status'] = 'success';
             $resp['msg'] = empty($id) ? " API Key generated successfully." : " API Key updated successfully.";
             $this->settings->set_flashdata('success', $resp['msg']);
@@ -134,8 +143,10 @@ class RoleService
     {
         $tenant_id = $this->settings->active_tenant_id();
 
+        $was = $this->conn->query("SELECT name FROM `api_keys` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'")->fetch_assoc() ?: [];
         $del = $this->conn->query("DELETE FROM `api_keys` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'");
         if ($del) {
+            $this->settings->log_audit('Deleted API Key', 'API & Integrations', "Revoked and deleted API key '" . ($was['name'] ?? '') . "' (#{$id}).");
             $resp['status'] = 'success';
             $this->settings->set_flashdata('success', " API Key revoked and deleted successfully.");
         } else {
@@ -143,5 +154,16 @@ class RoleService
             $resp['error'] = $this->conn->error;
         }
         return json_encode($resp);
+    }
+
+    private function auditRole(bool $created, int $id, array $before, string $name, string $permissions, int $status): void
+    {
+        if ($created) {
+            $this->settings->log_audit('Created Role', 'User Management', "Created role '{$name}' (#{$id}) with " . ($permissions === '' ? 0 : substr_count($permissions, ',') + 1) . ' permission(s).');
+            return;
+        }
+        $perm = \App\Support\AuditDiff::listChanges((string)($before['permissions'] ?? ''), $permissions);
+        $other = \App\Support\AuditDiff::changes($before, ['name' => $name, 'status' => $status], ['name', 'status']);
+        $this->settings->log_audit('Updated Role', 'User Management', "Updated role '{$name}' (#{$id}): {$perm}. Other: {$other}.");
     }
 }
