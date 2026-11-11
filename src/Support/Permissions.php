@@ -472,6 +472,10 @@ final class Permissions
         'save_product'          => ['products', 'save'],
         'delete_product'        => ['products', 'delete'],
         'save_stock_adjustment' => ['stock', 'save'],
+        'create_stock_count'    => ['stock', 'save'],
+        'save_stock_counts'     => ['stock', 'save'],
+        'post_stock_count'      => ['stock', 'save'],
+        'cancel_stock_count'    => ['stock', 'save'],
         'transfer_stock'        => ['stock', 'edit'],
         'save_warehouse'        => ['warehouses', 'save'],
         // Sales orders
@@ -685,6 +689,7 @@ final class Permissions
         'delivery_notes'    => 'sales_orders_view',
         'products'          => 'products_view',
         'stock_adjustments' => 'stock_view',
+        'stock_counts'      => 'stock_view',
         'warehouses'        => 'warehouses_view',
         'purchases'         => 'purchases_view',
         'journals'          => 'journals_view',

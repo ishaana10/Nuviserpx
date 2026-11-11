@@ -154,6 +154,12 @@ if($t_qry && $t_qry->num_rows > 0){
                                             <p>Stock Movements</p>
                                         </a>
                                     </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=stock_counts" class="nav-link nav-stock_counts tree-item">
+                                            <i class="nav-icon fas fa-clipboard-check"></i>
+                                            <p>Stock Take</p>
+                                        </a>
+                                    </li>
                                     <?php if ($_settings->can_access('settings_manage')): ?>
                                     <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=price_lists" class="nav-link nav-price_lists tree-item">
