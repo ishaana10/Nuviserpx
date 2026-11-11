@@ -98,7 +98,7 @@ $bills = $conn->query("SELECT * FROM `vendor_bill_list` WHERE purchase_order_id 
 				<ul class="list-group list-group-flush">
 					<?php while($g = $grns->fetch_assoc()): ?>
 					<li class="list-group-item px-0 py-1 d-flex justify-content-between">
-						<span><b><?php echo htmlspecialchars($g['grn_no']) ?></b> — <?php echo date("d M Y", strtotime($g['receipt_date'])) ?></span>
+						<span><b><?php echo htmlspecialchars($g['grn_no']) ?></b> — <?php echo date("d M Y", strtotime($g['receipt_date'])) ?> <a class="small ml-2" href="./?page=purchases/landed_cost&grn_id=<?php echo (int)$g['id'] ?>">Landed cost</a></span>
 						<span class="badge badge-success"><?php echo strtoupper($g['status']) ?></span>
 					</li>
 					<?php endwhile; ?>

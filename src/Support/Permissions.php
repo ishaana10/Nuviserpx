@@ -493,6 +493,8 @@ final class Permissions
         'save_purchase_order'   => ['purchases', 'save'],
         'delete_purchase_order' => ['purchases', 'delete'],
         'receive_goods'         => ['purchases', 'edit'],
+        'preview_landed_cost'   => ['purchases', 'edit'],
+        'post_landed_cost'      => ['purchases', 'edit'],
         'save_vendor_bill'      => ['purchases', 'save'],
         'delete_vendor_bill'    => ['purchases', 'delete'],
         'cancel_vendor_bill'    => ['purchases', 'edit'],
