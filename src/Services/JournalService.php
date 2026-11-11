@@ -21,6 +21,8 @@ class JournalService
         'payroll_payments' => ['label' => 'salary payment', 'ref' => 'reference'],
         'payroll_remittances' => ['label' => 'payroll remittance', 'ref' => 'reference'],
         'employee_loans' => ['label' => 'staff loan', 'ref' => 'description'],
+        'expense_reports' => ['label' => 'expense claim', 'ref' => 'claim_no'],
+        'expense_reimbursement' => ['table' => 'expense_reports', 'col' => 'payment_journal_id', 'label' => 'expense reimbursement of claim', 'ref' => 'claim_no'],
     ];
 
     public function __construct(
