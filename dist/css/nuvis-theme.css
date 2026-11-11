@@ -186,3 +186,13 @@ html[data-nv-eff="dark"] img.user-img { filter: none; }
   .nv-pin-btn { width: 36px; height: 36px; opacity: .6; }
 }
 @media (prefers-reduced-motion: reduce) { html .main-sidebar .nav-sidebar .nav-link, html .main-sidebar .nav-sidebar .right { transition: none; } }
+
+/* Sidebar: scroll the menu when it is longer than the screen. The OverlayScrollbars script is not loaded, so the
+   wrapper elements are left in normal flow and the sidebar itself scrolls. The brand header stays pinned. */
+html .main-sidebar { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+html .main-sidebar .brand-link { flex: 0 0 auto; }
+html .main-sidebar .sidebar { flex: 1 1 auto; min-height: 0; height: auto; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--nv-side-border) transparent; padding-bottom: 1rem; }
+html .main-sidebar .sidebar .os-padding, html .main-sidebar .sidebar .os-viewport, html .main-sidebar .sidebar .os-content { position: static !important; height: auto !important; overflow: visible !important; }
+html .main-sidebar .sidebar::-webkit-scrollbar { width: 6px; }
+html .main-sidebar .sidebar::-webkit-scrollbar-thumb { background: var(--nv-side-border); border-radius: 3px; }
+html .main-sidebar .sidebar::-webkit-scrollbar-thumb:hover { background: var(--nv-side-dim); }

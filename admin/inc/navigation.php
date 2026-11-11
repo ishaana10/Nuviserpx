@@ -751,6 +751,8 @@ $(document).ready(function(){
             $treeview.addClass('menu-open');
             $treeview.children('a.nav-is-tree').addClass('active');
         }
+        // Long menus scroll: bring the current page's link into view.
+        setTimeout(function(){ try { $activeLink[0].scrollIntoView({block: 'nearest'}); } catch (e) {} }, 350);
     }
 });
 </script>

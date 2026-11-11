@@ -34,7 +34,11 @@ $qry = $conn->query("
     WHERE o.tenant_id = '{$tenant_id}'
     ORDER BY o.id DESC
 ");
-while ($row = $qry->fetch_assoc()) {
+if (!$qry) {
+    // The activities table is missing (a migration has not run yet): still show the board, without follow-up counts.
+    $qry = $conn->query("SELECT o.*, p.name AS party_name, 0 AS open_acts, 0 AS overdue_acts FROM `crm_opportunities` o LEFT JOIN `party_list` p ON o.party_id = p.id WHERE o.tenant_id = '{$tenant_id}' ORDER BY o.id DESC");
+}
+while ($qry && ($row = $qry->fetch_assoc())) {
     if (isset($opps_by_stage[$row['stage']])) {
         $opps_by_stage[$row['stage']][] = $row;
     }
