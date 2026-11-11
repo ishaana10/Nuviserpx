@@ -440,6 +440,24 @@ class Master extends DBConnection
     }
 
     /* Dolibarr Inspired Contract Methods */
+    public function save_reminder_settings()
+    {
+        return $this->container->make(\App\Services\PaymentReminderService::class)->saveSettings($_POST);
+    }
+
+    public function run_payment_reminders()
+    {
+        $res = $this->container->make(\App\Services\PaymentReminderService::class)->run(date('Y-m-d'));
+        $msg = count($res['sent']) . ' reminder(s) sent, ' . count($res['fees']) . ' late fee(s) raised.';
+        if ($res['skipped_no_email']) {
+            $msg .= ' ' . count($res['skipped_no_email']) . ' customer(s) have no valid email.';
+        }
+        if ($res['problems']) {
+            $msg .= ' ' . implode(' ', $res['problems']);
+        }
+        return json_encode(['status' => $res['problems'] && !$res['sent'] && !$res['fees'] ? 'failed' : 'success', 'msg' => $msg]);
+    }
+
     public function generate_contract_invoices()
     {
         $id = intval($_POST['id'] ?? 0);
@@ -2679,6 +2697,12 @@ switch ($action) {
         break;
     case 'save_contract':
         echo $Master->save_contract();
+        break;
+    case 'save_reminder_settings':
+        echo $Master->save_reminder_settings();
+        break;
+    case 'run_payment_reminders':
+        echo $Master->run_payment_reminders();
         break;
     case 'generate_contract_invoices':
         echo $Master->generate_contract_invoices();

@@ -76,6 +76,12 @@ if($t_qry && $t_qry->num_rows > 0){
                                         </a>
                                     </li>
                                     <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=payment_reminders" class="nav-link nav-payment_reminders tree-item">
+                                            <i class="nav-icon fas fa-bell"></i>
+                                            <p>Payment Reminders</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=credit_notes" class="nav-link nav-credit_notes tree-item">
                                             <i class="nav-icon fas fa-file-invoice-dollar"></i>
                                             <p>Credit &amp; Debit Notes</p>
