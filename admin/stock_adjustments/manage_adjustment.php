@@ -41,6 +41,10 @@ $preset_product_id = isset($_GET['product_id']) ? intval($_GET['product_id']) : 
 			<div class="col-md-6 form-group">
 				<label for="unit_cost" class="control-label">Unit Cost Price<?php echo $_settings->currency_tag() ?></label>
 				<input type="number" step="any" name="unit_cost" id="unit_cost" class="form-control form-control-sm rounded-0 text-right" value="0.00"/>
+				<div class="row mt-2">
+					<div class="col-6"><input type="text" name="batch_no" maxlength="60" class="form-control form-control-sm rounded-0" placeholder="Batch / lot (stock in, if tracked)"></div>
+					<div class="col-6"><input type="date" name="expiry_date" class="form-control form-control-sm rounded-0" title="Expiry date"></div>
+				</div>
 			</div>
 			<div class="col-md-6 form-group">
 				<label for="reference" class="control-label">Reference No / Reason</label>

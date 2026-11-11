@@ -251,6 +251,10 @@ class PurchaseService
             if (is_int($prod_id)) {
                 $wh = is_int($warehouse_id) ? (int)$warehouse_id : 0;
                 $this->receiveStock((int)$prod_id, $recv_qty, $unit_cost, (int)$tenant_id, (int)$user_id, $grn_no, $wh);
+                $batches = new BatchService($this->conn, $this->settings);
+                if ($batches->isTracked((int)$prod_id)) {
+                    $batches->receive((int)$prod_id, $wh, $recv_qty, (string)($post['batch_no'][$k] ?? ''), BatchService::cleanExpiry($post['expiry_date'][$k] ?? ''), $unit_cost, $grn_no, $grn_no);
+                }
             }
             $any = true;
         }

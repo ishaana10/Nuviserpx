@@ -503,6 +503,11 @@ class Master extends DBConnection
         return $this->container->make(\App\Services\LandedCostService::class)->post($_POST);
     }
 
+    public function write_off_expired()
+    {
+        return $this->container->make(\App\Services\BatchService::class)->writeOffExpired((int)($_POST['product_id'] ?? 0), (int)($_POST['warehouse_id'] ?? 0));
+    }
+
     public function create_stock_count()
     {
         return $this->container->make(\App\Services\StockTakeService::class)->create(
@@ -2800,6 +2805,9 @@ switch ($action) {
         break;
     case 'post_landed_cost':
         echo $Master->post_landed_cost();
+        break;
+    case 'write_off_expired':
+        echo $Master->write_off_expired();
         break;
     case 'create_stock_count':
         echo $Master->create_stock_count();

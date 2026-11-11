@@ -67,6 +67,14 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
 		</div>
 
 		<div class="form-group">
+			<div class="custom-control custom-checkbox">
+				<input type="checkbox" class="custom-control-input" id="track_batches" name="track_batches" value="1" <?php echo !empty($track_batches) ? 'checked' : '' ?>>
+				<label for="track_batches" class="custom-control-label">Track batch / lot numbers and expiry dates</label>
+			</div>
+			<small class="text-muted">Goods receipts and stock-in adjustments then ask for a batch number and expiry; stock is used first-expiry-first-out.</small>
+		</div>
+
+		<div class="form-group">
 			<label for="description" class="control-label">Description / Specifications</label>
 			<textarea name="description" id="description" rows="2" class="form-control form-control-sm rounded-0"><?php echo isset($description) ? $description : ''; ?></textarea>
 		</div>

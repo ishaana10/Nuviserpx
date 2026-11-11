@@ -36,7 +36,7 @@ class WarehouseStockService
      * $syncTotal = false when the caller already updates the product total itself
      * (e.g. legacy code paths), so we only touch the location row.
      */
-    public function adjustLocation(int $product_id, int $warehouse_id, float $delta, bool $syncTotal = true): bool
+    public function adjustLocation(int $product_id, int $warehouse_id, float $delta, bool $syncTotal = true, bool $batches = true): bool
     {
         $tenant_id = (int)$this->settings->active_tenant_id();
         if ($product_id <= 0 || $delta == 0.0) {
@@ -54,6 +54,10 @@ class WarehouseStockService
             $abs = abs($delta);
             $ok = (bool)$this->conn->query("UPDATE `product_list` SET `stock_quantity` = `stock_quantity` {$sign} {$abs}
                 WHERE id = '{$product_id}' AND tenant_id = '{$tenant_id}'");
+        }
+        if ($ok && $batches && $delta < 0) {
+            // Stock leaving a batch-tracked product comes off the batch that expires first.
+            (new BatchService($this->conn, $this->settings))->consume($product_id, $warehouse_id, -$delta);
         }
         return $ok;
     }
@@ -128,8 +132,9 @@ class WarehouseStockService
             }
 
             // Move: out of source, into destination. Total unchanged -> syncTotal = false.
-            $ok = $this->adjustLocation($product_id, $from_wh, -$qty, false)
-                && $this->adjustLocation($product_id, $to_wh, $qty, false)
+            $ok = $this->adjustLocation($product_id, $from_wh, -$qty, false, false)
+                && $this->adjustLocation($product_id, $to_wh, $qty, false, false)
+                && (new BatchService($this->conn, $this->settings))->move($product_id, $from_wh, $to_wh, $qty, $ref)
                 && $this->conn->query("INSERT INTO `warehouse_transfers`
                     (`tenant_id`, `from_warehouse_id`, `to_warehouse_id`, `product_id`, `qty`, `notes`, `created_by`)
                     VALUES ('{$tenant_id}', '{$from_wh}', '{$to_wh}', '{$product_id}', '{$qty}', '{$notes_e}', '{$user_id}')")

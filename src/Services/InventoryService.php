@@ -30,6 +30,7 @@ class InventoryService
         $reorder_level = isset($reorder_level) ? (float)$reorder_level : 10.0;
         $description = isset($description) ? $this->conn->real_escape_string((string)$description) : '';
         $status = isset($status) ? (int)$status : 1;
+        $track_batches = !empty($post['track_batches']) ? 1 : 0;
 
         $check = $this->conn->query("SELECT * FROM `product_list` WHERE `product_code` = '{$product_code}' AND tenant_id = '{$tenant_id}' AND delete_flag = 0 " . (!empty($id) ? " AND id != '{$id}'" : ""))->num_rows;
         if ($check > 0) {
@@ -48,6 +49,7 @@ class InventoryService
 				`selling_price` = '{$selling_price}',
 				`stock_quantity` = '{$stock_quantity}',
 				`reorder_level` = '{$reorder_level}',
+				`track_batches` = '{$track_batches}',
 				`description` = '{$description}',
 				`status` = '{$status}'";
             $save = $this->conn->query($sql);
@@ -78,6 +80,7 @@ class InventoryService
 				`cost_price` = '{$cost_price}',
 				`selling_price` = '{$selling_price}',
 				`reorder_level` = '{$reorder_level}',
+				`track_batches` = '{$track_batches}',
 				`description` = '{$description}',
 				`status` = '{$status}'
 				WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'";
@@ -211,6 +214,12 @@ class InventoryService
 				`created_by` = '{$user_id}'");
             if (!$saved) {
                 throw new \RuntimeException($this->conn->error);
+            }
+            if ($delta > 0) {
+                $batches = new BatchService($this->conn, $this->settings);
+                if ($batches->isTracked($product_id) && !$batches->receive($product_id, $warehouse_id, $delta, (string)($post['batch_no'] ?? ''), BatchService::cleanExpiry($post['expiry_date'] ?? ''), $unit_cost, (string)($post['reference'] ?? ''), 'ADJ-' . date('Ymd'))) {
+                    throw new \RuntimeException($this->conn->error);
+                }
             }
             $this->conn->commit();
         } catch (\Throwable $e) {

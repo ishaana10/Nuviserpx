@@ -28,7 +28,7 @@ check('zero or negative transfer is refused', W::transferProblem(0.0, 9.0, 1, 2)
 $wh = file_get_contents(base_app . 'src/Services/WarehouseStockService.php');
 check('transfer runs in one transaction with the source row locked', str_contains($wh, 'begin_transaction') && str_contains($wh, 'FOR UPDATE') && str_contains($wh, 'rollback') && str_contains($wh, 'commit'));
 check('transfer checks both warehouses belong to the company', str_contains($wh, 'That warehouse was not found.'));
-check('location changes report failure', str_contains($wh, 'float $delta, bool $syncTotal = true): bool'));
+check('location changes report failure', str_contains($wh, 'float $delta, bool $syncTotal = true, bool $batches = true): bool'));
 
 $is = file_get_contents(base_app . 'src/Services/InventoryService.php');
 check('adjustment cannot drive the total below zero', str_contains($is, '`stock_quantity` + ({$delta}) >= 0'));

@@ -155,6 +155,12 @@ if($t_qry && $t_qry->num_rows > 0){
                                         </a>
                                     </li>
                                     <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=batches" class="nav-link nav-batches tree-item">
+                                            <i class="nav-icon fas fa-hourglass-half"></i>
+                                            <p>Batches &amp; Expiry</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=stock_counts" class="nav-link nav-stock_counts tree-item">
                                             <i class="nav-icon fas fa-clipboard-check"></i>
                                             <p>Stock Take</p>
