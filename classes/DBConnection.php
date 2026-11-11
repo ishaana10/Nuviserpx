@@ -47,6 +47,11 @@ class DBConnection{
                 }
             }
 
+            // MySQL's default sql_mode rejects queries MariaDB accepts (ONLY_FULL_GROUP_BY): relax just that.
+            if ($this->conn && !$this->conn->connect_error) {
+                \App\Database\SqlMode::apply($this->conn);
+            }
+
             // Auto-install schema if system_info table is missing
             $check_tbl = @$this->conn->query("SHOW TABLES LIKE 'system_info'");
             if (!$check_tbl || $check_tbl->num_rows == 0) {
