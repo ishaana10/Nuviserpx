@@ -227,6 +227,29 @@ class Emailer {
     }
 
     /**
+     * Payment reminder for an overdue invoice. $sys: name, email, currency (symbol or code).
+     */
+    public static function send_payment_reminder_email($to, $invoice, $daysOverdue, $sys_info = [], $note = '') {
+        $company = $sys_info['name'] ?? 'Nuvis ERPX';
+        $cur = $sys_info['currency'] ?? '';
+        $subject = "Payment reminder: invoice #" . $invoice['invoice_no'] . " is " . (int)$daysOverdue . " day" . ((int)$daysOverdue === 1 ? '' : 's') . " overdue";
+        $noteHtml = trim((string)$note) !== '' ? "<p>" . nl2br(htmlspecialchars((string)$note)) . "</p>" : '';
+        $body = "
+        <h3>Dear " . htmlspecialchars((string)$invoice['party_name']) . ",</h3>
+        <p>Our records show the invoice below is past its due date. If you have already paid, please disregard this reminder.</p>
+        <div style='background: #f8fafc; padding: 15px; border-radius: 6px; margin-bottom: 20px;'>
+            <p style='margin: 4px 0;'><b>Invoice:</b> #" . htmlspecialchars((string)$invoice['invoice_no']) . "</p>
+            <p style='margin: 4px 0;'><b>Invoice date:</b> " . date('d M Y', strtotime((string)$invoice['invoice_date'])) . "</p>
+            <p style='margin: 4px 0;'><b>Due date:</b> " . date('d M Y', strtotime((string)$invoice['due_date'])) . "</p>
+            <p style='margin: 4px 0; color: #dc2626;'><b>Amount outstanding:</b> " . htmlspecialchars((string)$cur) . number_format((float)$invoice['balance'], 2) . "</p>
+        </div>
+        {$noteHtml}
+        <p>Please arrange payment as soon as you can, or contact us if there is a problem with the invoice.</p>";
+        $html = self::wrap_template("Payment reminder", $body, $company);
+        return self::send_email($to, $subject, $html);
+    }
+
+    /**
      * Send Payment Receipt Email to Customer
      */
     public static function send_payment_receipt_email($to, $payment, $allocations, $sys_info = []) {

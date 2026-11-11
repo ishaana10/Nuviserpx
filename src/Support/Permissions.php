@@ -578,6 +578,8 @@ final class Permissions
         'reply_ticket'          => ['tickets', 'edit'],
         'save_contract'         => ['contracts', 'save'],
         'generate_contract_invoices' => ['invoices', 'save'],
+        'save_reminder_settings' => ['invoices', 'edit'],
+        'run_payment_reminders' => ['invoices', 'edit'],
         // Settings & configuration (tenant-admin: settings_manage)
         'save_currency'         => ['settings_manage'],
         'delete_currency'       => ['settings_manage'],
@@ -696,6 +698,7 @@ final class Permissions
         'crm'               => 'crm_view',
         'tickets'           => 'tickets_view',
         'contracts'         => 'contracts_view',
+        'payment_reminders' => 'invoices_view',
         // administration
         'user/list'         => 'users_manage',
         'user/manage_user'  => 'users_manage',
