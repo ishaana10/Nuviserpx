@@ -54,7 +54,7 @@ class MigrationRunner
             }
 
             foreach (self::splitStatements($sql) as $statement) {
-                @$this->conn->query($statement);
+                $this->apply($statement);
             }
 
             $stmt = $this->conn->prepare("INSERT INTO `schema_migrations` (`migration`) VALUES (?)");
@@ -63,6 +63,83 @@ class MigrationRunner
                 $stmt->execute();
             }
         }
+
+        $this->repairConditionalColumns($files, $executed);
+    }
+
+    /** Run one statement. `ADD COLUMN IF NOT EXISTS` is MariaDB-only, so it is done with a column check that works everywhere. */
+    private function apply(string $statement): void
+    {
+        $add = self::parseConditionalAddColumn($statement);
+        if ($add === null) {
+            @$this->conn->query($statement);
+            return;
+        }
+        if ($this->columnExists($add['table'], $add['column'])) {
+            return;
+        }
+        if (@$this->conn->query($add['sql']) === false && $add['sqlNoPosition'] !== $add['sql']) {
+            // AFTER names a column that is not there: add it at the end instead.
+            @$this->conn->query($add['sqlNoPosition']);
+        }
+    }
+
+    private function columnExists(string $table, string $column): bool
+    {
+        $q = $this->conn->prepare("SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ? LIMIT 1");
+        if (!$q) {
+            return false;
+        }
+        $q->bind_param('ss', $table, $column);
+        $q->execute();
+        return $q->get_result()->num_rows > 0;
+    }
+
+    /**
+     * Once per database: on MySQL the conditional column additions in migrations that ran earlier were rejected and the
+     * migration was still recorded as done. Apply them again now, skipping any column that already exists.
+     */
+    private function repairConditionalColumns(array $files, array $executed): void
+    {
+        $marker = 'repair_conditional_columns_v1';
+        if (in_array($marker, $executed, true)) {
+            return;
+        }
+        $done = $this->conn->query("SELECT 1 FROM `schema_migrations` WHERE `migration` = '{$marker}'");
+        if ($done && $done->num_rows > 0) {
+            return;
+        }
+        foreach ($files as $file) {
+            $sql = file_get_contents($file);
+            if ($sql === false) {
+                continue;
+            }
+            foreach (self::splitStatements($sql) as $statement) {
+                if (self::parseConditionalAddColumn($statement) !== null) {
+                    $this->apply($statement);
+                }
+            }
+        }
+        $stmt = $this->conn->prepare("INSERT INTO `schema_migrations` (`migration`) VALUES (?)");
+        if ($stmt) {
+            $stmt->bind_param('s', $marker);
+            $stmt->execute();
+        }
+    }
+
+    /**
+     * Pure: for `ALTER TABLE t ADD COLUMN IF NOT EXISTS c ...` return the table, the column, the statement without the
+     * IF NOT EXISTS clause, and the same without an AFTER position. Null for any other statement.
+     */
+    public static function parseConditionalAddColumn(string $statement): ?array
+    {
+        if (!preg_match('/^\s*ALTER\s+TABLE\s+`?([A-Za-z0-9_]+)`?\s+ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS\s+`?([A-Za-z0-9_]+)`?(.*)$/is', $statement, $m)) {
+            return null;
+        }
+        [$all, $table, $column, $rest] = $m;
+        $sql = "ALTER TABLE `{$table}` ADD COLUMN `{$column}`{$rest}";
+        $noPos = preg_replace('/\s+AFTER\s+`?[A-Za-z0-9_]+`?\s*$/i', '', $sql);
+        return ['table' => $table, 'column' => $column, 'sql' => $sql, 'sqlNoPosition' => $noPos];
     }
 
     /**
