@@ -483,6 +483,40 @@ class Master extends DBConnection
         return json_encode(['status' => 'success', 'msg' => $msg, 'dry_run' => $dry, 'counts' => $c, 'rows' => array_slice($res['rows'], 0, 500), 'truncated' => count($res['rows']) > 500, 'unknown' => $res['unknown']]);
     }
 
+    public function create_stock_count()
+    {
+        return $this->container->make(\App\Services\StockTakeService::class)->create(
+            (int)($_POST['warehouse_id'] ?? 0),
+            (string)($_POST['count_date'] ?? ''),
+            (string)($_POST['scope'] ?? 'stocked'),
+            (string)($_POST['notes'] ?? '')
+        );
+    }
+
+    public function save_stock_counts()
+    {
+        $counts = isset($_POST['counted']) && is_array($_POST['counted']) ? $_POST['counted'] : [];
+        return $this->container->make(\App\Services\StockTakeService::class)->saveCounts((int)($_POST['id'] ?? 0), $counts);
+    }
+
+    public function post_stock_count()
+    {
+        $svc = $this->container->make(\App\Services\StockTakeService::class);
+        $id = (int)($_POST['id'] ?? 0);
+        if (isset($_POST['counted']) && is_array($_POST['counted'])) {
+            $saved = json_decode($svc->saveCounts($id, $_POST['counted']), true);
+            if (($saved['status'] ?? '') !== 'success') {
+                return json_encode($saved);
+            }
+        }
+        return $svc->post($id);
+    }
+
+    public function cancel_stock_count()
+    {
+        return $this->container->make(\App\Services\StockTakeService::class)->cancel((int)($_POST['id'] ?? 0));
+    }
+
     public function import_parties() { return $this->import_csv('parties'); }
     public function import_products() { return $this->import_csv('products'); }
     public function import_accounts() { return $this->import_csv('accounts'); }
@@ -2740,6 +2774,18 @@ switch ($action) {
         break;
     case 'run_payment_reminders':
         echo $Master->run_payment_reminders();
+        break;
+    case 'create_stock_count':
+        echo $Master->create_stock_count();
+        break;
+    case 'save_stock_counts':
+        echo $Master->save_stock_counts();
+        break;
+    case 'post_stock_count':
+        echo $Master->post_stock_count();
+        break;
+    case 'cancel_stock_count':
+        echo $Master->cancel_stock_count();
         break;
     case 'import_parties':
         echo $Master->import_parties();
