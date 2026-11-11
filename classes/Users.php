@@ -274,7 +274,10 @@ Class Users extends DBConnection {
 		return json_encode($resp);
 	}
 	public function save_client(){
-		extract($_POST);
+		$oldpassword = $_POST['oldpassword'] ?? null;
+		$id = $_POST['id'] ?? null;
+		$email = $_POST['email'] ?? null;
+		$password = $_POST['password'] ?? null;
 		$data = '';
 		if(isset($oldpassword)){
 			$curr_pass = $this->settings->userdata('password');
