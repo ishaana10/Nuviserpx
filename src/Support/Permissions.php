@@ -578,6 +578,9 @@ final class Permissions
         'reply_ticket'          => ['tickets', 'edit'],
         'save_contract'         => ['contracts', 'save'],
         'generate_contract_invoices' => ['invoices', 'save'],
+        'import_parties'        => ['settings_manage'],
+        'import_products'       => ['settings_manage'],
+        'import_accounts'       => ['settings_manage'],
         'save_reminder_settings' => ['invoices', 'edit'],
         'run_payment_reminders' => ['invoices', 'edit'],
         // Settings & configuration (tenant-admin: settings_manage)

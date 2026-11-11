@@ -596,6 +596,12 @@ if($t_qry && $t_qry->num_rows > 0){
                                         </a>
                                     </li>
                                     <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=settings/data_import" class="nav-link nav-settings_data_import tree-item">
+                                            <i class="nav-icon fas fa-file-import"></i>
+                                            <p>Import Data (CSV)</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=settings/currencies" class="nav-link nav-settings_currencies tree-item">
                                             <i class="nav-icon fas fa-coins"></i>
                                             <p>Currencies & Rates</p>
