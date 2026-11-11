@@ -62,7 +62,11 @@
 				                  <div class="dropdown-menu" role="menu">
 				                    <a class="dropdown-item" href="./?page=purchases/manage_bill&id=<?php echo $row['id'] ?>"><span class="fa fa-edit text-primary"></span> View / Edit</a>
 				                    <div class="dropdown-divider"></div>
+				                    <?php if (!in_array($row['status'], ['draft', 'cancelled'], true)): ?>
+				                    <a class="dropdown-item cancel_data" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>"><span class="fa fa-ban text-warning"></span> Cancel bill</a>
+				                    <?php else: ?>
 				                    <a class="dropdown-item delete_data" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>"><span class="fa fa-trash text-danger"></span> Delete</a>
+				                    <?php endif; ?>
 				                  </div>
 							</td>
 						</tr>
@@ -75,10 +79,25 @@
 <script>
 	$(document).ready(function(){
 		$('.delete_data').click(function(){
-			_conf("Delete this vendor bill? Its journal posting will be reversed.","delete_vendor_bill",[$(this).attr('data-id')])
+			_conf("Delete this vendor bill?","delete_vendor_bill",[$(this).attr('data-id')])
+		})
+		$('.cancel_data').click(function(){
+			_conf("Cancel this vendor bill? Its ledger entry will be reversed and nothing will be owed on it. The bill stays on record.","cancel_vendor_bill",[$(this).attr('data-id')])
 		})
 		$('#list').dataTable({ columnDefs: [{ orderable: false, targets: [8] }], order: [0, 'asc'] });
 	})
+	function cancel_vendor_bill($id){
+		start_loader();
+		$.ajax({
+			url:_base_url_+"classes/Master.php?f=cancel_vendor_bill",
+			method:"POST", data:{id: $id}, dataType:"json",
+			error:err=>{ console.log(err); alert_toast("An error occurred.",'error'); end_loader(); },
+			success:function(resp){
+				if(typeof resp== 'object' && resp.status == 'success'){ location.reload(); }
+				else{ alert_toast(resp.msg || "An error occurred.",'error'); end_loader(); }
+			}
+		})
+	}
 	function delete_vendor_bill($id){
 		start_loader();
 		$.ajax({

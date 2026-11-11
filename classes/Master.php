@@ -1755,6 +1755,11 @@ class Master extends DBConnection
         return $this->container->make(\App\Services\BillPaymentService::class)->void(intval($_POST['id'] ?? 0));
     }
 
+    public function cancel_vendor_bill()
+    {
+        return $this->container->make(PurchaseService::class)->cancelVendorBill(intval($_POST['id'] ?? 0));
+    }
+
     public function delete_vendor_bill()
     {
         return $this->container->make(PurchaseService::class)->deleteVendorBill(intval($_POST['id'] ?? 0));
@@ -2535,6 +2540,9 @@ switch ($action) {
         break;
     case 'void_bill_payment':
         echo $Master->void_bill_payment();
+        break;
+    case 'cancel_vendor_bill':
+        echo $Master->cancel_vendor_bill();
         break;
     case 'delete_vendor_bill':
         echo $Master->delete_vendor_bill();

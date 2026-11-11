@@ -386,21 +386,31 @@ class PurchaseService
         $vendor = $v->fetch_assoc();
 
         // Preserve paid_amount on edit; recompute balance + status.
+        // Set explicitly: extract($post) above would otherwise let a posted field of the same name stand in for these.
         $paid_amount = 0.0;
+        $credited_amount = 0.0;
+        $oldStatus = '';
         if (!empty($id)) {
-            $cur = $this->conn->query("SELECT paid_amount, credited_amount FROM `vendor_bill_list` WHERE id = '{$id}'");
+            $cur = $this->conn->query("SELECT paid_amount, credited_amount, status FROM `vendor_bill_list` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'");
             if ($cur && $cur->num_rows) {
                 $row = $cur->fetch_assoc();
                 $paid_amount = (float)$row['paid_amount'];
                 $credited_amount = (float)$row['credited_amount'];
+                $oldStatus = (string)$row['status'];
             }
         }
-        $credited_amount = $credited_amount ?? 0.0;
+        if (!empty($id) && $oldStatus === 'cancelled') {
+            return json_encode(['status' => 'failed', 'msg' => 'This bill is cancelled and cannot be changed. Enter a new bill if it needs redoing.']);
+        }
+        $isCancelling = !empty($id) && $status === 'cancelled';
+        if ($isCancelling && ($problem = self::cancelProblem($paid_amount, $credited_amount))) {
+            return json_encode(['status' => 'failed', 'msg' => $problem]);
+        }
         if (!empty($id) && $status !== 'cancelled' && $status !== 'draft' && $total + 0.005 < $paid_amount + $credited_amount) {
             return json_encode(['status' => 'failed', 'msg' => 'This bill has already had ' . number_format($paid_amount + $credited_amount, 2) . ' paid or credited, so its total cannot be lowered below that. Void the payment first.']);
         }
         // Debit notes count towards settling the bill just as payments do.
-        $balance = CreditNoteService::outstanding($total, $paid_amount, $credited_amount);
+        $balance = $status === 'cancelled' ? 0.0 : CreditNoteService::outstanding($total, $paid_amount, $credited_amount);
         if ($status !== 'cancelled' && $status !== 'draft') {
             if ($paid_amount + $credited_amount >= $total && $total > 0) {
                 $status = 'paid';
@@ -486,7 +496,16 @@ class PurchaseService
         } else {
             $existing = $this->conn->query("SELECT journal_id FROM `vendor_bill_list` WHERE id = '{$id}'")->fetch_assoc();
             $journal_id = $existing['journal_id'] ?? null;
-            if ($journal_id) {
+            if ($isCancelling && $journal_id) {
+                // Cancelling keeps the bill and its journal as the record and undoes the ledger effect with a reversal.
+                $js = $this->conn->query("SELECT status FROM `journal_entries` WHERE id = '{$journal_id}' AND tenant_id = '{$tenant_id}'")->fetch_assoc()['status'] ?? '';
+                if ($js === 'posted') {
+                    $rev = json_decode((new JournalService($this->conn, $this->settings))->reverseJournal((int)$journal_id, date('Y-m-d'), true), true);
+                    if (($rev['status'] ?? '') !== 'success') {
+                        return json_encode(['status' => 'failed', 'msg' => 'The bill could not be cancelled: ' . ($rev['msg'] ?? 'its journal could not be reversed.')]);
+                    }
+                }
+            } elseif ($journal_id) {
                 $trail = new JournalTrail($this->conn, $this->settings);
                 $trailBefore = $trail->snapshot((int)$journal_id);
                 $this->conn->query("UPDATE `journal_entries` SET `description` = '{$description}', `journal_date` = '{$journal_date}' WHERE id = '{$journal_id}'");
@@ -518,7 +537,7 @@ class PurchaseService
         }
 
         // The bill's journal follows its approval state: held out of the ledger until approved.
-        if ($save && !empty($journal_id) && ($pendingApproval || $status !== 'draft')) {
+        if ($save && !empty($journal_id) && $status !== 'cancelled' && ($pendingApproval || $status !== 'draft')) {
             $jstatus = $pendingApproval ? ApprovalService::PENDING : 'posted';
             $this->conn->query("UPDATE `journal_entries` SET `status` = '{$jstatus}' WHERE id = '{$journal_id}' AND tenant_id = '{$tenant_id}'");
         }
@@ -560,7 +579,7 @@ class PurchaseService
         }
 
         $this->settings->set_flashdata('success', empty($id) ? ' Vendor bill created successfully.' : ' Vendor bill updated successfully.');
-        $this->settings->log_audit(empty($id) ? 'Created Vendor Bill' : 'Updated Vendor Bill', 'Purchasing', "Bill {$bill_no} for {$vendorName}, total {$total}.");
+        $this->settings->log_audit(empty($id) ? 'Created Vendor Bill' : ($isCancelling ? 'Cancelled Vendor Bill' : 'Updated Vendor Bill'), 'Purchasing', "Bill {$bill_no} for {$vendorName}, total {$total}" . ($isCancelling ? ', ledger entry reversed.' : '.'));
         $this->emit(
             empty($id) ? \App\Support\IntegrationEvents::VENDOR_BILL_CREATED : \App\Support\IntegrationEvents::VENDOR_BILL_UPDATED,
             [
@@ -584,13 +603,73 @@ class PurchaseService
         ]);
     }
 
+    /** Pure: why a bill cannot be cancelled, or null. A bill with payments or debit notes must have those undone first. */
+    public static function cancelProblem(float $paid, float $credited): ?string
+    {
+        if (($paid + $credited) > 0.004) {
+            return 'This bill has payments or debit notes against it, so it cannot be cancelled. Void those first.';
+        }
+        return null;
+    }
+
+    /** Pure: why a bill cannot be deleted, or null. Only a draft or an already-cancelled bill can go. */
+    public static function deleteProblem(string $status, float $paid, float $credited): ?string
+    {
+        if (($paid + $credited) > 0.004) {
+            return 'This bill has payments or debit notes against it, so it cannot be deleted. Void those first.';
+        }
+        if (!in_array($status, ['draft', 'cancelled'], true)) {
+            return 'A posted bill cannot be deleted. Cancel it first, which reverses it in the ledger, then delete the cancelled bill if you need to.';
+        }
+        return null;
+    }
+
+    /** Cancel a posted bill: reverse its journal and mark it cancelled with nothing owing. Nothing is erased. */
+    public function cancelVendorBill(int $id): string
+    {
+        $tenant_id = (int)$this->settings->active_tenant_id();
+        $q = $this->conn->query("SELECT bill_no, journal_id, status, total, paid_amount, credited_amount FROM `vendor_bill_list` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'");
+        $b = $q ? $q->fetch_assoc() : null;
+        if (!$b) {
+            return json_encode(['status' => 'failed', 'msg' => 'Vendor bill not found.']);
+        }
+        if ($b['status'] === 'cancelled') {
+            return json_encode(['status' => 'success', 'msg' => ' Bill is already cancelled.']);
+        }
+        if ($problem = self::cancelProblem((float)$b['paid_amount'], (float)$b['credited_amount'])) {
+            return json_encode(['status' => 'failed', 'msg' => $problem]);
+        }
+        if ($lockMsg = \App\Services\PeriodLockService::guardDocument($this->conn, $tenant_id, null, 'vendor_bill_list', $id)) {
+            return json_encode(['status' => 'failed', 'msg' => $lockMsg]);
+        }
+        $reversed = false;
+        if (!empty($b['journal_id'])) {
+            $js = $this->conn->query("SELECT status FROM `journal_entries` WHERE id = '{$b['journal_id']}' AND tenant_id = '{$tenant_id}'")->fetch_assoc()['status'] ?? '';
+            if ($js === 'posted') {
+                $rev = json_decode((new JournalService($this->conn, $this->settings))->reverseJournal((int)$b['journal_id'], date('Y-m-d'), true), true);
+                if (($rev['status'] ?? '') !== 'success') {
+                    return json_encode(['status' => 'failed', 'msg' => 'The bill could not be cancelled: ' . ($rev['msg'] ?? 'its journal could not be reversed.')]);
+                }
+                $reversed = true;
+            }
+        }
+        $old = $this->conn->real_escape_string((string)$b['status']);
+        $ok = $this->conn->query("UPDATE `vendor_bill_list` SET `status` = 'cancelled', `balance` = 0 WHERE id = '{$id}' AND tenant_id = '{$tenant_id}' AND `status` = '{$old}'");
+        if (!$ok || $this->conn->affected_rows !== 1) {
+            return json_encode(['status' => 'failed', 'msg' => 'The bill changed while it was being cancelled. Reload and check it.']);
+        }
+        $this->settings->log_audit('Cancelled Vendor Bill', 'Purchasing', "Bill {$b['bill_no']} (#{$id}), total {$b['total']}" . ($reversed ? ', ledger entry reversed.' : '.'));
+        $this->settings->set_flashdata('success', ' Vendor bill cancelled and its ledger entry reversed.');
+        return json_encode(['status' => 'success', 'msg' => ' Vendor bill cancelled.']);
+    }
+
     public function deleteVendorBill(int $id): string
     {
         $tenant_id = $this->settings->active_tenant_id();
         if ($lockMsg = \App\Services\PeriodLockService::guardDocument($this->conn, (int)$tenant_id, null, 'vendor_bill_list', $id)) {
             return json_encode(['status' => 'failed', 'msg' => $lockMsg]);
         }
-        $bill = $this->conn->query("SELECT bill_no, journal_id FROM `vendor_bill_list` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'");
+        $bill = $this->conn->query("SELECT bill_no, journal_id, status, paid_amount, credited_amount FROM `vendor_bill_list` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'");
         if (!$bill || $bill->num_rows == 0) {
             return json_encode(['status' => 'failed', 'msg' => 'Vendor bill not found.']);
         }
@@ -599,13 +678,18 @@ class PurchaseService
         if ($pay && $pay->num_rows > 0) {
             return json_encode(['status' => 'failed', 'msg' => 'This bill has payments against it. Void the payments before deleting the bill.']);
         }
-        if (!empty($b['journal_id'])) {
-            $this->conn->query("DELETE FROM `journal_entries` WHERE id = '{$b['journal_id']}'");
+        if ($problem = self::deleteProblem((string)$b['status'], (float)$b['paid_amount'], (float)$b['credited_amount'])) {
+            return json_encode(['status' => 'failed', 'msg' => $problem]);
+        }
+        // Only a draft can get here still holding a journal row, and a draft never reached the ledger. A cancelled
+        // bill keeps its journal and the reversal made when it was cancelled, as the record.
+        if ($b['status'] === 'draft' && !empty($b['journal_id'])) {
+            $this->conn->query("DELETE FROM `journal_entries` WHERE id = '{$b['journal_id']}' AND tenant_id = '{$tenant_id}' AND status <> 'posted'");
         }
         $del = $this->conn->query("DELETE FROM `vendor_bill_list` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'");
         if ($del) {
             $this->settings->set_flashdata('success', ' Vendor bill deleted successfully.');
-            $this->settings->log_audit('Deleted Vendor Bill', 'Purchasing', "Deleted bill " . ($b['bill_no'] ?? "#{$id}") . " (#{$id})" . (!empty($b['journal_id']) ? ", its journal #{$b['journal_id']} was removed" : '') . '.');
+            $this->settings->log_audit('Deleted Vendor Bill', 'Purchasing', "Deleted bill " . ($b['bill_no'] ?? "#{$id}") . " (#{$id})" . ($b['status'] === 'draft' ? ', a draft' : ', cancelled, its ledger entries kept') . '.');
             $this->emit(\App\Support\IntegrationEvents::VENDOR_BILL_DELETED, [
                 'vendor_bill_id' => (int)$id,
                 'bill_no'        => $b['bill_no'] ?? '',
