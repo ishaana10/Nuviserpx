@@ -440,6 +440,18 @@ class Master extends DBConnection
     }
 
     /* Dolibarr Inspired Contract Methods */
+    public function generate_contract_invoices()
+    {
+        $id = intval($_POST['id'] ?? 0);
+        $res = $this->container->make(\App\Services\ContractBillingService::class)->run(date('Y-m-d'), $id > 0 ? $id : null);
+        $made = count($res['made']);
+        $msg = $made ? "{$made} invoice(s) raised." : 'Nothing is due to be billed.';
+        if ($res['problems']) {
+            $msg .= ' ' . implode(' ', array_map(fn($p) => "{$p[0]}: {$p[1]}", $res['problems']));
+        }
+        return json_encode(['status' => $res['problems'] && !$made ? 'failed' : 'success', 'msg' => $msg, 'made' => $res['made']]);
+    }
+
     public function save_contract()
     {
         $tenant_id = $this->settings->active_tenant_id();
@@ -462,6 +474,8 @@ class Master extends DBConnection
             $data .= ", `end_date` = " . (!empty($end_date) ? "'{$this->conn->real_escape_string($end_date)}'" : "NULL") . " ";
             $data .= ", `status` = '{$this->conn->real_escape_string($status ?? 'active')}' ";
             $data .= ", `notes` = '{$this->conn->real_escape_string($notes ?? '')}' ";
+            $data .= ", `tax_rate` = '" . max(0, min(100, floatval($tax_rate ?? 0))) . "' ";
+            $data .= ", `tax_type` = '" . (in_array($tax_type ?? '', ['exclusive', 'inclusive'], true) ? $tax_type : 'exclusive') . "' ";
 
             $save = $this->conn->query("INSERT INTO `contracts` SET {$data}");
             if ($save) {
@@ -478,6 +492,8 @@ class Master extends DBConnection
             $data .= ", `end_date` = " . (!empty($end_date) ? "'{$this->conn->real_escape_string($end_date)}'" : "NULL") . " ";
             $data .= ", `status` = '{$this->conn->real_escape_string($status ?? 'active')}' ";
             $data .= ", `notes` = '{$this->conn->real_escape_string($notes ?? '')}' ";
+            $data .= ", `tax_rate` = '" . max(0, min(100, floatval($tax_rate ?? 0))) . "' ";
+            $data .= ", `tax_type` = '" . (in_array($tax_type ?? '', ['exclusive', 'inclusive'], true) ? $tax_type : 'exclusive') . "' ";
 
             $save = $this->conn->query("UPDATE `contracts` SET {$data} WHERE id = '{$target_id}' AND tenant_id = '{$tenant_id}'");
             if ($save) {
@@ -2663,6 +2679,9 @@ switch ($action) {
         break;
     case 'save_contract':
         echo $Master->save_contract();
+        break;
+    case 'generate_contract_invoices':
+        echo $Master->generate_contract_invoices();
         break;
     case 'save_warehouse':
         echo $Master->save_warehouse();
