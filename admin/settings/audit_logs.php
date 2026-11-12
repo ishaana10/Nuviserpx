@@ -23,6 +23,25 @@ $qry = $conn->query("
     ORDER BY al.id DESC
     LIMIT 200
 ");
+if($qry === false){
+    // The table is missing or has an older shape: repair it and read again.
+    $_settings->ensure_audit_schema();
+    $qry = $conn->query("
+        SELECT al.*, u.username, u.firstname, u.lastname, t.name as tenant_name
+        FROM `audit_logs` al
+        LEFT JOIN `users` u ON al.user_id = u.id
+        LEFT JOIN `tenants` t ON al.tenant_id = t.id
+        {$where}
+        ORDER BY al.id DESC
+        LIMIT 200
+    ");
+}
+$qry_error = $qry === false ? $conn->error : '';
+
+// Module filter choices come from what has actually been logged.
+$modules = [];
+$mq = $conn->query("SELECT DISTINCT `module` FROM `audit_logs` WHERE (tenant_id = '{$tenant_id}' OR tenant_id = 0 OR tenant_id IS NULL) ORDER BY `module`");
+if($mq){ while($m = $mq->fetch_assoc()){ if($m['module'] !== '') $modules[] = $m['module']; } }
 ?>
 
 <div class="card card-outline card-primary shadow-sm rounded-0">
@@ -41,12 +60,9 @@ $qry = $conn->query("
                     <label class="font-weight-bold text-xs text-uppercase text-muted">Module Filter</label>
                     <select name="module" class="form-control form-control-sm rounded-0">
                         <option value="all">All Modules</option>
-                        <option value="invoices" <?= $module == 'invoices' ? 'selected' : '' ?>>Invoices</option>
-                        <option value="journals" <?= $module == 'journals' ? 'selected' : '' ?>>Journals</option>
-                        <option value="assets" <?= $module == 'assets' ? 'selected' : '' ?>>Fixed Assets</option>
-                        <option value="payments" <?= $module == 'payments' ? 'selected' : '' ?>>Payments</option>
-                        <option value="users" <?= $module == 'users' ? 'selected' : '' ?>>Users & Access</option>
-                        <option value="settings" <?= $module == 'settings' ? 'selected' : '' ?>>System Settings</option>
+                        <?php foreach($modules as $m): ?>
+                        <option value="<?= htmlspecialchars($m) ?>" <?= $module == $m ? 'selected' : '' ?>><?= htmlspecialchars($m) ?></option>
+                        <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="col-md-3 form-group mb-md-0">
@@ -102,8 +118,12 @@ $qry = $conn->query("
                     </tr>
                     <?php
                         endwhile;
-                    else:
+                    elseif(!empty($qry_error)):
                     ?>
+                    <tr>
+                        <td colspan="8" class="text-center py-4 text-danger">The audit log could not be read: <?= htmlspecialchars($qry_error) ?></td>
+                    </tr>
+                    <?php else: ?>
                     <tr>
                         <td colspan="8" class="text-center py-4 text-muted">No audit logs found matching the selected filter criteria.</td>
                     </tr>

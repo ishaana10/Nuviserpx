@@ -220,6 +220,7 @@ class PaymentService
         $resp = ['status' => 'success', 'id' => (int)$payId];
         $resp['msg'] = empty($id) ? " Payment Receipt created and allocated successfully." : " Payment details updated successfully.";
         $this->settings->set_flashdata('success', $resp['msg']);
+        $this->settings->log_audit(empty($id) ? 'Recorded receipt' : 'Updated receipt', 'Payments', "{$payment_no}: " . number_format((float)$amount, 2) . ".");
         return json_encode($resp);
     }
 
