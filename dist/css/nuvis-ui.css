@@ -576,8 +576,14 @@ button.nv-stat.active { border-color: var(--nv-primary); box-shadow: 0 0 0 3px v
 .nv-filter-clear:hover { color: var(--nv-primary); }
 
 /* Status pills: soft tinted badges with a leading dot */
-table.nv-table .badge { position: relative; border-radius: 999px; font-size: .72rem; font-weight: 700; letter-spacing: .03em; padding: .32em .75em .32em 1.55em; }
-table.nv-table .badge::before { content: ''; position: absolute; left: .65em; top: 50%; transform: translateY(-50%); width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: .85; }
+table.nv-table .badge { display: inline-flex; align-items: center; vertical-align: middle; gap: .45em; border-radius: 999px; font-size: .72rem; font-weight: 700 !important; letter-spacing: .03em; padding: .32em .7em !important; }
+table.nv-table .badge::before { content: ''; width: 7px; height: 7px; flex: 0 0 7px; border-radius: 50%; background: currentColor; opacity: .85; }
+
+/* Column alignment, applied by nuvis-ui.js: numbers right under a
+   right-aligned heading, the index column centred. */
+table.nv-table th.nv-num, table.nv-table td.nv-num { text-align: right; }
+table.nv-table td.nv-num { font-variant-numeric: tabular-nums; }
+table.nv-table th.nv-idx, table.nv-table td.nv-idx { text-align: center; }
 table.nv-table .badge.badge-success { background: #ecfdf3 !important; color: #15803d !important; }
 table.nv-table .badge.badge-danger { background: #fef2f2 !important; color: #b91c1c !important; }
 table.nv-table .badge.badge-warning { background: #fffbeb !important; color: #b45309 !important; }
