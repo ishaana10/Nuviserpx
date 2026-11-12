@@ -2,53 +2,73 @@
 <!DOCTYPE html>
 <html lang="en">
 <?php require_once('inc/header.php') ?>
-<body class="hold-transition login-page bg-dark">
+<body class="hold-transition login-page">
   <script>start_loader()</script>
   <style>
     body {
-      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%) !important;
+      background: linear-gradient(160deg, #f8fafc 0%, #eef4ff 55%, #e5efff 100%) !important;
       font-family: 'Inter', -apple-system, sans-serif !important;
-      height: 100vh;
+      min-height: 100vh;
       display: flex;
       align-items: center;
       justify-content: center;
       margin: 0;
+      position: relative;
     }
+    /* soft blue glows behind the card */
+    body::before, body::after {
+      content: ''; position: fixed; border-radius: 50%; filter: blur(90px); opacity: .35; pointer-events: none;
+    }
+    body::before { width: 420px; height: 420px; background: #bfdbfe; top: -120px; right: -100px; }
+    body::after { width: 360px; height: 360px; background: #c7d2fe; bottom: -120px; left: -80px; }
     .login-box-custom {
-      width: 420px;
-      max-width: 90%;
+      width: 430px;
+      max-width: 92%;
+      position: relative;
+      z-index: 1;
     }
     .login-card-custom {
-      background: rgba(30, 41, 59, 0.7);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
       border-radius: 1rem;
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+      box-shadow: 0 20px 45px -18px rgba(15, 23, 42, 0.18), 0 2px 8px rgba(15, 23, 42, 0.05);
       overflow: hidden;
-      color: #f8fafc;
+      color: #0f172a;
     }
     .brand-logo-custom {
-      width: 80px;
-      height: 80px;
+      width: 76px;
+      height: 76px;
       object-fit: contain;
       background: #ffffff;
       padding: 6px;
       border-radius: 50%;
-      box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3);
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 8px 18px -8px rgba(15, 23, 42, 0.25);
     }
+    .view-title { color: #0f172a; }
     .form-control-custom {
-      background: rgba(15, 23, 42, 0.6) !important;
-      border: 1px solid rgba(255, 255, 255, 0.15) !important;
-      color: #ffffff !important;
+      background: #f8fafc !important;
+      border: 1px solid #e2e8f0 !important;
+      color: #0f172a !important;
       border-radius: 0.5rem !important;
-      padding: 0.75rem 1rem !important;
+      padding: 0.72rem 1rem !important;
       height: auto !important;
     }
+    .form-control-custom::placeholder { color: #94a3b8; }
     .form-control-custom:focus {
+      background: #ffffff !important;
       border-color: #3b82f6 !important;
-      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25) !important;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18) !important;
     }
+    .btn-eye {
+      border: 1px solid #e2e8f0 !important;
+      border-left: 0 !important;
+      background: #f8fafc !important;
+      color: #94a3b8 !important;
+      border-radius: 0 .5rem .5rem 0 !important;
+    }
+    .btn-eye:hover { color: #2563eb !important; }
+    .input-group .form-control-custom.has-eye { border-radius: .5rem 0 0 .5rem !important; border-right: 0 !important; }
     .btn-custom {
       background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
       border: none !important;
@@ -60,19 +80,28 @@
     }
     .btn-custom:hover {
       transform: translateY(-1px);
-      box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.4) !important;
+      box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.35) !important;
     }
     .text-muted-custom {
-      color: #94a3b8 !important;
+      color: #64748b !important;
     }
     .link-custom {
-      color: #60a5fa !important;
+      color: #2563eb !important;
       text-decoration: none;
       transition: color 0.2s;
     }
     .link-custom:hover {
-      color: #93c5fd !important;
+      color: #1d4ed8 !important;
       text-decoration: underline;
+    }
+    .nv-login-version {
+      position: fixed;
+      right: 14px;
+      bottom: 10px;
+      z-index: 1;
+      font-size: .72rem;
+      color: #94a3b8;
+      font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
     }
   </style>
 
@@ -80,7 +109,7 @@
     <div class="login-card-custom p-4">
       <div class="text-center mb-4">
         <img src="<?= validate_image($_settings->info('logo')) ?>" alt="Logo" class="brand-logo-custom mb-3">
-        <h3 class="font-weight-bold mb-1" style="color: #ffffff;"><?php echo $_settings->info('name') ?></h3>
+        <h3 class="font-weight-bold mb-1 view-title"><?php echo $_settings->info('name') ?></h3>
         <p class="text-muted-custom small mb-0">Enterprise Resource Planning Portal</p>
       </div>
 
@@ -96,7 +125,10 @@
           <div class="form-group mb-3">
             <label class="small text-muted-custom mb-1">Password</label>
             <div class="input-group">
-              <input type="password" class="form-control form-control-custom" name="password" placeholder="Enter your password" required>
+              <input type="password" class="form-control form-control-custom has-eye" name="password" placeholder="Enter your password" required>
+              <div class="input-group-append">
+                <button type="button" class="btn btn-eye" tabindex="-1" aria-label="Show password"><i class="far fa-eye"></i></button>
+              </div>
             </div>
           </div>
           <div class="d-flex justify-content-between align-items-center mb-4">
@@ -108,7 +140,7 @@
 
       <!-- Forgot Password View -->
       <div id="forgot-view" style="display: none;">
-        <h5 class="text-white font-weight-bold mb-2">Reset Password</h5>
+        <h5 class="view-title font-weight-bold mb-2">Reset Password</h5>
         <p class="text-muted-custom small mb-3">Enter your registered email address or username to receive a 6-digit OTP verification code.</p>
         <form id="forgot-frm" action="" method="post">
           <div class="form-group mb-3">
@@ -124,7 +156,7 @@
 
       <!-- OTP Reset Password View -->
       <div id="otp-view" style="display: none;">
-        <h5 class="text-white font-weight-bold mb-2">Enter OTP & New Password</h5>
+        <h5 class="view-title font-weight-bold mb-2">Enter OTP & New Password</h5>
         <p class="text-muted-custom small mb-3">Check your inbox for the 6-digit OTP code.</p>
         <form id="otp-frm" action="" method="post">
           <input type="hidden" name="email" id="otp_email" value="">
@@ -143,11 +175,15 @@
         </form>
       </div>
 
-      <div class="text-center border-top border-secondary pt-3 mt-3">
+      <div class="text-center border-top pt-3 mt-3">
         <small class="text-muted-custom">&copy; <?php echo date('Y') ?> Nuvis ERPX &bull; A Property of <a href="https://nuvistechnologies.com.fj/ERPX" target="_blank" class="link-custom">Nuvis Technologies</a></small>
       </div>
 
     </div>
+  </div>
+
+  <div class="nv-login-version" title="<?= htmlspecialchars(\App\Support\AppVersion::get('full')) ?>">
+    v<?= htmlspecialchars(\App\Support\AppVersion::get('version')) ?> &middot; build <?= htmlspecialchars(\App\Support\AppVersion::get('build')) ?>
   </div>
 
 <script src="plugins/jquery/jquery.min.js"></script>
@@ -156,6 +192,14 @@
 <script>
   $(document).ready(function(){
     end_loader();
+
+    $('.btn-eye').click(function(){
+      var inp = $(this).closest('.input-group').find('input');
+      var show = inp.attr('type') === 'password';
+      inp.attr('type', show ? 'text' : 'password');
+      $(this).attr('aria-label', show ? 'Hide password' : 'Show password')
+             .find('i').attr('class', show ? 'far fa-eye-slash' : 'far fa-eye');
+    });
 
     $('#btn-forgot-toggle').click(function(){
       $('#login-view').slideUp();
