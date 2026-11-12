@@ -51,7 +51,7 @@ $sections = [
     ]],
     ['Activity', 'fas fa-history', null, [
         ['settings/audit_logs', 'Audit Log', 'fas fa-history', 'Who changed what, and when.'],
-        ['settings/login_activity', 'Login Activity', 'fas fa-user-shield', 'Sign-ins, failed attempts and sources.'],
+        ['settings/audit_logs', 'Audit Trail', 'fas fa-user-shield', 'Every logged action, with sign-ins under the Authentication module.'],
     ]],
 ];
 $is_admin = $_settings->userdata('type') == 1;

@@ -50,6 +50,10 @@ class DBConnection{
             // MySQL's default sql_mode rejects queries MariaDB accepts (ONLY_FULL_GROUP_BY): relax just that.
             if ($this->conn && !$this->conn->connect_error) {
                 \App\Database\SqlMode::apply($this->conn);
+                // Database timestamps (current_timestamp()) follow the app's
+                // timezone, not the database server's, so logs and documents
+                // carry local time wherever the server is hosted.
+                @$this->conn->query("SET time_zone = '" . date('P') . "'");
             }
 
             // Auto-install schema if system_info table is missing
