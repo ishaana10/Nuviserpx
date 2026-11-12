@@ -73,7 +73,7 @@ Newest first. Each item names the pull request it shipped in.
 Clone or place the project files into your web server's root directory (e.g. `/var/www/html/nuvis-erpx` or `C:/xampp/htdocs/nuvis-erpx`).
 
 ```bash
-git clone https://github.com/ishaana10/Nuvis-payrollx.git nuvis-erpx
+git clone https://github.com/ishaana10/nuviserpx.git nuvis-erpx
 cd nuvis-erpx
 ```
 
@@ -172,12 +172,14 @@ Each prints `PASS`/`FAIL` per check and exits non-zero on failure. They cover ca
 
 ---
 
-## Default Login Credentials
+## Logging In
 
 Access the administrator portal at: `http://localhost/nuvis-erpx/admin/`
 
-- **Username:** `admin`
-- **Password:** `admin123`
+There are no default credentials: the Super Administrator username and
+password are chosen during installation (minimum 8 characters with letters
+and numbers). If an old installation still uses a short or well-known
+password, change it under *Access & Users* now.
 
 ---
 

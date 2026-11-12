@@ -272,7 +272,7 @@ $app_url = $protocol . $host . preg_replace('/\/install\/?.*$/', '/', $uri);
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Administrator Password</label>
-                            <input type="password" name="admin_password" class="form-control" placeholder="Enter secure password" minlength="6" required>
+                            <input type="password" name="admin_password" class="form-control" placeholder="8+ characters, letters and numbers" minlength="8" required>
                         </div>
                     </div>
                 </div>
