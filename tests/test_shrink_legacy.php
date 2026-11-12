@@ -50,7 +50,7 @@ check('Master is under 75 KB (was 132 KB)', strlen($ms) < 76800);
 
 // Tranche 3: dispatch whitelist instead of a 600-line switch, nav split by section.
 check('action switch replaced by a whitelist dispatch', strpos($ms, '$allowed_actions = [') !== false && strpos($ms, "switch (\$action)") === false && preg_match_all("/'([a-z0-9_]+)',/", substr($ms, strpos($ms, '$allowed_actions')), $aa) >= 200);
-check('backup_db still streams without echo', (bool)preg_match('/if \(\$action === 'backup_db'\) \{\s*\$Master->backup_db\(\);/', $ms));
+check('backup_db still streams without echo', (bool)preg_match('/if \(\$action === \x27backup_db\x27\) \{\s*\$Master->backup_db\(\);/', $ms));
 $navdir = $root . '/admin/inc/menus';
 $sections = glob($navdir . '/*.php');
 check('navigation split into 11 section files', count($sections) === 11);
