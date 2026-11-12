@@ -155,6 +155,12 @@ if($t_qry && $t_qry->num_rows > 0){
                                         </a>
                                     </li>
                                     <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=purchases/wht_report" class="nav-link nav-purchases_wht_report tree-item">
+                                            <i class="nav-icon fas fa-percent"></i>
+                                            <p>Withholding Tax</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=batches" class="nav-link nav-batches tree-item">
                                             <i class="nav-icon fas fa-hourglass-half"></i>
                                             <p>Batches &amp; Expiry</p>
