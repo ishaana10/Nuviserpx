@@ -69,6 +69,7 @@ while ($qry && ($row = $qry->fetch_assoc())) {
     <div class="card-header d-flex align-items-center justify-content-between">
         <h3 class="card-title font-weight-bold"><i class="fas fa-handshake text-primary mr-2"></i> Sales Pipeline</h3>
         <div class="card-tools">
+            <a href="./?page=crm/contacts" class="btn btn-sm btn-outline-secondary btn-flat mr-1"><i class="fas fa-address-book"></i> Contacts</a>
             <a href="./?page=reports/sales_pipeline" class="btn btn-sm btn-outline-secondary btn-flat mr-1"><i class="fas fa-chart-bar"></i> Pipeline Report</a>
             <button type="button" class="btn btn-sm btn-primary btn-flat" id="btn_new_opportunity"><i class="fas fa-plus mr-1"></i> New Opportunity</button>
         </div>
@@ -161,8 +162,46 @@ while ($qry && ($row = $qry->fetch_assoc())) {
     </div>
 </div>
 
+
+<?php $srcRows = $svc->sourceReport(); $lostRows = $svc->lostReasonReport(); ?>
+<div class="row mt-3">
+    <div class="col-md-7">
+        <div class="card card-outline card-info"><div class="card-header"><h3 class="card-title">Deals by lead source</h3></div>
+            <div class="card-body p-0"><table class="table table-sm mb-0"><thead><tr><th>Source</th><th class="text-right">Deals</th><th class="text-right">Won</th><th class="text-right">Lost</th><th class="text-right">Win rate</th><th class="text-right">Value won</th></tr></thead><tbody>
+            <?php foreach ($srcRows as $r): ?><tr><td><?= htmlspecialchars($r['label']) ?></td><td class="text-right"><?= $r['deals'] ?></td><td class="text-right"><?= $r['won'] ?></td><td class="text-right"><?= $r['lost'] ?></td><td class="text-right"><?= $r['win_rate'] === null ? '-' : $r['win_rate'] . '%' ?></td><td class="text-right"><?= number_format($r['won_value'], 2) ?></td></tr><?php endforeach; if (!$srcRows): ?><tr><td colspan="6" class="text-center text-muted">No deals yet.</td></tr><?php endif; ?>
+            </tbody></table></div></div>
+    </div>
+    <div class="col-md-5">
+        <div class="card card-outline card-danger"><div class="card-header"><h3 class="card-title">Why deals are lost</h3></div>
+            <div class="card-body p-0"><table class="table table-sm mb-0"><thead><tr><th>Reason</th><th class="text-right">Deals</th><th class="text-right">Value</th></tr></thead><tbody>
+            <?php foreach ($lostRows as $r): ?><tr><td><?= htmlspecialchars($r['label']) ?></td><td class="text-right"><?= $r['deals'] ?></td><td class="text-right"><?= number_format($r['value'], 2) ?></td></tr><?php endforeach; if (!$lostRows): ?><tr><td colspan="3" class="text-center text-muted">No lost deals.</td></tr><?php endif; ?>
+            </tbody></table></div></div>
+    </div>
+</div>
+
+<div class="modal fade" id="lost_modal" tabindex="-1"><div class="modal-dialog modal-sm"><div class="modal-content">
+    <div class="modal-header py-2"><h6 class="modal-title">Mark deal as lost</h6><button type="button" class="close" data-dismiss="modal">&times;</button></div>
+    <div class="modal-body">
+        <input type="hidden" id="lost_deal_id">
+        <label class="text-sm">Why was it lost?</label>
+        <select id="lost_deal_reason" class="form-control form-control-sm">
+            <option value="">Choose a reason...</option>
+            <?php foreach (CrmService::LOST_REASONS as $k => $lbl): ?><option value="<?= $k ?>"><?= htmlspecialchars($lbl) ?></option><?php endforeach; ?>
+        </select>
+    </div>
+    <div class="modal-footer py-2"><button type="button" class="btn btn-sm btn-default" data-dismiss="modal">Cancel</button><button type="button" class="btn btn-sm btn-danger" id="lost_confirm">Mark lost</button></div>
+</div></div></div>
+
 <script>
 $(document).ready(function(){
+    $('#lost_confirm').click(function(){
+        var reason = $('#lost_deal_reason').val();
+        if (!reason) { alert_toast('Choose why the deal was lost.', 'warning'); return; }
+        start_loader();
+        $.post(_base_url_+'classes/Master.php?f=move_opportunity_stage', { id: $('#lost_deal_id').val(), stage: 'lost', lost_reason: reason }, null, 'json')
+            .fail(function(){ alert_toast('Could not move the deal.', 'error'); end_loader(); })
+            .done(function(r){ if (r.status === 'success') { location.reload(); } else { alert_toast(r.msg || 'Could not move the deal.', 'error'); end_loader(); } });
+    });
     $('#btn_new_opportunity').click(function(){
         uni_modal("New Opportunity Deal", "crm/manage_opportunity.php", "mid-large");
     });
@@ -185,6 +224,7 @@ $(document).ready(function(){
         var newStage = $(this).data('stage');
         var id = dragId;
         if (!id) return;
+        if (newStage === 'lost') { $('#lost_deal_id').val(id); $('#lost_deal_reason').val(''); $('#lost_modal').modal('show'); return; }
         var $card = $('.opp-card[data-id="'+id+'"]');
         // optimistic move
         $(this).find('.crm-dropzone').append($card);

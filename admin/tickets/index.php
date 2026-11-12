@@ -8,6 +8,10 @@ if(!empty($status) && $status != 'all'){
     $where .= " AND t.status = '{$conn->real_escape_string($status)}'";
 }
 
+$slaSvc = new \App\Services\TicketSlaService($conn, $_settings);
+$slaPolicies = $slaSvc->policies();
+$slaBreaches = $slaSvc->breachCount();
+$slaBadge = ['met' => ['success', 'Met'], 'met_late' => ['secondary', 'Met late'], 'on_track' => ['info', 'On track'], 'at_risk' => ['warning', 'At risk'], 'breached' => ['danger', 'Breached']];
 $qry = $conn->query("
     SELECT t.*, p.name as party_name, u.username as assigned_user
     FROM `tickets` t
@@ -22,6 +26,7 @@ $qry = $conn->query("
     <div class="card-header d-flex align-items-center justify-content-between">
         <h3 class="card-title font-weight-bold"><i class="fas fa-headset text-primary mr-2"></i> Helpdesk & Support Tickets</h3>
         <div class="card-tools">
+            <?php if ($_settings->can_access('settings_manage')): ?><a href="./?page=tickets/sla" class="btn btn-sm btn-outline-secondary btn-flat mr-1"><i class="fas fa-stopwatch"></i> Service targets</a><?php endif; ?>
             <button type="button" class="btn btn-sm btn-primary btn-flat" id="btn_new_ticket" onclick="uni_modal('Create Support Ticket', 'tickets/manage_ticket.php', 'mid-large')"><i class="fas fa-plus mr-1"></i> New Ticket</button>
         </div>
     </div>
@@ -55,6 +60,7 @@ $qry = $conn->query("
                         <th>Customer / Contact</th>
                         <th>Priority</th>
                         <th>Assigned To</th>
+                        <th>Service target</th>
                         <th class="text-center">Status</th>
                         <th class="text-center" style="width: 10%;">Action</th>
                     </tr>
@@ -81,6 +87,11 @@ $qry = $conn->query("
                             <?php endif; ?>
                         </td>
                         <td class="align-middle"><?= htmlspecialchars($row['assigned_user'] ?: 'Unassigned') ?></td>
+                        <?php $ev = $slaSvc->evaluateRow($row, $slaPolicies); ?>
+                        <td class="align-middle text-xs">
+                            <span class="badge badge-<?= $slaBadge[$ev['response']['state']][0] ?>" title="First reply due <?= date('d M H:i', $ev['response']['due']) ?>">Reply: <?= $slaBadge[$ev['response']['state']][1] ?></span>
+                            <span class="badge badge-<?= $slaBadge[$ev['resolve']['state']][0] ?>" title="Resolution due <?= date('d M H:i', $ev['resolve']['due']) ?>">Fix: <?= $slaBadge[$ev['resolve']['state']][1] ?><?= !empty($ev['resolve']['paused']) ? ' (paused)' : '' ?></span>
+                        </td>
                         <td class="text-center align-middle">
                             <span class="badge badge-<?= $row['status'] == 'resolved' || $row['status'] == 'closed' ? 'success' : ($row['status'] == 'in_progress' ? 'primary' : 'warning') ?> px-2 py-1">
                                 <?= strtoupper(str_replace('_', ' ', $row['status'])) ?>
@@ -93,7 +104,7 @@ $qry = $conn->query("
                     <?php endwhile; ?>
                     <?php if($qry->num_rows <= 0): ?>
                     <tr>
-                        <td colspan="8" class="text-center py-4 text-muted">No support tickets found.</td>
+                        <td colspan="9" class="text-center py-4 text-muted">No support tickets found.</td>
                     </tr>
                     <?php endif; ?>
                 </tbody>

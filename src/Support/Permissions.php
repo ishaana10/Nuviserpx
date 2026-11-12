@@ -578,12 +578,15 @@ final class Permissions
         'move_opportunity_stage'=> ['crm', 'edit'],
         'convert_opportunity'   => ['crm', 'edit'],
         'save_crm_activity'     => ['crm', 'save'],
+        'save_crm_contact'      => ['crm', 'save'],
+        'delete_crm_contact'    => ['crm', 'delete'],
         'toggle_crm_activity'   => ['crm', 'edit'],
         'delete_crm_activity'   => ['crm', 'delete'],
         // 'save_proposal_signature' is a customer-portal action — see PUBLIC_ACTIONS.
         // Tickets / contracts
         'save_ticket'           => ['tickets', 'save'],
         'reply_ticket'          => ['tickets', 'edit'],
+        'save_sla_policies'     => ['settings_manage'],
         'save_contract'         => ['contracts', 'save'],
         'generate_contract_invoices' => ['invoices', 'save'],
         'import_parties'        => ['settings_manage'],
