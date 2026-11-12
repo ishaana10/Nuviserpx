@@ -29,7 +29,7 @@ check('only open quotes can be declined or extended', Q::openProblem(['type' => 
 $svc = file_get_contents(base_app . 'src/Services/QuotationService.php');
 check('revise supersedes with a guarded update inside a transaction', str_contains($svc, "begin_transaction") && str_contains($svc, "status NOT IN ('superseded'") && str_contains($svc, 'affected_rows !== 1'));
 check('revise copies the lines', str_contains($svc, 'INSERT INTO sales_order_items'));
-$m = file_get_contents(base_app . 'classes/Master.php');
+$m = (file_get_contents(base_app . 'classes/Master.php') . file_get_contents(base_app . 'src/Services/SalesOrderService.php'));
 check('confirming runs the accept check', str_contains($m, 'QuotationService::acceptProblem($order'));
 check('saving a confirmed quote runs the accept check', str_contains($m, "acceptProblem(['status' => 'proforma'"));
 check('superseded/declined orders are not edited in place', str_contains($m, "['superseded', 'declined', 'converted_to_invoice']"));
@@ -37,7 +37,7 @@ check('portal signing takes the company from the quote, not the request', str_co
 check('portal signing refuses expired/superseded quotes', substr_count($m, 'QuotationService::acceptProblem') >= 3);
 $p = file_get_contents(base_app . 'src/Support/Permissions.php');
 check('revise, decline, extend need sales order edit', substr_count($p, "['sales_orders', 'edit']") >= 4 && str_contains($p, "'revise_quote'"));
-$db = file_get_contents(base_app . 'classes/DBConnection.php');
+$db = file_get_contents(base_app . 'src/Database/LegacySchemaCatchup.php');
 check('migration chained and widens type/status', str_contains($db, '$this->check_quotation_migrations();') && str_contains($db, "'superseded','declined'") && str_contains($db, "'proforma','quote','sales_order'"));
 check('sql migration exists', is_file(base_app . 'database/migrations/015_quotation_versions_expiry.sql'));
 

@@ -28,7 +28,7 @@ check('issuing an invoice runs the credit check (not drafts or cancels)', str_co
 check('the invoice being edited is left out of what is owed', str_contains($inv, '(int)$id, !empty($post[\'credit_override\'])'));
 $ps = file_get_contents(base_app . 'src/Services/PartyService.php');
 check('the party save stores limit and terms', str_contains($ps, '`credit_limit` = {$limitSql}') && substr_count($ps, 'payment_terms_days') >= 3);
-check('migration chained', str_contains(file_get_contents(base_app . 'classes/DBConnection.php'), '$this->check_credit_control_migrations();'));
+check('migration chained', str_contains(file_get_contents(base_app . 'src/Database/LegacySchemaCatchup.php'), '$this->check_credit_control_migrations();'));
 check('override needs settings permission', str_contains(file_get_contents(base_app . 'src/Services/CreditControlService.php'), "can_access('settings_manage')"));
 check('sql migration exists', is_file(base_app . 'database/migrations/014_credit_limits_terms.sql'));
 

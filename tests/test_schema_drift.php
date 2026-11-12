@@ -1,8 +1,8 @@
 <?php
-// Every table and column that classes/DBConnection.php creates on start-up must also be in the migrations or the
+// Every table and column that src/Database/LegacySchemaCatchup.php creates on start-up must also be in the migrations or the
 // base schema, so a database built from the SQL files matches one the application built for itself.
 $root = dirname(__DIR__);
-$db   = file_get_contents("$root/classes/DBConnection.php");
+$db   = file_get_contents("$root/src/Database/LegacySchemaCatchup.php");
 $base = file_get_contents("$root/database/nuviserpx.sql");
 $mig  = '';
 foreach (glob("$root/database/migrations/*.sql") as $f) { $mig .= file_get_contents($f) . "\n"; }

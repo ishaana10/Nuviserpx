@@ -43,7 +43,7 @@ check('a plain line is qty x price plus tax', abs($l['amount'] - 34.5) < 1e-9 &&
 $inv = file_get_contents(base_app . 'src/Services/InvoiceService.php');
 check('saving checks the posted totals against the lines', str_contains($inv, 'computeTotals($rows') && str_contains($inv, 'do not match its lines'));
 check('the line discount is stored', str_contains($inv, '`discount_pct` ='));
-$db = file_get_contents(base_app . 'classes/DBConnection.php');
+$db = file_get_contents(base_app . 'src/Database/LegacySchemaCatchup.php');
 check('pricing migration chained', str_contains($db, '$this->check_pricing_migrations();') && str_contains($db, 'price_list_items') && str_contains($db, 'discount_pct'));
 $perm = file_get_contents(base_app . 'src/Support/Permissions.php');
 check('managing price lists needs settings_manage', str_contains($perm, "'save_price_list' => ['settings_manage']") && str_contains($perm, "\$page === 'price_lists'"));

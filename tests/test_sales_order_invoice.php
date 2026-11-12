@@ -3,7 +3,7 @@ define('base_app', dirname(__DIR__) . '/');
 $fail = 0;
 function check($n, $c) { global $fail; echo ($c ? 'PASS' : 'FAIL') . " - $n\n"; if (!$c) $fail++; }
 
-$m = file_get_contents(base_app . 'classes/Master.php');
+$m = file_get_contents(base_app . 'src/Services/SalesOrderService.php');
 $a = strpos($m, 'public function confirm_sales_order_internal');
 $b = strpos($m, 'public function confirm_sales_order()');
 $fn = substr($m, $a, $b - $a);

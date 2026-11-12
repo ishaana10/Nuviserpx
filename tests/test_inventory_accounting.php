@@ -66,7 +66,7 @@ $inv = file_get_contents(base_app . 'src/Services/InvoiceService.php');
 check('invoice save issues stock and checks availability first', str_contains($inv, 'checkAvailable($need, $returning)') && str_contains($inv, '->issue($need,') && strpos($inv, 'checkAvailable') < strpos($inv, 'INSERT INTO `journal_entries`'));
 check('invoice lines keep the product and the cost', str_contains($inv, '`product_id` = " . ($i_pid > 0') && str_contains($inv, '`unit_cost` = "'));
 check('invoice delete takes the stock back before deleting', strpos($inv, '->restore($held[\'items\']') < strpos($inv, 'DELETE FROM `invoice_list`'));
-$master = file_get_contents(base_app . 'classes/Master.php');
+$master = (file_get_contents(base_app . 'classes/Master.php') . file_get_contents(base_app . 'src/Services/SalesOrderService.php'));
 check('sales order confirmation uses the service and guards the period', str_contains($master, 'InventoryAccountingService::class') && str_contains($master, 'PeriodLockService::guard($this->conn, (int)$tenant_id, (string)$order[\'order_date\'])'));
 check('invoiced orders cannot be deleted out from under their cost of sales', str_contains($master, 'This order has been invoiced and its stock issued'));
 check('settings action is permissioned', str_contains(file_get_contents(base_app . 'src/Support/Permissions.php'), "'save_inventory_accounting' => ['settings_manage']"));

@@ -43,7 +43,7 @@ check($l[0] === [20, T::DEBIT, 450.50] && $l[1] === [10, T::CREDIT, 450.50], 'de
 echo "\n=== Wiring ===\n";
 check(Permissions::forAction('pay_vendor_bills') === 'purchases_edit', 'paying needs purchases edit');
 check(Permissions::forAction('void_bill_payment') === 'purchases_delete', 'voiding needs purchases delete');
-check(strpos(file_get_contents(__DIR__ . '/../classes/DBConnection.php'), 'check_bill_payment_migrations();') !== false, 'the migration is in the chain');
+check(strpos(file_get_contents(__DIR__ . '/../src/Database/LegacySchemaCatchup.php'), 'check_bill_payment_migrations();') !== false, 'the migration is in the chain');
 check(strpos(file_get_contents(__DIR__ . '/../src/Services/PurchaseService.php'), 'bill_payment_allocations') !== false, 'a bill with payments cannot be deleted');
 echo "\n=== Approval ===\n";
 use App\Services\ApprovalService as A;
@@ -57,5 +57,5 @@ foreach (['approve_bill_payment', 'reject_bill_payment'] as $a) { check(Permissi
 check(in_array('bill_payments_approve', Permissions::keys(), true), 'bill_payments_approve is a grantable permission');
 $svc = file_get_contents(__DIR__ . '/../src/Services/BillPaymentService.php');
 check(strpos($svc, "p.status = 'pending_approval'") !== false, 'money promised in a pending payment is held back from the bill');
-check(strpos(file_get_contents(__DIR__ . '/../classes/DBConnection.php'), 'check_bill_payment_approval_migrations();') !== false, 'the approval migration is in the chain');
+check(strpos(file_get_contents(__DIR__ . '/../src/Database/LegacySchemaCatchup.php'), 'check_bill_payment_approval_migrations();') !== false, 'the approval migration is in the chain');
 echo "\nAll {$passed} bill payment checks passed.\n";

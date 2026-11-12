@@ -43,7 +43,7 @@ check('lines store product, quantity and cost', str_contains($cn, 'product_id, r
 $ia = file_get_contents(base_app . 'src/Services/InventoryAccountingService.php');
 check('returns come back at the cost they left at', str_contains($ia, "'cost' => \$cur['qty'] > 0") || str_contains($ia, '$cur[\'cost\'] = $cur[\'qty\'] > 0'));
 check('already-returned counts only issued notes', str_contains($ia, "n.status = 'issued'") && str_contains($ia, "n.note_type = 'credit'"));
-$db = file_get_contents(base_app . 'classes/DBConnection.php');
+$db = file_get_contents(base_app . 'src/Database/LegacySchemaCatchup.php');
 check('migration chained and creates the columns', str_contains($db, '$this->check_sales_return_migrations();') && str_contains($db, 'stock_journal_id') && str_contains($db, "'return_qty'"));
 check('manual edits of the stock journal are blocked', str_contains(file_get_contents(base_app . 'src/Services/JournalService.php'), "'credit_note_stock'"));
 check('sql migration exists', is_file(base_app . 'database/migrations/012_sales_returns_restock.sql'));

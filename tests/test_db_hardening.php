@@ -5,7 +5,7 @@ $fail = 0;
 function check($n, $c) { global $fail; echo ($c ? 'PASS' : 'FAIL') . " - $n\n"; if (!$c) $fail++; }
 
 // The class has a constructor that connects; read the pure helper by source instead of instantiating.
-$src = file_get_contents(base_app . 'classes/DBConnection.php');
+$src = file_get_contents(base_app . 'src/Database/LegacySchemaCatchup.php');
 check('integrity migration is chained', str_contains($src, '$this->check_integrity_hardening_migrations();'));
 check('type list helper exists', str_contains($src, 'function account_type_sql_list'));
 

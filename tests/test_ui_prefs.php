@@ -26,7 +26,7 @@ check('auto mode starts light until the browser decides', str_contains(U::htmlAt
 // wiring
 $r = fn($f) => file_get_contents(base_app . $f);
 check('endpoint checks session, csrf and saves through the service', str_contains($r('classes/UiPrefs.php'), 'verify_csrf') && str_contains($r('classes/UiPrefs.php'), '$_SESSION[\'userdata\'][\'id\']') && str_contains($r('classes/UiPrefs.php'), '->save('));
-check('migration file and boot-time check create the table', str_contains($r('database/migrations/017_user_ui_prefs.sql'), 'user_ui_prefs') && str_contains($r('classes/DBConnection.php'), 'check_ui_pref_migrations();'));
+check('migration file and boot-time check create the table', str_contains($r('database/migrations/017_user_ui_prefs.sql'), 'user_ui_prefs') && str_contains($r('src/Database/LegacySchemaCatchup.php'), 'check_ui_pref_migrations();'));
 check('index renders saved attributes on <html>', str_contains($r('admin/index.php'), 'UiPrefsService::htmlAttrs'));
 check('header loads theme css after the others and primes NUVIS_UI', str_contains($r('admin/inc/header.php'), 'nuvis-theme.css') && str_contains($r('admin/inc/header.php'), 'window.NUVIS_UI'));
 check('footer loads the script and the panel', str_contains($r('admin/inc/footer.php'), 'nuvis-theme.js') && str_contains($r('admin/inc/footer.php'), 'personalise.php'));

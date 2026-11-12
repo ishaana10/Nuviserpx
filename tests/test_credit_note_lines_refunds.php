@@ -53,5 +53,5 @@ check(C::canVoidNote(1000, 1000, 500, 200, 100), 'another note still backs the r
 
 echo "\n=== Wiring ===\n";
 foreach (['refund_credit_note', 'void_note_refund'] as $a) { check(Permissions::forAction($a) === 'invoices_view', "$a is gated"); }
-check(strpos(file_get_contents(__DIR__ . '/../classes/DBConnection.php'), 'credit_note_refunds') !== false, 'refunds have a table');
+check(strpos(file_get_contents(__DIR__ . '/../src/Database/LegacySchemaCatchup.php'), 'credit_note_refunds') !== false, 'refunds have a table');
 echo "\nAll {$passed} checks passed.\n";
