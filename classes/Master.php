@@ -117,7 +117,24 @@ class Master extends DBConnection
     {
         $tenant_id = $this->settings->active_tenant_id();
         $user_id = $this->settings->userdata('id');
-        extract($_POST);
+        $asset_name = $_POST['asset_name'] ?? null;
+        $asset_number = $_POST['asset_number'] ?? null;
+        $id = $_POST['id'] ?? null;
+        $purchase_date = $_POST['purchase_date'] ?? null;
+        $purchase_price = $_POST['purchase_price'] ?? null;
+        $asset_type = $_POST['asset_type'] ?? null;
+        $warranty_expiry = $_POST['warranty_expiry'] ?? null;
+        $serial_number = $_POST['serial_number'] ?? null;
+        $description = $_POST['description'] ?? null;
+        $dep_start_date = $_POST['dep_start_date'] ?? null;
+        $dep_method = $_POST['dep_method'] ?? null;
+        $averaging_method = $_POST['averaging_method'] ?? null;
+        $dep_calc_by = $_POST['dep_calc_by'] ?? null;
+        $dep_rate = $_POST['dep_rate'] ?? null;
+        $effective_life_years = $_POST['effective_life_years'] ?? null;
+        $cost_limit = $_POST['cost_limit'] ?? null;
+        $residual_value = $_POST['residual_value'] ?? null;
+        $status = $_POST['status'] ?? null;
 
         if (empty($asset_name) || empty($asset_number)) {
             return json_encode(['status' => 'failed', 'msg' => 'Asset Name and Asset Number are required.']);
@@ -244,7 +261,10 @@ class Master extends DBConnection
     public function save_bank_account()
     {
         $tenant_id = $this->settings->active_tenant_id();
-        extract($_POST);
+        $bank_name = $_POST['bank_name'] ?? null;
+        $account_name = $_POST['account_name'] ?? null;
+        $account_number = $_POST['account_number'] ?? null;
+        $currency = $_POST['currency'] ?? null;
 
         if (empty($bank_name) || empty($account_name)) {
             return json_encode(['status' => 'failed', 'msg' => 'Bank Name and Account Name are required.']);
@@ -326,7 +346,11 @@ class Master extends DBConnection
 
     public function save_proposal_signature()
     {
-        extract($_POST);
+        $tenant_id = $_POST['tenant_id'] ?? null;
+        $sales_order_id = $_POST['sales_order_id'] ?? null;
+        $signer_name = $_POST['signer_name'] ?? null;
+        $signer_email = $_POST['signer_email'] ?? null;
+        $signature_data = $_POST['signature_data'] ?? null;
         $t_id = !empty($tenant_id) ? intval($tenant_id) : $this->settings->active_tenant_id();
         $so_id = intval($sales_order_id ?? 0);
 
@@ -372,7 +396,13 @@ class Master extends DBConnection
     {
         $tenant_id = $this->settings->active_tenant_id();
         $user_id = $this->settings->userdata('id');
-        extract($_POST);
+        $subject = $_POST['subject'] ?? null;
+        $id = $_POST['id'] ?? null;
+        $party_id = $_POST['party_id'] ?? null;
+        $priority = $_POST['priority'] ?? null;
+        $status = $_POST['status'] ?? null;
+        $assigned_to = $_POST['assigned_to'] ?? null;
+        $initial_message = $_POST['initial_message'] ?? null;
 
         if (empty($subject)) {
             return json_encode(['status' => 'failed', 'msg' => 'Ticket Subject is required.']);
@@ -419,7 +449,9 @@ class Master extends DBConnection
     {
         $tenant_id = $this->settings->active_tenant_id();
         $user_id = $this->settings->userdata('id');
-        extract($_POST);
+        $ticket_id = $_POST['ticket_id'] ?? null;
+        $message = $_POST['message'] ?? null;
+        $status = $_POST['status'] ?? null;
 
         $t_id = intval($ticket_id ?? 0);
         if ($t_id <= 0 || empty($message)) {
@@ -561,7 +593,17 @@ class Master extends DBConnection
     public function save_contract()
     {
         $tenant_id = $this->settings->active_tenant_id();
-        extract($_POST);
+        $title = $_POST['title'] ?? null;
+        $party_id = $_POST['party_id'] ?? null;
+        $amount = $_POST['amount'] ?? null;
+        $id = $_POST['id'] ?? null;
+        $billing_frequency = $_POST['billing_frequency'] ?? null;
+        $start_date = $_POST['start_date'] ?? null;
+        $end_date = $_POST['end_date'] ?? null;
+        $status = $_POST['status'] ?? null;
+        $notes = $_POST['notes'] ?? null;
+        $tax_rate = $_POST['tax_rate'] ?? null;
+        $tax_type = $_POST['tax_type'] ?? null;
 
         if (empty($title) || empty($party_id) || empty($amount)) {
             return json_encode(['status' => 'failed', 'msg' => 'Title, Customer, and Amount are required.']);
@@ -613,7 +655,8 @@ class Master extends DBConnection
     public function save_warehouse()
     {
         $tenant_id = $this->settings->active_tenant_id();
-        extract($_POST);
+        $name = $_POST['name'] ?? null;
+        $location = $_POST['location'] ?? null;
 
         if (empty($name)) {
             return json_encode(['status' => 'failed', 'msg' => 'Warehouse Name is required.']);
@@ -727,7 +770,12 @@ class Master extends DBConnection
     public function save_extrafield()
     {
         $tenant_id = $this->settings->active_tenant_id();
-        extract($_POST);
+        $element_type = $_POST['element_type'] ?? null;
+        $field_code = $_POST['field_code'] ?? null;
+        $field_label = $_POST['field_label'] ?? null;
+        $field_type = $_POST['field_type'] ?? null;
+        $field_options = $_POST['field_options'] ?? null;
+        $is_required = $_POST['is_required'] ?? null;
 
         if (empty($element_type) || empty($field_code) || empty($field_label)) {
             return json_encode(['status' => 'failed', 'msg' => 'Target entity, field code, and field label are required.']);
@@ -769,7 +817,12 @@ class Master extends DBConnection
     public function save_currency()
     {
         $tenant_id = $this->settings->active_tenant_id();
-        extract($_POST);
+        $code = $_POST['code'] ?? null;
+        $name = $_POST['name'] ?? null;
+        $symbol = $_POST['symbol'] ?? null;
+        $exchange_rate = $_POST['exchange_rate'] ?? null;
+        $is_default = $_POST['is_default'] ?? null;
+        $id = $_POST['id'] ?? null;
 
         if (empty($code) || empty($name) || empty($symbol)) {
             return json_encode(['status' => 'failed', 'msg' => 'Currency code, name, and symbol are required.']);
@@ -879,7 +932,10 @@ class Master extends DBConnection
     public function save_shift_type()
     {
         $tenant_id = $this->settings->active_tenant_id();
-        extract($_POST);
+        $name = $_POST['name'] ?? null;
+        $start_time = $_POST['start_time'] ?? null;
+        $end_time = $_POST['end_time'] ?? null;
+        $break_duration_mins = $_POST['break_duration_mins'] ?? null;
 
         if (empty($name) || empty($start_time) || empty($end_time)) {
             return json_encode(['status' => 'failed', 'msg' => 'Shift Name, Start Time, and End Time are required.']);
@@ -905,7 +961,10 @@ class Master extends DBConnection
     public function save_shift_assignment()
     {
         $tenant_id = $this->settings->active_tenant_id();
-        extract($_POST);
+        $employee_id = $_POST['employee_id'] ?? null;
+        $shift_type_id = $_POST['shift_type_id'] ?? null;
+        $start_date = $_POST['start_date'] ?? null;
+        $end_date = $_POST['end_date'] ?? null;
 
         $emp_id = intval($employee_id ?? 0);
         $shift_id = intval($shift_type_id ?? 0);
@@ -932,7 +991,12 @@ class Master extends DBConnection
     public function save_salary_component()
     {
         $tenant_id = $this->settings->active_tenant_id();
-        extract($_POST);
+        $code = $_POST['code'] ?? null;
+        $name = $_POST['name'] ?? null;
+        $type = $_POST['type'] ?? null;
+        $is_taxable = $_POST['is_taxable'] ?? null;
+        $is_fnpf_subject = $_POST['is_fnpf_subject'] ?? null;
+        $default_amount = $_POST['default_amount'] ?? null;
 
         if (empty($code) || empty($name)) {
             return json_encode(['status' => 'failed', 'msg' => 'Component Code and Name are required.']);
@@ -1485,7 +1549,25 @@ class Master extends DBConnection
 
     public function save_sales_order()
     {
-        extract($_POST);
+        $id = $_POST['id'] ?? null;
+        $order_no = $_POST['order_no'] ?? null;
+        $party_id = $_POST['party_id'] ?? null;
+        $order_date = $_POST['order_date'] ?? null;
+        $type = $_POST['type'] ?? null;
+        $warehouse_id = $_POST['warehouse_id'] ?? null;
+        $subtotal = $_POST['subtotal'] ?? null;
+        $tax_amount = $_POST['tax_amount'] ?? null;
+        $discount = $_POST['discount'] ?? null;
+        $total = $_POST['total'] ?? null;
+        $notes = $_POST['notes'] ?? null;
+        $status = $_POST['status'] ?? null;
+        $valid_until = $_POST['valid_until'] ?? null;
+        $item_name = $_POST['item_name'] ?? null;
+        $product_id = $_POST['product_id'] ?? null;
+        $item_desc = $_POST['item_desc'] ?? null;
+        $item_qty = $_POST['item_qty'] ?? null;
+        $item_price = $_POST['item_price'] ?? null;
+        $item_tax_rate = $_POST['item_tax_rate'] ?? null;
         $tenant_id = $this->settings->active_tenant_id();
         $user_id = $this->settings->userdata('id');
         $id = !empty($id) ? $this->conn->real_escape_string((string)$id) : '';
@@ -1751,7 +1833,7 @@ class Master extends DBConnection
 
     public function confirm_sales_order()
     {
-        extract($_POST);
+        $id = $_POST['id'] ?? null;
         $id = $this->conn->real_escape_string((string)$id);
         if ($this->confirm_sales_order_internal($id)) {
             $resp['status'] = 'success';
@@ -1766,7 +1848,7 @@ class Master extends DBConnection
 
     public function delete_sales_order()
     {
-        extract($_POST);
+        $id = $_POST['id'] ?? null;
         $id = $this->conn->real_escape_string((string)$id);
         $tenant_id = $this->settings->active_tenant_id();
 

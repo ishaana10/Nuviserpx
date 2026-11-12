@@ -91,7 +91,8 @@ class Login extends DBConnection {
 		}
 	}
 	function client_login(){
-		extract($_POST);
+		$email = $_POST['email'] ?? null;
+		$password = $_POST['password'] ?? null;
 		$stmt = $this->conn->prepare("SELECT *,concat(lastname,', ',firstname,' ',middlename) as fullname from client_list where email = ? LIMIT 1");
 		$stmt->bind_param('s',$email);
 		$stmt->execute();
