@@ -112,6 +112,21 @@ class SequenceService
     {
         $ins = $conn->prepare("INSERT IGNORE INTO document_sequences (tenant_id, seq_key, last_value) VALUES (?, ?, ?)");
         $exists = $conn->prepare("SELECT 1 FROM document_sequences WHERE tenant_id = ? AND seq_key = ?");
+        if ($ins === false || $exists === false) {
+            // The table is missing (an install where the catch-up migration
+            // never ran): create it and prepare again.
+            $conn->query("CREATE TABLE IF NOT EXISTS `document_sequences` (
+                `tenant_id` int(30) NOT NULL,
+                `seq_key` varchar(60) NOT NULL,
+                `last_value` bigint(20) NOT NULL DEFAULT 0,
+                PRIMARY KEY (`tenant_id`, `seq_key`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+            $ins = $conn->prepare("INSERT IGNORE INTO document_sequences (tenant_id, seq_key, last_value) VALUES (?, ?, ?)");
+            $exists = $conn->prepare("SELECT 1 FROM document_sequences WHERE tenant_id = ? AND seq_key = ?");
+            if ($ins === false || $exists === false) {
+                throw new \RuntimeException('The document_sequences table is unavailable: ' . $conn->error);
+            }
+        }
         $exists->bind_param('is', $tenantId, $key);
         $exists->execute();
         if (!$exists->get_result()->num_rows) {
