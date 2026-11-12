@@ -258,7 +258,7 @@ while($ac = $accounts_qry->fetch_assoc()){
                         <tr class="item-row">
                             <td>
                                 <select name="product_id[]" class="form-control form-control-modern product-select mb-1">
-                                    <option value="">-- Custom Item --</option>
+                                    <option value=""></option>
                                     <option value="__new_item__" class="font-weight-bold text-primary">+ Create new item...</option>
                                     <?php foreach($products as $pid => $pr): ?>
                                         <option value="<?php echo $pid ?>" <?php echo (isset($item['product_id']) && $item['product_id'] == $pid) ? 'selected' : '' ?> data-price="<?php echo $pr['selling_price'] ?>" data-desc="<?php echo htmlspecialchars($pr['description']) ?>" data-code="<?php echo htmlspecialchars($pr['product_code']) ?>">
@@ -290,7 +290,7 @@ while($ac = $accounts_qry->fetch_assoc()){
                         <tr class="item-row">
                             <td>
                                 <select name="product_id[]" class="form-control form-control-modern product-select mb-1">
-                                    <option value="">-- Custom Item --</option>
+                                    <option value=""></option>
                                     <option value="__new_item__" class="font-weight-bold text-primary">+ Create new item...</option>
                                     <?php foreach($products as $pid => $pr): ?>
                                         <option value="<?php echo $pid ?>" data-price="<?php echo $pr['selling_price'] ?>" data-desc="<?php echo htmlspecialchars($pr['description']) ?>" data-code="<?php echo htmlspecialchars($pr['product_code']) ?>">
@@ -613,6 +613,40 @@ while($ac = $accounts_qry->fetch_assoc()){
             width: '100%'
         });
 
+        // One combobox per line: search the product list, or type a name to
+        // bill a custom item. A typed name posts a non-numeric product_id,
+        // which save_invoice already stores as a custom line (product_id NULL).
+        // The item_name input stays in the form, hidden and kept in sync.
+        function init_item_select(){
+            $('.product-select').each(function(){
+                var sel = $(this), tr = sel.closest('tr');
+                if(sel.hasClass('select2-hidden-accessible')) return;
+                var name = tr.find('.item-name').val();
+                if(name && !sel.val()){
+                    // A saved custom line has a name but no product: show the name.
+                    sel.append(new Option(name, 'custom:' + name, true, true));
+                }
+                tr.find('.item-name').addClass('d-none').prop('required', false);
+                sel.select2({
+                    width: '100%',
+                    tags: true,
+                    placeholder: 'Search items, or type a custom item...',
+                    createTag: function(p){
+                        var t = $.trim(p.term);
+                        return t ? { id: 'custom:' + t, text: t, nv_custom: true } : null;
+                    },
+                    templateResult: function(d){
+                        if(d.nv_custom){
+                            return $('<span>').append($('<i class="fas fa-plus-circle mr-1 text-primary">'))
+                                .append(document.createTextNode('Add "' + d.text + '" as a custom item'));
+                        }
+                        return d.text;
+                    }
+                });
+            });
+        }
+        init_item_select();
+
         // Toggle Product Selection
         var active_row_for_new_item = null;
 
@@ -660,7 +694,7 @@ while($ac = $accounts_qry->fetch_assoc()){
             var lines = {}, rows = {};
             $('#items-table tbody tr.item-row').each(function(i){
                 var pid = $(this).find('.product-select').val();
-                if(pid && pid !== '__new_item__' && !$(this).find('.price').data('manual')){
+                if(pid && /^\d+$/.test(pid) && !$(this).find('.price').data('manual')){
                     lines[i] = { product_id: pid, qty: parseFloat($(this).find('.qty').val()) || 1 };
                     rows[i] = $(this);
                 }
@@ -720,7 +754,7 @@ while($ac = $accounts_qry->fetch_assoc()){
             var row = `<tr class="item-row">
                 <td>
                     <select name="product_id[]" class="form-control form-control-modern product-select mb-1">
-                        <option value="">-- Custom Item --</option>
+                        <option value=""></option>
                         <?php foreach($products as $pid => $pr): ?>
                             <option value="<?php echo $pid ?>" data-price="<?php echo $pr['selling_price'] ?>" data-desc="<?php echo htmlspecialchars($pr['description']) ?>">
                                 <?php echo htmlspecialchars($pr['name']) ?>
@@ -745,6 +779,7 @@ while($ac = $accounts_qry->fetch_assoc()){
                 <td class="text-center align-middle"><button type="button" class="btn btn-xs btn-outline-danger remove_row"><i class="fas fa-trash"></i></button></td>
             </tr>`;
             $('#items-table tbody').append(row);
+            init_item_select();
         });
 
         // Remove Row
@@ -839,7 +874,7 @@ while($ac = $accounts_qry->fetch_assoc()){
 
                             if (active_row_for_new_item) {
                                 var sel = active_row_for_new_item.find('.product-select');
-                                sel.val(new_id);
+                                sel.val(new_id).trigger('change.select2');
                                 active_row_for_new_item.find('.item-name').val(new_name);
                                 active_row_for_new_item.find('.price').val(new_price);
                                 active_row_for_new_item.find('input[name="item_desc[]"]').val(new_desc);
@@ -856,6 +891,14 @@ while($ac = $accounts_qry->fetch_assoc()){
         // Submit Invoice Form
         $('#invoice-form').submit(function(e){
             e.preventDefault();
+            var missing = false;
+            $('#items-table tbody tr.item-row').each(function(){
+                if(!$.trim($(this).find('.item-name').val())){ missing = true; }
+            });
+            if(missing){
+                alert_toast("Choose an item, or type a name, on every line.", 'warning');
+                return;
+            }
             start_loader();
             $.ajax({
                 url: _base_url_ + "classes/Master.php?f=save_invoice",
