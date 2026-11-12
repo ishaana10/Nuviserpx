@@ -15,6 +15,40 @@
 (function ($, window, document) {
     'use strict';
 
+    /* ------------------------------------------------------------------ *
+     * DataTables cannot initialise a table whose tbody holds a single
+     * cell spanning the width (the server-rendered "No records found"
+     * row): it throws "_DT_CellIndex" and the page's scripts die. Wrap
+     * both entry points, installed at load time so it is in place before
+     * any page's ready handler runs: strip such placeholder rows and
+     * carry their wording over as the table's emptyTable message.
+     * ------------------------------------------------------------------ */
+    $.each(['dataTable', 'DataTable'], function (_, name) {
+        var orig = $.fn[name];
+        if (!orig) { return; }
+        var wrapped = function (opts) {
+            var msg = '';
+            this.each(function () {
+                $(this).find('> tbody > tr').each(function () {
+                    var $tds = $(this).children('td');
+                    if ($tds.length === 1 && parseInt($tds.attr('colspan') || '1', 10) > 1) {
+                        msg = $.trim($tds.text()) || msg;
+                        $(this).remove();
+                    }
+                });
+            });
+            if (msg) {
+                opts = opts || {};
+                opts.language = $.extend({ emptyTable: msg }, opts.language);
+                return orig.call(this, opts);
+            }
+            return orig.apply(this, arguments);
+        };
+        $.extend(wrapped, orig);            // statics: Api, ext, defaults, versionCheck...
+        wrapped.prototype = orig.prototype; // legacy construction paths
+        $.fn[name] = wrapped;
+    });
+
     if (!$) { return; }
 
     var NV = window.NuvisUI = window.NuvisUI || {};
