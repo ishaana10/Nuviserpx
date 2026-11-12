@@ -43,6 +43,34 @@
     <script src="<?php echo base_url ?>plugins/datatables-buttons/js/buttons.html5.min.js"></script>
     <script src="<?php echo base_url ?>plugins/datatables-buttons/js/buttons.print.min.js"></script>
     <script src="<?php echo base_url ?>plugins/datatables-buttons/js/buttons.colVis.min.js"></script>
+    <script>
+    // Browser errors are reported to the server once each and shown under
+    // Developer > Error Logs.
+    (function(){
+        var sent = 0, seen = {};
+        function ship(p){
+            if (sent >= 10 || seen[p.message]) return;
+            seen[p.message] = true; sent++;
+            try { $.post(_base_url_ + 'classes/Master.php?f=log_js_error', p); } catch(e){}
+        }
+        window.addEventListener('error', function(ev){
+            var t = ev && ev.target;
+            if (t && t !== window && t.tagName && (t.tagName === 'SCRIPT' || t.tagName === 'LINK')) {
+                ship({ message: 'Failed to load ' + (t.src || t.href || 'resource'), source: location.pathname + location.search, line: 0, stack: '', page: location.href });
+                return;
+            }
+            if (!ev || ev.message === undefined) return;
+            ship({ message: String(ev.message || 'Script error'), source: String(ev.filename || ''), line: ev.lineno || 0,
+                   stack: ev.error && ev.error.stack ? String(ev.error.stack).slice(0, 3000) : '', page: location.href });
+        }, true);
+        window.addEventListener('unhandledrejection', function(ev){
+            var r = ev && ev.reason;
+            ship({ message: 'Unhandled promise rejection: ' + ((r && r.message) ? r.message : String(r)).slice(0, 500),
+                   source: location.pathname + location.search, line: 0,
+                   stack: (r && r.stack) ? String(r.stack).slice(0, 3000) : '', page: location.href });
+        });
+    })();
+    </script>
     <!-- Nuvis UI layer: table toolbar, form validation, modal behaviour -->
     <script src="<?php echo base_url ?>dist/js/nuvis-ui.js?v=<?php echo class_exists('AppVersion') ? urlencode(AppVersion::get('commit')) : '1.0' ?>"></script>
     <script src="<?php echo base_url ?>plugins/moment/moment.min.js"></script>

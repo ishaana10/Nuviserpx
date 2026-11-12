@@ -11,6 +11,23 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 require_once('initialize.php');
+
+// Server-side PHP errors are kept in logs/php_errors.log and shown under
+// Developer > Error Logs. The folder is blocked from the web (.htaccess).
+$__nv_logs = base_app . 'logs';
+if (!is_dir($__nv_logs)) {
+	@mkdir($__nv_logs, 0775, true);
+	@file_put_contents($__nv_logs . '/.htaccess', "Require all denied\n");
+	@file_put_contents($__nv_logs . '/index.html', '');
+}
+if (is_dir($__nv_logs) && is_writable($__nv_logs)) {
+	ini_set('log_errors', '1');
+	ini_set('error_log', $__nv_logs . '/php_errors.log');
+	if (is_file($__nv_logs . '/php_errors.log') && (filesize($__nv_logs . '/php_errors.log') ?: 0) > 8388608) {
+		@rename($__nv_logs . '/php_errors.log', $__nv_logs . '/php_errors.log.1');
+	}
+}
+
 require_once('classes/DBConnection.php');
 require_once('classes/SystemSettings.php');
 require_once('classes/ModuleManager.php');
