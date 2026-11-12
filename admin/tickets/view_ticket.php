@@ -65,6 +65,24 @@ $messages = $conn->query("
             </div>
         </div>
 
+        <?php
+        $slaSvc = new \App\Services\TicketSlaService($conn, $_settings);
+        $ev = $slaSvc->evaluateRow($ticket);
+        $slaBadge = ['met' => ['success', 'Met'], 'met_late' => ['secondary', 'Met late'], 'on_track' => ['info', 'On track'], 'at_risk' => ['warning', 'At risk'], 'breached' => ['danger', 'Breached']];
+        $clockText = function (array $c) {
+            if ($c['seconds_left'] === null) { return ''; }
+            return $c['seconds_left'] >= 0 ? \App\Services\TicketSlaService::human($c['seconds_left']) . ' left' : \App\Services\TicketSlaService::human($c['seconds_left']) . ' overdue';
+        };
+        ?>
+        <div class="row mb-4">
+            <div class="col-md-6"><small class="text-uppercase text-muted font-weight-bold d-block">First reply target</small>
+                <span class="badge badge-<?= $slaBadge[$ev['response']['state']][0] ?>"><?= $slaBadge[$ev['response']['state']][1] ?></span>
+                <small class="text-muted">due <?= date('d M Y H:i', $ev['response']['due']) ?> <?= htmlspecialchars($clockText($ev['response'])) ?></small></div>
+            <div class="col-md-6"><small class="text-uppercase text-muted font-weight-bold d-block">Resolution target</small>
+                <span class="badge badge-<?= $slaBadge[$ev['resolve']['state']][0] ?>"><?= $slaBadge[$ev['resolve']['state']][1] ?></span>
+                <small class="text-muted">due <?= date('d M Y H:i', $ev['resolve']['due']) ?> <?= htmlspecialchars($clockText($ev['resolve'])) ?><?= !empty($ev['resolve']['paused']) ? ' &middot; paused while waiting on the customer' : '' ?></small></div>
+        </div>
+
         <!-- Conversation Thread -->
         <h5 class="font-weight-bold text-dark border-bottom pb-2 mb-3"><i class="fas fa-comments mr-2 text-primary"></i> Discussion Thread</h5>
 

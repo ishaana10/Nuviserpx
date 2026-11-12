@@ -308,7 +308,17 @@ class Master extends DBConnection
 
     public function move_opportunity_stage()
     {
-        return $this->container->make(CrmService::class)->moveStage(intval($_POST['id'] ?? 0), (string)($_POST['stage'] ?? ''));
+        return $this->container->make(CrmService::class)->moveStage(intval($_POST['id'] ?? 0), (string)($_POST['stage'] ?? ''), (string)($_POST['lost_reason'] ?? ''));
+    }
+
+    public function save_crm_contact()
+    {
+        return $this->container->make(CrmService::class)->saveContact($_POST);
+    }
+
+    public function delete_crm_contact()
+    {
+        return $this->container->make(CrmService::class)->deleteContact(intval($_POST['id'] ?? 0));
     }
 
     public function convert_opportunity()
@@ -437,6 +447,8 @@ class Master extends DBConnection
             $data .= ", `status` = '{$this->conn->real_escape_string($status ?? 'new')}' ";
             $data .= ", `assigned_to` = " . (!empty($assigned_to) ? intval($assigned_to) : "NULL") . " ";
 
+            $newStatus = in_array((string)($status ?? 'new'), ['new', 'in_progress', 'waiting_client', 'resolved', 'closed'], true) ? (string)($status ?? 'new') : 'new';
+            $this->container->make(\App\Services\TicketSlaService::class)->applyStatus($target_id, $newStatus);
             $save = $this->conn->query("UPDATE `tickets` SET {$data} WHERE id = '{$target_id}' AND tenant_id = '{$tenant_id}'");
             if ($save) {
                 return json_encode(['status' => 'success', 'id' => $target_id, 'msg' => 'Ticket updated successfully.']);
@@ -458,11 +470,19 @@ class Master extends DBConnection
             return json_encode(['status' => 'failed', 'msg' => 'Message content is required.']);
         }
 
+        // The ticket has to belong to this company.
+        $own = $this->conn->query("SELECT 1 FROM `tickets` WHERE id = '{$t_id}' AND tenant_id = '{$tenant_id}'");
+        if (!$own || $own->num_rows === 0) {
+            return json_encode(['status' => 'failed', 'msg' => 'Ticket not found.']);
+        }
         $msg = $this->conn->real_escape_string($message);
         $save = $this->conn->query("INSERT INTO `ticket_messages` (`ticket_id`, `user_id`, `message`) VALUES ('{$t_id}', '{$user_id}', '{$msg}')");
 
         if ($save) {
-            if (!empty($status)) {
+            $sla = $this->container->make(\App\Services\TicketSlaService::class);
+            $sla->markFirstResponse($t_id);
+            if (!empty($status) && in_array((string)$status, ['new', 'in_progress', 'waiting_client', 'resolved', 'closed'], true)) {
+                $sla->applyStatus($t_id, (string)$status);
                 $st = $this->conn->real_escape_string($status);
                 $this->conn->query("UPDATE `tickets` SET `status` = '{$st}' WHERE id = '{$t_id}' AND tenant_id = '{$tenant_id}'");
             }
@@ -472,6 +492,11 @@ class Master extends DBConnection
     }
 
     /* Dolibarr Inspired Contract Methods */
+    public function save_sla_policies()
+    {
+        return $this->container->make(\App\Services\TicketSlaService::class)->savePolicies($_POST);
+    }
+
     public function save_reminder_settings()
     {
         return $this->container->make(\App\Services\PaymentReminderService::class)->saveSettings($_POST);
@@ -2849,6 +2874,12 @@ switch ($action) {
     case 'delete_opportunity':
         echo $Master->delete_opportunity();
         break;
+    case 'save_crm_contact':
+        echo $Master->save_crm_contact();
+        break;
+    case 'delete_crm_contact':
+        echo $Master->delete_crm_contact();
+        break;
     case 'move_opportunity_stage':
         echo $Master->move_opportunity_stage();
         break;
@@ -2875,6 +2906,9 @@ switch ($action) {
         break;
     case 'save_contract':
         echo $Master->save_contract();
+        break;
+    case 'save_sla_policies':
+        echo $Master->save_sla_policies();
         break;
     case 'save_reminder_settings':
         echo $Master->save_reminder_settings();

@@ -63,6 +63,37 @@ if($id > 0){
             </div>
         </div>
 
+        <div class="row">
+            <div class="col-md-6 form-group">
+                <label for="lead_source" class="font-weight-bold text-dark text-sm">Lead Source</label>
+                <select name="lead_source" id="lead_source" class="form-control form-control-sm" style="width: 100%;">
+                    <option value="">Not recorded</option>
+                    <?php foreach (\App\Services\CrmService::LEAD_SOURCES as $k => $lbl): ?>
+                        <option value="<?= $k ?>" <?= (isset($lead_source) && $lead_source === $k) ? 'selected' : '' ?>><?= htmlspecialchars($lbl) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="col-md-6 form-group">
+                <label for="contact_id" class="font-weight-bold text-dark text-sm">Contact Person</label>
+                <select name="contact_id" id="contact_id" class="form-control form-control-sm" style="width: 100%;">
+                    <option value="">None</option>
+                    <?php foreach ((new \App\Services\CrmService($conn, $_settings))->contacts() as $ct): ?>
+                        <option value="<?= (int)$ct['id'] ?>" <?= (isset($contact_id) && (int)$contact_id === (int)$ct['id']) ? 'selected' : '' ?>><?= htmlspecialchars($ct['name'] . ($ct['party_name'] ? ' - ' . $ct['party_name'] : '')) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-group mb-3" id="lost_reason_group" style="display:none">
+            <label for="lost_reason" class="font-weight-bold text-danger text-sm">Why was it lost? <span class="text-danger">*</span></label>
+            <select name="lost_reason" id="lost_reason" class="form-control form-control-sm" style="width: 100%;">
+                <option value="">Choose a reason...</option>
+                <?php foreach (\App\Services\CrmService::LOST_REASONS as $k => $lbl): ?>
+                    <option value="<?= $k ?>" <?= (isset($lost_reason) && $lost_reason === $k) ? 'selected' : '' ?>><?= htmlspecialchars($lbl) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+
         <div class="form-group mb-3">
             <label for="notes" class="font-weight-bold text-dark text-sm">Notes & Activity</label>
             <textarea id="notes" name="notes" rows="3" class="form-control form-control-sm rounded-0" placeholder="Add details about client requirements and discussions..."><?= isset($notes) ? htmlspecialchars($notes) : '' ?></textarea>
@@ -72,6 +103,8 @@ if($id > 0){
 
 <script>
 $(document).ready(function(){
+    function toggleLost(){ $('#lost_reason_group').toggle($('#stage').val() === 'lost'); }
+    $('#stage').on('change', toggleLost); toggleLost();
     $('#uni_modal').on('shown.bs.modal', function(){
         $('.select2').select2({
             dropdownParent: $('#uni_modal')
