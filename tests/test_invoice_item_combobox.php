@@ -3,7 +3,7 @@
 // custom item, replacing the stacked select + text input.
 $root = dirname(__DIR__);
 $page = file_get_contents($root . '/admin/invoices/manage_invoice.php');
-$master = file_get_contents($root . '/classes/Master.php');
+$master = file_get_contents($root . '/src/Services/SalesOrderService.php');
 
 $fail = 0;
 function check($n, $c) { global $fail; echo ($c ? 'PASS' : 'FAIL') . " - $n\n"; if (!$c) { $fail++; } }

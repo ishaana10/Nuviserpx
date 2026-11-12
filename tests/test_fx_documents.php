@@ -82,7 +82,7 @@ check(strpos($rs, 'movementAmountSql') !== false && strpos($rs, 'ji.amount_fc') 
 check(strpos($rs, "'untracked_base'") !== false, 'the summary reports untracked balance');
 
 echo "\n=== Plumbing ===\n";
-$m = file_get_contents(__DIR__ . '/../classes/DBConnection.php');
+$m = file_get_contents(__DIR__ . '/../src/Database/LegacySchemaCatchup.php');
 check(strpos($m, 'check_fx_document_migrations();') !== false, 'the migration is in the chain');
 check(strpos(file_get_contents(__DIR__ . '/../src/Services/PaymentService.php'), 'saveForeignReceipt') !== false, 'foreign receipts have their own path');
 check(F::REALISED_ACCOUNT === 'Realised FX Gain/Loss', 'realised gains have their own account');

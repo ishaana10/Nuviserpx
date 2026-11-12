@@ -19,5 +19,5 @@ foreach (['InvoiceService', 'PurchaseService', 'PaymentService', 'PayrollService
     $s = file_get_contents(__DIR__ . "/../src/Services/$svc.php");
     check(strpos($s, 'JournalTrail') !== false && strpos($s, '->record(') !== false, "$svc records journal rewrites");
 }
-check(strpos(file_get_contents(__DIR__ . '/../classes/DBConnection.php'), 'check_journal_trail_migrations();') !== false, 'the migration is in the chain');
+check(strpos(file_get_contents(__DIR__ . '/../src/Database/LegacySchemaCatchup.php'), 'check_journal_trail_migrations();') !== false, 'the migration is in the chain');
 echo "\nAll {$passed} journal trail checks passed.\n";

@@ -37,7 +37,7 @@ check('a count sets the chosen location, not the product total', str_contains($i
 check('adjustment type and warehouse are validated', str_contains($is, "Choose a valid adjustment type.") && str_contains($is, 'That warehouse was not found.'));
 check('a failed adjustment reverses the value it posted', str_contains($is, 'reverseJournal($journalId'));
 
-$master = file_get_contents(base_app . 'classes/Master.php');
+$master = (file_get_contents(base_app . 'classes/Master.php') . file_get_contents(base_app . 'src/Services/SalesOrderService.php'));
 check('units-only sales cannot oversell', str_contains($master, 'shortageMessage(') && str_contains($master, "AND `stock_quantity` >= {\$qty}"));
 
 $inv = file_get_contents(base_app . 'src/Services/InvoiceService.php');

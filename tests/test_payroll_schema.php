@@ -2,7 +2,7 @@
 // Payroll schema must not depend on on-load ALTERs: everything DBConnection adds at runtime has to be in
 // migration 018 (and the payroll_list / employee_list columns in the base schema too).
 $root = dirname(__DIR__);
-$db   = file_get_contents("$root/classes/DBConnection.php");
+$db   = file_get_contents("$root/src/Database/LegacySchemaCatchup.php");
 $mig  = file_get_contents("$root/database/migrations/018_payroll_schema.sql");
 $base = file_get_contents("$root/database/nuviserpx.sql");
 $fail = 0;

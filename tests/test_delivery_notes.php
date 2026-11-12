@@ -46,14 +46,14 @@ $inv = file_get_contents(base_app . 'src/Services/InvoiceService.php');
 check('the invoice does not issue stock for delivered goods', str_contains($inv, "!empty(\$post['stock_by_delivery'])"));
 check('cancel and delete release the deliveries', substr_count($inv, 'releaseInvoice($id)') === 2);
 check('an invoice raised from deliveries cannot be edited', str_contains($inv, 'linkedToInvoice((int)$id)'));
-$m = file_get_contents(base_app . 'classes/Master.php');
+$m = (file_get_contents(base_app . 'classes/Master.php') . file_get_contents(base_app . 'src/Services/SalesOrderService.php'));
 check('immediate confirm refuses delivery orders', str_contains($m, "!empty(\$order['delivery_mode'])"));
 check('orders with deliveries cannot be edited or deleted', substr_count($m, 'hasDeliveries(') === 2);
 $p = file_get_contents(base_app . 'src/Support/Permissions.php');
 check('actions are permissioned', str_contains($p, "'save_delivery_note'") && str_contains($p, "'invoice_delivered'     => ['invoices', 'save']"));
 $ia = file_get_contents(base_app . 'src/Services/InventoryAccountingService.php');
 check('returns can be taken for goods invoiced from deliveries', str_contains($ia, 'delivery_note_items x'));
-$db = file_get_contents(base_app . 'classes/DBConnection.php');
+$db = file_get_contents(base_app . 'src/Database/LegacySchemaCatchup.php');
 check('migration chained', str_contains($db, '$this->check_delivery_migrations();') && str_contains($db, 'delivery_note_items') && str_contains($db, 'delivered_qty'));
 check('sql migration exists', is_file(base_app . 'database/migrations/016_delivery_notes.sql'));
 

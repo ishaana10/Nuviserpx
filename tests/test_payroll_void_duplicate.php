@@ -3,7 +3,7 @@
 $fail = 0;
 function check($n, $c) { global $fail; echo ($c ? 'PASS' : 'FAIL') . " - $n\n"; if (!$c) $fail++; }
 $svc = file_get_contents(__DIR__ . '/../src/Services/PayrollService.php');
-$db  = file_get_contents(__DIR__ . '/../classes/DBConnection.php');
+$db  = file_get_contents(__DIR__ . '/../src/Database/LegacySchemaCatchup.php');
 $ui  = file_get_contents(__DIR__ . '/../admin/payroll/index.php');
 
 $i = strpos($svc, 'public function deletePayroll');

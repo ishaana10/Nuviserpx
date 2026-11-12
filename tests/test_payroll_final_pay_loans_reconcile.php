@@ -106,7 +106,7 @@ check('payroll stores final pay and loan columns', substr_count($svc, '`leave_pa
 check('payroll for a period after leaving is refused', strpos($svc, 'so no pay is due for a period that starts after that') !== false);
 check('batch skips people who left before the period', strpos($svc, "(left ' . \$left") !== false);
 check('loan actions need the pay permission', strpos(file_get_contents(base_app . 'src/Support/Permissions.php'), "'issue_staff_loan'          => ['payroll_pay']") !== false);
-check('payroll columns widened to ledger precision', strpos(file_get_contents(base_app . 'classes/DBConnection.php'), "MODIFY `{\$mc}` decimal(18,4)") !== false);
+check('payroll columns widened to ledger precision', strpos(file_get_contents(base_app . 'src/Database/LegacySchemaCatchup.php'), "MODIFY `{\$mc}` decimal(18,4)") !== false);
 
 echo $fail ? "\n$fail checks FAILED\n" : "\nAll final pay, loan and reconciliation tests passed\n";
 exit($fail ? 1 : 0);
