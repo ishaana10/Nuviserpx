@@ -1,4 +1,10 @@
-<?php require_once('../config.php'); ?>
+<?php
+require_once('../config.php');
+// Buffer the layout: pages that stream a download (CSV exports) can then
+// clear the buffer and set their own headers instead of warning
+// "headers already sent" and corrupting the file.
+ob_start();
+?>
 <?php require_once('inc/ui_prefs.php'); ?>
  <!DOCTYPE html>
 <html lang="en" class="" style="height: auto;" <?php echo \App\Services\UiPrefsService::htmlAttrs($__ui) ?>>

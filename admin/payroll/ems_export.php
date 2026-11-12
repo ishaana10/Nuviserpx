@@ -11,6 +11,7 @@ if(isset($_GET['export_csv']) && $_GET['export_csv'] == 1){
         ORDER BY e.firstname ASC
     ");
 
+    while (ob_get_level()) { ob_end_clean(); }   // drop the buffered layout: this response is the CSV file
     header('Content-Type: text/csv');
     header('Content-Disposition: attachment; filename="frcs_tpos_ems_export_' . strtolower(str_replace(' ', '_', $month)) . '.csv"');
 
