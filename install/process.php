@@ -40,10 +40,11 @@ if (empty($admin_username) || empty($admin_password)) {
     exit;
 }
 
-if (strlen($admin_password) < 6) {
+if (strlen($admin_password) < 8 || strlen($admin_password) > 72
+    || !preg_match('/[A-Za-z]/', $admin_password) || !preg_match('/\d/', $admin_password)) {
     echo json_encode([
         'status' => 'error',
-        'message' => 'Administrator password must be at least 6 characters long.'
+        'message' => 'Administrator password must be 8-72 characters and contain letters and numbers.'
     ]);
     exit;
 }

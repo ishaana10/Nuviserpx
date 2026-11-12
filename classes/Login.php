@@ -63,7 +63,9 @@ class Login extends DBConnection {
 				$throttle->clear('login', $username);
 
 				// Update last_login timestamp
-				$this->conn->query("UPDATE `users` SET `last_login` = NOW() WHERE id = '{$res['id']}'");
+				$ll = $this->conn->prepare("UPDATE `users` SET `last_login` = NOW() WHERE id = ?");
+				$ll->bind_param('i', $res['id']);
+				$ll->execute();
 
 				// Record successful login in audit trail
 				$this->settings->log_audit("User Login", "Authentication", "User '{$res['username']}' logged in successfully.");
@@ -159,7 +161,9 @@ class Login extends DBConnection {
 		$expires_at = date("Y-m-d H:i:s", strtotime("+15 minutes"));
 		$to = $user['username'];
 
-		$this->conn->query("UPDATE `otp_tokens` SET `status` = 1 WHERE `user_id` = '{$user_id}'");
+		$inv = $this->conn->prepare("UPDATE `otp_tokens` SET `status` = 1 WHERE `user_id` = ?");
+		$inv->bind_param('i', $user_id);
+		$inv->execute();
 		$ins = $this->conn->prepare("INSERT INTO `otp_tokens` (`user_id`, `email`, `otp_code`, `expires_at`, `status`) VALUES (?, ?, ?, ?, 0)");
 		$ins->bind_param('isss', $user_id, $to, $otp_hash, $expires_at);
 		if($ins->execute()){
@@ -193,15 +197,19 @@ class Login extends DBConnection {
 		$token = null;
 		if($user){
 			$uid = (int)$user['id'];
-			$tq = $this->conn->query("SELECT id, otp_code, attempts FROM `otp_tokens` WHERE `user_id` = '{$uid}' AND `status` = 0 AND `expires_at` >= NOW() ORDER BY id DESC LIMIT 1");
-			$token = $tq ? $tq->fetch_assoc() : null;
+			$tq = $this->conn->prepare("SELECT id, otp_code, attempts FROM `otp_tokens` WHERE `user_id` = ? AND `status` = 0 AND `expires_at` >= NOW() ORDER BY id DESC LIMIT 1");
+			$tq->bind_param('i', $uid);
+			$tq->execute();
+			$token = $tq->get_result()->fetch_assoc();
 		}
 		if(!$user || !$token || !preg_match('/^\d{6}$/', $otp_code) || !hash_equals((string)$token['otp_code'], hash('sha256', $otp_code))){
 			$throttle->record('otp_verify', $username);
 			if($token){
 				$tid = (int)$token['id'];
 				// Fifth wrong guess: the code is dead and a new one has to be requested.
-				$this->conn->query("UPDATE `otp_tokens` SET `attempts` = `attempts` + 1, `status` = IF(`attempts` >= 5, 1, `status`) WHERE `id` = '{$tid}'");
+				$ta = $this->conn->prepare("UPDATE `otp_tokens` SET `attempts` = `attempts` + 1, `status` = IF(`attempts` >= 5, 1, `status`) WHERE `id` = ?");
+				$ta->bind_param('i', $tid);
+				$ta->execute();
 			}
 			return json_encode($bad);
 		}
@@ -210,7 +218,9 @@ class Login extends DBConnection {
 		$up = $this->conn->prepare("UPDATE `users` SET `password` = ? WHERE `id` = ?");
 		$up->bind_param('si', $new_password, $uid);
 		$up->execute();
-		$this->conn->query("UPDATE `otp_tokens` SET `status` = 1 WHERE `user_id` = '{$uid}'");
+		$done = $this->conn->prepare("UPDATE `otp_tokens` SET `status` = 1 WHERE `user_id` = ?");
+		$done->bind_param('i', $uid);
+		$done->execute();
 		$throttle->clear('otp_verify', $username);
 		$throttle->clear('login', $username);
 		$this->settings->log_audit("Password Reset", "Authentication", "Password reset by emailed code for '" . htmlspecialchars($username) . "'.");

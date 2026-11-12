@@ -1,5 +1,8 @@
 # Local environment file
-# .env
+.env
+
+# Runtime logs (Developer > Error Logs)
+/logs/
 
 # Uploads and temporary files
 uploads/temp/
