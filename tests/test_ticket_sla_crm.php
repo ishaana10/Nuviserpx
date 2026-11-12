@@ -69,7 +69,7 @@ check('contact needs a name', C::cleanContact(['name' => ' '])[1] !== null);
 check('contact email checked', C::cleanContact(['name' => 'A', 'email' => 'nope'])[1] !== null);
 check('blank email allowed', C::cleanContact(['name' => 'A'])[1] === null);
 
-$m = file_get_contents("$root/classes/Master.php");
+$m = file_get_contents("$root/classes/Master.php") . file_get_contents("$root/src/Services/HelpdeskService.php");
 check('replies are limited to the company\'s own tickets', strpos($m, "SELECT 1 FROM `tickets` WHERE id = '{\$t_id}' AND tenant_id = '{\$tenant_id}'") !== false);
 check('status changes run the SLA clocks', substr_count($m, '->applyStatus(') === 2 && strpos($m, '->markFirstResponse(') !== false);
 check('moving to lost passes the reason', strpos($m, "(string)(\$_POST['lost_reason'] ?? '')") !== false);

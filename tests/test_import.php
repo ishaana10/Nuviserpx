@@ -71,7 +71,7 @@ foreach (array_keys(I::ENTITIES) as $k) {
 }
 
 // ---- wiring
-$master = file_get_contents("$root/classes/Master.php");
+$master = file_get_contents("$root/classes/Master.php") . file_get_contents("$root/src/Services/MaintenanceService.php");
 $perm = file_get_contents("$root/src/Support/Permissions.php");
 $svc = file_get_contents("$root/src/Services/ImportService.php");
 foreach (['import_parties', 'import_products', 'import_accounts'] as $f) {
