@@ -766,6 +766,17 @@ class Master extends DBConnection
         return $this->container->make(\App\Services\DeliveryService::class)->invoiceDelivered((int)($_POST['id'] ?? 0));
     }
 
+    public function provision_chart()
+    {
+        $tenant_id = (int)$this->settings->active_tenant_id();
+        $added = \App\Services\ChartProvisioner::fill($this->conn, $tenant_id);
+        if ($added > 0) {
+            $this->settings->log_audit('Provisioned chart accounts', 'Accounts', "Added {$added} standard account(s) the chart was missing.");
+            return json_encode(['status' => 'success', 'msg' => " {$added} standard account(s) added to your chart."]);
+        }
+        return json_encode(['status' => 'success', 'msg' => ' Your chart already has every standard account.']);
+    }
+
     public function save_default_accounts()
     {
         return $this->container->make(\App\Services\AccountDefaultsService::class)->save($_POST);
@@ -1419,7 +1430,7 @@ $allowed_actions = [
     'save_price_list', 'delete_price_list', 'save_price_list_item', 'delete_price_list_item',
     'assign_price_list', 'lookup_prices', 'revise_quote', 'decline_quote',
     'extend_quote', 'confirm_for_delivery', 'save_delivery_note', 'cancel_delivery_note',
-    'invoice_delivered', 'save_default_accounts', 'save_inventory_accounting', 'file_tax_return',
+    'invoice_delivered', 'save_default_accounts', 'provision_chart', 'save_inventory_accounting', 'file_tax_return',
     'void_tax_return', 'save_tax_code', 'delete_tax_code', 'set_period_lock',
     'delete_journal', 'cancel_journal', 'save_employee', 'delete_employee',
     'save_public_holiday', 'delete_public_holiday', 'save_leave_entitlement', 'save_leave_policy',
