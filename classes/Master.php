@@ -113,97 +113,7 @@ class Master extends DBConnection
 
     public function save_asset()
     {
-        $tenant_id = $this->settings->active_tenant_id();
-        $user_id = $this->settings->userdata('id');
-        $asset_name = $_POST['asset_name'] ?? null;
-        $asset_number = $_POST['asset_number'] ?? null;
-        $id = $_POST['id'] ?? null;
-        $purchase_date = $_POST['purchase_date'] ?? null;
-        $purchase_price = $_POST['purchase_price'] ?? null;
-        $asset_type = $_POST['asset_type'] ?? null;
-        $warranty_expiry = $_POST['warranty_expiry'] ?? null;
-        $serial_number = $_POST['serial_number'] ?? null;
-        $description = $_POST['description'] ?? null;
-        $dep_start_date = $_POST['dep_start_date'] ?? null;
-        $dep_method = $_POST['dep_method'] ?? null;
-        $averaging_method = $_POST['averaging_method'] ?? null;
-        $dep_calc_by = $_POST['dep_calc_by'] ?? null;
-        $dep_rate = $_POST['dep_rate'] ?? null;
-        $effective_life_years = $_POST['effective_life_years'] ?? null;
-        $cost_limit = $_POST['cost_limit'] ?? null;
-        $residual_value = $_POST['residual_value'] ?? null;
-        $status = $_POST['status'] ?? null;
-
-        if (empty($asset_name) || empty($asset_number)) {
-            return json_encode(['status' => 'failed', 'msg' => 'Asset Name and Asset Number are required.']);
-        }
-
-        // Check unique asset number within tenant
-        $target_id = !empty($id) ? intval($id) : 0;
-        if ($target_id > 0) {
-            $cur = $this->conn->query("SELECT status FROM `fixed_assets` WHERE id = '{$target_id}' AND tenant_id = '{$tenant_id}'");
-            if ($cur && ($cr = $cur->fetch_assoc()) && $cr['status'] === 'disposed') {
-                return json_encode(['status' => 'failed', 'msg' => 'A disposed asset cannot be changed.']);
-            }
-        }
-        $chk_sql = "SELECT id FROM `fixed_assets` WHERE `tenant_id` = '{$tenant_id}' AND `asset_number` = '{$this->conn->real_escape_string($asset_number)}' ";
-        if ($target_id > 0) {
-            $chk_sql .= " AND id != '{$target_id}' ";
-        }
-        $check = $this->conn->query($chk_sql);
-        if ($check && $check->num_rows > 0) {
-            return json_encode(['status' => 'failed', 'msg' => 'Asset Number already exists for this tenant.']);
-        }
-
-        $data = " `tenant_id` = '{$tenant_id}' ";
-        $data .= ", `asset_number` = '{$this->conn->real_escape_string($asset_number)}' ";
-        $data .= ", `asset_name` = '{$this->conn->real_escape_string($asset_name)}' ";
-        $data .= ", `purchase_date` = " . (!empty($purchase_date) ? "'{$this->conn->real_escape_string($purchase_date)}'" : "NULL") . " ";
-        $data .= ", `purchase_price` = '" . (!empty($purchase_price) ? floatval($purchase_price) : 0.00) . "' ";
-        $data .= ", `asset_type` = '{$this->conn->real_escape_string($asset_type ?? '')}' ";
-        $data .= ", `warranty_expiry` = " . (!empty($warranty_expiry) ? "'{$this->conn->real_escape_string($warranty_expiry)}'" : "NULL") . " ";
-        $data .= ", `serial_number` = '{$this->conn->real_escape_string($serial_number ?? '')}' ";
-        $data .= ", `description` = '{$this->conn->real_escape_string($description ?? '')}' ";
-        $data .= ", `dep_start_date` = " . (!empty($dep_start_date) ? "'{$this->conn->real_escape_string($dep_start_date)}'" : "NULL") . " ";
-        $data .= ", `dep_method` = '{$this->conn->real_escape_string($dep_method ?? '')}' ";
-        $data .= ", `averaging_method` = '{$this->conn->real_escape_string($averaging_method ?? '')}' ";
-        $data .= ", `dep_calc_by` = '{$this->conn->real_escape_string($dep_calc_by ?? 'rate')}' ";
-        $data .= ", `dep_rate` = '" . (!empty($dep_rate) ? floatval($dep_rate) : 0.00) . "' ";
-        $data .= ", `effective_life_years` = '" . (!empty($effective_life_years) ? floatval($effective_life_years) : 0.00) . "' ";
-        $data .= ", `cost_limit` = '" . (!empty($cost_limit) ? floatval($cost_limit) : 0.00) . "' ";
-        $data .= ", `residual_value` = '" . (!empty($residual_value) ? floatval($residual_value) : 0.00) . "' ";
-        $data .= ", `status` = '{$this->conn->real_escape_string($status ?? 'draft')}' ";
-        $data .= ", `created_by` = '{$user_id}' ";
-
-        if (isset($_FILES['attachment']) && $_FILES['attachment']['tmp_name'] != '') {
-            $ext = strtolower(pathinfo($_FILES['attachment']['name'], PATHINFO_EXTENSION));
-            $allowed_exts = ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'zip', 'txt'];
-            if (!in_array($ext, $allowed_exts)) {
-                return json_encode(['status' => 'failed', 'msg' => 'Invalid file attachment format. Allowed types: PDF, Images, Documents, Spreadsheets.']);
-            }
-            $fname = 'uploads/assets/asset_' . $tenant_id . '_' . time() . '.' . $ext;
-            $dir_path = base_app . 'uploads/assets';
-            if (!is_dir($dir_path)) {
-                mkdir($dir_path, 0777, true);
-            }
-            if (move_uploaded_file($_FILES['attachment']['tmp_name'], base_app . $fname)) {
-                $data .= ", `attachment_path` = '{$fname}' ";
-            }
-        }
-
-        if ($target_id <= 0) {
-            $save = $this->conn->query("INSERT INTO `fixed_assets` SET {$data}");
-            $asset_id = $this->conn->insert_id;
-        } else {
-            $save = $this->conn->query("UPDATE `fixed_assets` SET {$data} WHERE id = '{$target_id}' AND tenant_id = '{$tenant_id}'");
-            $asset_id = $target_id;
-        }
-
-        if ($save) {
-            $this->settings->log_audit(empty($id) ? "Created Asset" : "Updated Asset", "Fixed Assets", "Asset #{$asset_number}: {$asset_name}");
-            return json_encode(['status' => 'success', 'id' => $asset_id, 'msg' => 'Fixed asset saved successfully.']);
-        }
-        return json_encode(['status' => 'failed', 'msg' => 'Failed to save fixed asset. ' . $this->conn->error]);
+        return $this->container->make(\App\Services\FixedAssetService::class)->save_asset();
     }
 
     public function issue_credit_note()
@@ -238,67 +148,13 @@ class Master extends DBConnection
 
     public function delete_asset()
     {
-        $tenant_id = $this->settings->active_tenant_id();
-        $id = intval($_POST['id'] ?? 0);
-
-        // An asset with depreciation or a disposal in the ledger stays on record.
-        $hist = $this->conn->query("SELECT (SELECT COUNT(*) FROM asset_depreciation WHERE asset_id = '{$id}') d, (SELECT status FROM fixed_assets WHERE id = '{$id}' AND tenant_id = '{$tenant_id}') s");
-        $h = $hist ? $hist->fetch_assoc() : null;
-        if ($h && ((int)$h['d'] > 0 || $h['s'] === 'disposed')) {
-            return json_encode(['status' => 'failed', 'msg' => 'This asset has depreciation or a disposal posted to the ledger, so it cannot be deleted.']);
-        }
-
-        $del = $this->conn->query("DELETE FROM `fixed_assets` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'");
-        if ($del) {
-            $this->settings->log_audit("Deleted Asset", "Fixed Assets", "Asset ID #{$id}");
-            return json_encode(['status' => 'success', 'msg' => 'Fixed asset deleted successfully.']);
-        }
-        return json_encode(['status' => 'failed', 'msg' => 'Failed to delete fixed asset.']);
+        return $this->container->make(\App\Services\FixedAssetService::class)->delete_asset();
     }
 
     public function save_bank_account()
     {
-        $tenant_id = $this->settings->active_tenant_id();
-        $bank_name = $_POST['bank_name'] ?? null;
-        $account_name = $_POST['account_name'] ?? null;
-        $account_number = $_POST['account_number'] ?? null;
-        $currency = $_POST['currency'] ?? null;
-
-        if (empty($bank_name) || empty($account_name)) {
-            return json_encode(['status' => 'failed', 'msg' => 'Bank Name and Account Name are required.']);
-        }
-
-        // Auto-generate code if missing
-        $code_q = $this->conn->query("SELECT MAX(CAST(code AS UNSIGNED)) as max_code FROM `account_list` WHERE tenant_id = '{$tenant_id}' AND code REGEXP '^[0-9]+$'");
-        $max_code = ($code_q && $code_q->num_rows > 0) ? intval($code_q->fetch_assoc()['max_code']) : 1000;
-        $code = ($max_code > 0) ? strval($max_code + 10) : '1010';
-
-        $full_name = $this->conn->real_escape_string($account_name . ' (' . $bank_name . ')');
-        $b_name = $this->conn->real_escape_string($bank_name);
-        $acc_num = $this->conn->real_escape_string($account_number ?? '');
-        $curr = $this->conn->real_escape_string($currency ?? $this->settings->base_currency());
-        $a_type = 'Bank';
-
-        $data = " `tenant_id` = '{$tenant_id}' ";
-        $data .= ", `code` = '{$code}' ";
-        $data .= ", `name` = '{$full_name}' ";
-        $data .= ", `type` = '{$a_type}' ";
-        $data .= ", `tax_rate` = 'Tax Exempt (0%)' ";
-        $data .= ", `bank_name` = '{$b_name}' ";
-        $data .= ", `account_number` = '{$acc_num}' ";
-        $data .= ", `currency` = '{$curr}' ";
-        $data .= ", `status` = 1 ";
-
-        $save = $this->conn->query("INSERT INTO `account_list` SET {$data}");
-        if ($save) {
-            $acc_id = $this->conn->insert_id;
-            $this->settings->log_audit("Added Bank Account", "Chart of Accounts", "Bank: {$bank_name}, Account: {$account_name}");
-            return json_encode(['status' => 'success', 'id' => $acc_id, 'msg' => 'Bank account added successfully.']);
-        }
-        return json_encode(['status' => 'failed', 'msg' => 'Failed to add bank account. ' . $this->conn->error]);
+        return $this->container->make(\App\Services\CurrencyService::class)->save_bank_account();
     }
-
-    /* Dolibarr Inspired CRM Opportunity Methods */
     public function save_opportunity()
     {
         return $this->container->make(CrmService::class)->saveOpportunity($_POST);
@@ -354,142 +210,17 @@ class Master extends DBConnection
 
     public function save_proposal_signature()
     {
-        $tenant_id = $_POST['tenant_id'] ?? null;
-        $sales_order_id = $_POST['sales_order_id'] ?? null;
-        $signer_name = $_POST['signer_name'] ?? null;
-        $signer_email = $_POST['signer_email'] ?? null;
-        $signature_data = $_POST['signature_data'] ?? null;
-        $t_id = !empty($tenant_id) ? intval($tenant_id) : $this->settings->active_tenant_id();
-        $so_id = intval($sales_order_id ?? 0);
-
-        if ($so_id <= 0 || empty($signer_name) || empty($signer_email) || empty($signature_data)) {
-            return json_encode(['status' => 'failed', 'msg' => 'Signer Name, Email, and Signature drawing are required.']);
-        }
-
-        // The quote itself decides the company, and only an open, current, unexpired quote can be accepted.
-        $quoteRow = $this->conn->query("SELECT tenant_id, status, type, valid_until FROM `sales_order_list` WHERE id = '{$so_id}'")->fetch_assoc();
-        if (!$quoteRow || !\App\Services\QuotationService::isQuote((string)$quoteRow['type'])) {
-            return json_encode(['status' => 'failed', 'msg' => 'This proposal could not be found.']);
-        }
-        $t_id = (int)$quoteRow['tenant_id'];
-        if ($quoteRow['status'] === 'confirmed' || $quoteRow['status'] === 'converted_to_invoice') {
-            return json_encode(['status' => 'failed', 'msg' => 'This proposal has already been accepted.']);
-        }
-        if ($problem = \App\Services\QuotationService::acceptProblem($quoteRow, date('Y-m-d'))) {
-            return json_encode(['status' => 'failed', 'msg' => $problem]);
-        }
-
-        $ip = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
-        $s_name = $this->conn->real_escape_string($signer_name);
-        $s_email = $this->conn->real_escape_string($signer_email);
-        $sig_data = $this->conn->real_escape_string($signature_data);
-
-        $save = $this->conn->query("
-            INSERT INTO `proposal_signatures`
-            (`tenant_id`, `sales_order_id`, `signer_name`, `signer_email`, `signature_data`, `ip_address`, `status`)
-            VALUES ('{$t_id}', '{$so_id}', '{$s_name}', '{$s_email}', '{$sig_data}', '{$ip}', 'accepted')
-        ");
-
-        if ($save) {
-            // Update sales order status to confirmed
-            $this->conn->query("UPDATE `sales_order_list` SET `status` = 'confirmed' WHERE id = '{$so_id}'");
-            $this->settings->log_audit("Signed Commercial Proposal", "Customer Portal", "Quote ID #{$so_id} signed by {$signer_name}");
-            return json_encode(['status' => 'success', 'msg' => 'Proposal signed and confirmed successfully.']);
-        }
-        return json_encode(['status' => 'failed', 'msg' => 'Failed to save digital signature. ' . $this->conn->error]);
+        return $this->container->make(\App\Services\ContractService::class)->save_proposal_signature();
     }
-
-    /* Dolibarr Inspired Helpdesk Ticket Methods */
     public function save_ticket()
     {
-        $tenant_id = $this->settings->active_tenant_id();
-        $user_id = $this->settings->userdata('id');
-        $subject = $_POST['subject'] ?? null;
-        $id = $_POST['id'] ?? null;
-        $party_id = $_POST['party_id'] ?? null;
-        $priority = $_POST['priority'] ?? null;
-        $status = $_POST['status'] ?? null;
-        $assigned_to = $_POST['assigned_to'] ?? null;
-        $initial_message = $_POST['initial_message'] ?? null;
-
-        if (empty($subject)) {
-            return json_encode(['status' => 'failed', 'msg' => 'Ticket Subject is required.']);
-        }
-
-        $target_id = !empty($id) ? intval($id) : 0;
-        if ($target_id <= 0) {
-            $code = \App\Services\SequenceService::documentNo($this->conn, (int)$tenant_id, 'tickets', 'ticket_code', 'TCK-' . date('Ym') . '-', 'ticket-' . date('Ym'));
-            $data = " `tenant_id` = '{$tenant_id}' ";
-            $data .= ", `ticket_code` = '{$code}' ";
-            $data .= ", `subject` = '{$this->conn->real_escape_string($subject)}' ";
-            $data .= ", `party_id` = " . (!empty($party_id) ? intval($party_id) : "NULL") . " ";
-            $data .= ", `priority` = '{$this->conn->real_escape_string($priority ?? 'medium')}' ";
-            $data .= ", `status` = '{$this->conn->real_escape_string($status ?? 'new')}' ";
-            $data .= ", `assigned_to` = " . (!empty($assigned_to) ? intval($assigned_to) : "NULL") . " ";
-            $data .= ", `created_by` = '{$user_id}' ";
-
-            $save = $this->conn->query("INSERT INTO `tickets` SET {$data}");
-            if ($save) {
-                $ticket_id = $this->conn->insert_id;
-                if (!empty($initial_message)) {
-                    $msg = $this->conn->real_escape_string($initial_message);
-                    $this->conn->query("INSERT INTO `ticket_messages` (`ticket_id`, `user_id`, `message`) VALUES ('{$ticket_id}', '{$user_id}', '{$msg}')");
-                }
-                $this->settings->log_audit("Created Ticket", "Helpdesk", "Ticket #{$code}: {$subject}");
-                return json_encode(['status' => 'success', 'id' => $ticket_id, 'msg' => 'Ticket created successfully.']);
-            }
-        } else {
-            $data = " `subject` = '{$this->conn->real_escape_string($subject)}' ";
-            $data .= ", `party_id` = " . (!empty($party_id) ? intval($party_id) : "NULL") . " ";
-            $data .= ", `priority` = '{$this->conn->real_escape_string($priority ?? 'medium')}' ";
-            $data .= ", `status` = '{$this->conn->real_escape_string($status ?? 'new')}' ";
-            $data .= ", `assigned_to` = " . (!empty($assigned_to) ? intval($assigned_to) : "NULL") . " ";
-
-            $newStatus = in_array((string)($status ?? 'new'), ['new', 'in_progress', 'waiting_client', 'resolved', 'closed'], true) ? (string)($status ?? 'new') : 'new';
-            $this->container->make(\App\Services\TicketSlaService::class)->applyStatus($target_id, $newStatus);
-            $save = $this->conn->query("UPDATE `tickets` SET {$data} WHERE id = '{$target_id}' AND tenant_id = '{$tenant_id}'");
-            if ($save) {
-                return json_encode(['status' => 'success', 'id' => $target_id, 'msg' => 'Ticket updated successfully.']);
-            }
-        }
-        return json_encode(['status' => 'failed', 'msg' => 'Failed to save ticket. ' . $this->conn->error]);
+        return $this->container->make(\App\Services\HelpdeskService::class)->save_ticket();
     }
 
     public function reply_ticket()
     {
-        $tenant_id = $this->settings->active_tenant_id();
-        $user_id = $this->settings->userdata('id');
-        $ticket_id = $_POST['ticket_id'] ?? null;
-        $message = $_POST['message'] ?? null;
-        $status = $_POST['status'] ?? null;
-
-        $t_id = intval($ticket_id ?? 0);
-        if ($t_id <= 0 || empty($message)) {
-            return json_encode(['status' => 'failed', 'msg' => 'Message content is required.']);
-        }
-
-        // The ticket has to belong to this company.
-        $own = $this->conn->query("SELECT 1 FROM `tickets` WHERE id = '{$t_id}' AND tenant_id = '{$tenant_id}'");
-        if (!$own || $own->num_rows === 0) {
-            return json_encode(['status' => 'failed', 'msg' => 'Ticket not found.']);
-        }
-        $msg = $this->conn->real_escape_string($message);
-        $save = $this->conn->query("INSERT INTO `ticket_messages` (`ticket_id`, `user_id`, `message`) VALUES ('{$t_id}', '{$user_id}', '{$msg}')");
-
-        if ($save) {
-            $sla = $this->container->make(\App\Services\TicketSlaService::class);
-            $sla->markFirstResponse($t_id);
-            if (!empty($status) && in_array((string)$status, ['new', 'in_progress', 'waiting_client', 'resolved', 'closed'], true)) {
-                $sla->applyStatus($t_id, (string)$status);
-                $st = $this->conn->real_escape_string($status);
-                $this->conn->query("UPDATE `tickets` SET `status` = '{$st}' WHERE id = '{$t_id}' AND tenant_id = '{$tenant_id}'");
-            }
-            return json_encode(['status' => 'success', 'msg' => 'Reply posted successfully.']);
-        }
-        return json_encode(['status' => 'failed', 'msg' => 'Failed to post reply.']);
+        return $this->container->make(\App\Services\HelpdeskService::class)->reply_ticket();
     }
-
-    /* Dolibarr Inspired Contract Methods */
     public function save_sla_policies()
     {
         return $this->container->make(\App\Services\TicketSlaService::class)->savePolicies($_POST);
@@ -513,30 +244,6 @@ class Master extends DBConnection
         return json_encode(['status' => $res['problems'] && !$res['sent'] && !$res['fees'] ? 'failed' : 'success', 'msg' => $msg]);
     }
 
-    private function import_csv(string $entity)
-    {
-        $f = $_FILES['csv'] ?? null;
-        if (!$f || ($f['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || !is_uploaded_file($f['tmp_name'])) {
-            return json_encode(['status' => 'failed', 'msg' => 'Choose a CSV file to upload.']);
-        }
-        if (!in_array(strtolower(pathinfo((string)$f['name'], PATHINFO_EXTENSION)), ['csv', 'txt'], true)) {
-            return json_encode(['status' => 'failed', 'msg' => 'The file must be a .csv file. In Excel, use Save As and choose CSV.']);
-        }
-        if ((int)$f['size'] > \App\Services\ImportService::MAX_BYTES) {
-            return json_encode(['status' => 'failed', 'msg' => 'The file is larger than 2 MB. Split it into smaller files.']);
-        }
-        @set_time_limit(300);
-        $dry = !empty($_POST['dry_run']);
-        $res = $this->container->make(\App\Services\ImportService::class)->run($entity, (string)file_get_contents($f['tmp_name']), (string)($_POST['mode'] ?? 'skip'), $dry);
-        if ($res['fatal']) {
-            return json_encode(['status' => 'failed', 'msg' => $res['fatal']]);
-        }
-        $c = $res['counts'];
-        $msg = $dry
-            ? "Checked: {$c['new']} new, {$c['update']} to update, {$c['skip']} skipped, {$c['error']} with problems. Nothing has been saved yet."
-            : "Imported: {$c['created']} created, {$c['updated']} updated, {$c['skip']} skipped, " . ($c['error'] + $c['failed']) . ' not imported.';
-        return json_encode(['status' => 'success', 'msg' => $msg, 'dry_run' => $dry, 'counts' => $c, 'rows' => array_slice($res['rows'], 0, 500), 'truncated' => count($res['rows']) > 500, 'unknown' => $res['unknown']]);
-    }
 
     public function preview_landed_cost()
     {
@@ -597,9 +304,9 @@ class Master extends DBConnection
         return $this->container->make(\App\Services\StockTakeService::class)->cancel((int)($_POST['id'] ?? 0));
     }
 
-    public function import_parties() { return $this->import_csv('parties'); }
-    public function import_products() { return $this->import_csv('products'); }
-    public function import_accounts() { return $this->import_csv('accounts'); }
+    public function import_parties() { return $this->container->make(\App\Services\MaintenanceService::class)->import_csv('parties'); }
+    public function import_products() { return $this->container->make(\App\Services\MaintenanceService::class)->import_csv('products'); }
+    public function import_accounts() { return $this->container->make(\App\Services\MaintenanceService::class)->import_csv('accounts'); }
 
     public function generate_contract_invoices()
     {
@@ -615,66 +322,8 @@ class Master extends DBConnection
 
     public function save_contract()
     {
-        $tenant_id = $this->settings->active_tenant_id();
-        $title = $_POST['title'] ?? null;
-        $party_id = $_POST['party_id'] ?? null;
-        $amount = $_POST['amount'] ?? null;
-        $id = $_POST['id'] ?? null;
-        $billing_frequency = $_POST['billing_frequency'] ?? null;
-        $start_date = $_POST['start_date'] ?? null;
-        $end_date = $_POST['end_date'] ?? null;
-        $status = $_POST['status'] ?? null;
-        $notes = $_POST['notes'] ?? null;
-        $tax_rate = $_POST['tax_rate'] ?? null;
-        $tax_type = $_POST['tax_type'] ?? null;
-
-        if (empty($title) || empty($party_id) || empty($amount)) {
-            return json_encode(['status' => 'failed', 'msg' => 'Title, Customer, and Amount are required.']);
-        }
-
-        $target_id = !empty($id) ? intval($id) : 0;
-        if ($target_id <= 0) {
-            $c_no = \App\Services\SequenceService::documentNo($this->conn, (int)$tenant_id, 'contracts', 'contract_no', 'CTR-' . date('Ym') . '-', 'contract-' . date('Ym'));
-            $data = " `tenant_id` = '{$tenant_id}' ";
-            $data .= ", `contract_no` = '{$c_no}' ";
-            $data .= ", `title` = '{$this->conn->real_escape_string($title)}' ";
-            $data .= ", `party_id` = '" . intval($party_id) . "' ";
-            $data .= ", `billing_frequency` = '{$this->conn->real_escape_string($billing_frequency ?? 'monthly')}' ";
-            $data .= ", `amount` = '" . floatval($amount) . "' ";
-            $data .= ", `start_date` = '{$this->conn->real_escape_string($start_date)}' ";
-            $data .= ", `end_date` = " . (!empty($end_date) ? "'{$this->conn->real_escape_string($end_date)}'" : "NULL") . " ";
-            $data .= ", `status` = '{$this->conn->real_escape_string($status ?? 'active')}' ";
-            $data .= ", `notes` = '{$this->conn->real_escape_string($notes ?? '')}' ";
-            $data .= ", `tax_rate` = '" . max(0, min(100, floatval($tax_rate ?? 0))) . "' ";
-            $data .= ", `tax_type` = '" . (in_array($tax_type ?? '', ['exclusive', 'inclusive'], true) ? $tax_type : 'exclusive') . "' ";
-
-            $save = $this->conn->query("INSERT INTO `contracts` SET {$data}");
-            if ($save) {
-                $contract_id = $this->conn->insert_id;
-                $this->settings->log_audit("Created Contract", "Contracts", "Contract #{$c_no}: {$title}");
-                return json_encode(['status' => 'success', 'id' => $contract_id, 'msg' => 'Contract created successfully.']);
-            }
-        } else {
-            $data = " `title` = '{$this->conn->real_escape_string($title)}' ";
-            $data .= ", `party_id` = '" . intval($party_id) . "' ";
-            $data .= ", `billing_frequency` = '{$this->conn->real_escape_string($billing_frequency ?? 'monthly')}' ";
-            $data .= ", `amount` = '" . floatval($amount) . "' ";
-            $data .= ", `start_date` = '{$this->conn->real_escape_string($start_date)}' ";
-            $data .= ", `end_date` = " . (!empty($end_date) ? "'{$this->conn->real_escape_string($end_date)}'" : "NULL") . " ";
-            $data .= ", `status` = '{$this->conn->real_escape_string($status ?? 'active')}' ";
-            $data .= ", `notes` = '{$this->conn->real_escape_string($notes ?? '')}' ";
-            $data .= ", `tax_rate` = '" . max(0, min(100, floatval($tax_rate ?? 0))) . "' ";
-            $data .= ", `tax_type` = '" . (in_array($tax_type ?? '', ['exclusive', 'inclusive'], true) ? $tax_type : 'exclusive') . "' ";
-
-            $save = $this->conn->query("UPDATE `contracts` SET {$data} WHERE id = '{$target_id}' AND tenant_id = '{$tenant_id}'");
-            if ($save) {
-                return json_encode(['status' => 'success', 'id' => $target_id, 'msg' => 'Contract updated successfully.']);
-            }
-        }
-        return json_encode(['status' => 'failed', 'msg' => 'Failed to save contract. ' . $this->conn->error]);
+        return $this->container->make(\App\Services\ContractService::class)->save_contract();
     }
-
-    /* Dolibarr Inspired Warehouse Methods */
     public function save_warehouse()
     {
         $tenant_id = $this->settings->active_tenant_id();
@@ -792,223 +441,42 @@ class Master extends DBConnection
     /* Dolibarr Inspired Custom Extrafields Methods */
     public function save_extrafield()
     {
-        $tenant_id = $this->settings->active_tenant_id();
-        $element_type = $_POST['element_type'] ?? null;
-        $field_code = $_POST['field_code'] ?? null;
-        $field_label = $_POST['field_label'] ?? null;
-        $field_type = $_POST['field_type'] ?? null;
-        $field_options = $_POST['field_options'] ?? null;
-        $is_required = $_POST['is_required'] ?? null;
-
-        if (empty($element_type) || empty($field_code) || empty($field_label)) {
-            return json_encode(['status' => 'failed', 'msg' => 'Target entity, field code, and field label are required.']);
-        }
-
-        $elem = $this->conn->real_escape_string($element_type);
-        $f_code = $this->conn->real_escape_string(preg_replace('/[^a-z0-9_]/', '', strtolower($field_code)));
-        $f_label = $this->conn->real_escape_string($field_label);
-        $f_type = $this->conn->real_escape_string($field_type ?? 'text');
-        $f_opts = $this->conn->real_escape_string($field_options ?? '');
-        $req = isset($is_required) ? 1 : 0;
-
-        $save = $this->conn->query("
-            INSERT INTO `custom_extrafields`
-            (`tenant_id`, `element_type`, `field_code`, `field_label`, `field_type`, `field_options`, `is_required`, `status`)
-            VALUES ('{$tenant_id}', '{$elem}', '{$f_code}', '{$f_label}', '{$f_type}', '{$f_opts}', '{$req}', 1)
-        ");
-
-        if ($save) {
-            $this->settings->log_audit("Added Custom Extrafield", "Custom Fields", "Target: {$element_type}, Code: {$field_code}");
-            return json_encode(['status' => 'success', 'id' => $this->conn->insert_id, 'msg' => 'Custom extrafield created successfully.']);
-        }
-        return json_encode(['status' => 'failed', 'msg' => 'Failed to save custom extrafield. ' . $this->conn->error]);
+        return $this->container->make(\App\Services\ExtrafieldService::class)->save_extrafield();
     }
 
     public function delete_extrafield()
     {
-        $tenant_id = $this->settings->active_tenant_id();
-        $id = intval($_POST['id'] ?? 0);
-
-        $del = $this->conn->query("DELETE FROM `custom_extrafields` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'");
-        if ($del) {
-            $this->settings->log_audit("Deleted Custom Extrafield", "Custom Fields", "ID #{$id}");
-            return json_encode(['status' => 'success', 'msg' => 'Custom extrafield deleted.']);
-        }
-        return json_encode(['status' => 'failed', 'msg' => 'Failed to delete custom extrafield.']);
+        return $this->container->make(\App\Services\ExtrafieldService::class)->delete_extrafield();
     }
 
     public function save_currency()
     {
-        $tenant_id = $this->settings->active_tenant_id();
-        $code = $_POST['code'] ?? null;
-        $name = $_POST['name'] ?? null;
-        $symbol = $_POST['symbol'] ?? null;
-        $exchange_rate = $_POST['exchange_rate'] ?? null;
-        $is_default = $_POST['is_default'] ?? null;
-        $id = $_POST['id'] ?? null;
-
-        if (empty($code) || empty($name) || empty($symbol)) {
-            return json_encode(['status' => 'failed', 'msg' => 'Currency code, name, and symbol are required.']);
-        }
-
-        $c_code = $this->conn->real_escape_string(strtoupper(trim($code)));
-        $c_name = $this->conn->real_escape_string(trim($name));
-        $c_sym = $this->conn->real_escape_string(trim($symbol));
-        $c_rate = !empty($exchange_rate) ? floatval($exchange_rate) : 1.000000;
-        $is_def = isset($is_default) && $is_default == '1' ? 1 : 0;
-
-        if ($is_def == 1) {
-            $this->conn->query("UPDATE `currencies` SET `is_default` = 0 WHERE `tenant_id` = '{$tenant_id}'");
-        }
-
-        $target_id = !empty($id) ? intval($id) : 0;
-        if ($target_id <= 0) {
-            $save = $this->conn->query("
-                INSERT INTO `currencies` (`tenant_id`, `code`, `name`, `symbol`, `exchange_rate`, `is_default`, `status`)
-                VALUES ('{$tenant_id}', '{$c_code}', '{$c_name}', '{$c_sym}', '{$c_rate}', '{$is_def}', 1)
-            ");
-        } else {
-            $save = $this->conn->query("
-                UPDATE `currencies` SET `code` = '{$c_code}', `name` = '{$c_name}', `symbol` = '{$c_sym}', `exchange_rate` = '{$c_rate}', `is_default` = '{$is_def}'
-                WHERE id = '{$target_id}' AND tenant_id = '{$tenant_id}'
-            ");
-        }
-
-        if ($save) {
-            $this->settings->log_audit("Saved Currency", "Currencies", "Currency: {$c_code} ({$c_sym}), Rate: {$c_rate}");
-            return json_encode(['status' => 'success', 'msg' => 'Currency saved successfully.']);
-        }
-        return json_encode(['status' => 'failed', 'msg' => 'Failed to save currency. ' . $this->conn->error]);
+        return $this->container->make(\App\Services\CurrencyService::class)->save_currency();
     }
 
     public function delete_currency()
     {
-        $tenant_id = $this->settings->active_tenant_id();
-        $id = intval($_POST['id'] ?? 0);
-
-        $del = $this->conn->query("DELETE FROM `currencies` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}' AND `is_default` = 0");
-        if ($del) {
-            $this->settings->log_audit("Deleted Currency", "Currencies", "ID #{$id}");
-            return json_encode(['status' => 'success', 'msg' => 'Currency deleted successfully.']);
-        }
-        return json_encode(['status' => 'failed', 'msg' => 'Failed to delete currency or currency is set as base default.']);
+        return $this->container->make(\App\Services\CurrencyService::class)->delete_currency();
     }
 
     public function backup_db()
     {
-        if ($this->settings->userdata('type') != 1) {
-            return json_encode(['status' => 'failed', 'msg' => 'Super Administrator permission required.']);
-        }
-
-        $tables = [];
-        $res = $this->conn->query("SHOW TABLES");
-        while ($row = $res->fetch_array()) {
-            $tables[] = $row[0];
-        }
-
-        $sql_dump = "-- NuvisERPX Database Dump\n-- Generated on: " . date('Y-m-d H:i:s') . "\n\n";
-        foreach ($tables as $tbl) {
-            $res_create = $this->conn->query("SHOW CREATE TABLE `{$tbl}`");
-            $row_create = $res_create->fetch_array();
-            $sql_dump .= "DROP TABLE IF EXISTS `{$tbl}`;\n" . $row_create[1] . ";\n\n";
-
-            $res_data = $this->conn->query("SELECT * FROM `{$tbl}`");
-            while ($row_data = $res_data->fetch_assoc()) {
-                $cols = array_keys($row_data);
-                $escaped = array_map(function ($val) {
-                    if (is_null($val)) return "NULL";
-                    return "'" . $this->conn->real_escape_string($val) . "'";
-                }, array_values($row_data));
-
-                $sql_dump .= "INSERT INTO `{$tbl}` (`" . implode("`, `", $cols) . "`) VALUES (" . implode(", ", $escaped) . ");\n";
-            }
-            $sql_dump .= "\n";
-        }
-
-        $filename = 'backup_nuviserpx_' . date('Ymd_His') . '.sql';
-        header('Content-Type: application/octet-stream');
-        header('Content-Disposition: attachment; filename="' . $filename . '"');
-        echo $sql_dump;
-        exit;
+        return $this->container->make(\App\Services\MaintenanceService::class)->backup_db();
     }
 
     public function optimize_db()
     {
-        if ($this->settings->userdata('type') != 1) {
-            return json_encode(['status' => 'failed', 'msg' => 'Access denied']);
-        }
-
-        $tables = [];
-        $res = $this->conn->query("SHOW TABLES");
-        while ($row = $res->fetch_array()) {
-            $tables[] = $row[0];
-        }
-
-        foreach ($tables as $tbl) {
-            $this->conn->query("OPTIMIZE TABLE `{$tbl}`");
-        }
-
-        $this->settings->log_audit("Optimized Database", "System Settings", "Executed OPTIMIZE TABLE on " . count($tables) . " tables.");
-        return json_encode(['status' => 'success', 'msg' => 'All database tables successfully optimized.']);
+        return $this->container->make(\App\Services\MaintenanceService::class)->optimize_db();
     }
 
     public function save_shift_type()
     {
-        $tenant_id = $this->settings->active_tenant_id();
-        $name = $_POST['name'] ?? null;
-        $start_time = $_POST['start_time'] ?? null;
-        $end_time = $_POST['end_time'] ?? null;
-        $break_duration_mins = $_POST['break_duration_mins'] ?? null;
-
-        if (empty($name) || empty($start_time) || empty($end_time)) {
-            return json_encode(['status' => 'failed', 'msg' => 'Shift Name, Start Time, and End Time are required.']);
-        }
-
-        $s_name = $this->conn->real_escape_string($name);
-        $s_start = $this->conn->real_escape_string($start_time);
-        $s_end = $this->conn->real_escape_string($end_time);
-        $s_break = intval($break_duration_mins ?? 30);
-
-        $save = $this->conn->query("
-            INSERT INTO `shift_types` (`tenant_id`, `name`, `start_time`, `end_time`, `break_duration_mins`, `status`)
-            VALUES ('{$tenant_id}', '{$s_name}', '{$s_start}', '{$s_end}', '{$s_break}', 1)
-        ");
-
-        if ($save) {
-            $this->settings->log_audit("Created Shift Type", "HR & Attendance", "Shift: {$name} ({$start_time} - {$end_time})");
-            return json_encode(['status' => 'success', 'msg' => 'Shift type saved successfully.']);
-        }
-        return json_encode(['status' => 'failed', 'msg' => 'Failed to save shift type. ' . $this->conn->error]);
+        return $this->container->make(\App\Services\ShiftRosterService::class)->save_shift_type();
     }
 
     public function save_shift_assignment()
     {
-        $tenant_id = $this->settings->active_tenant_id();
-        $employee_id = $_POST['employee_id'] ?? null;
-        $shift_type_id = $_POST['shift_type_id'] ?? null;
-        $start_date = $_POST['start_date'] ?? null;
-        $end_date = $_POST['end_date'] ?? null;
-
-        $emp_id = intval($employee_id ?? 0);
-        $shift_id = intval($shift_type_id ?? 0);
-
-        if ($emp_id <= 0 || $shift_id <= 0 || empty($start_date)) {
-            return json_encode(['status' => 'failed', 'msg' => 'Employee, Shift Type, and Start Date are required.']);
-        }
-
-        $s_date = $this->conn->real_escape_string($start_date);
-        $e_date = !empty($end_date) ? "'{$this->conn->real_escape_string($end_date)}'" : "NULL";
-
-        $save = $this->conn->query("
-            INSERT INTO `shift_assignments` (`tenant_id`, `employee_id`, `shift_type_id`, `start_date`, `end_date`, `status`)
-            VALUES ('{$tenant_id}', '{$emp_id}', '{$shift_id}', '{$s_date}', {$e_date}, 1)
-        ");
-
-        if ($save) {
-            $this->settings->log_audit("Assigned Shift Roster", "HR & Attendance", "Employee ID #{$emp_id}, Shift ID #{$shift_id}");
-            return json_encode(['status' => 'success', 'msg' => 'Shift roster assigned successfully.']);
-        }
-        return json_encode(['status' => 'failed', 'msg' => 'Failed to assign shift roster.']);
+        return $this->container->make(\App\Services\ShiftRosterService::class)->save_shift_assignment();
     }
 
     public function save_salary_component()
@@ -1147,123 +615,23 @@ class Master extends DBConnection
 
     public function save_tenant_vms_settings()
     {
-        $tenant_id = $this->settings->active_tenant_id();
-        require_once(base_app . 'src/Services/VmsService.php');
-        $vmsService = new \App\Services\VmsService($this->conn, $this->settings);
-
-        if ($vmsService->saveTenantVmsConfig($tenant_id, $_POST)) {
-            $this->settings->log_audit("Saved Tenant VMS v3.0 Settings", "VMS Integration", "Configured SDC URL & TIN for tenant #{$tenant_id}");
-            return json_encode(['status' => 'success', 'msg' => 'Tenant FRCS VMS v3.0 settings saved successfully.']);
-        }
-        return json_encode(['status' => 'failed', 'msg' => 'Failed to save tenant VMS settings.']);
+        return $this->container->make(\App\Services\FiscalizationService::class)->save_tenant_vms_settings();
     }
 
     public function test_sdc_ping()
     {
-        if ($this->settings->userdata('type') != 1) {
-            return json_encode(['status' => 'failed', 'msg' => 'Access denied']);
-        }
-
-        $tenant_id = $this->settings->active_tenant_id();
-        require_once(base_app . 'src/Services/VmsService.php');
-        $vmsService = new \App\Services\VmsService($this->conn, $this->settings);
-        $config = $vmsService->getTenantVmsConfig($tenant_id);
-
-        $sdcUrl = $config['sdc_url'] ?? 'http://localhost:8088/api/v1/sdc';
-
-        $ch = curl_init($sdcUrl);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 5);
-        $res = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-
-        if ($httpCode > 0 || str_contains($sdcUrl, 'localhost')) {
-            return json_encode(['status' => 'success', 'msg' => "SDC Server Ping OK! Target: {$sdcUrl} (HTTP Status: " . ($httpCode ?: 200) . ")"]);
-        }
-        return json_encode(['status' => 'failed', 'msg' => "Could not reach SDC Server at {$sdcUrl}."]);
+        return $this->container->make(\App\Services\FiscalizationService::class)->test_sdc_ping();
     }
 
     public function simulate_vms_fiscalization()
     {
-        if ($this->settings->userdata('type') != 1) {
-            return json_encode(['status' => 'failed', 'msg' => 'Access denied']);
-        }
-
-        $tenant_id = $this->settings->active_tenant_id();
-        require_once(base_app . 'src/Services/VmsService.php');
-        $vmsService = new \App\Services\VmsService($this->conn, $this->settings);
-
-        $rawJson = $_POST['payload_json'] ?? '';
-        $decoded = json_decode($rawJson, true);
-
-        if (!$decoded || !isset($decoded['InvoiceNumber'])) {
-            return json_encode(['status' => 'failed', 'msg' => 'Invalid VSDC Request JSON format.']);
-        }
-
-        $dummyInvoice = [
-            'id' => 999,
-            'invoice_no' => $decoded['InvoiceNumber'],
-            'invoice_date' => date('Y-m-d'),
-            'total' => $decoded['Payments'][0]['Amount'] ?? 115.00
-        ];
-
-        $dummyItems = [
-            ['item_name' => $decoded['Items'][0]['Name'] ?? 'Sample Product', 'qty' => 1, 'unit_price' => 100, 'amount' => 115]
-        ];
-
-        $res = $vmsService->submitVsdcRequest($tenant_id, $dummyInvoice, $dummyItems);
-        if ($res['success']) {
-            return json_encode(['status' => 'success', 'msg' => 'VSDC Fiscalization Succeeded!', 'data' => $res]);
-        }
-        return json_encode(['status' => 'failed', 'msg' => $res['message'], 'data' => $res]);
+        return $this->container->make(\App\Services\FiscalizationService::class)->simulate_vms_fiscalization();
     }
 
     public function upload_tenant_vsdc_cert()
     {
-        $tenant_id = $this->settings->active_tenant_id();
-
-        if (!isset($_FILES['p12_cert']) || $_FILES['p12_cert']['tmp_name'] == '') {
-            return json_encode(['status' => 'failed', 'msg' => 'Please select a valid PKCS#12 certificate file (.p12 or .pfx).']);
-        }
-
-        $ext = strtolower(pathinfo($_FILES['p12_cert']['name'], PATHINFO_EXTENSION));
-        if (!in_array($ext, ['p12', 'pfx'])) {
-            return json_encode(['status' => 'failed', 'msg' => 'Invalid file type. Only .p12 or .pfx files allowed.']);
-        }
-
-        $fname = 'uploads/vms/cert_tenant_' . $tenant_id . '_' . time() . '.' . $ext;
-        $dir_path = base_app . 'uploads/vms';
-        if (!is_dir($dir_path)) {
-            mkdir($dir_path, 0777, true);
-        }
-
-        if (move_uploaded_file($_FILES['p12_cert']['tmp_name'], base_app . $fname)) {
-            $parsed = (new \App\Services\VmsService($this->conn, $this->settings))
-                ->parseCertificate(base_app . $fname, $_POST['cert_pass'] ?? '');
-            if (empty($parsed['success'])) {
-                @unlink(base_app . $fname);
-                return json_encode(['status' => 'failed', 'msg' => $parsed['message'] ?? 'Invalid certificate.']);
-            }
-
-            $c_name = $this->conn->real_escape_string($parsed['subject']);
-            $c_exp = $this->conn->real_escape_string($parsed['valid_to']);
-            $c_ser = $this->conn->real_escape_string($parsed['serial_number']);
-
-            $this->conn->query("
-                INSERT INTO `tenant_vsdc_certificates`
-                (`tenant_id`, `cert_name`, `p12_path`, `cert_expires_at`, `serial_number`, `status`)
-                VALUES ('{$tenant_id}', '{$c_name}', '{$fname}', '{$c_exp}', '{$c_ser}', 1)
-            ");
-
-            $this->settings->log_audit("Uploaded VSDC Certificate", "VMS Integration", "Uploaded PKCS#12 Certificate: {$c_name}");
-            return json_encode(['status' => 'success', 'msg' => 'Certificate successfully uploaded and validated.']);
-        }
-
-        return json_encode(['status' => 'failed', 'msg' => 'Failed to save certificate file.']);
+        return $this->container->make(\App\Services\FiscalizationService::class)->upload_tenant_vsdc_cert();
     }
-
-    /* Journal Actions */
     public function save_journal()
     {
         return $this->container->make(JournalService::class)->saveJournal($_POST);

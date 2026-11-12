@@ -29,7 +29,7 @@ check('only open quotes can be declined or extended', Q::openProblem(['type' => 
 $svc = file_get_contents(base_app . 'src/Services/QuotationService.php');
 check('revise supersedes with a guarded update inside a transaction', str_contains($svc, "begin_transaction") && str_contains($svc, "status NOT IN ('superseded'") && str_contains($svc, 'affected_rows !== 1'));
 check('revise copies the lines', str_contains($svc, 'INSERT INTO sales_order_items'));
-$m = (file_get_contents(base_app . 'classes/Master.php') . file_get_contents(base_app . 'src/Services/SalesOrderService.php'));
+$m = (file_get_contents(base_app . 'classes/Master.php') . file_get_contents(base_app . 'src/Services/SalesOrderService.php') . file_get_contents(base_app . 'src/Services/ContractService.php'));
 check('confirming runs the accept check', str_contains($m, 'QuotationService::acceptProblem($order'));
 check('saving a confirmed quote runs the accept check', str_contains($m, "acceptProblem(['status' => 'proforma'"));
 check('superseded/declined orders are not edited in place', str_contains($m, "['superseded', 'declined', 'converted_to_invoice']"));

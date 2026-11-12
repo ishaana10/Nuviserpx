@@ -5,7 +5,7 @@ $read = fn($f) => file_get_contents("$root/$f");
 $fail = 0;
 function check($n, $c) { global $fail; echo ($c ? 'PASS' : 'FAIL') . " - $n\n"; if (!$c) { $fail++; } }
 
-$master = ($read('classes/Master.php') . $read('src/Services/SalesOrderService.php'));
+$master = ($read('classes/Master.php') . $read('src/Services/SalesOrderService.php') . $read('src/Services/HelpdeskService.php') . $read('src/Services/ContractService.php'));
 $purch = $read('src/Services/PurchaseService.php');
 $wf = $read('src/Services/WorkflowService.php');
 check('no rand() in document numbers in Master', !preg_match("/(TCK|CTR|EXP|SO)-'[^;]*rand\\(/", $master));

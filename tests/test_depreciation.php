@@ -130,6 +130,6 @@ $svc = file_get_contents(__DIR__ . '/../src/Services/AssetService.php');
 check(str_contains($svc, 'postSystemJournal') && str_contains($svc, 'asset_depreciation'), 'each month is a journal linked to per-asset rows');
 check(str_contains($svc, 'Run depreciation through'), 'disposal refuses until depreciation is up to date');
 check(str_contains(file_get_contents(__DIR__ . '/../src/Services/JournalService.php'), 'function postSystemJournal'), 'the journal service exposes the system-journal entry point');
-check(str_contains(file_get_contents(__DIR__ . '/../classes/Master.php'), 'cannot be deleted'), 'an asset with depreciation or a disposal cannot be deleted');
+check(str_contains(file_get_contents(__DIR__ . '/../src/Services/FixedAssetService.php'), 'cannot be deleted'), 'an asset with depreciation or a disposal cannot be deleted');
 
 echo "\nAll {$passed} depreciation checks passed.\n";

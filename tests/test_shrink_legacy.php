@@ -22,5 +22,31 @@ check('Master lost the portal bodies but keeps the entry points', strpos($ms, 'C
 check('portal logic lives in the service', strpos($cp, 'function log_portal_activity') !== false && strpos($cp, 'function customer_register') !== false && strpos($cp, 'function get_portal_logs') !== false);
 check('save_invoice_template audit call no longer fatals', strpos($ms, '$this->settings->log_audit("save_invoice_template"') !== false && strpos($ms, '$this->log_audit("save_invoice_template"') === false);
 
+// Tranche 2: eight more domains out of Master, delegates in place.
+$t2 = [
+    'FixedAssetService' => ['save_asset', 'delete_asset'],
+    'ContractService' => ['save_contract', 'save_proposal_signature'],
+    'HelpdeskService' => ['save_ticket', 'reply_ticket'],
+    'CurrencyService' => ['save_currency', 'delete_currency', 'save_bank_account'],
+    'FiscalizationService' => ['save_tenant_vms_settings', 'test_sdc_ping', 'simulate_vms_fiscalization', 'upload_tenant_vsdc_cert'],
+    'MaintenanceService' => ['import_csv', 'backup_db', 'optimize_db'],
+    'ExtrafieldService' => ['save_extrafield', 'delete_extrafield'],
+    'ShiftRosterService' => ['save_shift_type', 'save_shift_assignment'],
+];
+foreach ($t2 as $svc => $fns) {
+    $s = file_get_contents($root . "/src/Services/{$svc}.php");
+    $ok = true;
+    foreach ($fns as $fn) {
+        $ok = $ok && strpos($s, "function {$fn}") !== false;
+        if ($fn !== 'import_csv') {
+            $ok = $ok && strpos($ms, "{$svc}::class)->{$fn}()") !== false
+                && substr_count($ms, "function {$fn}(") === 1;
+        }
+    }
+    check("{$svc}: bodies moved, Master delegates", $ok);
+}
+check('CSV import wrappers call the service', substr_count($ms, "MaintenanceService::class)->import_csv('") === 3);
+check('Master is under 75 KB (was 132 KB)', strlen($ms) < 76800);
+
 echo $fail ? "$fail FAILED\n" : "All passed\n";
 exit($fail ? 1 : 0);
