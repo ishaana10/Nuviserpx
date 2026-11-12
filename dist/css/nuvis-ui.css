@@ -584,6 +584,8 @@ table.nv-table .badge::before { content: ''; width: 7px; height: 7px; flex: 0 0 
 table.nv-table th.nv-num, table.nv-table td.nv-num { text-align: right; }
 table.nv-table td.nv-num { font-variant-numeric: tabular-nums; }
 table.nv-table th.nv-idx, table.nv-table td.nv-idx { text-align: center; }
+table.nv-table th.nv-center, table.nv-table td.nv-center { text-align: center; }
+table.nv-table th.nv-right { text-align: right; }
 table.nv-table .badge.badge-success { background: #ecfdf3 !important; color: #15803d !important; }
 table.nv-table .badge.badge-danger { background: #fef2f2 !important; color: #b91c1c !important; }
 table.nv-table .badge.badge-warning { background: #fffbeb !important; color: #b45309 !important; }

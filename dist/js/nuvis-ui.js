@@ -237,6 +237,29 @@
             if (seen > 0 && numeric / seen >= 0.8) {
                 $(this).addClass('nv-num');
                 api.column(i).nodes().to$().addClass('nv-num');
+                return;
+            }
+            // Headers follow their column's data: a column whose cells are
+            // centred (dates, status, actions) gets a centred heading, a
+            // right-aligned one a right heading. Left stays the default.
+            var sample = nodes.slice(0, 5), tally = { left: 0, center: 0, right: 0 };
+            for (var k = 0; k < sample.length; k++) {
+                var a = window.getComputedStyle(sample[k]).textAlign;
+                if (a === 'center') { tally.center++; }
+                else if (a === 'right' || a === 'end') { tally.right++; }
+                else { tally.left++; }
+            }
+            if (tally.center > tally.left && tally.center >= tally.right) {
+                $(this).addClass('nv-center');
+            } else if (tally.right > tally.left && tally.right > tally.center) {
+                $(this).addClass('nv-right');
+            }
+        });
+        // Utility columns (actions) centre both heading and cells.
+        $(api.table().header()).find('th').each(function (i) {
+            if (isUtilityHeader(this)) {
+                $(this).addClass('nv-center');
+                api.column(i).nodes().to$().addClass('nv-center');
             }
         });
     }
