@@ -312,6 +312,7 @@ class InvoiceService
             $resp['id'] = (int)$invoice_id;
             $resp['msg'] = empty($id) ? " Invoice created successfully." : " Invoice updated successfully.";
             $this->settings->set_flashdata('success', $resp['msg']);
+            $this->settings->log_audit(empty($id) ? 'Created invoice' : 'Updated invoice', 'Invoices', "{$invoice_no}: total " . number_format((float)$total, 2) . ", status {$status}.");
 
             // Emit integration event (webhooks + workflows).
             $event = empty($id)
@@ -595,6 +596,7 @@ class InvoiceService
         if ($del) {
             $resp['status'] = 'success';
             $this->settings->set_flashdata('success', " Invoice deleted successfully.");
+            $this->settings->log_audit('Deleted invoice', 'Invoices', (string)$inv['invoice_no']);
             $this->emit(\App\Support\IntegrationEvents::INVOICE_DELETED, [
                 'invoice_id' => (int)$id,
                 'invoice_no' => $inv['invoice_no'] ?? '',

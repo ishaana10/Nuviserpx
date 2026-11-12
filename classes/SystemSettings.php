@@ -499,7 +499,45 @@ class SystemSettings extends DBConnection{
 
 		$sql = "INSERT INTO `audit_logs` (`tenant_id`, `user_id`, `action`, `module`, `details`, `ip_address`)
 		        VALUES ('{$tenant_id}', {$user_id}, '{$action_esc}', '{$module_esc}', '{$details_esc}', '{$ip_esc}')";
-		@$this->conn->query($sql);
+		if(!@$this->conn->query($sql)){
+			// The table is missing, or an older install left it with a
+			// different shape: repair it and write the entry again.
+			$this->ensure_audit_schema();
+			@$this->conn->query($sql);
+		}
+	}
+
+	/** Create the audit_logs table if it is missing, and add any column an older install lacks. */
+	function ensure_audit_schema(){
+		@$this->conn->query("CREATE TABLE IF NOT EXISTS `audit_logs` (
+			`id` bigint(20) NOT NULL AUTO_INCREMENT,
+			`tenant_id` int(30) NOT NULL DEFAULT 1,
+			`user_id` int(50) DEFAULT NULL,
+			`action` varchar(150) NOT NULL,
+			`module` varchar(100) NOT NULL,
+			`details` text DEFAULT NULL,
+			`ip_address` varchar(64) DEFAULT NULL,
+			`date_created` datetime NOT NULL DEFAULT current_timestamp(),
+			PRIMARY KEY (`id`),
+			KEY `tenant_created` (`tenant_id`, `date_created`),
+			KEY `module_idx` (`module`)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+		$res = @$this->conn->query("SHOW COLUMNS FROM `audit_logs`");
+		if(!$res) return;
+		$have = [];
+		while($r = $res->fetch_assoc()) $have[strtolower($r['Field'])] = true;
+		$cols = [
+			'tenant_id' => "ADD COLUMN `tenant_id` int(30) NOT NULL DEFAULT 1",
+			'user_id' => "ADD COLUMN `user_id` int(50) DEFAULT NULL",
+			'action' => "ADD COLUMN `action` varchar(150) NOT NULL DEFAULT ''",
+			'module' => "ADD COLUMN `module` varchar(100) NOT NULL DEFAULT ''",
+			'details' => "ADD COLUMN `details` text DEFAULT NULL",
+			'ip_address' => "ADD COLUMN `ip_address` varchar(64) DEFAULT NULL",
+			'date_created' => "ADD COLUMN `date_created` datetime NOT NULL DEFAULT current_timestamp()",
+		];
+		foreach($cols as $c => $ddl){
+			if(empty($have[$c])) @$this->conn->query("ALTER TABLE `audit_logs` {$ddl}");
+		}
 	}
 }
 $_settings = new SystemSettings();
