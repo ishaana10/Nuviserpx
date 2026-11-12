@@ -748,6 +748,12 @@ if($t_qry && $t_qry->num_rows > 0){
                                             <p>Git Update Module</p>
                                         </a>
                                     </li>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=developer/error_logs" class="nav-link nav-developer_error_logs tree-item">
+                                            <i class="nav-icon fas fa-bug text-danger"></i>
+                                            <p>Error Logs</p>
+                                        </a>
+                                    </li>
                                 </ul>
                             </li>
                             <?php endif; ?>

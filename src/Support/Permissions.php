@@ -616,6 +616,7 @@ final class Permissions
         // User/session administration (tenant-admin: users_manage)
         'terminate_session'     => ['users_manage'],
         // Developer-only (super administrator)
+        'clear_error_log'       => [self::SUPER_ONLY],
         'save_role'             => [self::SUPER_ONLY],
         'delete_role'           => [self::SUPER_ONLY],
         'save_tenant'           => [self::SUPER_ONLY],

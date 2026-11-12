@@ -1525,6 +1525,34 @@ class Master extends DBConnection
     }
 
     /* Invoice Actions */
+    /* Developer error logs */
+    public function log_js_error()
+    {
+        $entry = [
+            'time' => date('Y-m-d H:i:s'),
+            'message' => substr(trim((string)($_POST['message'] ?? '')), 0, 600),
+            'source' => substr((string)($_POST['source'] ?? ''), 0, 300),
+            'line' => intval($_POST['line'] ?? 0),
+            'stack' => substr((string)($_POST['stack'] ?? ''), 0, 3000),
+            'page' => substr((string)($_POST['page'] ?? ''), 0, 300),
+            'user' => (string)($this->settings->userdata('username') ?? ''),
+            'agent' => substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 200),
+        ];
+        if ($entry['message'] === '') {
+            return json_encode(['status' => 'failed']);
+        }
+        \App\Support\ErrorLog::append('js', $entry);
+        return json_encode(['status' => 'success']);
+    }
+
+    public function clear_error_log()
+    {
+        $type = ($_POST['type'] ?? '') === 'js' ? 'js' : 'php';
+        \App\Support\ErrorLog::clear($type);
+        $this->settings->log_audit('Cleared error log', 'Developer', strtoupper($type) . ' error log cleared.');
+        return json_encode(['status' => 'success']);
+    }
+
     public function save_invoice()
     {
         return $this->container->make(InvoiceService::class)->saveInvoice($_POST);
@@ -2690,6 +2718,12 @@ switch ($action) {
         break;
     case 'delete_party':
         echo $Master->delete_party();
+        break;
+    case 'log_js_error':
+        echo $Master->log_js_error();
+        break;
+    case 'clear_error_log':
+        echo $Master->clear_error_log();
         break;
     case 'save_invoice':
         echo $Master->save_invoice();
