@@ -1706,6 +1706,9 @@
         Layout._jQueryInterface.call($__default['default']('body'));
     });
     $__default['default'](SELECTOR_SIDEBAR + " a").on('focusin', function() {
+        // A sidebar marked sidebar-no-expand must not grow when a link is
+        // focused, so it never gets the sidebar-focused class.
+        if ($__default['default'](SELECTOR_MAIN_SIDEBAR).hasClass('sidebar-no-expand')) { return; }
         $__default['default'](SELECTOR_MAIN_SIDEBAR).addClass(CLASS_NAME_SIDEBAR_FOCUSED);
     });
     $__default['default'](SELECTOR_SIDEBAR + " a").on('focusout', function() {
