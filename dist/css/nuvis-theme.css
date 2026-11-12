@@ -64,6 +64,10 @@ html .main-sidebar .nav-sidebar .right { color: var(--nv-side-dim) !important; t
 html .main-sidebar .nav-sidebar .menu-open > .nav-link .right { transform: rotate(90deg); }
 html .main-sidebar .nav-sidebar .nav-link.active .right { color: var(--nv-side-active-text) !important; }
 html .main-sidebar .nav-treeview .nav-link { padding-left: 2.2rem !important; font-size: .88rem; color: var(--nv-side-dim) !important; }
+/* AdminLTE's nav-flat puts a .2rem solid left border on every submenu link,
+   which the rounded corners turn into a "(" mark at the rail edge: remove it. */
+html .main-sidebar .nav-sidebar .nav-treeview .nav-item > .nav-link { border-left: 0 !important; }
+html .main-sidebar .nav-flat .nav-treeview .nav-icon { margin-left: 0 !important; }
 html .main-sidebar .nav-treeview .nav-link:hover { color: var(--nv-side-text) !important; background: var(--nv-side-hover) !important; }
 html .main-sidebar .nav-treeview .nav-link.active { color: var(--nv-side-active-text) !important; background: var(--nv-side-active-bg) !important; font-weight: 700; }
 html .main-sidebar .nav-treeview .nav-link.active .nav-icon { color: var(--nv-side-active-icon) !important; }
@@ -101,7 +105,26 @@ html .main-sidebar .nav-treeview .nav-link.active .nav-icon { color: var(--nv-si
 
 /* collapsed rail: keep icons, hide the extras */
 .sidebar-collapse:not(.sidebar-open) .nv-side-search, .sidebar-collapse:not(.sidebar-open) .nv-side-label, .sidebar-collapse:not(.sidebar-open) .nv-pin-btn { display: none; }
-.sidebar-collapse:not(.sidebar-open) .main-sidebar:hover .nv-side-search { display: block; }
+
+/* The collapsed rail stays put. The aside carries .sidebar-no-expand, but
+   AdminLTE's hover and focus (.sidebar-focused) rules ignore it and grew the
+   rail to 250px, shifting everything right. Honour the class. */
+body[class*="sidebar-mini"].sidebar-collapse .main-sidebar.sidebar-no-expand,
+body[class*="sidebar-mini"].sidebar-collapse .main-sidebar.sidebar-no-expand::before,
+body[class*="sidebar-mini"].sidebar-collapse .main-sidebar.sidebar-no-expand:hover,
+body[class*="sidebar-mini"].sidebar-collapse .main-sidebar.sidebar-no-expand.sidebar-focused,
+body[class*="sidebar-mini"].sidebar-collapse .main-sidebar.sidebar-no-expand:hover .brand-link,
+body[class*="sidebar-mini"].sidebar-collapse .main-sidebar.sidebar-no-expand.sidebar-focused .brand-link {
+  width: 4.6rem !important;
+  overflow-x: hidden !important;
+}
+body[class*="sidebar-mini"].sidebar-collapse .main-sidebar.sidebar-no-expand:hover .nav-sidebar .nav-link p,
+body[class*="sidebar-mini"].sidebar-collapse .main-sidebar.sidebar-no-expand.sidebar-focused .nav-sidebar .nav-link p,
+body[class*="sidebar-mini"].sidebar-collapse .main-sidebar.sidebar-no-expand:hover .brand-link .tenant-title-text,
+body[class*="sidebar-mini"].sidebar-collapse .main-sidebar.sidebar-no-expand.sidebar-focused .brand-link .tenant-title-text {
+  display: none !important;
+  animation: none !important;
+}
 
 /* ---------- density and text size ---------- */
 html[data-nv-text="small"] { font-size: 14.5px; }
