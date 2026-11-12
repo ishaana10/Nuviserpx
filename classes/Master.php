@@ -1402,619 +1402,69 @@ if ($action !== 'none' && !in_array($action, \App\Support\Permissions::PUBLIC_AC
     }
 }
 
-switch ($action) {
-    case 'save_group':
-        echo $Master->save_group();
-        break;
-    case 'delete_group':
-        echo $Master->delete_group();
-        break;
-    case 'save_account':
-        echo $Master->save_account();
-        break;
-    case 'delete_account':
-        echo $Master->delete_account();
-        break;
-    case 'save_journal':
-        echo $Master->save_journal();
-        break;
-    case 'post_opening_balances':
-        echo $Master->post_opening_balances();
-        break;
-    case 'reverse_journal':
-        echo $Master->reverse_journal();
-        break;
-    case 'save_budget':
-        echo $Master->save_budget();
-        break;
-    case 'save_exchange_rate':
-        echo $Master->save_exchange_rate();
-        break;
-    case 'post_fx_revaluation':
-        echo $Master->post_fx_revaluation();
-        break;
-    case 'issue_credit_note':
-        echo $Master->issue_credit_note();
-        break;
-    case 'refund_credit_note':
-        echo $Master->refund_credit_note();
-        break;
-    case 'void_note_refund':
-        echo $Master->void_note_refund();
-        break;
-    case 'void_credit_note':
-        echo $Master->void_credit_note();
-        break;
-    case 'run_depreciation':
-        echo $Master->run_depreciation();
-        break;
-    case 'dispose_asset':
-        echo $Master->dispose_asset();
-        break;
-    case 'run_auto_reversals':
-        echo $Master->run_auto_reversals();
-        break;
-    case 'approve_bill_payment':
-        echo $Master->approve_bill_payment();
-        break;
-    case 'reject_bill_payment':
-        echo $Master->reject_bill_payment();
-        break;
-    case 'approve_bill':
-        echo $Master->approve_bill();
-        break;
-    case 'reject_bill':
-        echo $Master->reject_bill();
-        break;
-    case 'approve_journal':
-        echo $Master->approve_journal();
-        break;
-    case 'reject_journal':
-        echo $Master->reject_journal();
-        break;
-    case 'save_approval_policy':
-        echo $Master->save_approval_policy();
-        break;
-    case 'save_price_list':
-        echo $Master->save_price_list();
-        break;
-    case 'delete_price_list':
-        echo $Master->delete_price_list();
-        break;
-    case 'save_price_list_item':
-        echo $Master->save_price_list_item();
-        break;
-    case 'delete_price_list_item':
-        echo $Master->delete_price_list_item();
-        break;
-    case 'assign_price_list':
-        echo $Master->assign_price_list();
-        break;
-    case 'lookup_prices':
-        echo $Master->lookup_prices();
-        break;
-    case 'revise_quote':
-        echo $Master->revise_quote();
-        break;
-    case 'decline_quote':
-        echo $Master->decline_quote();
-        break;
-    case 'extend_quote':
-        echo $Master->extend_quote();
-        break;
-    case 'confirm_for_delivery':
-        echo $Master->confirm_for_delivery();
-        break;
-    case 'save_delivery_note':
-        echo $Master->save_delivery_note();
-        break;
-    case 'cancel_delivery_note':
-        echo $Master->cancel_delivery_note();
-        break;
-    case 'invoice_delivered':
-        echo $Master->invoice_delivered();
-        break;
-    case 'save_default_accounts':
-        echo $Master->save_default_accounts();
-        break;
-    case 'save_inventory_accounting':
-        echo $Master->save_inventory_accounting();
-        break;
-    case 'file_tax_return':
-        echo $Master->file_tax_return();
-        break;
-    case 'void_tax_return':
-        echo $Master->void_tax_return();
-        break;
-    case 'save_tax_code':
-        echo $Master->save_tax_code();
-        break;
-    case 'delete_tax_code':
-        echo $Master->delete_tax_code();
-        break;
-    case 'set_period_lock':
-        echo $Master->set_period_lock();
-        break;
-    case 'delete_journal':
-        echo $Master->delete_journal();
-        break;
-    case 'cancel_journal':
-        echo $Master->cancel_journal();
-        break;
-    case 'save_employee':
-        echo $Master->save_employee();
-        break;
-    case 'delete_employee':
-        echo $Master->delete_employee();
-        break;
-    case 'save_public_holiday':
-        echo $Master->save_public_holiday();
-        break;
-    case 'delete_public_holiday':
-        echo $Master->delete_public_holiday();
-        break;
-    case 'save_leave_entitlement':
-        echo $Master->save_leave_entitlement();
-        break;
-    case 'save_leave_policy':
-        echo $Master->save_leave_policy();
-        break;
-    case 'save_leave_adjustment':
-        echo $Master->save_leave_adjustment();
-        break;
-    case 'leave_balance_info':
-        echo $Master->leave_balance_info();
-        break;
-    case 'leave_payout_suggestion':
-        echo $Master->leave_payout_suggestion();
-        break;
-    case 'invite_employee_portal':
-        echo $Master->invite_employee_portal();
-        break;
-    case 'revoke_employee_portal':
-        echo $Master->revoke_employee_portal();
-        break;
-    case 'employee_portal_login':
-        echo $Master->employee_portal_login();
-        break;
-    case 'employee_portal_activate':
-        echo $Master->employee_portal_activate();
-        break;
-    case 'save_attendance':
-        echo $Master->save_attendance();
-        break;
-    case 'delete_attendance':
-        echo $Master->delete_attendance();
-        break;
-    case 'save_leave':
-        echo $Master->save_leave();
-        break;
-    case 'update_leave_status':
-        echo $Master->update_leave_status();
-        break;
-    case 'cancel_leave':
-        echo $Master->cancel_leave();
-        break;
-    case 'delete_leave':
-        echo $Master->delete_leave();
-        break;
-    case 'calculate_payroll_ajax':
-        echo $Master->calculate_payroll_ajax();
-        break;
-    case 'save_payroll_rules':
-        echo $Master->save_payroll_rules();
-        break;
-    case 'delete_payroll_rules_version':
-        echo $Master->delete_payroll_rules_version();
-        break;
-    case 'reset_payroll_rules':
-        echo $Master->reset_payroll_rules();
-        break;
-    case 'save_payroll':
-        echo $Master->save_payroll();
-        break;
-    case 'delete_payroll':
-        echo $Master->delete_payroll();
-        break;
-    case 'save_party':
-        echo $Master->save_party();
-        break;
-    case 'delete_party':
-        echo $Master->delete_party();
-        break;
-    case 'log_js_error':
-        echo $Master->log_js_error();
-        break;
-    case 'clear_error_log':
-        echo $Master->clear_error_log();
-        break;
-    case 'save_invoice':
-        echo $Master->save_invoice();
-        break;
-    case 'delete_invoice':
-        echo $Master->delete_invoice();
-        break;
-    case 'save_payment':
-        echo $Master->save_payment();
-        break;
-    case 'delete_payment':
-        echo $Master->delete_payment();
-        break;
-    case 'save_product':
-        echo $Master->save_product();
-        break;
-    case 'delete_product':
-        echo $Master->delete_product();
-        break;
-    case 'save_sales_order':
-        echo $Master->save_sales_order();
-        break;
-    case 'confirm_sales_order':
-        echo $Master->confirm_sales_order();
-        break;
-    case 'delete_sales_order':
-        echo $Master->delete_sales_order();
-        break;
-    case 'save_purchase_order':
-        echo $Master->save_purchase_order();
-        break;
-    case 'delete_purchase_order':
-        echo $Master->delete_purchase_order();
-        break;
-    case 'receive_goods':
-        echo $Master->receive_goods();
-        break;
-    case 'save_vendor_bill':
-        echo $Master->save_vendor_bill();
-        break;
-    case 'pay_vendor_bills':
-        echo $Master->pay_vendor_bills();
-        break;
-    case 'void_bill_payment':
-        echo $Master->void_bill_payment();
-        break;
-    case 'cancel_vendor_bill':
-        echo $Master->cancel_vendor_bill();
-        break;
-    case 'delete_vendor_bill':
-        echo $Master->delete_vendor_bill();
-        break;
-    case 'start_reconciliation':
-        echo $Master->start_reconciliation();
-        break;
-    case 'update_reconciliation':
-        echo $Master->update_reconciliation();
-        break;
-    case 'delete_reconciliation':
-        echo $Master->delete_reconciliation();
-        break;
-    case 'add_statement_lines':
-        echo $Master->add_statement_lines();
-        break;
-    case 'delete_statement_line':
-        echo $Master->delete_statement_line();
-        break;
-    case 'match_statement_line':
-        echo $Master->match_statement_line();
-        break;
-    case 'unmatch_statement_line':
-        echo $Master->unmatch_statement_line();
-        break;
-    case 'finalize_reconciliation':
-        echo $Master->finalize_reconciliation();
-        break;
-    case 'reopen_reconciliation':
-        echo $Master->reopen_reconciliation();
-        break;
-    case 'save_stock_adjustment':
-        echo $Master->save_stock_adjustment();
-        break;
-    case 'save_api_key':
-        echo $Master->save_api_key();
-        break;
-    case 'delete_api_key':
-        echo $Master->delete_api_key();
-        break;
-    case 'save_webhook':
-        echo $Master->save_webhook();
-        break;
-    case 'delete_webhook':
-        echo $Master->delete_webhook();
-        break;
-    case 'test_webhook':
-        echo $Master->test_webhook();
-        break;
-    case 'save_workflow':
-        echo $Master->save_workflow();
-        break;
-    case 'delete_workflow':
-        echo $Master->delete_workflow();
-        break;
-    case 'toggle_workflow':
-        echo $Master->toggle_workflow();
-        break;
-    case 'save_plan':
-        echo $Master->save_plan();
-        break;
-    case 'delete_plan':
-        echo $Master->delete_plan();
-        break;
-    case 'assign_plan':
-        echo $Master->assign_plan();
-        break;
-    case 'save_role':
-        echo $Master->save_role();
-        break;
-    case 'delete_role':
-        echo $Master->delete_role();
-        break;
-    case 'email_invoice':
-        echo $Master->email_invoice();
-        break;
-    case 'email_payment_receipt':
-        echo $Master->email_payment_receipt();
-        break;
-    case 'save_batch_payroll':
-        echo $Master->save_batch_payroll();
-        break;
-    case 'email_payslip':
-        echo $Master->email_payslip();
-        break;
-    case 'save_tenant':
-        echo $Master->save_tenant();
-        break;
-    case 'delete_tenant':
-        echo $Master->delete_tenant();
-        break;
-    case 'git_pull':
-        echo $Master->git_pull();
-        break;
-    case 'git_fetch':
-        echo $Master->git_fetch();
-        break;
-    case 'get_redis_status':
-        echo $Master->get_redis_status();
-        break;
-    case 'test_redis_ping':
-        echo $Master->test_redis_ping();
-        break;
-    case 'start_redis_daemon':
-        echo $Master->start_redis_daemon();
-        break;
-    case 'send_customer_invitation':
-        echo $Master->send_customer_invitation();
-        break;
-    case 'customer_register':
-        echo $Master->customer_register();
-        break;
-    case 'customer_login':
-        echo $Master->customer_login();
-        break;
-    case 'get_portal_logs':
-        echo $Master->get_portal_logs();
-        break;
-    case 'save_invoice_template':
-        echo $Master->save_invoice_template();
-        break;
-    case 'save_asset':
-        echo $Master->save_asset();
-        break;
-    case 'delete_asset':
-        echo $Master->delete_asset();
-        break;
-    case 'save_bank_account':
-        echo $Master->save_bank_account();
-        break;
-    case 'save_opportunity':
-        echo $Master->save_opportunity();
-        break;
-    case 'delete_opportunity':
-        echo $Master->delete_opportunity();
-        break;
-    case 'save_crm_contact':
-        echo $Master->save_crm_contact();
-        break;
-    case 'delete_crm_contact':
-        echo $Master->delete_crm_contact();
-        break;
-    case 'move_opportunity_stage':
-        echo $Master->move_opportunity_stage();
-        break;
-    case 'convert_opportunity':
-        echo $Master->convert_opportunity();
-        break;
-    case 'save_crm_activity':
-        echo $Master->save_crm_activity();
-        break;
-    case 'toggle_crm_activity':
-        echo $Master->toggle_crm_activity();
-        break;
-    case 'delete_crm_activity':
-        echo $Master->delete_crm_activity();
-        break;
-    case 'save_proposal_signature':
-        echo $Master->save_proposal_signature();
-        break;
-    case 'save_ticket':
-        echo $Master->save_ticket();
-        break;
-    case 'reply_ticket':
-        echo $Master->reply_ticket();
-        break;
-    case 'save_contract':
-        echo $Master->save_contract();
-        break;
-    case 'save_sla_policies':
-        echo $Master->save_sla_policies();
-        break;
-    case 'save_reminder_settings':
-        echo $Master->save_reminder_settings();
-        break;
-    case 'run_payment_reminders':
-        echo $Master->run_payment_reminders();
-        break;
-    case 'preview_landed_cost':
-        echo $Master->preview_landed_cost();
-        break;
-    case 'post_landed_cost':
-        echo $Master->post_landed_cost();
-        break;
-    case 'write_off_expired':
-        echo $Master->write_off_expired();
-        break;
-    case 'create_stock_count':
-        echo $Master->create_stock_count();
-        break;
-    case 'save_stock_counts':
-        echo $Master->save_stock_counts();
-        break;
-    case 'post_stock_count':
-        echo $Master->post_stock_count();
-        break;
-    case 'cancel_stock_count':
-        echo $Master->cancel_stock_count();
-        break;
-    case 'import_parties':
-        echo $Master->import_parties();
-        break;
-    case 'import_products':
-        echo $Master->import_products();
-        break;
-    case 'import_accounts':
-        echo $Master->import_accounts();
-        break;
-    case 'generate_contract_invoices':
-        echo $Master->generate_contract_invoices();
-        break;
-    case 'save_warehouse':
-        echo $Master->save_warehouse();
-        break;
-    case 'transfer_stock':
-        echo $Master->transfer_stock();
-        break;
-    case 'save_expense_claim':
-        echo $Master->save_expense_claim();
-        break;
-    case 'approve_expense_claim':
-        echo $Master->approve_expense_claim();
-        break;
-    case 'reject_expense_claim':
-        echo $Master->reject_expense_claim();
-        break;
-    case 'cancel_expense_claim':
-        echo $Master->cancel_expense_claim();
-        break;
-    case 'void_expense_claim':
-        echo $Master->void_expense_claim();
-        break;
-    case 'reimburse_expense_claims':
-        echo $Master->reimburse_expense_claims();
-        break;
-    case 'reverse_expense_reimbursement':
-        echo $Master->reverse_expense_reimbursement();
-        break;
-    case 'save_expense_category':
-        echo $Master->save_expense_category();
-        break;
-    case 'save_module_settings':
-        echo $Master->save_module_settings();
-        break;
-    case 'save_extrafield':
-        echo $Master->save_extrafield();
-        break;
-    case 'delete_extrafield':
-        echo $Master->delete_extrafield();
-        break;
-    case 'delete_accounts_bulk':
-        echo $Master->delete_accounts_bulk();
-        break;
-    case 'archive_accounts_bulk':
-        echo $Master->archive_accounts_bulk();
-        break;
-    case 'change_tax_rate_bulk':
-        echo $Master->change_tax_rate_bulk();
-        break;
-    case 'save_currency':
-        echo $Master->save_currency();
-        break;
-    case 'delete_currency':
-        echo $Master->delete_currency();
-        break;
-    case 'backup_db':
-        $Master->backup_db();
-        break;
-    case 'optimize_db':
-        echo $Master->optimize_db();
-        break;
-    case 'save_shift_type':
-        echo $Master->save_shift_type();
-        break;
-    case 'save_shift_assignment':
-        echo $Master->save_shift_assignment();
-        break;
-    case 'save_salary_component':
-        echo $Master->save_salary_component();
-        break;
-    case 'delete_salary_component':
-        echo $Master->delete_salary_component();
-        break;
-    case 'issue_staff_loan':
-        echo $Master->issue_staff_loan();
-        break;
-    case 'cancel_staff_loan':
-        echo $Master->cancel_staff_loan();
-        break;
-    case 'assign_salary_component':
-        echo $Master->assign_salary_component();
-        break;
-    case 'unassign_salary_component':
-        echo $Master->unassign_salary_component();
-        break;
-    case 'terminate_session':
-        echo $Master->terminate_session();
-        break;
-    case 'approve_payroll_run':
-        echo $Master->approve_payroll_run();
-        break;
-    case 'reject_payroll_run':
-        echo $Master->reject_payroll_run();
-        break;
-    case 'approve_payroll_remittance':
-        echo $Master->approve_payroll_remittance();
-        break;
-    case 'reject_payroll_remittance':
-        echo $Master->reject_payroll_remittance();
-        break;
-    case 'pay_payroll_salaries':
-        echo $Master->pay_payroll_salaries();
-        break;
-    case 'reverse_payroll_payment':
-        echo $Master->reverse_payroll_payment();
-        break;
-    case 'remit_payroll_liability':
-        echo $Master->remit_payroll_liability();
-        break;
-    case 'reverse_payroll_remittance':
-        echo $Master->reverse_payroll_remittance();
-        break;
-    case 'cancel_retro_pay':
-        echo $Master->cancel_retro_pay();
-        break;
-    case 'apply_retro_pay':
-        echo $Master->apply_retro_pay();
-        break;
-    case 'save_tenant_vms_settings':
-        echo $Master->save_tenant_vms_settings();
-        break;
-    case 'test_sdc_ping':
-        echo $Master->test_sdc_ping();
-        break;
-    case 'simulate_vms_fiscalization':
-        echo $Master->simulate_vms_fiscalization();
-        break;
-    case 'upload_tenant_vsdc_cert':
-        echo $Master->upload_tenant_vsdc_cert();
-        break;
-    default:
-        break;
+/* -------------------------------------------------------------------------
+ * Dispatch: every allowed action calls the same-named public Master method
+ * (most are one-line delegates into src/Services). The permission gate above
+ * has already run for the action. backup_db streams its download itself, so
+ * it is called without echo. Unknown actions fall through silently, as the
+ * old switch's default did.
+ * ------------------------------------------------------------------------- */
+$allowed_actions = [
+    'save_group', 'delete_group', 'save_account', 'delete_account',
+    'save_journal', 'post_opening_balances', 'reverse_journal', 'save_budget',
+    'save_exchange_rate', 'post_fx_revaluation', 'issue_credit_note', 'refund_credit_note',
+    'void_note_refund', 'void_credit_note', 'run_depreciation', 'dispose_asset',
+    'run_auto_reversals', 'approve_bill_payment', 'reject_bill_payment', 'approve_bill',
+    'reject_bill', 'approve_journal', 'reject_journal', 'save_approval_policy',
+    'save_price_list', 'delete_price_list', 'save_price_list_item', 'delete_price_list_item',
+    'assign_price_list', 'lookup_prices', 'revise_quote', 'decline_quote',
+    'extend_quote', 'confirm_for_delivery', 'save_delivery_note', 'cancel_delivery_note',
+    'invoice_delivered', 'save_default_accounts', 'save_inventory_accounting', 'file_tax_return',
+    'void_tax_return', 'save_tax_code', 'delete_tax_code', 'set_period_lock',
+    'delete_journal', 'cancel_journal', 'save_employee', 'delete_employee',
+    'save_public_holiday', 'delete_public_holiday', 'save_leave_entitlement', 'save_leave_policy',
+    'save_leave_adjustment', 'leave_balance_info', 'leave_payout_suggestion', 'invite_employee_portal',
+    'revoke_employee_portal', 'employee_portal_login', 'employee_portal_activate', 'save_attendance',
+    'delete_attendance', 'save_leave', 'update_leave_status', 'cancel_leave',
+    'delete_leave', 'calculate_payroll_ajax', 'save_payroll_rules', 'delete_payroll_rules_version',
+    'reset_payroll_rules', 'save_payroll', 'delete_payroll', 'save_party',
+    'delete_party', 'log_js_error', 'clear_error_log', 'save_invoice',
+    'delete_invoice', 'save_payment', 'delete_payment', 'save_product',
+    'delete_product', 'save_sales_order', 'confirm_sales_order', 'delete_sales_order',
+    'save_purchase_order', 'delete_purchase_order', 'receive_goods', 'save_vendor_bill',
+    'pay_vendor_bills', 'void_bill_payment', 'cancel_vendor_bill', 'delete_vendor_bill',
+    'start_reconciliation', 'update_reconciliation', 'delete_reconciliation', 'add_statement_lines',
+    'delete_statement_line', 'match_statement_line', 'unmatch_statement_line', 'finalize_reconciliation',
+    'reopen_reconciliation', 'save_stock_adjustment', 'save_api_key', 'delete_api_key',
+    'save_webhook', 'delete_webhook', 'test_webhook', 'save_workflow',
+    'delete_workflow', 'toggle_workflow', 'save_plan', 'delete_plan',
+    'assign_plan', 'save_role', 'delete_role', 'email_invoice',
+    'email_payment_receipt', 'save_batch_payroll', 'email_payslip', 'save_tenant',
+    'delete_tenant', 'git_pull', 'git_fetch', 'get_redis_status',
+    'test_redis_ping', 'start_redis_daemon', 'send_customer_invitation', 'customer_register',
+    'customer_login', 'get_portal_logs', 'save_invoice_template', 'save_asset',
+    'delete_asset', 'save_bank_account', 'save_opportunity', 'delete_opportunity',
+    'save_crm_contact', 'delete_crm_contact', 'move_opportunity_stage', 'convert_opportunity',
+    'save_crm_activity', 'toggle_crm_activity', 'delete_crm_activity', 'save_proposal_signature',
+    'save_ticket', 'reply_ticket', 'save_contract', 'save_sla_policies',
+    'save_reminder_settings', 'run_payment_reminders', 'preview_landed_cost', 'post_landed_cost',
+    'write_off_expired', 'create_stock_count', 'save_stock_counts', 'post_stock_count',
+    'cancel_stock_count', 'import_parties', 'import_products', 'import_accounts',
+    'generate_contract_invoices', 'save_warehouse', 'transfer_stock', 'save_expense_claim',
+    'approve_expense_claim', 'reject_expense_claim', 'cancel_expense_claim', 'void_expense_claim',
+    'reimburse_expense_claims', 'reverse_expense_reimbursement', 'save_expense_category', 'save_module_settings',
+    'save_extrafield', 'delete_extrafield', 'delete_accounts_bulk', 'archive_accounts_bulk',
+    'change_tax_rate_bulk', 'save_currency', 'delete_currency', 'optimize_db',
+    'save_shift_type', 'save_shift_assignment', 'save_salary_component', 'delete_salary_component',
+    'issue_staff_loan', 'cancel_staff_loan', 'assign_salary_component', 'unassign_salary_component',
+    'terminate_session', 'approve_payroll_run', 'reject_payroll_run', 'approve_payroll_remittance',
+    'reject_payroll_remittance', 'pay_payroll_salaries', 'reverse_payroll_payment', 'remit_payroll_liability',
+    'reverse_payroll_remittance', 'cancel_retro_pay', 'apply_retro_pay', 'save_tenant_vms_settings',
+    'test_sdc_ping', 'simulate_vms_fiscalization', 'upload_tenant_vsdc_cert',
+];
+
+if ($action === 'backup_db') {
+    $Master->backup_db();
+} elseif (in_array($action, $allowed_actions, true)) {
+    echo $Master->{$action}();
 }

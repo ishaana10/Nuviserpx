@@ -5,7 +5,7 @@ $root = dirname(__DIR__);
 $cfg = file_get_contents($root . '/config.php');
 $dbc = file_get_contents($root . '/classes/DBConnection.php');
 $la  = file_get_contents($root . '/admin/settings/login_activity.php');
-$nav = file_get_contents($root . '/admin/inc/navigation.php');
+$nav = file_get_contents($root . '/admin/inc/navigation.php') . implode('', array_map('file_get_contents', glob($root . '/admin/inc/menus/*.php')));
 $rep = file_get_contents($root . '/admin/reports/index.php');
 
 $fail = 0;

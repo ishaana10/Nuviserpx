@@ -41,7 +41,7 @@ $perm = file_get_contents("$root/src/Support/Permissions.php");
 $svc = file_get_contents("$root/src/Services/PaymentReminderService.php");
 $cron = file_get_contents("$root/cron/payment_reminders.php");
 foreach (['save_reminder_settings', 'run_payment_reminders'] as $f) {
-    check("Master has $f", strpos($master, "function $f(") !== false && strpos($master, "case '$f':") !== false);
+    check("Master has $f", strpos($master, "function $f(") !== false && strpos($master, "'$f',") !== false);
     check("Permissions maps $f", strpos($perm, "'$f'") !== false);
 }
 check('page is permissioned', strpos($perm, "'payment_reminders' => 'invoices_view'") !== false);
@@ -49,6 +49,6 @@ check('run is locked per company', strpos($svc, 'GET_LOCK') !== false);
 check('fee invoices are excluded from reminders and fees', strpos($svc, 'late_fee_for_id IS NULL') !== false);
 check('cron is CLI only', strpos($cron, "PHP_SAPI !== 'cli'") !== false);
 check('email template exists', strpos(file_get_contents("$root/classes/Emailer.php"), 'function send_payment_reminder_email') !== false);
-check('nav link exists', strpos(file_get_contents("$root/admin/inc/navigation.php"), 'page=payment_reminders') !== false);
+check('nav link exists', strpos(implode('', array_map('file_get_contents', glob("$root/admin/inc/menus/*.php"))), 'page=payment_reminders') !== false);
 echo $fail ? "\n$fail FAILED\n" : "\nAll passed\n";
 exit($fail ? 1 : 0);

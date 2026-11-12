@@ -44,6 +44,6 @@ foreach (['create_stock_count', 'save_stock_counts', 'post_stock_count', 'cancel
 check('page is mapped to stock view', preg_match("/'stock_counts'\s*=>\s*'stock_view'/", $perm) === 1);
 $m = file_get_contents("$root/classes/Master.php");
 foreach (['create_stock_count', 'save_stock_counts', 'post_stock_count', 'cancel_stock_count'] as $a) {
-    check("$a is routed", strpos($m, "case '$a':") !== false);
+    check("$a is routed", strpos($m, "'$a',") !== false);
 }
 exit($fail ? 1 : 0);

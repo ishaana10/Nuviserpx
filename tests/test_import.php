@@ -75,13 +75,13 @@ $master = file_get_contents("$root/classes/Master.php") . file_get_contents("$ro
 $perm = file_get_contents("$root/src/Support/Permissions.php");
 $svc = file_get_contents("$root/src/Services/ImportService.php");
 foreach (['import_parties', 'import_products', 'import_accounts'] as $f) {
-    check("Master has $f", strpos($master, "function $f(") !== false && strpos($master, "case '$f':") !== false);
+    check("Master has $f", strpos($master, "function $f(") !== false && strpos($master, "'$f',") !== false);
     check("Permissions maps $f", strpos($perm, "'$f'") !== false);
 }
 check('upload is limited by extension and size', strpos($master, "['csv', 'txt']") !== false && strpos($master, 'ImportService::MAX_BYTES') !== false);
 check('rows are saved through the normal services', strpos($svc, 'saveParty(') !== false && strpos($svc, 'saveProduct(') !== false && strpos($svc, 'saveAccount(') !== false);
 check('updates never change stock', strpos($svc, "array_diff_key(\$clean, ['stock_quantity' => 1])") !== false);
 check('import is audited', strpos($svc, "log_audit('Imported '") !== false);
-check('nav link and page exist', strpos(file_get_contents("$root/admin/inc/navigation.php"), 'settings/data_import') !== false && is_file("$root/admin/settings/data_import.php"));
+check('nav link and page exist', strpos(implode('', array_map('file_get_contents', glob("$root/admin/inc/menus/*.php"))), 'settings/data_import') !== false && is_file("$root/admin/settings/data_import.php"));
 echo $fail ? "\n$fail FAILED\n" : "\nAll passed\n";
 exit($fail ? 1 : 0);

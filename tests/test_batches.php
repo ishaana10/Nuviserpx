@@ -46,5 +46,5 @@ check('one row per batch per location', strpos($mig, 'uniq_batch') !== false && 
 $perm = file_get_contents("$root/src/Support/Permissions.php");
 check('write-off needs stock save', preg_match("/'write_off_expired'\s*=>\s*\['stock', 'save'\]/", $perm) === 1);
 check('batches page needs stock view', preg_match("/'batches'\s*=>\s*'stock_view'/", $perm) === 1);
-check('write-off is routed', strpos(file_get_contents("$root/classes/Master.php"), "case 'write_off_expired':") !== false);
+check('write-off is routed', strpos(file_get_contents("$root/classes/Master.php"), "'write_off_expired',") !== false);
 exit($fail ? 1 : 0);

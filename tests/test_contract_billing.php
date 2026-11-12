@@ -47,7 +47,7 @@ $master = file_get_contents("$root/classes/Master.php");
 $perm = file_get_contents("$root/src/Support/Permissions.php");
 $svc = file_get_contents("$root/src/Services/ContractBillingService.php");
 $cron = file_get_contents("$root/cron/contract_invoices.php");
-check('Master action and case exist', strpos($master, 'function generate_contract_invoices(') !== false && strpos($master, "case 'generate_contract_invoices':") !== false);
+check('Master action and case exist', strpos($master, 'function generate_contract_invoices(') !== false && strpos($master, "'generate_contract_invoices',") !== false);
 check('action is permissioned', strpos($perm, "'generate_contract_invoices'") !== false);
 check('billing is locked per contract', strpos($svc, 'GET_LOCK') !== false);
 check('cron is CLI only and loops tenants', strpos($cron, "PHP_SAPI !== 'cli'") !== false && strpos($cron, 'FROM tenants') !== false);

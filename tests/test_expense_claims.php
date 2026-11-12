@@ -49,7 +49,7 @@ $perm = file_get_contents("$root/src/Support/Permissions.php");
 $jr = file_get_contents("$root/src/Services/JournalService.php");
 $svc = file_get_contents("$root/src/Services/ExpenseClaimService.php");
 foreach (['approve_expense_claim', 'reject_expense_claim', 'cancel_expense_claim', 'void_expense_claim', 'reimburse_expense_claims', 'reverse_expense_reimbursement', 'save_expense_category'] as $f) {
-    check("Master has $f method and case", strpos($master, "function $f(") !== false && strpos($master, "case '$f':") !== false);
+    check("Master has $f method and case", strpos($master, "function $f(") !== false && strpos($master, "'$f',") !== false);
     check("Permissions maps $f", strpos($perm, "'$f'") !== false);
 }
 check('journal sources cover claims and payments', strpos($jr, "'expense_reports'") !== false && strpos($jr, "'expense_reimbursement'") !== false);
