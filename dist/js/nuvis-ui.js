@@ -201,6 +201,7 @@
         applyDensity();
         buildSummary(api);
         buildFilters(api);
+        alignColumns(api);
 
         // Double-click a row to open its edit form (if it has one).
         $table.on('dblclick', 'tbody tr', function (ev) {
@@ -210,6 +211,32 @@
             var $link = $(this).find('a.dropdown-item[href*="manage_"], a.dropdown-item[href*="view"]').first();
             if ($link.length && $link.attr('href') && $link.attr('href').indexOf('javascript') !== 0) {
                 window.location.href = $link.attr('href');
+            }
+        });
+    }
+
+    // Right-align money/number columns (heading and cells together) and
+    // centre the index column, so values line up under their headings.
+    function alignColumns(api) {
+        var numRe = /^-?[\d,]+(\.\d+)?%?$/;
+        $(api.table().header()).find('th').each(function (i) {
+            if (isIndexHeader(this)) {
+                $(this).addClass('nv-idx');
+                api.column(i).nodes().to$().addClass('nv-idx');
+                return;
+            }
+            if (isUtilityHeader(this)) { return; }
+            var nodes = api.column(i).nodes().toArray(), seen = 0, numeric = 0;
+            for (var j = 0; j < nodes.length; j++) {
+                if ($(nodes[j]).find('.badge, .btn, .dropdown').length) { seen = 0; break; }
+                var t = $.trim($(nodes[j]).text()).replace(/^[A-Z]{1,3}\$?\s*|^[$\u20ac\u00a3]\s*/, '');
+                if (t === '') { continue; }
+                seen++;
+                if (numRe.test(t)) { numeric++; }
+            }
+            if (seen > 0 && numeric / seen >= 0.8) {
+                $(this).addClass('nv-num');
+                api.column(i).nodes().to$().addClass('nv-num');
             }
         });
     }
