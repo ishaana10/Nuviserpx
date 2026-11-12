@@ -18,7 +18,18 @@ class PaymentService
 
     public function savePayment(array $post): string
     {
-        extract($post);
+        $id = $post['id'] ?? null;
+        $type = $post['type'] ?? null;
+        $party_id = $post['party_id'] ?? null;
+        $bank_account_id = $post['bank_account_id'] ?? null;
+        $payment_date = $post['payment_date'] ?? null;
+        $amount = $post['amount'] ?? null;
+        $method = $post['method'] ?? null;
+        $reference = $post['reference'] ?? null;
+        $notes = $post['notes'] ?? null;
+        $status = $post['status'] ?? null;
+        $currency = $post['currency'] ?? null;
+        $invoice_alloc = $post['invoice_alloc'] ?? null;
         $tenant_id = $this->settings->active_tenant_id();
         $user_id = $this->settings->userdata('id');
         $id = !empty($id) ? $this->conn->real_escape_string((string)$id) : '';

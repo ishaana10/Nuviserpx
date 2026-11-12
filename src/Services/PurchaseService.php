@@ -33,7 +33,24 @@ class PurchaseService
 
     public function savePurchaseOrder(array $post): string
     {
-        extract($post);
+        $id = $post['id'] ?? null;
+        $po_no = $post['po_no'] ?? null;
+        $vendor_id = $post['vendor_id'] ?? null;
+        $order_date = $post['order_date'] ?? null;
+        $expected_date = $post['expected_date'] ?? null;
+        $warehouse_id = $post['warehouse_id'] ?? null;
+        $subtotal = $post['subtotal'] ?? null;
+        $tax_amount = $post['tax_amount'] ?? null;
+        $discount = $post['discount'] ?? null;
+        $total = $post['total'] ?? null;
+        $notes = $post['notes'] ?? null;
+        $status = $post['status'] ?? null;
+        $item_name = $post['item_name'] ?? null;
+        $product_id = $post['product_id'] ?? null;
+        $item_desc = $post['item_desc'] ?? null;
+        $item_qty = $post['item_qty'] ?? null;
+        $item_price = $post['item_price'] ?? null;
+        $item_tax_rate = $post['item_tax_rate'] ?? null;
         $tenant_id = $this->settings->active_tenant_id();
         $user_id = $this->settings->userdata('id');
         $id = !empty($id) ? $this->conn->real_escape_string((string)$id) : '';
@@ -182,7 +199,11 @@ class PurchaseService
 
     public function receiveGoods(array $post): string
     {
-        extract($post);
+        $purchase_order_id = $post['purchase_order_id'] ?? null;
+        $receipt_date = $post['receipt_date'] ?? null;
+        $notes = $post['notes'] ?? null;
+        $po_item_id = $post['po_item_id'] ?? null;
+        $receive_qty = $post['receive_qty'] ?? null;
         $tenant_id = $this->settings->active_tenant_id();
         $user_id = $this->settings->userdata('id');
 
@@ -358,7 +379,25 @@ class PurchaseService
 
     public function saveVendorBill(array $post): string
     {
-        extract($post);
+        $id = $post['id'] ?? null;
+        $bill_no = $post['bill_no'] ?? null;
+        $vendor_ref = $post['vendor_ref'] ?? null;
+        $purchase_order_id = $post['purchase_order_id'] ?? null;
+        $vendor_id = $post['vendor_id'] ?? null;
+        $bill_date = $post['bill_date'] ?? null;
+        $due_date = $post['due_date'] ?? null;
+        $subtotal = $post['subtotal'] ?? null;
+        $tax_amount = $post['tax_amount'] ?? null;
+        $discount = $post['discount'] ?? null;
+        $total = $post['total'] ?? null;
+        $notes = $post['notes'] ?? null;
+        $status = $post['status'] ?? null;
+        $item_name = $post['item_name'] ?? null;
+        $product_id = $post['product_id'] ?? null;
+        $item_desc = $post['item_desc'] ?? null;
+        $item_qty = $post['item_qty'] ?? null;
+        $item_price = $post['item_price'] ?? null;
+        $item_tax_rate = $post['item_tax_rate'] ?? null;
         $tenant_id = $this->settings->active_tenant_id();
         $user_id = $this->settings->userdata('id');
         $id = !empty($id) ? $this->conn->real_escape_string((string)$id) : '';
@@ -390,7 +429,7 @@ class PurchaseService
         $vendor = $v->fetch_assoc();
 
         // Preserve paid_amount on edit; recompute balance + status.
-        // Set explicitly: extract($post) above would otherwise let a posted field of the same name stand in for these.
+        // Start from known values; they are filled from the saved bill below.
         $paid_amount = 0.0;
         $credited_amount = 0.0;
         $oldStatus = '';

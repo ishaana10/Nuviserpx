@@ -17,7 +17,11 @@ class RoleService
 
     public function saveRole(array $post): string
     {
-        extract($post);
+        $id = $post['id'] ?? null;
+        $name = $post['name'] ?? null;
+        $description = $post['description'] ?? null;
+        $permissions = $post['permissions'] ?? null;
+        $status = $post['status'] ?? null;
         $tenant_id = $this->settings->active_tenant_id();
         $id = !empty($id) ? $this->conn->real_escape_string((string)$id) : '';
 
@@ -85,7 +89,10 @@ class RoleService
 
     public function saveApiKey(array $post): string
     {
-        extract($post);
+        $id = $post['id'] ?? null;
+        $name = $post['name'] ?? null;
+        $permissions = $post['permissions'] ?? null;
+        $status = $post['status'] ?? null;
         $tenant_id = $this->settings->active_tenant_id();
         $user_id = $this->settings->userdata('id');
         $id = !empty($id) ? $this->conn->real_escape_string((string)$id) : '';

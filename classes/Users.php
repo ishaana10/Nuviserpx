@@ -273,33 +273,42 @@ Class Users extends DBConnection {
 		}
 		return json_encode($resp);
 	}
+	private function guardClient(int $targetId){
+		$this->settings->require_login();
+		$this->settings->require_csrf();
+		$staff = $this->settings->userdata('login_type') == 1;
+		$err = \App\Support\ClientAccess::error(true, $staff, $staff && $this->settings->can_access('users_manage'), (int)$this->settings->userdata('id'), $targetId);
+		if($err !== null){
+			echo json_encode(['status'=>'failed','msg'=>$err]);
+			exit;
+		}
+	}
+
 	public function save_client(){
 		$oldpassword = $_POST['oldpassword'] ?? null;
-		$id = $_POST['id'] ?? null;
+		$id = isset($_POST['id']) ? (int)$_POST['id'] : 0;
+		$this->guardClient($id);
 		$email = $_POST['email'] ?? null;
 		$password = $_POST['password'] ?? null;
 		$data = '';
-		if(isset($oldpassword)){
+		$self_edit = $this->settings->userdata('login_type') != 1;
+		if($self_edit && !empty($password)){
+			// A client changing their own password has to prove they know the current one.
 			$curr_pass = $this->settings->userdata('password');
-			if (!password_verify($oldpassword, $curr_pass)) {
+			if (empty($oldpassword) || !password_verify((string)$oldpassword, (string)$curr_pass)) {
 				return json_encode(array("status"=>'failed',
 										 "msg"=>'Old Password is Incorrect'));
 			}
 		}
-		$id = isset($id) ? (int)$id : 0;
 		$email_esc = $this->conn->real_escape_string((string)($email ?? ''));
 		$chk = $this->conn->query("SELECT id FROM `client_list` where email ='{$email_esc}' ".($id>0? " and id != {$id} " : ""))->num_rows;
 		if($chk > 0){
 			return 3;
 		}
-		foreach($_POST as $k => $v){
-			if(!in_array($k,array('id','oldpassword','cpassword','password'))){
-				// Guard against column-name injection via crafted POST keys.
-				if(!preg_match('/^[a-zA-Z0-9_]+$/', $k)) continue;
-				if(!empty($data)) $data .=" , ";
-				$v_escaped = $this->conn->real_escape_string((string)$v);
-				$data .= " `{$k}` = '{$v_escaped}' ";
-			}
+		foreach(\App\Support\ClientAccess::pick($_POST) as $k => $v){
+			if(!empty($data)) $data .=" , ";
+			$v_escaped = $this->conn->real_escape_string($v);
+			$data .= " `{$k}` = '{$v_escaped}' ";
 		}
 		if(!empty($password)){
 			$password_hash = password_hash($password, PASSWORD_BCRYPT);
@@ -307,6 +316,9 @@ Class Users extends DBConnection {
 			$data .= " `password` = '{$password_hash}' ";
 		}
 
+		if(empty($data)){
+			return json_encode(array("status"=>'failed',"msg"=>'There is nothing to save.'));
+		}
 		if(empty($id)){
 			$qry = $this->conn->query("INSERT INTO client_list set {$data}");
 			if($qry){
@@ -322,14 +334,10 @@ Class Users extends DBConnection {
 			$qry = $this->conn->query("UPDATE client_list set $data where id = {$id}");
 			if($qry){
 				$this->settings->set_flashdata('success','User Details successfully updated.');
-				if($id == $this->settings->userdata('id')){
-					foreach($_POST as $k => $v){
-						if($k != 'id'){
-							if(!empty($data)) $data .=" , ";
-							$this->settings->set_userdata($k,$v);
-						}
+				if($id == $this->settings->userdata('id') && $self_edit){
+					foreach(\App\Support\ClientAccess::pick($_POST) as $k => $v){
+						$this->settings->set_userdata($k,$v);
 					}
-					
 				}
 				$resp['status'] = "success";
 			}else{
@@ -379,6 +387,8 @@ Class Users extends DBConnection {
 	}
 	public function delete_client(){
 		$id = isset($_POST['id']) ? (int)$_POST['id'] : 0;
+		$this->settings->require_permission('users_manage');
+		$this->settings->require_csrf();
 		$avatar = $this->conn->query("SELECT avatar FROM client_list where id = {$id}")->fetch_array()['avatar'];
 		$qry = $this->conn->query("DELETE FROM client_list where id = {$id}");
 		if($qry){
@@ -394,6 +404,8 @@ Class Users extends DBConnection {
 	}
 	public function verify_client(){
 		$id = isset($_POST['id']) ? (int)$_POST['id'] : 0;
+		$this->settings->require_permission('users_manage');
+		$this->settings->require_csrf();
 		$update = $this->conn->query("UPDATE `client_list` set `status` = 1 where id = {$id}");
 		if($update){
 			$this->settings->set_flashdata('success','client Account has verified successfully.');

@@ -16,7 +16,17 @@ class PartyService
 
     public function saveParty(array $post): string
     {
-        extract($post);
+        $id = $post['id'] ?? null;
+        $party_code = $post['party_code'] ?? null;
+        $name = $post['name'] ?? null;
+        $type = $post['type'] ?? null;
+        $email = $post['email'] ?? null;
+        $phone = $post['phone'] ?? null;
+        $tin = $post['tin'] ?? null;
+        $address = $post['address'] ?? null;
+        $status = $post['status'] ?? null;
+        $credit_limit = $post['credit_limit'] ?? null;
+        $payment_terms_days = $post['payment_terms_days'] ?? null;
         $tenant_id = $this->settings->active_tenant_id();
         $id = !empty($id) ? $this->conn->real_escape_string((string)$id) : '';
 
