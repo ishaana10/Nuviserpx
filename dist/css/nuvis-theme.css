@@ -196,3 +196,11 @@ html .main-sidebar .sidebar .os-padding, html .main-sidebar .sidebar .os-viewpor
 html .main-sidebar .sidebar::-webkit-scrollbar { width: 6px; }
 html .main-sidebar .sidebar::-webkit-scrollbar-thumb { background: var(--nv-side-border); border-radius: 3px; }
 html .main-sidebar .sidebar::-webkit-scrollbar-thumb:hover { background: var(--nv-side-dim); }
+
+/* Dark mode: list-page heading, summary cards and filter panel */
+html[data-nv-eff="dark"] .nv-crumb-current,
+html[data-nv-eff="dark"] .nv-page-title,
+html[data-nv-eff="dark"] .nv-stat-value { color: var(--nv-text) !important; }
+html[data-nv-eff="dark"] .nv-stat { background: var(--nv-surface-2); border-color: var(--nv-border); box-shadow: none; }
+html[data-nv-eff="dark"] .nv-dt-filters { background: var(--nv-surface-2); border-color: var(--nv-border); }
+html[data-nv-eff="dark"] .nv-filter-field select { background: var(--nv-surface); color: var(--nv-text); border-color: var(--nv-border); }

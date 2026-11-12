@@ -20,6 +20,25 @@
         <section class="content">
           <div class="container-fluid">
             <?php
+              // Page heading: breadcrumb + title derived from the current page.
+              if($page !== 'home'){
+                $nvNames = ['crm' => 'CRM', 'hr' => 'HR', 'api_keys' => 'API Keys'];
+                $nvSegs = array_values(array_filter(explode('/', $page), fn($s) => $s !== '' && $s !== 'index'));
+                if($nvSegs){
+                  $nvLast = count($nvSegs) - 1;
+                  echo '<div class="nv-page-head"><nav class="nv-breadcrumb" aria-label="breadcrumb"><a href="./">Home</a>';
+                  foreach($nvSegs as $nvIx => $nvSeg){
+                    $nvLabel = $nvNames[$nvSeg] ?? ucwords(str_replace(['_', '-'], ' ', $nvSeg));
+                    echo '<span class="nv-crumb-sep">/</span>';
+                    if($nvIx < $nvLast){
+                      echo '<a href="./?page=' . htmlspecialchars(implode('/', array_slice($nvSegs, 0, $nvIx + 1))) . '">' . htmlspecialchars($nvLabel) . '</a>';
+                    } else {
+                      echo '<span class="nv-crumb-current">' . htmlspecialchars($nvLabel) . '</span>';
+                      echo '</nav><h1 class="nv-page-title">' . htmlspecialchars($nvLabel) . '</h1></div>';
+                    }
+                  }
+                }
+              }
               $view_file = $page . '.php';
               if(is_dir($page)){
                 $view_file = $page . '/index.php';

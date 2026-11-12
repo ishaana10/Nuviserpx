@@ -199,6 +199,8 @@
 
         enhanceRows(api);
         applyDensity();
+        buildSummary(api);
+        buildFilters(api);
 
         // Double-click a row to open its edit form (if it has one).
         $table.on('dblclick', 'tbody tr', function (ev) {
@@ -209,6 +211,132 @@
             if ($link.length && $link.attr('href') && $link.attr('href').indexOf('javascript') !== 0) {
                 window.location.href = $link.attr('href');
             }
+        });
+    }
+
+    /* ------------------------------------------------------------------ *
+     * Summary cards + column filters (list pages)
+     * ------------------------------------------------------------------ */
+    function escRegex(s) { return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+    function escHtml(s) { return $('<i>').text(s).html(); }
+    function exactSearch(v) { return v === '' ? '' : '^\\s*' + escRegex(v) + '\\s*$'; }
+
+    function badgeTone($badge) {
+        var m = /badge-(success|danger|warning|info|primary|secondary|dark|light)/.exec($badge.attr('class') || '');
+        return m ? m[1] : 'secondary';
+    }
+
+    // The column that holds record status: named like one, or mostly badges.
+    function statusColumn(api) {
+        var best = -1, bestScore = 0.5;
+        $(api.table().header()).find('th').each(function (i) {
+            if (isUtilityHeader(this) || isIndexHeader(this)) { return; }
+            var nodes = api.column(i).nodes().toArray();
+            if (!nodes.length) { return; }
+            var withBadge = 0;
+            for (var j = 0; j < nodes.length; j++) {
+                if ($(nodes[j]).find('.badge').length) { withBadge++; }
+            }
+            if (!withBadge) { return; }
+            var score = withBadge / nodes.length + (/status|state|stage/i.test($(this).text()) ? 0.5 : 0);
+            if (score > bestScore) { bestScore = score; best = i; }
+        });
+        return best;
+    }
+
+    // Cards above the main list: total records plus the biggest statuses.
+    // Clicking a status card filters the table to it.
+    function buildSummary(api) {
+        if ($(api.table().node()).attr('id') !== 'list') { return; }
+        var $card = $(api.table().container()).closest('.card');
+        if (!$card.length || $card.prev('.nv-page-stats').length) { return; }
+        var total = api.rows().count();
+        if (!total) { return; }
+        var colIx = statusColumn(api), counts = [], seen = {};
+        if (colIx > -1) {
+            $.each(api.column(colIx).nodes().toArray(), function (_, node) {
+                var $b = $(node).find('.badge').first();
+                var label = $.trim($b.length ? $b.text() : $(node).text());
+                if (!label) { return; }
+                if (!seen[label]) { seen[label] = { label: label, n: 0, tone: $b.length ? badgeTone($b) : 'secondary' }; counts.push(seen[label]); }
+                seen[label].n++;
+            });
+            counts.sort(function (a, b) { return b.n - a.n; });
+        }
+        var html = '<div class="nv-page-stats">' +
+            '<div class="nv-stat"><div class="nv-stat-label">Total records</div><div class="nv-stat-value">' + total + '</div></div>';
+        $.each(counts.slice(0, 3), function (_, c) {
+            html += '<button type="button" class="nv-stat nv-stat-click" title="Show only these records" data-val="' + escHtml(c.label) + '">' +
+                '<div class="nv-stat-label"><span class="nv-stat-dot nv-dot-' + c.tone + '"></span>' + escHtml(c.label) + '</div>' +
+                '<div class="nv-stat-value">' + c.n + '</div></button>';
+        });
+        var $stats = $(html + '</div>').insertBefore($card);
+        $stats.on('click', '.nv-stat-click', function () {
+            var $btn = $(this), on = !$btn.hasClass('active');
+            $stats.find('.nv-stat-click').removeClass('active');
+            $btn.toggleClass('active', on);
+            var val = on ? $btn.attr('data-val') : '';
+            api.column(colIx).search(exactSearch(val), true, false).draw();
+            $card.find('.nv-dt-filters select[data-col="' + colIx + '"]').val(val);
+        });
+    }
+
+    // "Filters" button + panel of per-column dropdowns, for columns whose
+    // values repeat (status, type, priority, warehouse and the like).
+    function buildFilters(api) {
+        var $container = $(api.table().container());
+        if ($container.data('nvFilters')) { return; }
+        var fields = [];
+        $(api.table().header()).find('th').each(function (i) {
+            if (isUtilityHeader(this) || isIndexHeader(this)) { return; }
+            var nodes = api.column(i).nodes().toArray();
+            if (nodes.length < 3) { return; }
+            var values = {}, count = 0, ok = true;
+            for (var j = 0; j < nodes.length; j++) {
+                var t = $.trim($(nodes[j]).text());
+                if (!t) { continue; }
+                if (t.length > 40) { ok = false; break; }
+                if (!values[t]) { values[t] = true; if (++count > 12) { ok = false; break; } }
+            }
+            if (ok && count >= 2 && count < nodes.length) {
+                fields.push({ ix: i, label: $.trim($(this).text()), values: Object.keys(values).sort() });
+            }
+        });
+        if (!fields.length) { return; }
+        $container.data('nvFilters', true);
+
+        var $btn = $('<button type="button" class="btn btn-default btn-sm nv-filter-btn"><i class="fas fa-filter"></i> Filters</button>');
+        $container.find('.nv-dt-left').first().append($btn);
+
+        var html = '<div class="nv-dt-filters">';
+        $.each(fields, function (_, f) {
+            html += '<label class="nv-filter-field">' + escHtml(f.label) +
+                '<select class="form-control form-control-sm" data-col="' + f.ix + '"><option value="">All</option>';
+            $.each(f.values, function (_, v) { html += '<option value="' + escHtml(v) + '">' + escHtml(v) + '</option>'; });
+            html += '</select></label>';
+        });
+        html += '<button type="button" class="btn btn-link btn-sm nv-filter-clear">Clear filters</button></div>';
+        var $panel = $(html).insertAfter($container.find('.nv-dt-toolbar').first());
+
+        function refresh() {
+            var n = $panel.find('select').filter(function () { return this.value !== ''; }).length;
+            $btn.toggleClass('active', n > 0).find('.nv-filter-count').remove();
+            if (n) { $btn.append('<span class="nv-filter-count">' + n + '</span>'); }
+        }
+        $btn.on('click', function () { $panel.toggleClass('open'); });
+        $panel.on('change', 'select', function () {
+            api.column(+$(this).attr('data-col')).search(exactSearch(this.value), true, false).draw();
+            if (this.value === '' || !$(this).is('[data-col="' + statusColumn(api) + '"]')) {
+                $('.nv-page-stats .nv-stat-click').removeClass('active');
+            }
+            refresh();
+        });
+        $panel.on('click', '.nv-filter-clear', function () {
+            $panel.find('select').val('');
+            api.columns().search('');
+            api.draw();
+            $('.nv-page-stats .nv-stat-click').removeClass('active');
+            refresh();
         });
     }
 
