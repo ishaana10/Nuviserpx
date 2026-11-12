@@ -38,7 +38,14 @@ class CrmService
 
     public function saveOpportunity(array $post): string
     {
-        extract($post);
+        $title = $post['title'] ?? null;
+        $stage = $post['stage'] ?? null;
+        $party_id = $post['party_id'] ?? null;
+        $amount = $post['amount'] ?? null;
+        $probability = $post['probability'] ?? null;
+        $expected_close_date = $post['expected_close_date'] ?? null;
+        $notes = $post['notes'] ?? null;
+        $id = $post['id'] ?? null;
         $tenant_id = $this->settings->active_tenant_id();
         $user_id = $this->settings->userdata('id');
 
@@ -120,7 +127,12 @@ class CrmService
 
     public function saveActivity(array $post): string
     {
-        extract($post);
+        $opportunity_id = $post['opportunity_id'] ?? null;
+        $type = $post['type'] ?? null;
+        $subject = $post['subject'] ?? null;
+        $due_date = $post['due_date'] ?? null;
+        $notes = $post['notes'] ?? null;
+        $id = $post['id'] ?? null;
         $tenant_id = $this->settings->active_tenant_id();
         $user_id = $this->settings->userdata('id');
 

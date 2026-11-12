@@ -196,7 +196,25 @@ class PayrollService
     {
         require_once(base_app . 'classes/PayrollEngine.php');
         $post += ['id' => 0];
-        extract($post);
+        $payroll_run_ref = $post['payroll_run_ref'] ?? null;
+        $salary_month = $post['salary_month'] ?? null;
+        $pay_frequency = $post['pay_frequency'] ?? null;
+        $pay_date = $post['pay_date'] ?? null;
+        $period_start = $post['period_start'] ?? null;
+        $period_end = $post['period_end'] ?? null;
+        $employee_id = $post['employee_id'] ?? null;
+        $basic_salary = $post['basic_salary'] ?? null;
+        $overtime = $post['overtime'] ?? null;
+        $allowances = $post['allowances'] ?? null;
+        $other_earnings = $post['other_earnings'] ?? null;
+        $deductions = $post['deductions'] ?? null;
+        $is_resident = $post['is_resident'] ?? null;
+        $leave_payout = $post['leave_payout'] ?? null;
+        $redundancy_pay = $post['redundancy_pay'] ?? null;
+        $id = $post['id'] ?? null;
+        $unpaid_days = $post['unpaid_days'] ?? null;
+        $overtime_1_5_hours = $post['overtime_1_5_hours'] ?? null;
+        $overtime_2_0_hours = $post['overtime_2_0_hours'] ?? null;
         $tenant_id = $this->settings->active_tenant_id();
 
         try {

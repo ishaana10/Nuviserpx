@@ -16,7 +16,17 @@ class InventoryService
 
     public function saveProduct(array $post): string
     {
-        extract($post);
+        $id = $post['id'] ?? null;
+        $product_code = $post['product_code'] ?? null;
+        $name = $post['name'] ?? null;
+        $category = $post['category'] ?? null;
+        $unit = $post['unit'] ?? null;
+        $cost_price = $post['cost_price'] ?? null;
+        $selling_price = $post['selling_price'] ?? null;
+        $stock_quantity = $post['stock_quantity'] ?? null;
+        $reorder_level = $post['reorder_level'] ?? null;
+        $description = $post['description'] ?? null;
+        $status = $post['status'] ?? null;
         $tenant_id = $this->settings->active_tenant_id();
         $id = !empty($id) ? $this->conn->real_escape_string((string)$id) : '';
 
@@ -125,7 +135,14 @@ class InventoryService
 
     public function saveStockAdjustment(array $post): string
     {
-        extract($post);
+        $product_id = $post['product_id'] ?? null;
+        $type = $post['type'] ?? null;
+        $qty = $post['qty'] ?? null;
+        $unit_cost = $post['unit_cost'] ?? null;
+        $warehouse_id = $post['warehouse_id'] ?? null;
+        $reference = $post['reference'] ?? null;
+        $notes = $post['notes'] ?? null;
+        $is_absolute = $post['is_absolute'] ?? null;
         $tenant_id = $this->settings->active_tenant_id();
         $user_id = $this->settings->userdata('id');
 

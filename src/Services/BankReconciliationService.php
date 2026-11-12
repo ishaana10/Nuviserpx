@@ -77,7 +77,11 @@ class BankReconciliationService
 
     public function startReconciliation(array $post): string
     {
-        extract($post);
+        $account_id = $post['account_id'] ?? null;
+        $statement_date = $post['statement_date'] ?? null;
+        $opening_balance = $post['opening_balance'] ?? null;
+        $closing_balance = $post['closing_balance'] ?? null;
+        $notes = $post['notes'] ?? null;
         $tenant_id = $this->settings->active_tenant_id();
         $user_id = $this->settings->userdata('id');
 
@@ -113,7 +117,11 @@ class BankReconciliationService
 
     public function updateReconciliation(array $post): string
     {
-        extract($post);
+        $id = $post['id'] ?? null;
+        $statement_date = $post['statement_date'] ?? null;
+        $opening_balance = $post['opening_balance'] ?? null;
+        $closing_balance = $post['closing_balance'] ?? null;
+        $notes = $post['notes'] ?? null;
         $tenant_id = $this->settings->active_tenant_id();
         $id = isset($id) ? (int)$id : 0;
 
@@ -157,7 +165,11 @@ class BankReconciliationService
      */
     public function addStatementLines(array $post): string
     {
-        extract($post);
+        $reconciliation_id = $post['reconciliation_id'] ?? null;
+        $line_date = $post['line_date'] ?? null;
+        $amount = $post['amount'] ?? null;
+        $description = $post['description'] ?? null;
+        $reference = $post['reference'] ?? null;
         $tenant_id = $this->settings->active_tenant_id();
         $rec_id = isset($reconciliation_id) ? (int)$reconciliation_id : 0;
 
@@ -218,7 +230,8 @@ class BankReconciliationService
      */
     public function matchLine(array $post): string
     {
-        extract($post);
+        $statement_line_id = $post['statement_line_id'] ?? null;
+        $journal_id = $post['journal_id'] ?? null;
         $tenant_id = $this->settings->active_tenant_id();
         $user_id = $this->settings->userdata('id');
 

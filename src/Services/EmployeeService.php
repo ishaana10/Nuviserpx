@@ -16,7 +16,8 @@ class EmployeeService
 
     public function saveEmployee(array $post): string
     {
-        extract($post);
+        $id = $post['id'] ?? null;
+        $employee_code = $post['employee_code'] ?? null;
         $tenant_id = $this->settings->active_tenant_id();
         $id = isset($id) ? intval($id) : 0;
         $dataStr = "";
@@ -109,7 +110,12 @@ class EmployeeService
             }
             $post['employee_id'] = $scope;
         }
-        extract($post);
+        $id = $post['id'] ?? null;
+        $employee_id = $post['employee_id'] ?? null;
+        $attendance_date = $post['attendance_date'] ?? null;
+        $status = $post['status'] ?? null;
+        $check_in = $post['check_in'] ?? null;
+        $check_out = $post['check_out'] ?? null;
         $tenant_id = $this->settings->active_tenant_id();
         $id = isset($id) ? intval($id) : 0;
         $employee_id = isset($employee_id) ? $this->conn->real_escape_string((string)$employee_id) : '0';

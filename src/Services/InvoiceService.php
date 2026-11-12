@@ -18,7 +18,21 @@ class InvoiceService
 
     public function saveInvoice(array $post): string
     {
-        extract($post);
+        $id = $post['id'] ?? null;
+        $invoice_no = $post['invoice_no'] ?? null;
+        $party_id = $post['party_id'] ?? null;
+        $invoice_date = $post['invoice_date'] ?? null;
+        $due_date = $post['due_date'] ?? null;
+        $subtotal = $post['subtotal'] ?? null;
+        $tax_amount = $post['tax_amount'] ?? null;
+        $discount = $post['discount'] ?? null;
+        $total = $post['total'] ?? null;
+        $notes = $post['notes'] ?? null;
+        $status = $post['status'] ?? null;
+        $tax_type = $post['tax_type'] ?? null;
+        $item_name = $post['item_name'] ?? null;
+        $currency = $post['currency'] ?? null;
+        $item_desc = $post['item_desc'] ?? null;
         $tenant_id = $this->settings->active_tenant_id();
         $user_id = $this->settings->userdata('id');
         $id = !empty($id) ? $this->conn->real_escape_string((string)$id) : '';
