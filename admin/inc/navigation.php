@@ -674,12 +674,6 @@ if($t_qry && $t_qry->num_rows > 0){
                                         </a>
                                     </li>
                                     <li class="nav-item">
-                                        <a href="<?php echo base_url ?>admin/?page=settings/login_activity" class="nav-link nav-settings_login_activity tree-item">
-                                            <i class="nav-icon fas fa-exclamation-triangle"></i>
-                                            <p>Login Security Log</p>
-                                        </a>
-                                    </li>
-                                    <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=settings/backup" class="nav-link nav-settings_backup tree-item">
                                             <i class="nav-icon fas fa-database"></i>
                                             <p>DB Backup & Storage</p>
