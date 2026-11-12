@@ -44,5 +44,5 @@ foreach (['preview_landed_cost', 'post_landed_cost'] as $a) {
     check("$a needs purchases edit", preg_match("/'$a'\s*=>\s*\['purchases', 'edit'\]/", $perm) === 1);
 }
 $m = file_get_contents("$root/classes/Master.php");
-foreach (['preview_landed_cost', 'post_landed_cost'] as $a) { check("$a is routed", strpos($m, "case '$a':") !== false); }
+foreach (['preview_landed_cost', 'post_landed_cost'] as $a) { check("$a is routed", strpos($m, "'$a',") !== false); }
 exit($fail ? 1 : 0);

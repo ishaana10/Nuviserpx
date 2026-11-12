@@ -31,7 +31,7 @@ check('login and activate are public', preg_match("/PUBLIC_ACTIONS = \[[^\]]*emp
 check('invite and revoke need employees save', preg_match("/'invite_employee_portal'\s*=>\s*\['employees', 'save'\]/", $perm) && preg_match("/'revoke_employee_portal'\s*=>\s*\['employees', 'save'\]/", $perm));
 $m = file_get_contents("$root/classes/Master.php");
 foreach (['invite_employee_portal', 'revoke_employee_portal', 'employee_portal_login', 'employee_portal_activate'] as $a) {
-    check("Master routes $a", strpos($m, "case '$a':") !== false);
+    check("Master routes $a", strpos($m, "'$a',") !== false);
 }
 check('session regenerated on sign-in', strpos($m, 'session_regenerate_id(true)') !== false);
 $page = file_get_contents("$root/portal/employee.php");

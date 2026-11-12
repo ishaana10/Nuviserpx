@@ -87,7 +87,7 @@ echo "\n=== Every write action in Master.php is gated ===\n";
 // An action missing from the map needs nothing beyond a login, so a new write action that is
 // forgotten there is open to every user. Reads and public portal actions are listed explicitly.
 $src = file_get_contents(__DIR__ . '/../classes/Master.php');
-preg_match_all("/^    case '([a-z0-9_]+)':/m", $src, $mm);
+preg_match_all("/'([a-z0-9_]+)',/", substr($src, strpos($src, '$allowed_actions')), $mm);
 $readOnlyOrOther = [];
 $unmapped = [];
 foreach (array_unique($mm[1]) as $a) {

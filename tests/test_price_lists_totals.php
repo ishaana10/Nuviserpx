@@ -47,7 +47,7 @@ $db = file_get_contents(base_app . 'src/Database/LegacySchemaCatchup.php');
 check('pricing migration chained', str_contains($db, '$this->check_pricing_migrations();') && str_contains($db, 'price_list_items') && str_contains($db, 'discount_pct'));
 $perm = file_get_contents(base_app . 'src/Support/Permissions.php');
 check('managing price lists needs settings_manage', str_contains($perm, "'save_price_list' => ['settings_manage']") && str_contains($perm, "\$page === 'price_lists'"));
-check('Master exposes the actions', substr_count(file_get_contents(base_app . 'classes/Master.php'), "case 'lookup_prices'") === 1);
+check('Master exposes the actions', substr_count(file_get_contents(base_app . 'classes/Master.php'), "'lookup_prices',") === 1);
 check('the invoice form looks up list prices', str_contains(file_get_contents(base_app . 'admin/invoices/manage_invoice.php'), 'lookup_prices'));
 check('sql migration exists', is_file(base_app . 'database/migrations/013_price_lists_line_discount.sql'));
 

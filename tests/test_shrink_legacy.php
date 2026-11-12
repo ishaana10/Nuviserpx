@@ -48,5 +48,16 @@ foreach ($t2 as $svc => $fns) {
 check('CSV import wrappers call the service', substr_count($ms, "MaintenanceService::class)->import_csv('") === 3);
 check('Master is under 75 KB (was 132 KB)', strlen($ms) < 76800);
 
+// Tranche 3: dispatch whitelist instead of a 600-line switch, nav split by section.
+check('action switch replaced by a whitelist dispatch', strpos($ms, '$allowed_actions = [') !== false && strpos($ms, "switch (\$action)") === false && preg_match_all("/'([a-z0-9_]+)',/", substr($ms, strpos($ms, '$allowed_actions')), $aa) >= 200);
+check('backup_db still streams without echo', (bool)preg_match('/if \(\$action === 'backup_db'\) \{\s*\$Master->backup_db\(\);/', $ms));
+$navdir = $root . '/admin/inc/menus';
+$sections = glob($navdir . '/*.php');
+check('navigation split into 11 section files', count($sections) === 11);
+$navmain = file_get_contents($root . '/admin/inc/navigation.php');
+check('navigation.php is a thin shell including the sections', strlen($navmain) < 8192 && strpos($navmain, "include __DIR__ . '/menus/'") !== false);
+$all = implode('', array_map('file_get_contents', $sections));
+check('every module section is present', str_contains($all, '2. Sales') && str_contains($all, '8. Payroll & HR') && str_contains($all, '10. Developer Tools') && str_contains($all, 'developer/error_logs'));
+
 echo $fail ? "$fail FAILED\n" : "All passed\n";
 exit($fail ? 1 : 0);

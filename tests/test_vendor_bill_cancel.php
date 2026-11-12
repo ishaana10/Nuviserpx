@@ -27,7 +27,7 @@ check('a cancelled bill is not re-posted', strpos($save, "\$status !== 'cancelle
 check('a cancelled bill cannot be edited', strpos($save, 'This bill is cancelled and cannot be changed') !== false);
 check('cancelled bill owes nothing', strpos($save, "\$status === 'cancelled' ? 0.0") !== false);
 check('previous status is not taken from the posted form', strpos($save, "\$oldStatus = '';") !== false && strpos($save, "\$credited_amount = 0.0;") !== false);
-check('cancel action exists in service, Master and permissions', strpos($src, 'function cancelVendorBill(') !== false && strpos(file_get_contents("$root/classes/Master.php"), "case 'cancel_vendor_bill':") !== false && strpos(file_get_contents("$root/src/Support/Permissions.php"), "'cancel_vendor_bill'") !== false);
+check('cancel action exists in service, Master and permissions', strpos($src, 'function cancelVendorBill(') !== false && strpos(file_get_contents("$root/classes/Master.php"), "'cancel_vendor_bill',") !== false && strpos(file_get_contents("$root/src/Support/Permissions.php"), "'cancel_vendor_bill'") !== false);
 check('cancel is guarded against a concurrent change', strpos($src, "AND `status` = '{\$old}'") !== false);
 check('bills list offers Cancel for posted bills and Delete only for draft or cancelled', strpos(file_get_contents("$root/admin/purchases/vendor_bills.php"), 'cancel_data') !== false);
 echo $fail ? "\n$fail FAILED\n" : "\nAll passed\n";

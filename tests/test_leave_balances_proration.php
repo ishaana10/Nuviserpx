@@ -78,7 +78,7 @@ $es = $read('src/Services/EmployeeService.php');
 check('leave save and approval check the balance', substr_count($es, 'LeaveBalanceService') >= 2);
 $perm = $read('src/Support/Permissions.php');
 foreach (['save_leave_policy', 'save_leave_adjustment', 'leave_balance_info', 'leave_payout_suggestion'] as $a) {
-    check("$a is permission-mapped and routed", strpos($perm, "'$a'") !== false && strpos($read('classes/Master.php'), "case '$a':") !== false);
+    check("$a is permission-mapped and routed", strpos($perm, "'$a'") !== false && strpos($read('classes/Master.php'), "'$a',") !== false);
 }
 $mig = $read('database/migrations/020_leave_balances.sql');
 check('migration: tables, cancelled status, no semicolons in comments', strpos($mig, 'leave_policies') !== false && strpos($mig, 'leave_adjustments') !== false && strpos($mig, "'cancelled'") !== false && !preg_match('/^--.*;/m', $mig));
@@ -103,7 +103,7 @@ check('individual entitlement overrides the policy days', strpos($lb, "\$p['annu
 check('attendance service loads holidays', strpos($read('src/Services/PayrollAttendanceService.php'), 'public_holidays') !== false);
 check('leave save validates the day fraction', strpos($es, 'fractionError') !== false && strpos($es, "'day_fraction'") !== false);
 foreach (['save_public_holiday', 'delete_public_holiday', 'save_leave_entitlement'] as $a) {
-    check("$a is permission-mapped and routed", strpos($perm, "'$a'") !== false && strpos($read('classes/Master.php'), "case '$a':") !== false);
+    check("$a is permission-mapped and routed", strpos($perm, "'$a'") !== false && strpos($read('classes/Master.php'), "'$a',") !== false);
 }
 $m2 = $read('database/migrations/021_leave_extras.sql');
 check('migration 021: tables and day_fraction, no semicolons in comments', strpos($m2, 'public_holidays') !== false && strpos($m2, 'employee_leave_entitlements') !== false && strpos($m2, 'ADD COLUMN `day_fraction`') !== false && !preg_match('/^--.*;/m', $m2));

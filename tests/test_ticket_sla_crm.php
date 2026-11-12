@@ -73,7 +73,7 @@ $m = file_get_contents("$root/classes/Master.php") . file_get_contents("$root/sr
 check('replies are limited to the company\'s own tickets', strpos($m, "SELECT 1 FROM `tickets` WHERE id = '{\$t_id}' AND tenant_id = '{\$tenant_id}'") !== false);
 check('status changes run the SLA clocks', substr_count($m, '->applyStatus(') === 2 && strpos($m, '->markFirstResponse(') !== false);
 check('moving to lost passes the reason', strpos($m, "(string)(\$_POST['lost_reason'] ?? '')") !== false);
-foreach (['save_sla_policies', 'save_crm_contact', 'delete_crm_contact'] as $a) { check("$a is routed", strpos($m, "case '$a':") !== false); }
+foreach (['save_sla_policies', 'save_crm_contact', 'delete_crm_contact'] as $a) { check("$a is routed", strpos($m, "'$a',") !== false); }
 $perm = file_get_contents("$root/src/Support/Permissions.php");
 check('SLA targets need settings_manage', preg_match("/'save_sla_policies'\s*=>\s*\['settings_manage'\]/", $perm) === 1);
 check('contacts use CRM permissions', preg_match("/'save_crm_contact'\s*=>\s*\['crm', 'save'\]/", $perm) === 1 && preg_match("/'delete_crm_contact'\s*=>\s*\['crm', 'delete'\]/", $perm) === 1);
