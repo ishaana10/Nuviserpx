@@ -19,5 +19,16 @@ check('price-list lookup only sends real product ids', strpos($page, "/^\\d+\$/.
 check('submit blocks lines without an item', strpos($page, 'Choose an item, or type a name, on every line.') !== false);
 check('server stores non-numeric product ids as NULL', (bool)preg_match('/is_numeric\(\$product_id\[\$k\]\)\s*\?\s*\(int\)\$product_id\[\$k\]\s*:\s*\'NULL\'/', $master));
 
+// Regression: the extract() removal must bind every item array the totals
+// and line writer read, or every line computes as qty 1 x price 0.
+$inv = file_get_contents($root . '/src/Services/InvoiceService.php');
+$fnStart = strpos($inv, 'function saveInvoice');
+$fn = substr($inv, $fnStart, strpos($inv, 'function ', $fnStart + 10) - $fnStart);
+preg_match_all('/\$(item_\w+)/', $fn, $u);
+preg_match_all('/\$(item_\w+)\s*=(?!=)/', $fn, $a);
+$missing = array_diff(array_unique($u[1]), array_unique($a[1]));
+check('every item_* array saveInvoice reads is bound from the post', $missing === []);
+check('line amounts come from the posted qty, price, discount and tax', strpos($fn, "\$item_qty = \$post['item_qty']") !== false && strpos($fn, "\$item_price = \$post['item_price']") !== false && strpos($fn, "\$item_discount_pct = \$post['item_discount_pct']") !== false && strpos($fn, "\$item_tax_rate = \$post['item_tax_rate']") !== false);
+
 echo $fail ? "$fail FAILED\n" : "All passed\n";
 exit($fail ? 1 : 0);

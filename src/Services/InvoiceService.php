@@ -33,6 +33,10 @@ class InvoiceService
         $item_name = $post['item_name'] ?? null;
         $currency = $post['currency'] ?? null;
         $item_desc = $post['item_desc'] ?? null;
+        $item_qty = $post['item_qty'] ?? null;
+        $item_price = $post['item_price'] ?? null;
+        $item_discount_pct = $post['item_discount_pct'] ?? null;
+        $item_tax_rate = $post['item_tax_rate'] ?? null;
         $tenant_id = $this->settings->active_tenant_id();
         $user_id = $this->settings->userdata('id');
         $id = !empty($id) ? $this->conn->real_escape_string((string)$id) : '';
