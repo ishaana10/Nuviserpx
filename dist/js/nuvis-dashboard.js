@@ -556,6 +556,12 @@
 
     function renderChecklist(item, data, $body) {
         var steps = data.steps || [];
+        // Once every set-up step is done the card has served its purpose:
+        // drop it from the dashboard (it stays available under Customize).
+        if (data.complete) {
+            $body.closest('.nv-w-col').remove();
+            return;
+        }
         if (!steps.length) { $body.html(emptyState('Nothing to set up.', 'fas fa-check-circle')); setFooter(item, ''); return; }
         var pct = data.total ? Math.round(data.done / data.total * 100) : 0;
         var h = '<div class="nv-check-head"><span>' + (data.complete ? 'All set — your company is ready to go.' : data.done + ' of ' + data.total + ' steps done') + '</span><b>' + pct + '%</b></div>' +
