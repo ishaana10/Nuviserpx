@@ -110,22 +110,15 @@ class SequenceService
      */
     public static function next(mysqli $conn, int $tenantId, string $key, callable $seed): int
     {
+        self::ensureTable($conn);
         $ins = $conn->prepare("INSERT IGNORE INTO document_sequences (tenant_id, seq_key, last_value) VALUES (?, ?, ?)");
         $exists = $conn->prepare("SELECT 1 FROM document_sequences WHERE tenant_id = ? AND seq_key = ?");
-        if ($ins === false || $exists === false) {
-            // The table is missing (an install where the catch-up migration
-            // never ran): create it and prepare again.
-            $conn->query("CREATE TABLE IF NOT EXISTS `document_sequences` (
-                `tenant_id` int(30) NOT NULL,
-                `seq_key` varchar(60) NOT NULL,
-                `last_value` bigint(20) NOT NULL DEFAULT 0,
-                PRIMARY KEY (`tenant_id`, `seq_key`)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-            $ins = $conn->prepare("INSERT IGNORE INTO document_sequences (tenant_id, seq_key, last_value) VALUES (?, ?, ?)");
-            $exists = $conn->prepare("SELECT 1 FROM document_sequences WHERE tenant_id = ? AND seq_key = ?");
-            if ($ins === false || $exists === false) {
-                throw new \RuntimeException('The document_sequences table is unavailable: ' . $conn->error);
-            }
+        $up = $conn->prepare("UPDATE document_sequences SET last_value = LAST_INSERT_ID(last_value + 1) WHERE tenant_id = ? AND seq_key = ?");
+        if ($ins === false || $exists === false || $up === false) {
+            // Prepared statements are failing on this table (seen on one host
+            // with an empty error string): the plain-query path does the same
+            // job, and reports errno and error if even that cannot run.
+            return self::nextViaQuery($conn, $tenantId, $key, $seed);
         }
         $exists->bind_param('is', $tenantId, $key);
         $exists->execute();
@@ -134,9 +127,41 @@ class SequenceService
             $ins->bind_param('isi', $tenantId, $key, $start);
             $ins->execute();
         }
-        $up = $conn->prepare("UPDATE document_sequences SET last_value = LAST_INSERT_ID(last_value + 1) WHERE tenant_id = ? AND seq_key = ?");
         $up->bind_param('is', $tenantId, $key);
         $up->execute();
+        return (int)$conn->insert_id;
+    }
+
+    /** Create the sequences table if it is missing; errors are reported by whatever runs next. */
+    private static function ensureTable(mysqli $conn): void
+    {
+        $r = @$conn->query("SELECT 1 FROM document_sequences LIMIT 1");
+        if ($r !== false) {
+            return;
+        }
+        @$conn->query("CREATE TABLE IF NOT EXISTS `document_sequences` (
+            `tenant_id` int(30) NOT NULL,
+            `seq_key` varchar(60) NOT NULL,
+            `last_value` bigint(20) NOT NULL DEFAULT 0,
+            PRIMARY KEY (`tenant_id`, `seq_key`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    }
+
+    /** The same take-a-number, in plain escaped SQL. $key is internal, never user input. */
+    private static function nextViaQuery(mysqli $conn, int $tenantId, string $key, callable $seed): int
+    {
+        $k = $conn->real_escape_string($key);
+        $r = $conn->query("SELECT 1 FROM document_sequences WHERE tenant_id = {$tenantId} AND seq_key = '{$k}' LIMIT 1");
+        if ($r === false) {
+            throw new \RuntimeException("The document_sequences table is unavailable ([{$conn->errno}] {$conn->error}). Run the repair migration or create the table, then try again.");
+        }
+        if (!$r->num_rows) {
+            $start = (int)$seed();
+            $conn->query("INSERT IGNORE INTO document_sequences (tenant_id, seq_key, last_value) VALUES ({$tenantId}, '{$k}', {$start})");
+        }
+        if ($conn->query("UPDATE document_sequences SET last_value = LAST_INSERT_ID(last_value + 1) WHERE tenant_id = {$tenantId} AND seq_key = '{$k}'") === false) {
+            throw new \RuntimeException("The document sequence could not be advanced ([{$conn->errno}] {$conn->error}).");
+        }
         return (int)$conn->insert_id;
     }
 }
