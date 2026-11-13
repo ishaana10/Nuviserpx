@@ -23,6 +23,12 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
   4-hour idle lifetime.
 
 ### Added
+- **Per-tenant company email (SMTP)**: each company can send its customer
+  notifications from its own email account (Settings > Company Email), with
+  the system SMTP as fallback. Passwords are encrypted at rest (set APP_KEY
+  in .env for a dedicated key); SMTP server replies are now verified, and a
+  per-tenant email log records every send - recipient, transport, sent or
+  failed with the exact server error - with a Send Test Email button.
 - Continuous integration (GitHub Actions): repo-wide `php -l`, the full test
   suite under a PHPUnit bridge, and PHPStan level 5 on `src/` (advisory).
 

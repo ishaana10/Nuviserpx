@@ -1822,6 +1822,35 @@ class LegacySchemaCatchup
             @$this->conn->query("ALTER TABLE `users` ADD COLUMN `role_id` int(30) DEFAULT NULL AFTER `type` ");
         }
 
+        // Per-tenant SMTP + email log (mirror of migration 039)
+        foreach ([
+            'smtp_enabled'    => "ADD COLUMN `smtp_enabled` tinyint(1) NOT NULL DEFAULT 0",
+            'smtp_host'       => "ADD COLUMN `smtp_host` varchar(255) DEFAULT NULL",
+            'smtp_port'       => "ADD COLUMN `smtp_port` int DEFAULT 587",
+            'smtp_encryption' => "ADD COLUMN `smtp_encryption` varchar(10) DEFAULT 'tls'",
+            'smtp_user'       => "ADD COLUMN `smtp_user` varchar(255) DEFAULT NULL",
+            'smtp_pass'       => "ADD COLUMN `smtp_pass` text DEFAULT NULL",
+            'smtp_from_email' => "ADD COLUMN `smtp_from_email` varchar(255) DEFAULT NULL",
+            'smtp_from_name'  => "ADD COLUMN `smtp_from_name` varchar(255) DEFAULT NULL",
+        ] as $nv_col => $nv_ddl) {
+            $nv_res = @$this->conn->query("SHOW COLUMNS FROM `tenants` LIKE '{$nv_col}'");
+            if ($nv_res && $nv_res->num_rows == 0) {
+                @$this->conn->query("ALTER TABLE `tenants` {$nv_ddl}");
+            }
+        }
+        @$this->conn->query("CREATE TABLE IF NOT EXISTS `email_log` (
+            `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+            `tenant_id` int NOT NULL,
+            `to_email` varchar(255) NOT NULL,
+            `subject` varchar(255) DEFAULT NULL,
+            `transport` varchar(20) NOT NULL DEFAULT 'system-smtp',
+            `status` varchar(10) NOT NULL DEFAULT 'sent',
+            `error` text DEFAULT NULL,
+            `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+            PRIMARY KEY (`id`),
+            KEY `tenant_created` (`tenant_id`, `created_at`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
         // Email registration & verification columns in users table
         foreach ([
             'email'                => "ADD COLUMN `email` varchar(255) DEFAULT NULL AFTER `username`",

@@ -16,6 +16,14 @@
                                             <p>Modules &amp; Features</p>
                                         </a>
                                     </li>
+                                    <?php if($_settings->can_access('settings_manage')): ?>
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=settings/email" class="nav-link nav-settings_email tree-item">
+                                            <i class="nav-icon fas fa-envelope-open-text"></i>
+                                            <p>Company Email</p>
+                                        </a>
+                                    </li>
+                                    <?php endif; ?>
                                     <?php if($_settings->can_access('users_manage')): ?>
                                     <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=user/list" class="nav-link nav-user_list tree-item">

@@ -766,6 +766,16 @@ class Master extends DBConnection
         return $this->container->make(\App\Services\DeliveryService::class)->invoiceDelivered((int)($_POST['id'] ?? 0));
     }
 
+    public function save_tenant_smtp()
+    {
+        return $this->container->make(\App\Services\TenantMailService::class)->save($_POST);
+    }
+
+    public function test_tenant_smtp()
+    {
+        return $this->container->make(\App\Services\TenantMailService::class)->test();
+    }
+
     public function provision_chart()
     {
         $tenant_id = (int)$this->settings->active_tenant_id();
@@ -1430,7 +1440,7 @@ $allowed_actions = [
     'save_price_list', 'delete_price_list', 'save_price_list_item', 'delete_price_list_item',
     'assign_price_list', 'lookup_prices', 'revise_quote', 'decline_quote',
     'extend_quote', 'confirm_for_delivery', 'save_delivery_note', 'cancel_delivery_note',
-    'invoice_delivered', 'save_default_accounts', 'provision_chart', 'save_inventory_accounting', 'file_tax_return',
+    'invoice_delivered', 'save_default_accounts', 'provision_chart', 'save_tenant_smtp', 'test_tenant_smtp', 'save_inventory_accounting', 'file_tax_return',
     'void_tax_return', 'save_tax_code', 'delete_tax_code', 'set_period_lock',
     'delete_journal', 'cancel_journal', 'save_employee', 'delete_employee',
     'save_public_holiday', 'delete_public_holiday', 'save_leave_entitlement', 'save_leave_policy',
