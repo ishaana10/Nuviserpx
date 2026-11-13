@@ -65,7 +65,7 @@ $tmpl = [
     'label_color'   => '#0f172a',
     'font_color'    => '#334155',
     'font_family'   => 'sans-serif',
-    'logo_path'     => $_settings->info('logo') ?: ''
+    'logo_path'     => $_settings->tenant_branding()['logo'] ?: ''
 ];
 
 $tmpl_qry = $conn->query("SELECT * FROM `invoice_templates` WHERE tenant_id = '{$tenant_id}' LIMIT 1");
@@ -180,10 +180,11 @@ $status_class = [
                     <img src="<?= validate_image($tmpl['logo_path']) ?>" alt="Logo" class="mr-3 rounded" style="max-height: 75px; width: auto; object-fit: contain;">
                 <?php endif; ?>
                 <div>
-                    <h3 class="font-weight-bold text-inv-label mb-1"><?= htmlspecialchars($sys['name'] ?? 'Nuvis ERPX') ?></h3>
-                    <p class="mb-0 text-muted small"><?= htmlspecialchars($sys['address'] ?? '') ?></p>
+                    <?php $nv_brand = $_settings->tenant_branding(); ?>
+                    <h3 class="font-weight-bold text-inv-label mb-1"><?= htmlspecialchars($nv_brand['name']) ?></h3>
+                    <p class="mb-0 text-muted small"><?= htmlspecialchars($nv_brand['address']) ?></p>
                     <p class="mb-0 text-muted small">
-                        <b>Email:</b> <?= htmlspecialchars($sys['email'] ?? '') ?> | <b>Phone:</b> <?= htmlspecialchars($sys['contact'] ?? '') ?>
+                        <b>Email:</b> <?= htmlspecialchars($nv_brand['email']) ?> | <b>Phone:</b> <?= htmlspecialchars($nv_brand['phone']) ?>
                     </p>
                 </div>
             </div>

@@ -173,6 +173,36 @@ class SystemSettings extends DBConnection{
 		return $home > 0 ? $home : 1;
 	}
 
+	/**
+	 * The active company's identity for documents, receipts and emails:
+	 * name, email, phone, address and logo from the tenants table (logo
+	 * falls back to the invoice-template logo). The platform's own branding
+	 * (system_info) is the developer's and is NOT used as a fallback here -
+	 * a company without a logo simply prints without one.
+	 */
+	private $branding_cache = null;
+	function tenant_branding(){
+		if($this->branding_cache !== null) return $this->branding_cache;
+		$t = (int)$this->active_tenant_id();
+		$b = ['name' => '', 'email' => '', 'phone' => '', 'address' => '', 'logo' => ''];
+		$q = @$this->conn->query("SELECT name, email, phone, address, logo FROM `tenants` WHERE id = '{$t}'");
+		if($q && $q->num_rows){
+			$r = $q->fetch_assoc();
+			$b['name'] = (string)$r['name'];
+			$b['email'] = (string)($r['email'] ?? '');
+			$b['phone'] = (string)($r['phone'] ?? '');
+			$b['address'] = (string)($r['address'] ?? '');
+			$b['logo'] = (string)($r['logo'] ?? '');
+		}
+		if($b['logo'] === ''){
+			$q2 = @$this->conn->query("SELECT logo_path FROM `invoice_templates` WHERE tenant_id = '{$t}' LIMIT 1");
+			if($q2 && $q2->num_rows){
+				$b['logo'] = (string)($q2->fetch_assoc()['logo_path'] ?? '');
+			}
+		}
+		return $this->branding_cache = $b;
+	}
+
 	function set_active_tenant($tenant_id){
 		$tenant_id = (int)$tenant_id;
 		if($tenant_id <= 0){
@@ -560,12 +590,12 @@ $action = !isset($_GET['f']) ? 'none' : strtolower($_GET['f']);
 $sysset = new SystemSettings();
 switch ($action) {
 	case 'update_settings':
-		$sysset->require_permission('settings_manage');
+		$sysset->require_super_admin();
 		$sysset->require_csrf();
 		echo $sysset->update_settings_info();
 		break;
 	case 'send_test_email':
-		$sysset->require_permission('settings_manage');
+		$sysset->require_super_admin();
 		$sysset->require_csrf();
 		echo $sysset->send_test_email();
 		break;

@@ -9,6 +9,59 @@ use SystemSettings;
 
 class TenantService
 {
+    /** Company Profile: the active tenant edits its own identity and logo. */
+    public function saveProfile(array $post, array $files): string
+    {
+        $t = (int)$this->settings->active_tenant_id();
+        $name = trim((string)($post['name'] ?? ''));
+        $email = strtolower(trim((string)($post['email'] ?? '')));
+        $phone = trim((string)($post['phone'] ?? ''));
+        $address = trim((string)($post['address'] ?? ''));
+        if ($name === '') {
+            return json_encode(['status' => 'failed', 'msg' => 'The company name is required.']);
+        }
+        if ($email !== '' && !filter_var($email, \FILTER_VALIDATE_EMAIL)) {
+            return json_encode(['status' => 'failed', 'msg' => 'The company email address is not valid.']);
+        }
+
+        $logo_sql = '';
+        if (!empty($files['logo']['tmp_name'])) {
+            if ((int)$files['logo']['size'] > 2 * 1024 * 1024) {
+                return json_encode(['status' => 'failed', 'msg' => 'The logo must be 2 MB or smaller.']);
+            }
+            $info = @getimagesize($files['logo']['tmp_name']);
+            $ext = ['image/png' => 'png', 'image/jpeg' => 'jpg', 'image/webp' => 'webp'][$info['mime'] ?? ''] ?? null;
+            if ($ext === null) {
+                return json_encode(['status' => 'failed', 'msg' => 'The logo must be a PNG, JPG or WebP image.']);
+            }
+            $rel = 'uploads/tenant_logo_' . $t . '.' . $ext;
+            foreach (['png', 'jpg', 'webp'] as $old) { // one logo per company
+                if ($old !== $ext) { @unlink(base_app . 'uploads/tenant_logo_' . $t . '.' . $old); }
+            }
+            if (!@move_uploaded_file($files['logo']['tmp_name'], base_app . $rel)) {
+                return json_encode(['status' => 'failed', 'msg' => 'The logo could not be stored. Check that the uploads folder is writable.']);
+            }
+            $logo_sql = ", `logo` = '" . $this->conn->real_escape_string($rel) . "'";
+        } elseif (!empty($post['remove_logo'])) {
+            $cur = $this->conn->query("SELECT logo FROM `tenants` WHERE id = '{$t}'")->fetch_assoc()['logo'] ?? '';
+            if ($cur) { @unlink(base_app . $cur); }
+            $logo_sql = ", `logo` = NULL";
+        }
+
+        $ok = $this->conn->query("UPDATE `tenants` SET
+            `name` = '" . $this->conn->real_escape_string($name) . "',
+            `email` = '" . $this->conn->real_escape_string($email) . "',
+            `phone` = '" . $this->conn->real_escape_string($phone) . "',
+            `address` = '" . $this->conn->real_escape_string($address) . "'
+            {$logo_sql}
+            WHERE id = '{$t}'");
+        if (!$ok) {
+            return \App\Support\Db::fail($this->conn, 'The company profile could not be saved.');
+        }
+        $this->settings->log_audit('Updated Company Profile', 'Settings', "Company profile updated: {$name}" . ($logo_sql !== '' ? ' (logo changed)' : '') . '.');
+        return json_encode(['status' => 'success', 'msg' => 'Company profile saved. Your documents now carry it.']);
+    }
+
     public function __construct(
         private readonly mysqli $conn,
         private readonly SystemSettings $settings

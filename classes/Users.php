@@ -215,7 +215,7 @@ Class Users extends DBConnection {
 		// Deliver the verification / welcome email now that the token is stored.
 		if($verify_token !== null && isset($resp['status']) && $resp['status'] == 1){
 			$verify_url = base_url . 'verify_email.php?token=' . $verify_token;
-			$sys = ['name' => $this->settings->info('name') ?: 'Nuvis ERPX'];
+			$sys = ['name' => ($this->settings->tenant_branding()['name'] ?: ($this->settings->info('name') ?: 'Nuvis ERPX'))];
 			$name_to = trim((string)($_POST['firstname'] ?? '')) ?: $username;
 			$sent = false;
 			try {
@@ -561,7 +561,7 @@ Class Users extends DBConnection {
 		$token = bin2hex(random_bytes(32));
 		$hash = hash('sha256', $token);
 		$this->conn->query("UPDATE `users` SET `email_verify_token` = '{$hash}', `email_verify_expires` = DATE_ADD(NOW(), INTERVAL 48 HOUR) WHERE id = ".(int)$u['id']);
-		$sys = ['name' => $this->settings->info('name') ?: 'Nuvis ERPX'];
+		$sys = ['name' => ($this->settings->tenant_branding()['name'] ?: ($this->settings->info('name') ?: 'Nuvis ERPX'))];
 		$sent = false;
 		try {
 			$sent = (bool)\Emailer::send_email_verification($u['email'], $u['firstname'] ?: $u['username'], $u['username'], base_url.'verify_email.php?token='.$token, $sys, false);

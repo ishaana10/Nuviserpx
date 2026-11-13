@@ -32,8 +32,9 @@ class Emailer {
             }
         }
 
+        $brand_name = ($has && method_exists($_settings, 'tenant_branding')) ? (string)($_settings->tenant_branding()['name'] ?? '') : '';
         $sys_from_email = $from_email ?: ($has ? $_settings->info('email') : 'no-reply@nuvistechnologies.com.fj');
-        $sys_from_name  = $from_name  ?: ($has ? $_settings->info('name')  : 'Nuvis ERPX');
+        $sys_from_name  = $from_name  ?: ($brand_name !== '' ? $brand_name : ($has ? $_settings->info('name')  : 'Nuvis ERPX'));
 
         $attempts = [];
         if ($tcfg !== null) {

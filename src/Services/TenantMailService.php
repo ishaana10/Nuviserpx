@@ -101,7 +101,7 @@ class TenantMailService
         if ($to === '') {
             return json_encode(['status' => 'failed', 'msg' => 'Add an email address to your own account first (My Account), so the test has somewhere to go.']);
         }
-        $ok = \Emailer::send_email($to, 'Test email - ' . ($this->settings->info('name') ?: 'Nuvis ERPX'), '<p>This is a test of your company email settings. If you are reading this, delivery works.</p>');
+        $ok = \Emailer::send_email($to, 'Test email - ' . (($this->settings->tenant_branding()['name'] ?: ($this->settings->info('name') ?: 'Nuvis ERPX'))), '<p>This is a test of your company email settings. If you are reading this, delivery works.</p>');
         return json_encode($ok
             ? ['status' => 'success', 'msg' => "Test email sent to {$to} - check the inbox (and spam folder)."]
             : ['status' => 'failed', 'msg' => 'The test email could not be sent. Check the host, port, username and password - the exact error is in the log below.']);

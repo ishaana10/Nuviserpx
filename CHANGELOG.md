@@ -23,6 +23,10 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
   4-hour idle lifetime.
 
 ### Added
+- **Per-tenant branding**: each company sets its own name, contact details
+  and logo (Settings > Company Profile), carried on its invoices, receipts,
+  payslips and customer emails. The platform's own branding (System
+  Information) is developer-only and is never printed on tenant documents.
 - **Per-tenant company email (SMTP)**: each company can send its customer
   notifications from its own email account (Settings > Company Email), with
   the system SMTP as fallback. Passwords are encrypted at rest (set APP_KEY
