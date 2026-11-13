@@ -448,6 +448,7 @@ final class Permissions
         'save_default_accounts' => ['settings_manage'],
         'provision_chart'       => ['settings_manage'],
         'save_tenant_smtp'      => ['settings_manage'],
+        'save_company_profile'  => ['settings_manage'],
         'test_tenant_smtp'      => ['settings_manage'],
         'save_price_list' => ['settings_manage'],
         'delete_price_list' => ['settings_manage'],
@@ -728,7 +729,7 @@ final class Permissions
         'webhooks'          => 'webhooks_manage',
         'workflows'         => 'workflows_manage',
         'settings'          => 'settings_manage',
-        'system_info'       => 'settings_manage',
+        'system_info'       => self::SUPER_ONLY, // the platform's own branding & settings belong to the developer
         'tax'               => 'settings_manage',
         'templates'         => 'settings_manage',
         // developer-only (super administrator)

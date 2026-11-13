@@ -1822,6 +1822,12 @@ class LegacySchemaCatchup
             @$this->conn->query("ALTER TABLE `users` ADD COLUMN `role_id` int(30) DEFAULT NULL AFTER `type` ");
         }
 
+        // Tenant logo column (mirror of migration 040)
+        $nv_res = @$this->conn->query("SHOW COLUMNS FROM `tenants` LIKE 'logo'");
+        if ($nv_res && $nv_res->num_rows == 0) {
+            @$this->conn->query("ALTER TABLE `tenants` ADD COLUMN `logo` varchar(255) DEFAULT NULL");
+        }
+
         // Per-tenant SMTP + email log (mirror of migration 039)
         foreach ([
             'smtp_enabled'    => "ADD COLUMN `smtp_enabled` tinyint(1) NOT NULL DEFAULT 0",

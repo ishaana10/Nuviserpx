@@ -250,6 +250,18 @@ class HelpContent
                 ], 'tips' => []],
             ],
         ],
+        'company_profile' => [
+            'title' => 'Company Profile & Logo', 'icon' => 'fa-id-card', 'perm' => 'settings_manage',
+            'pages' => ['settings/company'],
+            'intro' => 'Your company name, contact details and logo, as they appear on your invoices, receipts, payslips and customer emails. Each company brands its own documents.',
+            'sections' => [
+                ['h' => 'Branding your documents', 'steps' => [
+                    'Fill in the name, email, phone and address your customers should see.',
+                    'Upload a logo (PNG, JPG or WebP, up to 2 MB) - a wide logo around 300x100 px prints best.',
+                    'Save, then open any invoice or receipt: the header now carries your identity.',
+                ], 'tips' => ['No logo uploaded means documents print your company name alone - the platform logo is never used on your documents.']],
+            ],
+        ],
         'email_settings' => [
             'title' => 'Company Email (SMTP)', 'icon' => 'fa-envelope-open-text', 'perm' => 'settings_manage',
             'pages' => ['settings/email'],

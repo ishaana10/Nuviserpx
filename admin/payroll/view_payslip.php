@@ -34,7 +34,7 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
         <!-- Header -->
         <div class="row border-bottom pb-3 mb-3">
             <div class="col-8">
-                <h3 class="font-weight-bold text-navy mb-0"><?php echo $_settings->info('name') ?></h3>
+                <h3 class="font-weight-bold text-navy mb-0"><?php echo htmlspecialchars($_settings->tenant_branding()['name'] ?: $_settings->info('name')) ?></h3>
                 <p class="text-muted mb-1 small"><?php echo $_settings->info('address') ?: '' ?></p>
                 <p class="text-muted mb-0 small"><b>Contact:</b> <?php echo $_settings->info('contact') ?> | <b>Email:</b> <?php echo $_settings->info('email') ?></p>
             </div>
