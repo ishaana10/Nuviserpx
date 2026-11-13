@@ -110,7 +110,7 @@ if ($method === 'POST') {
         $inv = inv_fetch($conn, $api_tenant_id, $id);
         if (!$inv) api_respond(404, ['status' => 'not_found', 'message' => 'Invoice not found.']);
 
-        $fcRow = $conn->query("SELECT currency FROM `invoice_list` WHERE id = '{$id}'")->fetch_assoc();
+        $fcRow = $conn->query("SELECT currency FROM `invoice_list` WHERE id = '{$id}' AND tenant_id = '{$api_tenant_id}'")->fetch_assoc();
         if (!empty($fcRow['currency'])) {
             api_respond(422, ['status' => 'failed', 'message' => 'This invoice is in ' . $fcRow['currency'] . '. Record the receipt in the application so the exchange difference is booked.']);
         }
@@ -135,10 +135,10 @@ if ($method === 'POST') {
         $sum = $conn->query("SELECT SUM(amount) AS paid FROM `payment_allocations` WHERE invoice_id = '{$id}'")->fetch_assoc();
         $tot_paid = (float)($sum['paid'] ?? 0);
         $inv_total = (float)$inv['total'];
-        $inv_credit = (float)($conn->query("SELECT credited_amount FROM `invoice_list` WHERE id = '{$id}'")->fetch_assoc()['credited_amount'] ?? 0);
+        $inv_credit = (float)($conn->query("SELECT credited_amount FROM `invoice_list` WHERE id = '{$id}' AND tenant_id = '{$api_tenant_id}'")->fetch_assoc()['credited_amount'] ?? 0);
         $new_bal = \App\Services\CreditNoteService::outstanding($inv_total, $tot_paid, $inv_credit);
         $new_status = $tot_paid + $inv_credit >= $inv_total && $inv_total > 0 ? 'paid' : ($tot_paid + $inv_credit > 0 ? 'partially_paid' : 'unpaid');
-        $conn->query("UPDATE `invoice_list` SET `paid_amount` = '{$tot_paid}', `balance` = '{$new_bal}', `status` = '{$new_status}' WHERE id = '{$id}'");
+        $conn->query("UPDATE `invoice_list` SET `paid_amount` = '{$tot_paid}', `balance` = '{$new_bal}', `status` = '{$new_status}' WHERE id = '{$id}' AND tenant_id = '{$api_tenant_id}'");
 
         api_emit(IntegrationEvents::PAYMENT_RECEIVED, [
             'payment_id' => $payment_id, 'payment_no' => $pay_no, 'party_id' => $pid,
@@ -193,7 +193,8 @@ if ($method === 'POST') {
         `balance` = '{$total}', `status` = 'unpaid', `notes` = '{$notes}'");
 
     if ($conn->error) {
-        api_respond(500, ['status' => 'failed', 'message' => 'Failed to create invoice.', 'error' => $conn->error]);
+        \App\Support\Db::log($conn);
+        api_respond(500, ['status' => 'failed', 'message' => 'Failed to create invoice.']);
     }
     $inv_id = (int)$conn->insert_id;
 
@@ -256,12 +257,12 @@ if ($method === 'PUT' || $method === 'PATCH') {
     if (array_key_exists('total', $input)) {
         $new_total = (float)$input['total'];
         $paid = (float)$inv['paid_amount'];
-        $cr = (float)($conn->query("SELECT credited_amount FROM `invoice_list` WHERE id = '" . (int)$inv['id'] . "'")->fetch_assoc()['credited_amount'] ?? 0);
+        $cr = (float)($conn->query("SELECT credited_amount FROM `invoice_list` WHERE id = '" . (int)$inv['id'] . "' AND tenant_id = '{$api_tenant_id}'")->fetch_assoc()['credited_amount'] ?? 0);
         $fields[] = "`balance` = '" . \App\Services\CreditNoteService::outstanding($new_total, $paid, $cr) . "'";
     }
 
     $conn->query("UPDATE `invoice_list` SET " . implode(', ', $fields) . " WHERE id = '{$id}' AND tenant_id = '{$api_tenant_id}'");
-    if ($conn->error) api_respond(500, ['status' => 'failed', 'message' => 'Update failed.', 'error' => $conn->error]);
+    if ($conn->error) { \App\Support\Db::log($conn); api_respond(500, ['status' => 'failed', 'message' => 'Update failed.']); }
 
     $updated = inv_fetch($conn, $api_tenant_id, $id);
 
@@ -285,7 +286,7 @@ if ($method === 'DELETE') {
     if (!$inv) api_respond(404, ['status' => 'not_found', 'message' => 'Invoice not found.']);
 
     if (!empty($inv['journal_id'])) {
-        $conn->query("DELETE FROM `journal_entries` WHERE id = '" . (int)$inv['journal_id'] . "'");
+        $conn->query("DELETE FROM `journal_entries` WHERE id = '" . (int)$inv['journal_id'] . "' AND tenant_id = '{$api_tenant_id}'");
     }
     $conn->query("DELETE FROM `invoice_list` WHERE id = '{$id}' AND tenant_id = '{$api_tenant_id}'");
 

@@ -6,6 +6,12 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
 ## [Unreleased] - 2026-11-14
 
 ### Security
+- Tenant isolation: the payments API verifies an invoice belongs to the API
+  key's company before allocating against it; by-id API follow-up queries
+  carry the tenant clause; a signed-in user with no home company is denied
+  instead of falling back to tenant 1; super-admin company switches and all
+  logins (with IP, super tier flagged) are audited; a ratchet test fails CI
+  if any file gains a tenant-unscoped query on a core business table.
 - CSRF verification added to the remaining user endpoints (client save, own
   password change); every state-changing endpoint now verifies the token.
 - Database error details (`mysqli::$error`) no longer reach the browser from

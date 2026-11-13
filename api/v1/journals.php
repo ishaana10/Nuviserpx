@@ -76,7 +76,7 @@ if($method === 'POST'){
         ]);
     } else {
         http_response_code(500);
-        echo json_encode(['status' => 'failed', 'message' => 'Failed to post journal entry.', 'error' => $conn->error]);
+        \App\Support\Db::log($conn); echo json_encode(['status' => 'failed', 'message' => 'Failed to post journal entry.']);
     }
     exit;
 }

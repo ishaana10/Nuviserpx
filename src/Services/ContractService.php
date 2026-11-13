@@ -83,12 +83,10 @@ class ContractService
 
     public function save_proposal_signature()
     {
-        $tenant_id = $_POST['tenant_id'] ?? null;
         $sales_order_id = $_POST['sales_order_id'] ?? null;
         $signer_name = $_POST['signer_name'] ?? null;
         $signer_email = $_POST['signer_email'] ?? null;
         $signature_data = $_POST['signature_data'] ?? null;
-        $t_id = !empty($tenant_id) ? intval($tenant_id) : $this->settings->active_tenant_id();
         $so_id = intval($sales_order_id ?? 0);
 
         if ($so_id <= 0 || empty($signer_name) || empty($signer_email) || empty($signature_data)) {
