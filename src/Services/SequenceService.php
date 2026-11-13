@@ -111,9 +111,9 @@ class SequenceService
     public static function next(mysqli $conn, int $tenantId, string $key, callable $seed): int
     {
         self::ensureTable($conn);
-        $ins = $conn->prepare("INSERT IGNORE INTO document_sequences (tenant_id, seq_key, last_value) VALUES (?, ?, ?)");
-        $exists = $conn->prepare("SELECT 1 FROM document_sequences WHERE tenant_id = ? AND seq_key = ?");
-        $up = $conn->prepare("UPDATE document_sequences SET last_value = LAST_INSERT_ID(last_value + 1) WHERE tenant_id = ? AND seq_key = ?");
+        $ins = $conn->prepare("INSERT IGNORE INTO `document_sequences` (`tenant_id`, `seq_key`, `last_value`) VALUES (?, ?, ?)");
+        $exists = $conn->prepare("SELECT 1 FROM `document_sequences` WHERE `tenant_id` = ? AND `seq_key` = ?");
+        $up = $conn->prepare("UPDATE `document_sequences` SET `last_value` = LAST_INSERT_ID(`last_value` + 1) WHERE `tenant_id` = ? AND `seq_key` = ?");
         if ($ins === false || $exists === false || $up === false) {
             // Prepared statements are failing on this table (seen on one host
             // with an empty error string): the plain-query path does the same
@@ -135,7 +135,7 @@ class SequenceService
     /** Create the sequences table if it is missing; errors are reported by whatever runs next. */
     private static function ensureTable(mysqli $conn): void
     {
-        $r = @$conn->query("SELECT 1 FROM document_sequences LIMIT 1");
+        $r = @$conn->query("SELECT 1 FROM `document_sequences` LIMIT 1");
         if ($r !== false) {
             return;
         }
@@ -151,15 +151,15 @@ class SequenceService
     private static function nextViaQuery(mysqli $conn, int $tenantId, string $key, callable $seed): int
     {
         $k = $conn->real_escape_string($key);
-        $r = $conn->query("SELECT 1 FROM document_sequences WHERE tenant_id = {$tenantId} AND seq_key = '{$k}' LIMIT 1");
+        $r = $conn->query("SELECT 1 FROM `document_sequences` WHERE `tenant_id` = {$tenantId} AND `seq_key` = '{$k}' LIMIT 1");
         if ($r === false) {
             throw new \RuntimeException("The document_sequences table is unavailable ([{$conn->errno}] {$conn->error}). Run the repair migration or create the table, then try again.");
         }
         if (!$r->num_rows) {
             $start = (int)$seed();
-            $conn->query("INSERT IGNORE INTO document_sequences (tenant_id, seq_key, last_value) VALUES ({$tenantId}, '{$k}', {$start})");
+            $conn->query("INSERT IGNORE INTO `document_sequences` (`tenant_id`, `seq_key`, `last_value`) VALUES ({$tenantId}, '{$k}', {$start})");
         }
-        if ($conn->query("UPDATE document_sequences SET last_value = LAST_INSERT_ID(last_value + 1) WHERE tenant_id = {$tenantId} AND seq_key = '{$k}'") === false) {
+        if ($conn->query("UPDATE `document_sequences` SET `last_value` = LAST_INSERT_ID(`last_value` + 1) WHERE `tenant_id` = {$tenantId} AND `seq_key` = '{$k}'") === false) {
             throw new \RuntimeException("The document sequence could not be advanced ([{$conn->errno}] {$conn->error}).");
         }
         return (int)$conn->insert_id;
