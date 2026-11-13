@@ -155,7 +155,16 @@ class SystemSettings extends DBConnection{
 		// administrators (the developer tier), who may operate across companies.
 		$is_super = isset($_SESSION['userdata']['type']) && $_SESSION['userdata']['type'] == 1;
 		if(!$is_super){
-			return $home > 0 ? $home : 1;
+			if($home > 0){
+				return $home;
+			}
+			// Fail closed: an account with no home company must not fall into
+			// another tenant's data. Signed-in users are denied; anonymous
+			// contexts (login page, public portal bootstrap) keep the default.
+			if(!empty($_SESSION['userdata']['id'])){
+				$this->deny('Your account is not linked to a company. Ask your administrator to assign one.');
+			}
+			return 1;
 		}
 
 		if(isset($_SESSION['userdata']['active_tenant_id']) && (int)$_SESSION['userdata']['active_tenant_id'] > 0){
@@ -178,7 +187,11 @@ class SystemSettings extends DBConnection{
 				return false;
 			}
 		}
+		$previous = (int)($_SESSION['userdata']['active_tenant_id'] ?? $this->userdata('tenant_id'));
 		$_SESSION['userdata']['active_tenant_id'] = $tenant_id;
+		if($this->is_super_admin() && $previous !== $tenant_id){
+			$this->log_audit('Switched Company', 'Authentication', "Super admin switched from tenant #{$previous} to tenant #{$tenant_id}.");
+		}
 		return true;
 	}
 	function set_flashdata($flash='',$value=''){

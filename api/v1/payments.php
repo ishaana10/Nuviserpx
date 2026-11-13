@@ -56,15 +56,23 @@ if($method === 'POST'){
         // Auto allocate across customer unpaid invoices
         if(isset($input['invoice_id']) && is_numeric($input['invoice_id'])){
             $inv_id = intval($input['invoice_id']);
-            $fcRow = $conn->query("SELECT currency FROM `invoice_list` WHERE id = '{$inv_id}'")->fetch_assoc();
+            // The invoice must belong to the API key's company - an id alone
+            // never reaches another tenant's data.
+            $fcRow = $conn->query("SELECT currency FROM `invoice_list` WHERE id = '{$inv_id}' AND tenant_id = '{$api_tenant_id}'")->fetch_assoc();
+            if (!$fcRow) {
+                $conn->query("DELETE FROM `payment_list` WHERE id = '{$pay_id}' AND tenant_id = '{$api_tenant_id}'");
+                http_response_code(404);
+                echo json_encode(['status' => 'not_found', 'message' => 'Invoice not found.']);
+                exit;
+            }
             if (!empty($fcRow['currency'])) {
-                $conn->query("DELETE FROM `payment_list` WHERE id = '{$pay_id}'");
+                $conn->query("DELETE FROM `payment_list` WHERE id = '{$pay_id}' AND tenant_id = '{$api_tenant_id}'");
                 http_response_code(422);
                 echo json_encode(['status' => 'failed', 'message' => 'That invoice is in ' . $fcRow['currency'] . '. Record the receipt in the application so the exchange difference is booked.']);
                 exit;
             }
             $conn->query("INSERT INTO `payment_allocations` SET `payment_id` = '{$pay_id}', `invoice_id` = '{$inv_id}', `amount` = '{$amount}'");
-            $conn->query("UPDATE `invoice_list` SET `paid_amount` = `paid_amount` + {$amount}, `balance` = GREATEST(0, `total` - (`paid_amount` + {$amount}) - `credited_amount`), `status` = IF((`paid_amount` + {$amount} + `credited_amount`) >= `total`, 'paid', 'partially_paid') WHERE id = '{$inv_id}'");
+            $conn->query("UPDATE `invoice_list` SET `paid_amount` = `paid_amount` + {$amount}, `balance` = GREATEST(0, `total` - (`paid_amount` + {$amount}) - `credited_amount`), `status` = IF((`paid_amount` + {$amount} + `credited_amount`) >= `total`, 'paid', 'partially_paid') WHERE id = '{$inv_id}' AND tenant_id = '{$api_tenant_id}'");
         }
 
         http_response_code(201);
@@ -76,7 +84,7 @@ if($method === 'POST'){
         ]);
     } else {
         http_response_code(500);
-        echo json_encode(['status' => 'failed', 'message' => 'Failed to record payment.', 'error' => $conn->error]);
+        \App\Support\Db::log($conn); echo json_encode(['status' => 'failed', 'message' => 'Failed to record payment.']);
     }
     exit;
 }

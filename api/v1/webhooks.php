@@ -55,7 +55,7 @@ if ($method === 'POST') {
         `tenant_id` = '{$api_tenant_id}', `name` = '{$name}', `event` = '{$event_esc}',
         `target_url` = '{$url_esc}', `secret_token` = '{$secret}', `status` = 1");
 
-    if ($conn->error) api_respond(500, ['status' => 'failed', 'message' => 'Could not create subscription.', 'error' => $conn->error]);
+    if ($conn->error) { \App\Support\Db::log($conn); api_respond(500, ['status' => 'failed', 'message' => 'Could not create subscription.']); }
 
     api_respond(201, [
         'status' => 'success',

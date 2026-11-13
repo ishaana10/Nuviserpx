@@ -68,7 +68,9 @@ class Login extends DBConnection {
 				$ll->execute();
 
 				// Record successful login in audit trail
-				$this->settings->log_audit("User Login", "Authentication", "User '{$res['username']}' logged in successfully.");
+				$nv_ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+				$nv_tier = ((int)($res['type'] ?? 0) === 1) ? ' [SUPER ADMIN]' : '';
+				$this->settings->log_audit("User Login", "Authentication", "User '{$res['username']}' logged in successfully{$nv_tier} from {$nv_ip}.");
 
 				return json_encode(array('status'=>'success'));
 			}

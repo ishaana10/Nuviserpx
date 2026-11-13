@@ -18,7 +18,7 @@ foreach (['classes/Master.php', 'classes/Login.php', 'classes/Users.php'] as $f)
 
 // Every controller method that took the company or user from the session must not read them from the form after.
 $m = file_get_contents("$root/classes/Master.php") . file_get_contents("$root/src/Services/FixedAssetService.php") . file_get_contents("$root/src/Services/ContractService.php");
-check('asset save takes the company from the session only', strpos($m, "\$tenant_id = \$_POST['tenant_id']") === strpos($m, "\$tenant_id = \$_POST['tenant_id']") && substr_count($m, "\$tenant_id = \$_POST['tenant_id']") === 1);
+check('no controller reads the company from the form', substr_count($m, "\$tenant_id = \$_POST['tenant_id']") === 0);
 check('only the public proposal form reads a posted company, and the quote overrides it', strpos($m, "\$t_id = (int)\$quoteRow['tenant_id'];") !== false);
 check('user_id is never read from the form', strpos($m, "\$user_id = \$_POST") === false);
 exit($fail ? 1 : 0);
