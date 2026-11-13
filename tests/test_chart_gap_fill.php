@@ -14,6 +14,7 @@ check('fill() adds only the standard accounts a chart lacks', strpos($cp, 'publi
 check('an untyped standard account gets the standard type repaired', strpos($cp, 'SET type = ?, normal_balance = ?, status = 1 WHERE id = ? AND tenant_id = ?') !== false && strpos($cp, 'isRecognisedType((string)$row[\'type\'])') !== false);
 check('an inactive standard account is reactivated, not skipped', strpos($cp, 'SET status = 1 WHERE id = ? AND tenant_id = ?') !== false && strpos($cp, 'repair it instead of skipping') !== false);
 check('reactivation is scoped to the tenant and counted once', strpos($cp, "!isset(\$woken[\$wake])") !== false);
+check('a standard account left on the legacy default type Expense is retyped', strpos($cp, "\$ex['type'] === 'expense'") !== false && strpos($cp, "classify(\$type)['class'] !== 'expense'") !== false);
 check('provision() for empty charts is untouched', strpos($cp, 'never touch a chart that already exists') !== false);
 check('the standard chart covers every posting role', strpos($cp, 'Accounts Receivable') !== false && strpos($cp, 'Sales Revenue') !== false && (bool)preg_match('/Bank|Cash/', $cp));
 check('provision_chart action exists, is audited and whitelisted', strpos($ms, 'function provision_chart') !== false && strpos($ms, "'Provisioned chart accounts'") !== false && strpos($ms, "'provision_chart',") !== false);

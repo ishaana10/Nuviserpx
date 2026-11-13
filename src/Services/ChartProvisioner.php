@@ -68,6 +68,7 @@ class ChartProvisioner
         $have = ['codes' => [], 'names' => []];
         $inactive = [];
         $untyped = [];
+        $byName = [];
         $r = $conn->prepare("SELECT id, code, name, type, status FROM account_list WHERE tenant_id = ? AND delete_flag = 0");
         if (!$r) {
             return 0;
@@ -79,6 +80,7 @@ class ChartProvisioner
             $nkey = strtolower(trim((string)$row['name']));
             $have['codes'][$ckey] = true;
             $have['names'][$nkey] = true;
+            $byName[$nkey] = ['id' => (int)$row['id'], 'type' => strtolower(trim((string)$row['type']))];
             if ((int)$row['status'] !== 1) {
                 $inactive[$ckey] = (int)$row['id'];
                 $inactive[$nkey] = (int)$row['id'];
@@ -103,6 +105,16 @@ class ChartProvisioner
                 // empty/unknown type, is the same dead end as a missing one:
                 // repair it instead of skipping.
                 $fixId = $untyped[strtolower($code)] ?? $untyped[strtolower($name)] ?? 0;
+                // Legacy rows were given the column default 'Expense' when the
+                // type column was added, which is a recognised type, so they
+                // look fine but file e.g. Accounts Receivable under Expenses.
+                // A standard account matched by name that still carries that
+                // default is retyped to its real class.
+                $ex = $byName[strtolower($name)] ?? null;
+                if ($fixId === 0 && $ex !== null && $ex['type'] === 'expense'
+                    && LedgerService::classify($type)['class'] !== 'expense') {
+                    $fixId = $ex['id'];
+                }
                 if ($fixId > 0 && !isset($woken[$fixId])) {
                     $normal = LedgerService::classify($type)['normal'] === 'credit' ? 'credit' : 'debit';
                     $up = $conn->prepare("UPDATE account_list SET type = ?, normal_balance = ?, status = 1 WHERE id = ? AND tenant_id = ?");
