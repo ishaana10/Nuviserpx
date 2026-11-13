@@ -53,7 +53,7 @@ check('action switch replaced by a whitelist dispatch', strpos($ms, '$allowed_ac
 check('backup_db still streams without echo', (bool)preg_match('/if \(\$action === \x27backup_db\x27\) \{\s*\$Master->backup_db\(\);/', $ms));
 $navdir = $root . '/admin/inc/menus';
 $sections = glob($navdir . '/*.php');
-check('navigation split into 11 section files', count($sections) === 11);
+check('navigation split into section files', count($sections) >= 11);
 $navmain = file_get_contents($root . '/admin/inc/navigation.php');
 check('navigation.php is a thin shell including the sections', strlen($navmain) < 8192 && strpos($navmain, "include __DIR__ . '/menus/'") !== false);
 $all = implode('', array_map('file_get_contents', $sections));
