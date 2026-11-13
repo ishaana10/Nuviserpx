@@ -24,6 +24,7 @@ check('email addresses are unique across users', strpos($us, 'return 6; // email
 check('a changed address is re-verified: token stored hashed with expiry', strpos($us, "hash('sha256', \$verify_token)") !== false && strpos($us, 'DATE_ADD(NOW(), INTERVAL 48 HOUR)') !== false && strpos($us, '`email_verified_at` = NULL') !== false);
 check('token is random and never stored in clear', strpos($us, 'random_bytes(32)') !== false && !preg_match('/email_verify_token`?\s*=\s*\'\{?\$verify_token/', $us));
 check('welcome/verification email is sent after a successful save', strpos($us, 'send_email_verification($email') !== false && strpos($us, "verify_email.php?token=") !== false);
+check('Emailer class is loaded before use', strpos($us, "require_once(__DIR__ . '/Emailer.php')") !== false);
 check('a send failure is reported, not swallowed silently', strpos($us, 'could not be sent') !== false);
 check('resend endpoint exists with permission + csrf checks', strpos($us, 'function resend_verification') !== false && preg_match('/function resend_verification\(\)\{\s*\$this->settings->require_login\(\);\s*\$this->settings->require_csrf\(\);/', $us) && strpos($us, "case 'resend_verification':") !== false);
 
