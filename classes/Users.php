@@ -1,5 +1,6 @@
 <?php
 require_once('../config.php');
+require_once(__DIR__ . '/Emailer.php'); // loaded lazily elsewhere; needed here for verification emails
 Class Users extends DBConnection {
 	private $settings;
 	public function __construct(){
