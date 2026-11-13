@@ -56,7 +56,7 @@ if($t_qry && $t_qry->num_rows > 0){
                             foreach ([
                                 '01_home', '02_sales', '03_purchases', '04_reporting',
                                 '05_accounting', '06_tax', '07_contacts', '08_payroll_hr',
-                                '09_access_users', '10_settings', '11_developer',
+                                '09_access_users', '10_settings', '11_developer', '12_help',
                             ] as $nv_menu_section) {
                                 include __DIR__ . '/menus/' . $nv_menu_section . '.php';
                             }

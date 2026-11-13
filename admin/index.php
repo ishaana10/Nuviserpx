@@ -133,6 +133,7 @@ ob_start();
   </div>
       </div>
       <!-- /.content-wrapper -->
+      <?php require_once('inc/help_widget.php') ?>
       <?php require_once('inc/footer.php') ?>
   </body>
 </html>
