@@ -106,6 +106,7 @@ class InventoryService
                 $this->settings->log_audit('Updated Product', 'Inventory', "Updated '{$name_raw}' (#{$id}): {$diff}.");
             }
             $resp['status'] = 'success';
+            $resp['id'] = (int)(empty($id) ? $product_id : $id);
             $resp['msg'] = (empty($id) ? " Product added successfully." : " Product details updated successfully.") . ($openingWarning ?? '');
             $this->settings->set_flashdata('success', $resp['msg']);
         } else {
