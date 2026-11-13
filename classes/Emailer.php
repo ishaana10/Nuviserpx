@@ -81,6 +81,9 @@ class Emailer {
             $headers .= "To: <{$to}>\r\n";
             $headers .= "Subject: {$subject}\r\n";
             $headers .= "Date: " . date("r") . "\r\n";
+            $from_domain = substr(strrchr($from_email, '@'), 1) ?: 'localhost';
+            $headers .= "Message-ID: <" . bin2hex(random_bytes(16)) . "@" . $from_domain . ">\r\n";
+            $headers .= "Reply-To: {$from_email}\r\n";
 
             $message  = $headers . "\r\n" . $body_html . "\r\n.\r\n";
 
