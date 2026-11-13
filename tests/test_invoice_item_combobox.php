@@ -30,5 +30,15 @@ $missing = array_diff(array_unique($u[1]), array_unique($a[1]));
 check('every item_* array saveInvoice reads is bound from the post', $missing === []);
 check('line amounts come from the posted qty, price, discount and tax', strpos($fn, "\$item_qty = \$post['item_qty']") !== false && strpos($fn, "\$item_price = \$post['item_price']") !== false && strpos($fn, "\$item_discount_pct = \$post['item_discount_pct']") !== false && strpos($fn, "\$item_tax_rate = \$post['item_tax_rate']") !== false);
 
+
+// The same combobox applies to sales/purchase orders, and quick-added
+// products appear immediately (save_product returns the new id).
+$so = file_get_contents(dirname(__DIR__) . '/admin/sales_orders/manage_order.php');
+$inv_svc = file_get_contents(dirname(__DIR__) . '/src/Services/InventoryService.php');
+check('order form merges item select and name into one combobox', strpos($so, "tags: true") !== false && strpos($so, "'custom:' + t") !== false && strpos($so, "addClass('d-none').prop('required', false)") !== false);
+check('order form handles typed custom items', strpos($so, "indexOf('custom:') === 0") !== false);
+check('new rows get a fresh combobox', strpos($so, 'init_item_select();') !== false && substr_count($so, 'init_item_select') >= 3);
+check('saveProduct returns the new id for live refresh', strpos($inv_svc, "\$resp['id'] = (int)(empty(\$id) ? \$product_id : \$id);") !== false);
+
 echo $fail ? "$fail FAILED\n" : "All passed\n";
 exit($fail ? 1 : 0);

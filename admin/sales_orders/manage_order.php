@@ -406,6 +406,38 @@ while($p = $products_qry->fetch_assoc()){
 	$(document).ready(function(){
 		$('.select2').select2({ placeholder:"Select party", width:'100%' });
 
+		// One combobox per line: search the catalog, or type a name for a
+		// custom item (posts a non-numeric product_id, stored with NULL
+		// product). The item_name input stays in the form, hidden and synced.
+		function init_item_select(){
+			$('.product-select').each(function(){
+				var sel = $(this), tr = sel.closest('tr');
+				if(sel.hasClass('select2-hidden-accessible')) return;
+				var name = tr.find('.item-name').val();
+				if(name && !sel.val()){
+					sel.append(new Option(name, 'custom:' + name, true, true));
+				}
+				tr.find('.item-name').addClass('d-none').prop('required', false);
+				sel.select2({
+					width: '100%',
+					tags: true,
+					placeholder: 'Search items, or type a custom item...',
+					createTag: function(p){
+						var t = $.trim(p.term);
+						return t ? { id: 'custom:' + t, text: t, nv_custom: true } : null;
+					},
+					templateResult: function(d){
+						if(d.nv_custom){
+							return $('<span>').append($('<i class="fas fa-plus-circle mr-1 text-primary">'))
+								.append(document.createTextNode('Add "' + d.text + '" as a custom item'));
+						}
+						return d.text;
+					}
+				});
+			});
+		}
+		init_item_select();
+
 		var active_row_for_new_item = null;
 
 		$(document).on('change', '.product-select', function(){
@@ -418,6 +450,9 @@ while($p = $products_qry->fetch_assoc()){
 				$('#item_modal_id').val('');
 				$('#item_modal_code').val('ITEM-' + Math.floor(100 + Math.random() * 900));
 				$('#modal_quick_product').modal('show');
+			} else if(String(option.val()).indexOf('custom:') === 0){
+				// A typed custom item: the name is the tag text itself.
+				row.find('.item-name').val(option.text().trim());
 			} else {
 				var price = option.attr('data-price');
 				var name = option.attr('data-name');
@@ -494,7 +529,7 @@ while($p = $products_qry->fetch_assoc()){
 
 							if (active_row_for_new_item) {
 								var sel = active_row_for_new_item.find('.product-select');
-								sel.val(new_id);
+								sel.val(new_id).trigger('change.select2');
 								active_row_for_new_item.find('.item-name').val(new_name);
 								active_row_for_new_item.find('.price').val(new_price);
 								active_row_for_new_item.find('.item-desc').val(new_desc);
@@ -509,12 +544,10 @@ while($p = $products_qry->fetch_assoc()){
 		});
 
 		$('#add_item_row').click(function(){
-			var first_select_options = $('.product-select').first().html();
+			var first_select_options = $('.product-select').first().find('option').not('[value^="custom:"]').clone().removeAttr('selected');
 			var row = `<tr>
 				<td>
-					<select name="product_id[]" class="form-control form-control-sm rounded-0 product-select">
-						${first_select_options}
-					</select>
+					<select name="product_id[]" class="form-control form-control-sm rounded-0 product-select"></select>
 					<input type="text" name="item_name[]" class="form-control form-control-sm rounded-0 mt-1 item-name" placeholder="Item Name" required>
 					<input type="hidden" name="item_desc[]" class="item-desc" value="">
 				</td>
@@ -524,7 +557,10 @@ while($p = $products_qry->fetch_assoc()){
 				<td><input type="number" step="any" name="item_amount[]" class="form-control form-control-sm rounded-0 text-right amount bg-light" value="0.00" readonly></td>
 				<td class="text-center align-middle"><button type="button" class="btn btn-xs btn-danger remove_row"><i class="fas fa-trash"></i></button></td>
 			</tr>`;
-			$('#items-table tbody').append(row);
+			var tr = $(row);
+			tr.find('.product-select').empty().append(first_select_options).val('');
+			$('#items-table tbody').append(tr);
+			init_item_select();
 		});
 
 		$(document).on('click', '.remove_row', function(){
