@@ -359,7 +359,7 @@ class InvoiceService
             }
             $resp['status'] = 'failed';
             $resp['msg'] = "An error occurred while saving invoice.";
-            $resp['err'] = $this->conn->error;
+            \App\Support\Db::log($this->conn);
         }
 
         return json_encode($resp);
@@ -607,7 +607,7 @@ class InvoiceService
             ], (int)$tenant_id);
         } else {
             $resp['status'] = 'failed';
-            $resp['error'] = $this->conn->error;
+            \App\Support\Db::log($this->conn);
         }
         return json_encode($resp);
     }

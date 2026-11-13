@@ -117,7 +117,7 @@ class PurchaseService
         }
 
         if (!$save) {
-            return json_encode(['status' => 'failed', 'msg' => 'An error occurred while saving the purchase order.', 'err' => $this->conn->error]);
+            return \App\Support\Db::fail($this->conn, 'An error occurred while saving the purchase order.');
         }
 
         // Replace line items
@@ -190,7 +190,7 @@ class PurchaseService
             ], (int)$tenant_id);
             return json_encode(['status' => 'success']);
         }
-        return json_encode(['status' => 'failed', 'error' => $this->conn->error]);
+        return \App\Support\Db::fail($this->conn);
     }
 
     /* ===================================================================
@@ -586,7 +586,7 @@ class PurchaseService
         }
 
         if (!$save) {
-            return json_encode(['status' => 'failed', 'msg' => 'An error occurred while saving the vendor bill.', 'err' => $this->conn->error]);
+            return \App\Support\Db::fail($this->conn, 'An error occurred while saving the vendor bill.');
         }
 
         // Line items
@@ -739,7 +739,7 @@ class PurchaseService
             ], (int)$tenant_id);
             return json_encode(['status' => 'success']);
         }
-        return json_encode(['status' => 'failed', 'error' => $this->conn->error]);
+        return \App\Support\Db::fail($this->conn);
     }
 
     /* ===================================================================

@@ -49,7 +49,7 @@ class ExtrafieldService
             $this->settings->log_audit("Added Custom Extrafield", "Custom Fields", "Target: {$element_type}, Code: {$field_code}");
             return json_encode(['status' => 'success', 'id' => $this->conn->insert_id, 'msg' => 'Custom extrafield created successfully.']);
         }
-        return json_encode(['status' => 'failed', 'msg' => 'Failed to save custom extrafield. ' . $this->conn->error]);
+        return \App\Support\Db::fail($this->conn, 'Failed to save custom extrafield.');
     }
 
     public function delete_extrafield()

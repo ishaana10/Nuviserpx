@@ -59,7 +59,7 @@ class CurrencyService
             $this->settings->log_audit("Saved Currency", "Currencies", "Currency: {$c_code} ({$c_sym}), Rate: {$c_rate}");
             return json_encode(['status' => 'success', 'msg' => 'Currency saved successfully.']);
         }
-        return json_encode(['status' => 'failed', 'msg' => 'Failed to save currency. ' . $this->conn->error]);
+        return \App\Support\Db::fail($this->conn, 'Failed to save currency.');
     }
 
     public function delete_currency()
@@ -114,7 +114,7 @@ class CurrencyService
             $this->settings->log_audit("Added Bank Account", "Chart of Accounts", "Bank: {$bank_name}, Account: {$account_name}");
             return json_encode(['status' => 'success', 'id' => $acc_id, 'msg' => 'Bank account added successfully.']);
         }
-        return json_encode(['status' => 'failed', 'msg' => 'Failed to add bank account. ' . $this->conn->error]);
+        return \App\Support\Db::fail($this->conn, 'Failed to add bank account.');
     }
 
     /* Dolibarr Inspired CRM Opportunity Methods */

@@ -110,7 +110,7 @@ class FixedAssetService
             $this->settings->log_audit(empty($id) ? "Created Asset" : "Updated Asset", "Fixed Assets", "Asset #{$asset_number}: {$asset_name}");
             return json_encode(['status' => 'success', 'id' => $asset_id, 'msg' => 'Fixed asset saved successfully.']);
         }
-        return json_encode(['status' => 'failed', 'msg' => 'Failed to save fixed asset. ' . $this->conn->error]);
+        return \App\Support\Db::fail($this->conn, 'Failed to save fixed asset.');
     }
 
     public function delete_asset()

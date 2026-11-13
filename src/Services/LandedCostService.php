@@ -237,23 +237,23 @@ class LandedCostService
                 if (!$this->conn->query("INSERT INTO `landed_costs` SET tenant_id = '{$t}', landed_no = '{$noE}', grn_id = '{$grnId}',
                     cost_date = '{$date}', basis = '{$basis}', total = '{$total}', capitalised = '{$plan['capitalised']}',
                     credit_account_id = '{$creditId}', journal_id = '{$journalId}', notes = '{$notesE}', created_by = '{$user}'")) {
-                    throw new \RuntimeException($this->conn->error);
+                    throw new \RuntimeException(\App\Support\Db::oops($this->conn));
                 }
                 $lid = (int)$this->conn->insert_id;
                 foreach ($charges as $c) {
                     $d = $this->conn->real_escape_string($c['description']);
                     if (!$this->conn->query("INSERT INTO `landed_cost_charges` SET landed_id = '{$lid}', description = '{$d}', amount = '{$c['amount']}'")) {
-                        throw new \RuntimeException($this->conn->error);
+                        throw new \RuntimeException(\App\Support\Db::oops($this->conn));
                     }
                 }
                 foreach ($plan['rows'] as $pid => $r) {
                     if (!$this->conn->query("INSERT INTO `landed_cost_items` SET landed_id = '{$lid}', product_id = '{$pid}', qty_received = '{$r['qty']}',
                         allocated = '{$r['allocated']}', capitalised = '{$r['capitalised']}', old_cost = '{$r['cost']}', new_cost = '{$r['new_cost']}'")) {
-                        throw new \RuntimeException($this->conn->error);
+                        throw new \RuntimeException(\App\Support\Db::oops($this->conn));
                     }
                     if ($r['capitalised'] > 0) {
                         if (!$this->conn->query("UPDATE `product_list` SET cost_price = '{$r['new_cost']}' WHERE id = '{$pid}' AND tenant_id = '{$t}'")) {
-                            throw new \RuntimeException($this->conn->error);
+                            throw new \RuntimeException(\App\Support\Db::oops($this->conn));
                         }
                     }
                 }

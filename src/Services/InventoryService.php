@@ -112,7 +112,7 @@ class InventoryService
         } else {
             $resp['status'] = 'failed';
             $resp['msg'] = "An error occurred while saving product.";
-            $resp['err'] = $this->conn->error;
+            \App\Support\Db::log($this->conn);
         }
 
         return json_encode($resp);
@@ -129,7 +129,7 @@ class InventoryService
             $this->settings->set_flashdata('success', " Product deleted successfully.");
         } else {
             $resp['status'] = 'failed';
-            $resp['error'] = $this->conn->error;
+            \App\Support\Db::log($this->conn);
         }
         return json_encode($resp);
     }
@@ -214,7 +214,7 @@ class InventoryService
                 throw new \RuntimeException('Stock changed while this was being saved.');
             }
             if (!$stockSvc->adjustLocation($product_id, $warehouse_id, $delta, false)) {
-                throw new \RuntimeException($this->conn->error);
+                throw new \RuntimeException(\App\Support\Db::oops($this->conn));
             }
             if ($absolute) {
                 $logType = 'adjustment';
@@ -231,12 +231,12 @@ class InventoryService
 				" . ($journalId > 0 ? "`journal_id` = '{$journalId}'," : '') . "
 				`created_by` = '{$user_id}'");
             if (!$saved) {
-                throw new \RuntimeException($this->conn->error);
+                throw new \RuntimeException(\App\Support\Db::oops($this->conn));
             }
             if ($delta > 0) {
                 $batches = new BatchService($this->conn, $this->settings);
                 if ($batches->isTracked($product_id) && !$batches->receive($product_id, $warehouse_id, $delta, (string)($post['batch_no'] ?? ''), BatchService::cleanExpiry($post['expiry_date'] ?? ''), $unit_cost, (string)($post['reference'] ?? ''), 'ADJ-' . date('Ymd'))) {
-                    throw new \RuntimeException($this->conn->error);
+                    throw new \RuntimeException(\App\Support\Db::oops($this->conn));
                 }
             }
             $this->conn->commit();

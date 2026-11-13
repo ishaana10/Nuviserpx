@@ -184,7 +184,7 @@ class TaxService
                 $up->bind_param('isdsi', $t, $name, $rate, $applies, $default);
             }
             if (!$up->execute()) {
-                throw new \RuntimeException($this->conn->error);
+                throw new \RuntimeException(\App\Support\Db::oops($this->conn));
             }
             $this->conn->commit();
         } catch (\Throwable $e) {

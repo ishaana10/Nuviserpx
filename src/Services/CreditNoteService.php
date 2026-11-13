@@ -236,7 +236,7 @@ class CreditNoteService
             return [];
         }
         $t = $this->tenantId();
-        $in = implode(',', $ids);
+        $in = implode(',', array_map('intval', $ids));
         $sold = [];
         $res = $this->conn->query("SELECT ii.invoice_id, ii.product_id, p.name, SUM(ii.qty) q
             FROM invoice_items ii INNER JOIN invoice_list i ON i.id = ii.invoice_id AND i.tenant_id = {$t}
@@ -456,7 +456,7 @@ class CreditNoteService
             $party = (int)$doc['party_id'];
             $ins->bind_param('issiisssssi', $t, $kind, $noteNo, $party, $docId, $date, $reason, $n, $tx, $tt, $userId);
             if (!$ins->execute()) {
-                throw new \RuntimeException($this->conn->error);
+                throw new \RuntimeException(\App\Support\Db::oops($this->conn));
             }
             $noteId = (int)$this->conn->insert_id;
             if ($noteLines) {
@@ -469,7 +469,7 @@ class CreditNoteService
                     $rc = $rp !== null ? (string)$stockItems[$rp]['cost'] : null;
                     $li->bind_param('isssssssss', $noteId, $l['description'], $q, $pr, $tr, $ln, $lx, $rp, $rq, $rc);
                     if (!$li->execute()) {
-                        throw new \RuntimeException($this->conn->error);
+                        throw new \RuntimeException(\App\Support\Db::oops($this->conn));
                     }
                 }
             }

@@ -144,7 +144,7 @@ class WarehouseStockService
                 && $this->conn->query("INSERT INTO `inventory_logs` (`tenant_id`, `product_id`, `warehouse_id`, `type`, `qty`, `reference`, `notes`, `created_by`)
                     VALUES ('{$tenant_id}', '{$product_id}', '{$to_wh}', 'in', '{$qty}', '{$ref_e}', '{$notes_e}', '{$user_id}')");
             if (!$ok) {
-                throw new \RuntimeException($this->conn->error);
+                throw new \RuntimeException(\App\Support\Db::oops($this->conn));
             }
             $this->conn->commit();
         } catch (\Throwable $e) {

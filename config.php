@@ -6,6 +6,15 @@ if (session_status() === PHP_SESSION_NONE) {
 	ini_set('session.cookie_httponly', 1);
 	ini_set('session.use_only_cookies', 1);
 	ini_set('session.cookie_samesite', 'Lax');
+	// On HTTPS (direct or behind a proxy) the session cookie is secure-only.
+	$nv_https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+		|| (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
+	if ($nv_https) {
+		ini_set('session.cookie_secure', 1);
+	}
+	ini_set('session.gc_maxlifetime', 14400);   // idle sessions live at most 4h server-side
+	ini_set('session.cookie_lifetime', 0);      // cookie ends with the browser session
+	ini_set('session.use_strict_mode', 1);      // reject uninitialised session ids
 	session_name('NUVISERPXSESSID');
 	session_start();
 }

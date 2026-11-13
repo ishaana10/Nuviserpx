@@ -69,7 +69,7 @@ class PlanService
             $this->settings->set_flashdata('success', $id === 0 ? ' Plan created.' : ' Plan updated.');
             return json_encode(['status' => 'success']);
         }
-        return json_encode(['status' => 'failed', 'msg' => 'Could not save plan (code may already exist).', 'err' => $this->conn->error]);
+        return \App\Support\Db::fail($this->conn, 'Could not save plan (code may already exist).');
     }
 
     public function deletePlan(int $id): string
@@ -83,7 +83,7 @@ class PlanService
             $this->settings->set_flashdata('success', ' Plan deleted.');
             return json_encode(['status' => 'success']);
         }
-        return json_encode(['status' => 'failed', 'err' => $this->conn->error]);
+        return \App\Support\Db::fail($this->conn);
     }
 
     /** @param array<string,mixed> $post */
@@ -115,6 +115,6 @@ class PlanService
             $this->settings->set_flashdata('success', ' Plan assignment updated.');
             return json_encode(['status' => 'success']);
         }
-        return json_encode(['status' => 'failed', 'err' => $this->conn->error]);
+        return \App\Support\Db::fail($this->conn);
     }
 }

@@ -64,7 +64,7 @@ class RoleService
         } else {
             $resp['status'] = 'failed';
             $resp['msg'] = "An error occurred while saving role.";
-            $resp['err'] = $this->conn->error;
+            \App\Support\Db::log($this->conn);
         }
 
         return json_encode($resp);
@@ -82,7 +82,7 @@ class RoleService
             $this->settings->set_flashdata('success', " Role deleted successfully.");
         } else {
             $resp['status'] = 'failed';
-            $resp['error'] = $this->conn->error;
+            \App\Support\Db::log($this->conn);
         }
         return json_encode($resp);
     }
@@ -140,7 +140,7 @@ class RoleService
         } else {
             $resp['status'] = 'failed';
             $resp['msg'] = "An error occurred while saving API Key.";
-            $resp['err'] = $this->conn->error;
+            \App\Support\Db::log($this->conn);
         }
 
         return json_encode($resp);
@@ -158,7 +158,7 @@ class RoleService
             $this->settings->set_flashdata('success', " API Key revoked and deleted successfully.");
         } else {
             $resp['status'] = 'failed';
-            $resp['error'] = $this->conn->error;
+            \App\Support\Db::log($this->conn);
         }
         return json_encode($resp);
     }

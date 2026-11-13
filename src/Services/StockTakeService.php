@@ -146,7 +146,7 @@ class StockTakeService
         try {
             if (!$this->conn->query("INSERT INTO `stock_counts` SET tenant_id = '{$t}', count_no = '" . $this->conn->real_escape_string($no) . "',
                 warehouse_id = '{$warehouseId}', count_date = '{$date}', notes = '{$notesE}', created_by = '{$user}'")) {
-                throw new \RuntimeException($this->conn->error);
+                throw new \RuntimeException(\App\Support\Db::oops($this->conn));
             }
             $id = (int)$this->conn->insert_id;
             foreach ($products as $p) {
@@ -155,7 +155,7 @@ class StockTakeService
                 $cost = (float)$p['cost_price'];
                 if (!$this->conn->query("INSERT INTO `stock_count_lines` SET count_id = '{$id}', tenant_id = '{$t}', product_id = '{$pid}',
                     system_qty = '{$sys}', unit_cost = '{$cost}'")) {
-                    throw new \RuntimeException($this->conn->error);
+                    throw new \RuntimeException(\App\Support\Db::oops($this->conn));
                 }
             }
             $this->conn->commit();

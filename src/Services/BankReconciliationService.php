@@ -109,7 +109,7 @@ class BankReconciliationService
         $rec_id = $this->conn->insert_id;
 
         if (!$rec_id) {
-            return json_encode(['status' => 'failed', 'msg' => 'Could not start reconciliation.', 'err' => $this->conn->error]);
+            return \App\Support\Db::fail($this->conn, 'Could not start reconciliation.');
         }
         $this->settings->set_flashdata('success', ' Reconciliation started.');
         return json_encode(['status' => 'success', 'id' => (int)$rec_id]);
@@ -152,7 +152,7 @@ class BankReconciliationService
             $this->settings->set_flashdata('success', ' Reconciliation deleted.');
             return json_encode(['status' => 'success']);
         }
-        return json_encode(['status' => 'failed', 'error' => $this->conn->error]);
+        return \App\Support\Db::fail($this->conn);
     }
 
     /* ===================================================================
@@ -217,7 +217,7 @@ class BankReconciliationService
         if ($del) {
             return json_encode(['status' => 'success']);
         }
-        return json_encode(['status' => 'failed', 'error' => $this->conn->error]);
+        return \App\Support\Db::fail($this->conn);
     }
 
     /* ===================================================================

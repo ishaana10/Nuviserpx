@@ -136,7 +136,7 @@ class PayrollApprovalService
                     throw new \RuntimeException('A payroll journal does not balance, so the run cannot be approved. Return it and run payroll again.');
                 }
             }
-            $in = implode(',', $ids);
+            $in = implode(',', array_map('intval', $ids));
             $this->conn->query("UPDATE payroll_list SET status = 'posted', approved_by = {$me}, approved_at = NOW(), approval_note = NULL WHERE tenant_id = {$t} AND id IN ({$in}) AND status = 'pending_approval'");
             if ($this->conn->affected_rows !== count($ids)) {
                 throw new \RuntimeException('That payroll run was already dealt with by someone else.');
@@ -169,7 +169,7 @@ class PayrollApprovalService
         }
         $ids = array_map('intval', array_column($rows, 'id'));
         $jids = array_values(array_filter(array_map('intval', array_column($rows, 'journal_id'))));
-        $in = implode(',', $ids);
+        $in = implode(',', array_map('intval', $ids));
         $this->conn->begin_transaction();
         try {
             $up = $this->conn->prepare("UPDATE payroll_list SET status = 'rejected', approval_note = ? WHERE tenant_id = ? AND id IN ({$in}) AND status = 'pending_approval'");

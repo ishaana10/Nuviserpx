@@ -101,7 +101,7 @@ class Login extends DBConnection {
 		$qry = $stmt->get_result();
 		if($this->conn->error){
 			$resp['status'] = 'failed';
-			$resp['msg'] = "An error occurred while fetching data. Error:". $this->conn->error;
+			$resp['msg'] = "An error occurred while fetching data. Error:"; \App\Support\Db::log($this->conn);
 		}else{
 			if($qry->num_rows > 0){
 				$res = $qry->fetch_array();

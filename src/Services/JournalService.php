@@ -125,7 +125,7 @@ class JournalService
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
                 $stmt->bind_param('issssiissi', $tenant_id, $code, $date, $reversing, $description, $defaultNarration, $cashBasis, $taxMode, $status, $userId);
                 if (!$stmt->execute()) {
-                    throw new \RuntimeException($this->conn->error);
+                    throw new \RuntimeException(\App\Support\Db::oops($this->conn));
                 }
                 $id = (int)$this->conn->insert_id;
             } else {
@@ -133,7 +133,7 @@ class JournalService
                     default_narration = ?, show_cash_basis = ?, tax_mode = ?, status = ? WHERE id = ? AND tenant_id = ?");
                 $stmt->bind_param('sssiissii', $date, $reversing, $description, $defaultNarration, $cashBasis, $taxMode, $status, $id, $tenant_id);
                 if (!$stmt->execute()) {
-                    throw new \RuntimeException($this->conn->error);
+                    throw new \RuntimeException(\App\Support\Db::oops($this->conn));
                 }
                 $del = $this->conn->prepare("DELETE FROM journal_items WHERE journal_id = ?");
                 $del->bind_param('i', $id);
@@ -159,7 +159,7 @@ class JournalService
                 $fc = $cur !== null ? number_format((float)$l['amount_fc'], 4, '.', '') : null;
                 $ins->bind_param('iiisssssss', $id, $acc, $side, $entrySide, $amount, $desc, $tax, $cur, $fxRate, $fc);
                 if (!$ins->execute()) {
-                    throw new \RuntimeException($this->conn->error);
+                    throw new \RuntimeException(\App\Support\Db::oops($this->conn));
                 }
             }
             $this->conn->commit();
@@ -308,7 +308,7 @@ class JournalService
             $h = $this->conn->prepare("INSERT INTO journal_entries (tenant_id, code, journal_date, description, tax_mode, status, user_id) VALUES (?, ?, ?, ?, 'No Tax', ?, ?)");
             $h->bind_param('issssi', $tenant_id, $code, $date, $description, $status, $userId);
             if (!$h->execute()) {
-                throw new \RuntimeException($this->conn->error);
+                throw new \RuntimeException(\App\Support\Db::oops($this->conn));
             }
             $id = (int)$this->conn->insert_id;
             $ins = $this->conn->prepare("INSERT INTO journal_items (journal_id, account_id, group_id, entry_side, amount, description, currency, fx_rate, amount_fc) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
@@ -324,7 +324,7 @@ class JournalService
                 $fc = $cur !== null ? number_format((float)($l['amount_fc'] ?? 0), 4, '.', '') : null;
                 $ins->bind_param('iiissssss', $id, $acc, $side, $entry, $amount, $desc, $cur, $rate, $fc);
                 if (!$ins->execute()) {
-                    throw new \RuntimeException($this->conn->error);
+                    throw new \RuntimeException(\App\Support\Db::oops($this->conn));
                 }
             }
             $this->conn->commit();
@@ -441,7 +441,7 @@ class JournalService
                 VALUES (?, ?, ?, ?, ?, 'posted', ?, ?)");
             $h->bind_param('issssii', $tenant_id, $code, $date, $description, $taxMode, $id, $userId);
             if (!$h->execute()) {
-                throw new \RuntimeException($this->conn->error);
+                throw new \RuntimeException(\App\Support\Db::oops($this->conn));
             }
             $newId = (int)$this->conn->insert_id;
             $ins = $this->conn->prepare("INSERT INTO journal_items (journal_id, account_id, group_id, entry_side, amount, description, tax_rate, currency, fx_rate, amount_fc) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
@@ -457,7 +457,7 @@ class JournalService
                 $fc = $cur !== null ? (string)$l['amount_fc'] : null;
                 $ins->bind_param('iiisssssss', $newId, $acc, $groupId, $entrySide, $amount, $desc, $tax, $cur, $fxRate, $fc);
                 if (!$ins->execute()) {
-                    throw new \RuntimeException($this->conn->error);
+                    throw new \RuntimeException(\App\Support\Db::oops($this->conn));
                 }
             }
             $this->conn->commit();
