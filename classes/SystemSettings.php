@@ -299,10 +299,10 @@ class SystemSettings extends DBConnection{
 	 * Is a tenant module (e.g. mod_payroll) enabled for the active tenant?
 	 * The developer assigns modules per tenant (tenants.modules, CSV; NULL means
 	 * "not restricted yet"). A system-wide switch-off (system_info mod_*=0) also
-	 * disables it. Super administrators are never blocked.
+	 * disables it. The check applies to every user type, so switching a module
+	 * off genuinely removes it for that tenant.
 	 */
 	function module_enabled($module_key){
-		if($this->userdata('type') == 1) return true;
 		if(!isset(\App\Support\Permissions::TENANT_MODULES[$module_key])) return true;
 		if($this->info($module_key) === '0') return false;
 		static $cache = [];
@@ -344,12 +344,13 @@ class SystemSettings extends DBConnection{
 	}
 
 	function can_access($permission_key){
-		$user_type = $this->userdata('type');
-		if($user_type == 1) return true;
-
-		// Modules the developer has not assigned to this tenant are off-limits.
+		// Modules not assigned to this tenant are off for everyone - the
+		// developer included - so deactivating a module actually removes it.
 		$tenant_module = \App\Support\Permissions::tenantModuleFor((string)$permission_key);
 		if($tenant_module !== null && !$this->module_enabled($tenant_module)) return false;
+
+		$user_type = $this->userdata('type');
+		if($user_type == 1) return true;
 
 		$role = $this->get_user_role();
 		$perms = $role['permissions'];

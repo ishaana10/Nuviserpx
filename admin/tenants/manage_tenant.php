@@ -52,14 +52,18 @@ if(isset($_GET['id']) && is_numeric($_GET['id'])){
 		</div>
 		<div class="form-group">
 			<label class="control-label font-weight-bold"><i class="fas fa-puzzle-piece mr-1"></i> Modules assigned to this tenant</label>
-			<small class="text-muted d-block mb-1">Only ticked modules appear for this tenant's users and can be used, regardless of their role.</small>
+			<small class="text-muted d-block mb-1">Only ticked modules appear for this tenant's users and can be used, regardless of their role. Ticking a module also ticks what it depends on; unticking one switches off the modules that need it.</small>
 			<input type="hidden" name="modules_submitted" value="1">
 			<div class="row">
 			<?php foreach(\App\Support\Permissions::TENANT_MODULES as $mk => $mdef): ?>
 				<div class="col-md-6">
 					<div class="custom-control custom-checkbox mb-1">
-						<input type="checkbox" class="custom-control-input" id="tm_<?php echo $mk ?>" name="modules[]" value="<?php echo $mk ?>" <?php echo ($assigned_modules === null || in_array($mk, $assigned_modules, true)) ? 'checked' : '' ?>>
-						<label class="custom-control-label" for="tm_<?php echo $mk ?>"><?php echo htmlspecialchars($mdef['label']) ?></label>
+						<input type="checkbox" class="custom-control-input tenant-module" id="tm_<?php echo $mk ?>" name="modules[]" value="<?php echo $mk ?>" <?php echo ($assigned_modules === null || in_array($mk, $assigned_modules, true)) ? 'checked' : '' ?>>
+						<label class="custom-control-label" for="tm_<?php echo $mk ?>"><?php echo htmlspecialchars($mdef['label']) ?>
+						<?php if(!empty($mdef['requires'])): ?>
+							<small class="text-muted d-block">needs: <?php echo htmlspecialchars(implode(', ', array_map(fn($r) => \App\Support\Permissions::TENANT_MODULES[$r]['label'], $mdef['requires']))) ?></small>
+						<?php endif; ?>
+						</label>
 					</div>
 				</div>
 			<?php endforeach; ?>
@@ -68,7 +72,31 @@ if(isset($_GET['id']) && is_numeric($_GET['id'])){
 	</form>
 </div>
 <script>
+	// Module dependency graph: key => modules it directly requires.
+	var MODULE_REQUIRES = <?php echo json_encode(array_map(fn($d) => $d['requires'], \App\Support\Permissions::TENANT_MODULES)) ?>;
+	function moduleClosure(key, seen){
+		seen = seen || {};
+		if(seen[key]) return seen;
+		seen[key] = true;
+		(MODULE_REQUIRES[key] || []).forEach(function(r){ moduleClosure(r, seen); });
+		return seen;
+	}
 	$(document).ready(function(){
+		$('.tenant-module').on('change', function(){
+			var key = this.value;
+			if(this.checked){
+				// Activation pulls every requirement in.
+				Object.keys(moduleClosure(key)).forEach(function(m){
+					$('#tm_' + m).prop('checked', true);
+				});
+			}else{
+				// Deactivation switches off everything that needs this module.
+				Object.keys(MODULE_REQUIRES).forEach(function(m){
+					if(m !== key && moduleClosure(m)[key]) $('#tm_' + m).prop('checked', false);
+				});
+			}
+		});
+
 		$('#tenant-form').submit(function(e){
 			e.preventDefault();
             var _this = $(this)

@@ -93,16 +93,38 @@ class ModuleManager {
         return null;
     }
 
-    /** @return array registered modules list */
+    /**
+     * Registered modules. When SystemSettings is available, status reflects
+     * the active tenant's assignment ('active' / 'off') and each entry lists
+     * what it requires, so the registry shows the real per-tenant state.
+     *
+     * @return array registered modules list
+     */
     public static function get_modules() {
-        return self::$modules;
+        global $_settings;
+        $out = self::$modules;
+        foreach ($out as $key => $m) {
+            $out[$key]['requires'] = \App\Support\Permissions::moduleRequires($key);
+            if (isset($_settings) && method_exists($_settings, 'module_enabled') && isset(\App\Support\Permissions::TENANT_MODULES[$key])) {
+                $out[$key]['status'] = $_settings->module_enabled($key) ? 'active' : 'off';
+            }
+        }
+        return $out;
     }
 }
 
-// Pre-register core system modules
-ModuleManager::register_module('accounting', 'Financial Accounting', 'General Ledger, Balance Sheet, P&L, AR Aging');
-ModuleManager::register_module('invoicing', 'Invoicing & Sales', 'Tax Invoices, Customer Payments, Customer Profiles');
-ModuleManager::register_module('inventory', 'Commercial Stock & Sales', 'Product Catalog, Stock Movements, Mobile Orders & Proforma');
-ModuleManager::register_module('payroll', 'Payroll & HR', 'PAYE Tax, FNPF, Batch Processing, Payslips, Compliance Exporters');
+// The registry mirrors Permissions::TENANT_MODULES; make sure it is loaded
+// even when this file is included without the composer autoloader (tests, CLI).
+if (!class_exists('App\\Support\\Permissions')) {
+    require_once __DIR__ . '/../src/Support/Permissions.php';
+}
+
+// Pre-register the tenant-assignable modules from the single source of truth,
+// so the registry, the tenant form and the permission gates always agree.
+foreach (\App\Support\Permissions::TENANT_MODULES as $nv_mod_key => $nv_mod_def) {
+    ModuleManager::register_module($nv_mod_key, $nv_mod_def['label'], 'Covers: ' . implode(', ', $nv_mod_def['perms']));
+}
+unset($nv_mod_key, $nv_mod_def);
+// System-level engines (not tenant-assignable)
 ModuleManager::register_module('emailer', 'Email Notifications', 'SMTP & Mail Delivery Engine for Invoices, Receipts, and OTPs');
 ModuleManager::register_module('integrations', 'Integrations & Automation', 'Webhooks, REST API, and the customisable Workflow engine');

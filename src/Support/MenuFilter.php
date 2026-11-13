@@ -19,7 +19,7 @@ final class MenuFilter
      */
     public static function filter(string $html, $settings, bool $create = false): string
     {
-        if ($settings->is_super_admin() || trim($html) === '' || !class_exists('DOMDocument')) {
+        if (trim($html) === '' || !class_exists('DOMDocument')) {
             return $html;
         }
         $prev = libxml_use_internal_errors(true);
@@ -70,7 +70,7 @@ final class MenuFilter
     {
         $perm = Permissions::forPage($page);
         if ($perm === Permissions::SUPER_ONLY) {
-            return false; // super admins never reach here (filter() bypasses them)
+            return (bool)$settings->is_super_admin();
         }
         if (!is_string($perm)) {
             return true; // open or unlisted page

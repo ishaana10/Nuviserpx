@@ -687,6 +687,7 @@ final class Permissions
         'home'              => null,
         'user/index'        => null,   // "My Account" self-profile
         'user/change_password' => null, // Change own password
+        'settings/modules'  => null,   // read-only module overview for the tenant
         // business modules (view permission)
         'invoices'          => 'invoices_view',
         'parties'           => 'parties_view',
@@ -763,16 +764,65 @@ final class Permissions
      * A tenant without the module cannot reach those pages/actions no matter
      * what a role grants.
      */
+    /**
+     * Tenant modules: the features a company has, assigned per tenant by the
+     * developer. Every permission module is governed by exactly one entry, and
+     * 'requires' names the modules it cannot run without (invoices post to the
+     * ledger and sell products, expense claims belong to employees, ...).
+     * Activation pulls requirements in; deactivation switches dependents off.
+     */
     public const TENANT_MODULES = [
-        'mod_accounting'      => ['label' => 'Accounting & Chart of Accounts', 'perms' => ['journals', 'accounts', 'bank_reconciliation']],
-        'mod_fixed_assets'    => ['label' => 'Fixed Assets Management',        'perms' => ['assets']],
-        'mod_sales_crm'       => ['label' => 'Sales & CRM Opportunities',      'perms' => ['crm']],
-        'mod_tickets'         => ['label' => 'Helpdesk & Support Tickets',     'perms' => ['tickets']],
-        'mod_contracts'       => ['label' => 'Contracts & Subscriptions',      'perms' => ['contracts']],
-        'mod_warehouses'      => ['label' => 'Multi-Warehouse Inventory',      'perms' => ['warehouses']],
-        'mod_expense_reports' => ['label' => 'Employee Expense Claims',        'perms' => ['expenses']],
-        'mod_payroll'         => ['label' => 'Payroll & HR Suite',             'perms' => ['employees', 'attendance', 'leaves', 'payroll']],
+        'mod_accounting'      => ['label' => 'Accounting & Financial Reports', 'perms' => ['journals', 'accounts', 'bank_reconciliation', 'reports'], 'requires' => []],
+        'mod_inventory'       => ['label' => 'Products & Inventory',           'perms' => ['products', 'stock'], 'requires' => []],
+        'mod_sales'           => ['label' => 'Invoicing & Receivables',        'perms' => ['invoices', 'payments', 'parties', 'sales_orders'], 'requires' => ['mod_accounting', 'mod_inventory']],
+        'mod_purchases'       => ['label' => 'Purchasing & Vendor Bills',      'perms' => ['purchases'], 'requires' => ['mod_accounting', 'mod_inventory']],
+        'mod_warehouses'      => ['label' => 'Multi-Warehouse Inventory',      'perms' => ['warehouses'], 'requires' => ['mod_inventory']],
+        'mod_fixed_assets'    => ['label' => 'Fixed Assets Management',        'perms' => ['assets'], 'requires' => ['mod_accounting']],
+        'mod_payroll'         => ['label' => 'Payroll & HR Suite',             'perms' => ['employees', 'attendance', 'leaves', 'payroll'], 'requires' => ['mod_accounting']],
+        'mod_expense_reports' => ['label' => 'Employee Expense Claims',        'perms' => ['expenses'], 'requires' => ['mod_accounting', 'mod_payroll']],
+        'mod_sales_crm'       => ['label' => 'Sales & CRM Opportunities',      'perms' => ['crm'], 'requires' => ['mod_sales']],
+        'mod_tickets'         => ['label' => 'Helpdesk & Support Tickets',     'perms' => ['tickets'], 'requires' => ['mod_sales']],
+        'mod_contracts'       => ['label' => 'Contracts & Subscriptions',      'perms' => ['contracts'], 'requires' => ['mod_sales']],
     ];
+
+    /** Modules a tenant module directly requires. */
+    public static function moduleRequires(string $key): array
+    {
+        return self::TENANT_MODULES[$key]['requires'] ?? [];
+    }
+
+    /**
+     * Dependency closure: the given modules plus everything they require,
+     * directly or indirectly, in registry order.
+     */
+    public static function expandTenantModules(array $keys): array
+    {
+        $on = [];
+        $queue = $keys;
+        while ($queue) {
+            $k = array_shift($queue);
+            if (!isset(self::TENANT_MODULES[$k]) || isset($on[$k])) {
+                continue;
+            }
+            $on[$k] = true;
+            foreach (self::moduleRequires($k) as $req) {
+                $queue[] = $req;
+            }
+        }
+        return array_values(array_intersect(array_keys(self::TENANT_MODULES), array_keys($on)));
+    }
+
+    /** Every module that, directly or indirectly, requires $key. */
+    public static function moduleDependents(string $key): array
+    {
+        $out = [];
+        foreach (array_keys(self::TENANT_MODULES) as $k) {
+            if ($k !== $key && in_array($key, self::expandTenantModules([$k]), true)) {
+                $out[] = $k;
+            }
+        }
+        return $out;
+    }
 
     /** Tenant module key governing a permission key, or null if ungoverned. */
     public static function tenantModuleFor(string $permKey): ?string
@@ -798,7 +848,10 @@ final class Permissions
     public static function sanitizeTenantModules($list): array
     {
         $list = is_array($list) ? $list : explode(',', (string)$list);
-        return array_values(array_intersect(array_keys(self::TENANT_MODULES), array_map('trim', $list)));
+        $valid = array_values(array_intersect(array_keys(self::TENANT_MODULES), array_map('trim', $list)));
+        // A stored assignment is always dependency-closed: a module never
+        // arrives without the modules it needs.
+        return self::expandTenantModules($valid);
     }
 
     /**
