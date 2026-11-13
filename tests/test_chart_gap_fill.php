@@ -11,6 +11,8 @@ $fail = 0;
 function check($n, $c) { global $fail; echo ($c ? 'PASS' : 'FAIL') . " - $n\n"; if (!$c) { $fail++; } }
 
 check('fill() adds only the standard accounts a chart lacks', strpos($cp, 'public static function fill(') !== false && strpos($cp, "isset(\$have['codes'][strtolower(\$code)]) || isset(\$have['names'][strtolower(\$name)])") !== false);
+check('an inactive standard account is reactivated, not skipped', strpos($cp, 'SET status = 1 WHERE id = ? AND tenant_id = ?') !== false && strpos($cp, 'wake it instead of skipping') !== false);
+check('reactivation is scoped to the tenant and counted once', strpos($cp, "!isset(\$woken[\$wake])") !== false);
 check('provision() for empty charts is untouched', strpos($cp, 'never touch a chart that already exists') !== false);
 check('the standard chart covers every posting role', strpos($cp, 'Accounts Receivable') !== false && strpos($cp, 'Sales Revenue') !== false && (bool)preg_match('/Bank|Cash/', $cp));
 check('provision_chart action exists, is audited and whitelisted', strpos($ms, 'function provision_chart') !== false && strpos($ms, "'Provisioned chart accounts'") !== false && strpos($ms, "'provision_chart',") !== false);

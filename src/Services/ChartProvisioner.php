@@ -66,7 +66,8 @@ class ChartProvisioner
     public static function fill(mysqli $conn, int $tenantId): int
     {
         $have = ['codes' => [], 'names' => []];
-        $r = $conn->prepare("SELECT code, name FROM account_list WHERE tenant_id = ? AND delete_flag = 0");
+        $inactive = [];
+        $r = $conn->prepare("SELECT id, code, name, status FROM account_list WHERE tenant_id = ? AND delete_flag = 0");
         if (!$r) {
             return 0;
         }
@@ -75,14 +76,32 @@ class ChartProvisioner
         foreach ($r->get_result()->fetch_all(MYSQLI_ASSOC) as $row) {
             $have['codes'][strtolower(trim((string)$row['code']))] = true;
             $have['names'][strtolower(trim((string)$row['name']))] = true;
+            if ((int)$row['status'] !== 1) {
+                $inactive[strtolower(trim((string)$row['code']))] = (int)$row['id'];
+                $inactive[strtolower(trim((string)$row['name']))] = (int)$row['id'];
+            }
         }
         $ins = $conn->prepare("INSERT INTO account_list (tenant_id, code, name, type, normal_balance, description, status) VALUES (?, ?, ?, ?, ?, ?, 1)");
         if (!$ins) {
             return 0;
         }
         $added = 0;
+        $woken = [];
         foreach (self::STANDARD_CHART as [$code, $name, $type, $desc]) {
             if (isset($have['codes'][strtolower($code)]) || isset($have['names'][strtolower($name)])) {
+                // A standard account that exists but was made inactive is the
+                // same dead end as a missing one: wake it instead of skipping.
+                $wake = $inactive[strtolower($code)] ?? $inactive[strtolower($name)] ?? 0;
+                if ($wake > 0 && !isset($woken[$wake])) {
+                    $up = $conn->prepare("UPDATE account_list SET status = 1 WHERE id = ? AND tenant_id = ?");
+                    if ($up) {
+                        $up->bind_param('ii', $wake, $tenantId);
+                        if ($up->execute() && $conn->affected_rows > 0) {
+                            $woken[$wake] = true;
+                            $added++;
+                        }
+                    }
+                }
                 continue;
             }
             $normal = LedgerService::classify($type)['normal'] === 'credit' ? 'credit' : 'debit';
