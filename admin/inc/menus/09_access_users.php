@@ -1,6 +1,6 @@
 <?php /* Sidebar section: included by navigation.php; $_settings, $conn and the $show_* flags are in scope. */ ?>
                             <!-- 8b. Access & Users (super admin or delegated permission) -->
-                            <?php if($_settings->is_super_admin() || $_settings->can_access('users_manage') || $_settings->can_access('api_keys_manage')): ?>
+                            <?php if(true): /* every user may at least view the tenant's modules */ ?>
                             <li class="nav-item has-treeview">
                                 <a href="#" class="nav-link nav-is-tree">
                                     <i class="nav-icon fas fa-users-cog"></i>
@@ -10,6 +10,12 @@
                                     </p>
                                 </a>
                                 <ul class="nav nav-treeview">
+                                    <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=settings/modules" class="nav-link nav-settings_modules tree-item">
+                                            <i class="nav-icon fas fa-puzzle-piece"></i>
+                                            <p>Modules &amp; Features</p>
+                                        </a>
+                                    </li>
                                     <?php if($_settings->can_access('users_manage')): ?>
                                     <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=user/list" class="nav-link nav-user_list tree-item">

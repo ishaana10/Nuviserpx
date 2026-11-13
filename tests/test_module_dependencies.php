@@ -61,6 +61,17 @@ check('tenant form auto-ticks requirements and unticks dependents', strpos($mt, 
 check('ModuleManager registers from TENANT_MODULES', strpos($mm, 'Permissions::TENANT_MODULES as') !== false && strpos($mm, "register_module('invoicing'") === false);
 check('registry reports per-tenant status via module_enabled', strpos($mm, "module_enabled(\$key) ? 'active' : 'off'") !== false);
 
+// --- Tenants see, the developer sets ---
+$mv = file_get_contents($root . '/admin/settings/modules.php');
+$menu = file_get_contents($root . '/admin/inc/menus/09_access_users.php');
+$pf = Permissions::forPage('settings/modules');
+check('module overview page is open to any logged-in admin', $pf === null);
+check('module overview is read-only (no forms, no actions)', strpos($mv, '<form') === false && strpos($mv, 'Master.php?f=') === false && strpos($mv, '$_POST') === false);
+check('overview shows live status, coverage and dependencies', strpos($mv, 'module_enabled($nv_mk)') !== false && strpos($mv, "\$nv_md['requires']") !== false);
+check('overview tells tenants to contact the provider; devs get the Tenants link', strpos($mv, 'contact your provider') !== false && strpos($mv, 'page=tenants') !== false);
+check('menu links the overview for every user', strpos($menu, 'page=settings/modules') !== false);
+check('module switches stay developer-only', Permissions::forPage('tenants') === Permissions::SUPER_ONLY && strpos(file_get_contents($root . '/admin/tenants/manage_tenant.php'), 'is_super_admin()') !== false);
+
 // --- Migration keeps existing tenants unchanged ---
 $mig = @file_get_contents($root . '/database/migrations/037_tenant_module_dependencies.sql');
 check('migration appends the new module keys to recorded assignments', $mig && strpos($mig, 'mod_sales,mod_inventory,mod_purchases') !== false && strpos($mig, 'WHERE `modules` IS NOT NULL') !== false);

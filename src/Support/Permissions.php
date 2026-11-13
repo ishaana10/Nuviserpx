@@ -687,6 +687,7 @@ final class Permissions
         'home'              => null,
         'user/index'        => null,   // "My Account" self-profile
         'user/change_password' => null, // Change own password
+        'settings/modules'  => null,   // read-only module overview for the tenant
         // business modules (view permission)
         'invoices'          => 'invoices_view',
         'parties'           => 'parties_view',
