@@ -446,6 +446,7 @@ final class Permissions
         'set_period_lock'       => ['settings_manage'],
         'save_inventory_accounting' => ['settings_manage'],
         'save_default_accounts' => ['settings_manage'],
+        'provision_chart'       => ['settings_manage'],
         'save_price_list' => ['settings_manage'],
         'delete_price_list' => ['settings_manage'],
         'save_price_list_item' => ['settings_manage'],

@@ -58,6 +58,42 @@ class ChartProvisioner
         return true;
     }
 
+    /**
+     * Add the standard accounts a company's chart is missing (matched by code
+     * or name, so nothing is duplicated). Safe on any chart, empty included.
+     * Returns how many accounts were added.
+     */
+    public static function fill(mysqli $conn, int $tenantId): int
+    {
+        $have = ['codes' => [], 'names' => []];
+        $r = $conn->prepare("SELECT code, name FROM account_list WHERE tenant_id = ? AND delete_flag = 0");
+        if (!$r) {
+            return 0;
+        }
+        $r->bind_param('i', $tenantId);
+        $r->execute();
+        foreach ($r->get_result()->fetch_all(MYSQLI_ASSOC) as $row) {
+            $have['codes'][strtolower(trim((string)$row['code']))] = true;
+            $have['names'][strtolower(trim((string)$row['name']))] = true;
+        }
+        $ins = $conn->prepare("INSERT INTO account_list (tenant_id, code, name, type, normal_balance, description, status) VALUES (?, ?, ?, ?, ?, ?, 1)");
+        if (!$ins) {
+            return 0;
+        }
+        $added = 0;
+        foreach (self::STANDARD_CHART as [$code, $name, $type, $desc]) {
+            if (isset($have['codes'][strtolower($code)]) || isset($have['names'][strtolower($name)])) {
+                continue;
+            }
+            $normal = LedgerService::classify($type)['normal'] === 'credit' ? 'credit' : 'debit';
+            $ins->bind_param('isssss', $tenantId, $code, $name, $type, $normal, $desc);
+            if ($ins->execute()) {
+                $added++;
+            }
+        }
+        return $added;
+    }
+
     /** Create the standard chart for a company that has no accounts. Returns how many accounts were added. */
     public static function provision(mysqli $conn, int $tenantId): int
     {

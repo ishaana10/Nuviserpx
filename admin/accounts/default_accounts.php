@@ -15,6 +15,22 @@ $classOf = fn ($t) => \App\Services\LedgerService::classify($t)['class'];
             Invoices, customer receipts and credit notes post to these accounts. Where nothing has been chosen yet, the first account
             of the right kind whose name fits is used (shown selected). If there is none, the document is refused rather than posted to the wrong account.
         </div>
+        <?php
+            // A role with no fitting account at all cannot be configured: offer
+            // to add the standard accounts the chart is missing.
+            $nv_missing = [];
+            foreach (\App\Services\AccountDefaultsService::ROLES as $nv_role => $nv_meta) {
+                if ($svc->resolve($nv_role) <= 0) { $nv_missing[] = $nv_meta['label']; }
+            }
+            if ($nv_missing):
+        ?>
+        <div class="alert alert-warning text-sm d-flex align-items-center justify-content-between">
+            <div><i class="fas fa-exclamation-triangle mr-2"></i>Your chart has no account to use for: <b><?= $e(implode(', ', $nv_missing)) ?></b>.</div>
+            <button type="button" class="btn btn-sm btn-warning font-weight-bold ml-3 text-nowrap" id="btn-provision-chart">
+                <i class="fas fa-magic mr-1"></i> Add the standard accounts
+            </button>
+        </div>
+        <?php endif; ?>
         <form id="defaults-form">
             <?php foreach (\App\Services\AccountDefaultsService::ROLES as $role => $meta):
                 $current = $svc->resolve($role); ?>
@@ -36,6 +52,15 @@ $classOf = fn ($t) => \App\Services\LedgerService::classify($t)['class'];
     </div>
 </div>
 <script>
+$('#btn-provision-chart').on('click', function(){
+    start_loader();
+    $.post(_base_url_ + 'classes/Master.php?f=provision_chart', {}, function(r){
+        end_loader();
+        alert_toast(r.msg || 'Done.', r.status === 'success' ? 'success' : 'error');
+        if (r.status === 'success') { setTimeout(function(){ location.reload(); }, 800); }
+    }, 'json').fail(function(){ end_loader(); alert_toast('Could not add the accounts.', 'error'); });
+});
+
 $('#defaults-form').on('submit', function(ev){
     ev.preventDefault();
     start_loader();
