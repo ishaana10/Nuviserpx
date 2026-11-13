@@ -1822,6 +1822,19 @@ class LegacySchemaCatchup
             @$this->conn->query("ALTER TABLE `users` ADD COLUMN `role_id` int(30) DEFAULT NULL AFTER `type` ");
         }
 
+        // Email registration & verification columns in users table
+        foreach ([
+            'email'                => "ADD COLUMN `email` varchar(255) DEFAULT NULL AFTER `username`",
+            'email_verified_at'    => "ADD COLUMN `email_verified_at` datetime DEFAULT NULL AFTER `email`",
+            'email_verify_token'   => "ADD COLUMN `email_verify_token` varchar(64) DEFAULT NULL AFTER `email_verified_at`",
+            'email_verify_expires' => "ADD COLUMN `email_verify_expires` datetime DEFAULT NULL AFTER `email_verify_token`",
+        ] as $nv_col => $nv_ddl) {
+            $nv_res = @$this->conn->query("SHOW COLUMNS FROM `users` LIKE '{$nv_col}'");
+            if ($nv_res && $nv_res->num_rows == 0) {
+                @$this->conn->query("ALTER TABLE `users` {$nv_ddl}");
+            }
+        }
+
         // Check employee_id column in users table
         $res_emp = @$this->conn->query("SHOW COLUMNS FROM `users` LIKE 'employee_id'");
         if ($res_emp && $res_emp->num_rows == 0) {

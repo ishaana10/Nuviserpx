@@ -335,6 +335,33 @@ class Emailer {
         return self::send_email($to, $subject, $html);
     }
 
+    /**
+     * Welcome / email-verification message for a system user account.
+     * $is_new = true sends the "account created for you" wording.
+     */
+    public static function send_email_verification($to, $name, $username, $verify_url, $sys_info = [], $is_new = false) {
+        $company_name = $sys_info['name'] ?? 'Nuvis ERPX';
+        $subject = ($is_new ? "Your account - " : "Verify your email - ") . $company_name;
+
+        $intro = $is_new
+            ? "<p>An account has been created for you on <b>" . htmlspecialchars($company_name) . "</b>.</p>
+               <p>Your login username is <b>" . htmlspecialchars($username) . "</b>. Your administrator will provide your password if you don't have it yet.</p>
+               <p>Please confirm this email address so we know we can reach you:</p>"
+            : "<p>Please confirm that this email address belongs to your <b>" . htmlspecialchars($company_name) . "</b> account (<b>" . htmlspecialchars($username) . "</b>):</p>";
+
+        $body = "
+        <h3>Dear " . htmlspecialchars($name) . ",</h3>
+        {$intro}
+        <div style='text-align: center; margin: 30px 0;'>
+            <a href='" . htmlspecialchars($verify_url) . "' style='background-color: #0284c7; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px; display: inline-block;'>Verify My Email &rarr;</a>
+        </div>
+        <p style='font-size: 13px; color: #666;'>Or copy and paste this URL into your browser:<br><a href='" . htmlspecialchars($verify_url) . "'>" . htmlspecialchars($verify_url) . "</a></p>
+        <p style='font-size: 13px; color: #666;'>This link is valid for 48 hours. If you did not expect this email, you can ignore it.</p>";
+
+        $html = self::wrap_template($is_new ? "Welcome" : "Email Verification", $body, $company_name);
+        return self::send_email($to, $subject, $html);
+    }
+
     public static function send_payslip_email($to, $payroll, $sys_info = []) {
         $company_name = $sys_info['name'] ?? 'Nuvis ERPX';
         $subject = "Confidential Salary Slip - " . $payroll['salary_month'] . " (" . $company_name . ")";

@@ -32,7 +32,7 @@ Class Users extends DBConnection {
 		// and protect privileged accounts.
 		$target = null;
 		if(!$is_new){
-			$t_qry = $this->conn->query("SELECT `id`,`type`,`tenant_id` FROM `users` WHERE id = {$id}");
+			$t_qry = $this->conn->query("SELECT `id`,`type`,`tenant_id`,`email`,`email_verified_at` FROM `users` WHERE id = {$id}");
 			$target = ($t_qry && $t_qry->num_rows > 0) ? $t_qry->fetch_assoc() : null;
 			if($target === null){
 				return 2; // nothing to update
@@ -65,9 +65,33 @@ Class Users extends DBConnection {
 			return 3;
 		}
 
+		/* ---- Registered email: required on new accounts, always validated,
+		   unique, and re-verified whenever it changes. ---- */
+		$email_posted = array_key_exists('email', $_POST);
+		$email = $email_posted ? strtolower(trim((string)$_POST['email'])) : null;
+		if($is_new && ($email === null || $email === '')){
+			return 5; // a new user must register an email address
+		}
+		if($email !== null && $email !== ''){
+			if(!filter_var($email, FILTER_VALIDATE_EMAIL)){
+				return 5;
+			}
+			$email_esc = $this->conn->real_escape_string($email);
+			$e_chk = $this->conn->query("SELECT id FROM `users` WHERE `email` = '{$email_esc}' ".($id>0? " AND id != {$id} " : ""));
+			if($e_chk && $e_chk->num_rows > 0){
+				return 6; // email already registered to another user
+			}
+		}
+		$old_email = strtolower(trim((string)($target['email'] ?? '')));
+		$email_changed = $email_posted && $email !== '' && $email !== $old_email;
+
 		/* ---- Decide which fields this caller is allowed to write ---- */
 		// Everyone may set their basic profile fields.
 		$allowed = array('firstname','middlename','lastname','username');
+		if($email_posted){
+			$_POST['email'] = $email;
+			$allowed[] = 'email';
+		}
 		// Only user administrators may set privilege/assignment fields, and
 		// never on their own account (prevents self-escalation / self-lockout).
 		$can_admin_fields = !$is_self && ($is_super || $this->settings->can_access('users_manage'));
@@ -115,7 +139,9 @@ Class Users extends DBConnection {
 		foreach($_POST as $k => $v){
 			if(in_array($k, $allowed, true)){
 				if(!empty($data)) $data .=" , ";
-				if(in_array($k, array('role_id','employee_id'), true) && (empty($v) || $v == '0')){
+				if($k === 'email' && $v === ''){
+					$data .= " `email` = NULL , `email_verified_at` = NULL , `email_verify_token` = NULL , `email_verify_expires` = NULL ";
+				}elseif(in_array($k, array('role_id','employee_id'), true) && (empty($v) || $v == '0')){
 					$data .= " `{$k}` = NULL ";
 				}elseif(in_array($k, array('type','status','role_id','employee_id','tenant_id'), true)){
 					$data .= " `{$k}` = '".(int)$v."' ";
@@ -124,6 +150,16 @@ Class Users extends DBConnection {
 					$data .= " `{$k}` = '{$v_escaped}' ";
 				}
 			}
+		}
+
+		// A new or changed address is unverified until the link in the email
+		// is clicked. The token is stored hashed; only the recipient gets it.
+		$verify_token = null;
+		if($email_changed){
+			$verify_token = bin2hex(random_bytes(32));
+			$token_hash = hash('sha256', $verify_token);
+			if(!empty($data)) $data .=" , ";
+			$data .= " `email_verified_at` = NULL , `email_verify_token` = '{$token_hash}' , `email_verify_expires` = DATE_ADD(NOW(), INTERVAL 48 HOUR) ";
 		}
 
 		$password = isset($_POST['password']) ? (string)$_POST['password'] : '';
@@ -173,6 +209,22 @@ Class Users extends DBConnection {
 			}else{
 				$resp['status'] = 2;
 			}
+		}
+
+		// Deliver the verification / welcome email now that the token is stored.
+		if($verify_token !== null && isset($resp['status']) && $resp['status'] == 1){
+			$verify_url = base_url . 'verify_email.php?token=' . $verify_token;
+			$sys = ['name' => $this->settings->info('name') ?: 'Nuvis ERPX'];
+			$name_to = trim((string)($_POST['firstname'] ?? '')) ?: $username;
+			$sent = false;
+			try {
+				$sent = (bool)\Emailer::send_email_verification($email, $name_to, $username, $verify_url, $sys, $is_new);
+			} catch (\Throwable $e) {
+				error_log('[users] verification email failed: ' . $e->getMessage());
+			}
+			$this->settings->set_flashdata('success', $sent
+				? ($is_new ? 'User saved. A welcome email with a verification link was sent to '.$email.'.' : 'Saved. A verification link was sent to '.$email.'.')
+				: 'Saved, but the verification email could not be sent. Check the SMTP settings, then use "Resend verification email".');
 		}
 
 		// Persist the leave approver onto this user's linked employee record.
@@ -484,6 +536,41 @@ Class Users extends DBConnection {
 	}
 
 	/** Activate (verify) a pending system user account. */
+	/** Re-issue the email verification link (own account, or users_manage). */
+	public function resend_verification(){
+		$this->settings->require_login();
+		$this->settings->require_csrf();
+		$id = isset($_POST['id']) ? (int)$_POST['id'] : 0;
+		$self_id = (int)$this->settings->userdata('id');
+		if($id <= 0) $id = $self_id;
+		if($id !== $self_id && !$this->settings->can_access('users_manage')){
+			$this->settings->deny("You don't have permission to manage system users.");
+		}
+		$scope = ($this->settings->is_super_admin() || $id === $self_id) ? "" : " AND tenant_id = ".(int)$this->settings->active_tenant_id();
+		$q = $this->conn->query("SELECT id, firstname, username, email, email_verified_at FROM `users` WHERE id = {$id} {$scope}");
+		$u = ($q && $q->num_rows) ? $q->fetch_assoc() : null;
+		if(!$u || empty($u['email'])){
+			return json_encode(['status' => 'failed', 'msg' => 'This account has no email address registered.']);
+		}
+		if(!empty($u['email_verified_at'])){
+			return json_encode(['status' => 'failed', 'msg' => 'This email address is already verified.']);
+		}
+		$token = bin2hex(random_bytes(32));
+		$hash = hash('sha256', $token);
+		$this->conn->query("UPDATE `users` SET `email_verify_token` = '{$hash}', `email_verify_expires` = DATE_ADD(NOW(), INTERVAL 48 HOUR) WHERE id = ".(int)$u['id']);
+		$sys = ['name' => $this->settings->info('name') ?: 'Nuvis ERPX'];
+		$sent = false;
+		try {
+			$sent = (bool)\Emailer::send_email_verification($u['email'], $u['firstname'] ?: $u['username'], $u['username'], base_url.'verify_email.php?token='.$token, $sys, false);
+		} catch (\Throwable $e) {
+			error_log('[users] resend verification failed: ' . $e->getMessage());
+		}
+		$this->settings->log_audit('Resend Email Verification','User Management',"Verification link re-sent for user #{$u['id']}.");
+		return json_encode($sent
+			? ['status' => 'success', 'msg' => 'Verification email sent to '.$u['email'].'.']
+			: ['status' => 'failed', 'msg' => 'The email could not be sent. Check the SMTP settings under System Settings.']);
+	}
+
 	public function verify_user(){
 		$this->settings->require_permission('users_manage');
 		$this->settings->require_csrf();
@@ -530,6 +617,9 @@ switch ($action) {
 	break;
 	case 'verify_user':
 		echo $users->verify_user();
+	break;
+	case 'resend_verification':
+		echo $users->resend_verification();
 	break;
 	case 'change_password':
 		echo $users->change_password();

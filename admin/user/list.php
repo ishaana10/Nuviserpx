@@ -72,7 +72,18 @@
 								</td>
 								<td class="align-middle">
 									<p class="m-0 font-weight-bold text-navy"><?php echo ucwords(htmlspecialchars($row['name'])) ?></p>
-									<small class="text-muted"><i class="fas fa-user mr-1"></i><?php echo htmlspecialchars($row['username']) ?></small>
+									<small class="text-muted d-block"><i class="fas fa-user mr-1"></i><?php echo htmlspecialchars($row['username']) ?></small>
+									<?php if(!empty($row['email'])): ?>
+									<small class="text-muted d-block"><i class="fas fa-envelope mr-1"></i><?php echo htmlspecialchars($row['email']) ?>
+										<?php if(!empty($row['email_verified_at'])): ?>
+											<span class="badge badge-success ml-1" title="Email verified <?php echo date('d M Y', strtotime($row['email_verified_at'])) ?>"><i class="fas fa-check-circle"></i> Email verified</span>
+										<?php else: ?>
+											<span class="badge badge-warning ml-1"><i class="fas fa-clock"></i> Email not verified</span>
+										<?php endif; ?>
+									</small>
+									<?php else: ?>
+									<small class="text-muted d-block"><i class="fas fa-envelope mr-1"></i><span class="badge badge-secondary">No email registered</span></small>
+									<?php endif; ?>
 								</td>
 								<td class="align-middle text-center">
 									<span class="badge badge-<?php echo $row['type'] == 1 ? 'navy' : 'info' ?> px-3 py-1 font-weight-bold">
