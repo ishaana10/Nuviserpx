@@ -70,6 +70,17 @@ if(isset($meta['employee_id']) && (int)$meta['employee_id'] > 0){
 
 				<div class="row">
 					<div class="form-group col-md-6 col-12">
+						<label for="email" class="control-label font-weight-bold text-navy">Email Address
+						<?php if(!empty($meta['email']) && !empty($meta['email_verified_at'])): ?>
+							<span class="badge badge-success ml-1"><i class="fas fa-check-circle mr-1"></i>Verified</span>
+						<?php elseif(!empty($meta['email'])): ?>
+							<span class="badge badge-warning ml-1"><i class="fas fa-clock mr-1"></i>Not verified</span>
+						<?php endif; ?>
+						</label>
+						<input type="email" name="email" id="email" class="form-control form-control-sm rounded-0" value="<?php echo isset($meta['email']) ? htmlspecialchars((string)$meta['email']): '' ?>" required autocomplete="off" placeholder="user@example.com">
+						<small class="text-muted">The user receives a welcome email here with a verification link.</small>
+					</div>
+					<div class="form-group col-md-6 col-12">
 						<label for="username" class="control-label font-weight-bold text-navy">Username / Login ID</label>
 						<input type="text" name="username" id="username" class="form-control form-control-sm rounded-0" value="<?php echo isset($meta['username']) ? htmlspecialchars($meta['username']): '' ?>" required autocomplete="off">
 					</div>
@@ -329,6 +340,8 @@ if(isset($meta['employee_id']) && (int)$meta['employee_id'] > 0){
 					}else{
 						var msg = 'Failed to save user. Please try again.';
 						if(code == '3'){ msg = 'That username is already taken. Please choose another.'; }
+						else if(code == '5'){ msg = 'Please enter a valid email address.'; }
+						else if(code == '6'){ msg = 'That email address is already registered to another user.'; }
 						else if(code == '4'){ msg = 'Your current password is incorrect.'; }
 						else if(code == '2'){ msg = 'Could not save the user. Please check the details and try again.'; }
 						$('#msg').html('<div class="alert alert-danger">'+msg+'</div>')

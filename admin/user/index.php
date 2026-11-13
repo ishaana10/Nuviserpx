@@ -28,6 +28,19 @@ foreach($user->fetch_array() as $k =>$v){
 					<input type="text" name="username" id="username" class="form-control" value="<?php echo isset($meta['username']) ? $meta['username']: '' ?>" required  autocomplete="off">
 				</div>
 				<div class="form-group">
+					<label for="email">Email Address</label>
+					<?php if(!empty($meta['email']) && !empty($meta['email_verified_at'])): ?>
+						<span class="badge badge-success ml-2" id="email-verify-state"><i class="fas fa-check-circle mr-1"></i>Verified<?php echo ' on '.date('d M Y', strtotime($meta['email_verified_at'])) ?></span>
+					<?php elseif(!empty($meta['email'])): ?>
+						<span class="badge badge-warning ml-2" id="email-verify-state"><i class="fas fa-clock mr-1"></i>Not verified</span>
+						<a href="javascript:void(0)" id="resend-verification" class="ml-2 small">Resend verification email</a>
+					<?php else: ?>
+						<span class="badge badge-secondary ml-2" id="email-verify-state">Not registered</span>
+					<?php endif; ?>
+					<input type="email" name="email" id="email" class="form-control" value="<?php echo isset($meta['email']) ? htmlspecialchars((string)$meta['email']): '' ?>" autocomplete="off" placeholder="you@example.com">
+					<small><i>Changing your email sends a new verification link to the new address.</i></small>
+				</div>
+				<div class="form-group">
 					<label for="password">Password</label>
 					<input type="password" name="password" id="password" class="form-control" value="" autocomplete="off">
 					<small><i>Leave this blank if you dont want to change the password.</i></small>
@@ -72,6 +85,20 @@ foreach($user->fetch_array() as $k =>$v){
 	        reader.readAsDataURL(input.files[0]);
 	    }
 	}
+	$('#resend-verification').click(function(){
+		start_loader()
+		$.ajax({
+			url:_base_url_+'classes/Users.php?f=resend_verification',
+			method: 'POST',
+			data: {id: <?php echo (int)$_settings->userdata('id') ?>},
+			dataType: 'json',
+			error:function(){ alert_toast('An error occurred','error'); end_loader(); },
+			success:function(resp){
+				alert_toast(resp.msg || 'Done', resp.status == 'success' ? 'success' : 'error');
+				end_loader();
+			}
+		})
+	})
 	$('#manage-user').submit(function(e){
 		e.preventDefault();
 var _this = $(this)
@@ -85,10 +112,16 @@ var _this = $(this)
 		    method: 'POST',
 		    type: 'POST',
 			success:function(resp){
-				if(resp ==1){
+				var code = $.trim(String(resp));
+				if(code == '1'){
 					location.reload()
 				}else{
-					$('#msg').html('<div class="alert alert-danger">Username already exist</div>')
+					var msg = 'Failed to save. Please try again.';
+					if(code == '3'){ msg = 'That username is already taken.'; }
+					else if(code == '4'){ msg = 'Your current password is incorrect.'; }
+					else if(code == '5'){ msg = 'Please enter a valid email address.'; }
+					else if(code == '6'){ msg = 'That email address is already registered to another user.'; }
+					$('#msg').html('<div class="alert alert-danger">'+msg+'</div>')
 					end_loader()
 				}
 			}
