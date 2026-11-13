@@ -771,8 +771,8 @@ class Master extends DBConnection
         $tenant_id = (int)$this->settings->active_tenant_id();
         $added = \App\Services\ChartProvisioner::fill($this->conn, $tenant_id);
         if ($added > 0) {
-            $this->settings->log_audit('Provisioned chart accounts', 'Accounts', "Added {$added} standard account(s) the chart was missing.");
-            return json_encode(['status' => 'success', 'msg' => " {$added} standard account(s) added to your chart."]);
+            $this->settings->log_audit('Provisioned chart accounts', 'Accounts', "Added or reactivated {$added} standard account(s) the chart was missing.");
+            return json_encode(['status' => 'success', 'msg' => " {$added} standard account(s) added or reactivated."]);
         }
         return json_encode(['status' => 'success', 'msg' => ' Your chart already has every standard account.']);
     }
