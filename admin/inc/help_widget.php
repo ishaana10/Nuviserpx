@@ -48,7 +48,7 @@ if ($hw_page !== 'help'):
 </div>
 <style>
     #nv-help-btn{
-        position: fixed; right: 10px; top: 60px; z-index: 1035;
+        position: fixed; right: 6px; top: 52px; z-index: 1035;
         width: 28px; height: 28px; border-radius: 50%; padding: 0;
         font-size: .75rem; line-height: 1;
         display: flex; align-items: center; justify-content: center;
