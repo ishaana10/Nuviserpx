@@ -250,6 +250,19 @@ class HelpContent
                 ], 'tips' => []],
             ],
         ],
+        'email_settings' => [
+            'title' => 'Company Email (SMTP)', 'icon' => 'fa-envelope-open-text', 'perm' => 'settings_manage',
+            'pages' => ['settings/email'],
+            'intro' => 'Each company can send its customer notifications (invoices, receipts, reminders) from its own email address. When enabled, your SMTP settings are used; otherwise the system mail settings apply. Every send is recorded in the log on that page.',
+            'sections' => [
+                ['h' => 'Setting it up', 'steps' => [
+                    'Get the SMTP details from your email provider: host, port (465 for SSL, 587 for TLS), username and password.',
+                    'Enter them, set the From name and address your customers should see, and tick Enable.',
+                    'Save, then click Send Test Email - it goes to your own account\'s address.',
+                    'Check the log: a green "sent" row means delivery worked; a red "failed" row shows the exact server error.',
+                ], 'tips' => ['Use a From address on the same domain as the SMTP account, and make sure the domain has SPF and DKIM records - otherwise receivers like Yahoo may discard the mail.', 'The password is stored encrypted and never shown again; leave the field blank to keep it.']],
+            ],
+        ],
         'modules' => [
             'title' => 'Modules & Features', 'icon' => 'fa-puzzle-piece',
             'pages' => ['settings/modules'],

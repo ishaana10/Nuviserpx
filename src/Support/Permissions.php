@@ -447,6 +447,8 @@ final class Permissions
         'save_inventory_accounting' => ['settings_manage'],
         'save_default_accounts' => ['settings_manage'],
         'provision_chart'       => ['settings_manage'],
+        'save_tenant_smtp'      => ['settings_manage'],
+        'test_tenant_smtp'      => ['settings_manage'],
         'save_price_list' => ['settings_manage'],
         'delete_price_list' => ['settings_manage'],
         'save_price_list_item' => ['settings_manage'],

@@ -10,26 +10,58 @@ class Emailer {
     /**
      * Send email using configured SMTP or PHP mail()
      */
+    /** Last transport error, for the per-tenant email log. */
+    protected static $last_error = '';
+
     public static function send_email($to, $subject, $body_html, $from_email = null, $from_name = null) {
-        global $_settings;
+        global $_settings, $conn;
 
         if (empty($to)) return false;
 
-        $host = (isset($_settings) && method_exists($_settings, 'info')) ? $_settings->info('smtp_host') : 'smtp.gmail.com';
-        $port = (isset($_settings) && method_exists($_settings, 'info')) ? $_settings->info('smtp_port') : 587;
-        $user = (isset($_settings) && method_exists($_settings, 'info')) ? $_settings->info('smtp_user') : '';
-        $pass = (isset($_settings) && method_exists($_settings, 'info')) ? $_settings->info('smtp_pass') : '';
-        $encryption = (isset($_settings) && method_exists($_settings, 'info')) ? $_settings->info('smtp_encryption') : 'tls';
+        $has = isset($_settings) && method_exists($_settings, 'info');
+        $tenant_id = ($has && method_exists($_settings, 'active_tenant_id')) ? (int)$_settings->active_tenant_id() : 0;
 
-        $from_email = $from_email ?: ((isset($_settings) && method_exists($_settings, 'info')) ? $_settings->info('email') : 'no-reply@nuvistechnologies.com.fj');
-        $from_name  = $from_name  ?: ((isset($_settings) && method_exists($_settings, 'info')) ? $_settings->info('name')  : 'Nuvis ERPX');
-
-        // Check if SMTP is configured with host and username
-        if (!empty($host) && !empty($user) && !empty($pass)) {
-            return self::send_smtp($to, $subject, $body_html, $host, $port, $user, $pass, $encryption, $from_email, $from_name);
-        } else {
-            return self::send_native($to, $subject, $body_html, $from_email, $from_name);
+        // The company's own SMTP (Settings > Company Email), when enabled,
+        // sends this tenant's notifications; the system SMTP is the fallback.
+        $tcfg = null;
+        if ($tenant_id > 0 && isset($conn) && $conn instanceof \mysqli && class_exists('App\\Services\\TenantMailService')) {
+            try {
+                $tcfg = (new \App\Services\TenantMailService($conn, $_settings))->config($tenant_id);
+            } catch (\Throwable $e) {
+                $tcfg = null;
+            }
         }
+
+        $sys_from_email = $from_email ?: ($has ? $_settings->info('email') : 'no-reply@nuvistechnologies.com.fj');
+        $sys_from_name  = $from_name  ?: ($has ? $_settings->info('name')  : 'Nuvis ERPX');
+
+        $attempts = [];
+        if ($tcfg !== null) {
+            $attempts[] = ['tenant-smtp', $tcfg['host'], $tcfg['port'], $tcfg['user'], $tcfg['pass'], $tcfg['encryption'], $from_email ?: $tcfg['from_email'], $from_name ?: $tcfg['from_name']];
+        }
+        $sh = $has ? $_settings->info('smtp_host') : ''; $su = $has ? $_settings->info('smtp_user') : ''; $sp = $has ? $_settings->info('smtp_pass') : '';
+        if (!empty($sh) && !empty($su) && !empty($sp)) {
+            $attempts[] = ['system-smtp', $sh, $has ? $_settings->info('smtp_port') : 587, $su, $sp, $has ? $_settings->info('smtp_encryption') : 'tls', $sys_from_email, $sys_from_name];
+        }
+
+        $ok = false; $used = 'mail()'; $errors = [];
+        foreach ($attempts as $a) {
+            self::$last_error = '';
+            if (self::send_smtp($to, $subject, $body_html, $a[1], $a[2], $a[3], $a[4], $a[5], $a[6], $a[7])) {
+                $ok = true; $used = $a[0];
+                break;
+            }
+            $errors[] = $a[0] . ': ' . (self::$last_error ?: 'send failed');
+        }
+        if (!$ok && $attempts === []) {
+            $ok = self::send_native($to, $subject, $body_html, $sys_from_email, $sys_from_name);
+            if (!$ok) { $errors[] = 'mail(): refused by the local mailer'; }
+        }
+
+        if ($tenant_id > 0 && isset($conn) && $conn instanceof \mysqli && class_exists('App\\Services\\TenantMailService')) {
+            \App\Services\TenantMailService::logSend($conn, $tenant_id, (string)$to, (string)$subject, $used, $ok, implode(' | ', $errors));
+        }
+        return $ok;
     }
 
     /**
@@ -41,7 +73,8 @@ class Emailer {
             $socket = @fsockopen($prefix . $host, $port, $errno, $errstr, 15);
 
             if (!$socket) {
-                return self::send_native($to, $subject, $body_html, $from_email, $from_name);
+                self::$last_error = "could not connect to {$host}:{$port} - {$errstr} ({$errno})";
+                return false;
             }
 
             self::get_smtp_response($socket);
@@ -58,22 +91,22 @@ class Emailer {
             }
 
             fputs($socket, "AUTH LOGIN\r\n");
-            self::get_smtp_response($socket);
+            self::expect($socket, '334', 'AUTH');
 
             fputs($socket, base64_encode($user) . "\r\n");
-            self::get_smtp_response($socket);
+            self::expect($socket, '334', 'username');
 
             fputs($socket, base64_encode($pass) . "\r\n");
-            self::get_smtp_response($socket);
+            self::expect($socket, '235', 'authentication');
 
             fputs($socket, "MAIL FROM: <{$from_email}>\r\n");
-            self::get_smtp_response($socket);
+            self::expect($socket, '250', 'MAIL FROM');
 
             fputs($socket, "RCPT TO: <{$to}>\r\n");
-            self::get_smtp_response($socket);
+            self::expect($socket, '250', 'RCPT TO');
 
             fputs($socket, "DATA\r\n");
-            self::get_smtp_response($socket);
+            self::expect($socket, '354', 'DATA');
 
             $headers  = "MIME-Version: 1.0\r\n";
             $headers .= "Content-Type: text/html; charset=UTF-8\r\n";
@@ -88,15 +121,25 @@ class Emailer {
             $message  = $headers . "\r\n" . $body_html . "\r\n.\r\n";
 
             fputs($socket, $message);
-            self::get_smtp_response($socket);
+            self::expect($socket, '250', 'message delivery');
 
             fputs($socket, "QUIT\r\n");
             fclose($socket);
 
             return true;
         } catch (Exception $e) {
-            return self::send_native($to, $subject, $body_html, $from_email, $from_name);
+            self::$last_error = $e->getMessage();
+            return false;
         }
+    }
+
+    /** Read the server's reply and fail loudly when it is not the expected code. */
+    protected static function expect($socket, $code, $step) {
+        $response = self::get_smtp_response($socket);
+        if (strpos((string)$response, (string)$code) !== 0) {
+            throw new Exception("SMTP {$step} failed: " . trim((string)$response));
+        }
+        return $response;
     }
 
     protected static function get_smtp_response($socket) {
