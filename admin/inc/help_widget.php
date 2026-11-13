@@ -48,10 +48,11 @@ if ($hw_page !== 'help'):
 </div>
 <style>
     #nv-help-btn{
-        position: fixed; right: 18px; bottom: 18px; z-index: 1035;
-        width: 42px; height: 42px; border-radius: 50%; padding: 0;
+        position: fixed; right: 18px; top: 72px; z-index: 1035;
+        width: 38px; height: 38px; border-radius: 50%; padding: 0;
         display: flex; align-items: center; justify-content: center;
     }
+    body.layout-navbar-fixed #nv-help-btn{ top: 72px; }
     @media print { #nv-help-btn, #nv-help-modal { display: none !important; } }
 </style>
 <?php endif; ?>
