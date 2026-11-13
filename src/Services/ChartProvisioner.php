@@ -67,18 +67,28 @@ class ChartProvisioner
     {
         $have = ['codes' => [], 'names' => []];
         $inactive = [];
-        $r = $conn->prepare("SELECT id, code, name, status FROM account_list WHERE tenant_id = ? AND delete_flag = 0");
+        $untyped = [];
+        $r = $conn->prepare("SELECT id, code, name, type, status FROM account_list WHERE tenant_id = ? AND delete_flag = 0");
         if (!$r) {
             return 0;
         }
         $r->bind_param('i', $tenantId);
         $r->execute();
         foreach ($r->get_result()->fetch_all(MYSQLI_ASSOC) as $row) {
-            $have['codes'][strtolower(trim((string)$row['code']))] = true;
-            $have['names'][strtolower(trim((string)$row['name']))] = true;
+            $ckey = strtolower(trim((string)$row['code']));
+            $nkey = strtolower(trim((string)$row['name']));
+            $have['codes'][$ckey] = true;
+            $have['names'][$nkey] = true;
             if ((int)$row['status'] !== 1) {
-                $inactive[strtolower(trim((string)$row['code']))] = (int)$row['id'];
-                $inactive[strtolower(trim((string)$row['name']))] = (int)$row['id'];
+                $inactive[$ckey] = (int)$row['id'];
+                $inactive[$nkey] = (int)$row['id'];
+            }
+            // Accounts seeded before the type column existed carry an empty or
+            // unknown type, which classifies as nothing: invisible to the
+            // pickers and to posting. Remember them for repair.
+            if (!LedgerService::isRecognisedType((string)$row['type'])) {
+                $untyped[$ckey] = (int)$row['id'];
+                $untyped[$nkey] = (int)$row['id'];
             }
         }
         $ins = $conn->prepare("INSERT INTO account_list (tenant_id, code, name, type, normal_balance, description, status) VALUES (?, ?, ?, ?, ?, ?, 1)");
@@ -89,8 +99,22 @@ class ChartProvisioner
         $woken = [];
         foreach (self::STANDARD_CHART as [$code, $name, $type, $desc]) {
             if (isset($have['codes'][strtolower($code)]) || isset($have['names'][strtolower($name)])) {
-                // A standard account that exists but was made inactive is the
-                // same dead end as a missing one: wake it instead of skipping.
+                // A standard account that exists but is inactive, or carries an
+                // empty/unknown type, is the same dead end as a missing one:
+                // repair it instead of skipping.
+                $fixId = $untyped[strtolower($code)] ?? $untyped[strtolower($name)] ?? 0;
+                if ($fixId > 0 && !isset($woken[$fixId])) {
+                    $normal = LedgerService::classify($type)['normal'] === 'credit' ? 'credit' : 'debit';
+                    $up = $conn->prepare("UPDATE account_list SET type = ?, normal_balance = ?, status = 1 WHERE id = ? AND tenant_id = ?");
+                    if ($up) {
+                        $up->bind_param('ssii', $type, $normal, $fixId, $tenantId);
+                        if ($up->execute()) {
+                            $woken[$fixId] = true;
+                            $added++;
+                        }
+                    }
+                    continue;
+                }
                 $wake = $inactive[strtolower($code)] ?? $inactive[strtolower($name)] ?? 0;
                 if ($wake > 0 && !isset($woken[$wake])) {
                     $up = $conn->prepare("UPDATE account_list SET status = 1 WHERE id = ? AND tenant_id = ?");
