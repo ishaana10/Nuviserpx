@@ -76,7 +76,7 @@ class ContractService
                 return json_encode(['status' => 'success', 'id' => $target_id, 'msg' => 'Contract updated successfully.']);
             }
         }
-        return json_encode(['status' => 'failed', 'msg' => 'Failed to save contract. ' . $this->conn->error]);
+        return \App\Support\Db::fail($this->conn, 'Failed to save contract.');
     }
 
     /* Dolibarr Inspired Warehouse Methods */
@@ -125,7 +125,7 @@ class ContractService
             $this->settings->log_audit("Signed Commercial Proposal", "Customer Portal", "Quote ID #{$so_id} signed by {$signer_name}");
             return json_encode(['status' => 'success', 'msg' => 'Proposal signed and confirmed successfully.']);
         }
-        return json_encode(['status' => 'failed', 'msg' => 'Failed to save digital signature. ' . $this->conn->error]);
+        return \App\Support\Db::fail($this->conn, 'Failed to save digital signature.');
     }
 
     /* Dolibarr Inspired Helpdesk Ticket Methods */

@@ -184,7 +184,7 @@ class TicketSlaService
                 if (!$this->conn->query("INSERT INTO `ticket_sla_policies` (tenant_id, priority, response_hours, resolve_hours)
                     VALUES ('{$t}', '{$p}', '{$a}', '{$b}')
                     ON DUPLICATE KEY UPDATE response_hours = VALUES(response_hours), resolve_hours = VALUES(resolve_hours)")) {
-                    throw new \RuntimeException($this->conn->error);
+                    throw new \RuntimeException(\App\Support\Db::oops($this->conn));
                 }
             }
             $this->conn->commit();

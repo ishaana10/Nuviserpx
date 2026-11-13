@@ -490,7 +490,7 @@ class PayrollService
             if ($this->inTransaction) {
                 throw $e; // the batch rolls back the whole run
             }
-            return json_encode(['status' => 'failed', 'msg' => 'Payroll was not saved. ' . $e->getMessage(), 'err' => $this->conn->error]);
+            return json_encode(['status' => 'failed', 'msg' => 'Payroll was not saved. ' . $e->getMessage()]);
         }
         if ($save) {
             $resp['status'] = 'success';
@@ -501,7 +501,7 @@ class PayrollService
         } else {
             $resp['status'] = 'failed';
             $resp['msg'] = "An error occurred while saving payroll.";
-            $resp['err'] = $this->conn->error;
+            \App\Support\Db::log($this->conn);
         }
         if ($resp['status'] === 'success') {
             $this->settings->set_flashdata('success', $resp['msg']);
@@ -677,7 +677,7 @@ class PayrollService
             $this->settings->set_flashdata('success', ' Payroll record deleted successfully.');
             return json_encode(['status' => 'success']);
         }
-        return json_encode(['status' => 'failed', 'error' => $this->conn->error]);
+        return \App\Support\Db::fail($this->conn);
     }
 
     /** Error message if reversing this payroll journal would take a payroll liability below what is still owed. */

@@ -64,7 +64,7 @@ class TenantService
             } else {
                 $resp['status'] = 'failed';
                 $resp['msg'] = "An error occurred.";
-                $resp['err'] = $this->conn->error;
+                \App\Support\Db::log($this->conn);
             }
         }
         if ($resp['status'] === 'success') {
@@ -83,7 +83,7 @@ class TenantService
             $this->settings->set_flashdata('success', " Tenant deleted successfully.");
         } else {
             $resp['status'] = 'failed';
-            $resp['error'] = $this->conn->error;
+            \App\Support\Db::log($this->conn);
         }
         return json_encode($resp);
     }

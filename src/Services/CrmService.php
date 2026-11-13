@@ -144,7 +144,7 @@ class CrmService
         }
 
         if (!$save) {
-            return json_encode(['status' => 'failed', 'msg' => 'Failed to save opportunity. ' . $this->conn->error]);
+            return \App\Support\Db::fail($this->conn, 'Failed to save opportunity.');
         }
         $this->settings->log_audit($target_id ? 'Updated CRM Deal' : 'Created CRM Deal', 'CRM Opportunities', "Title: {$title}");
         return json_encode(['status' => 'success', 'id' => (int)$opp_id, 'msg' => 'Opportunity saved successfully.']);
@@ -171,7 +171,7 @@ class CrmService
             $this->settings->log_audit('Moved CRM Deal', 'CRM Opportunities', "Deal #{$id} -> {$stage}" . ($stage === 'lost' ? " ({$reason})" : ''));
             return json_encode(['status' => 'success']);
         }
-        return json_encode(['status' => 'failed', 'msg' => $this->conn->error]);
+        return \App\Support\Db::fail($this->conn);
     }
 
     public function deleteOpportunity(int $id): string
@@ -183,7 +183,7 @@ class CrmService
             $this->settings->set_flashdata('success', ' Opportunity deleted.');
             return json_encode(['status' => 'success']);
         }
-        return json_encode(['status' => 'failed', 'error' => $this->conn->error]);
+        return \App\Support\Db::fail($this->conn);
     }
 
     /* ===================================================================
@@ -231,7 +231,7 @@ class CrmService
         if ($ok) {
             return json_encode(['status' => 'success', 'msg' => 'Activity saved.']);
         }
-        return json_encode(['status' => 'failed', 'msg' => $this->conn->error]);
+        return \App\Support\Db::fail($this->conn);
     }
 
     public function toggleActivity(int $id): string
@@ -369,7 +369,7 @@ class CrmService
                 $ok = $this->conn->query("UPDATE `crm_contacts` SET {$set} WHERE id = '{$id}' AND tenant_id = '{$t}'");
             }
             if (!$ok) {
-                throw new \RuntimeException($this->conn->error);
+                throw new \RuntimeException(\App\Support\Db::oops($this->conn));
             }
             if ($f['is_primary'] && $partyId > 0) {
                 // One primary contact per customer.

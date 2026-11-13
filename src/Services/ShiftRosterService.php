@@ -44,7 +44,7 @@ class ShiftRosterService
             $this->settings->log_audit("Created Shift Type", "HR & Attendance", "Shift: {$name} ({$start_time} - {$end_time})");
             return json_encode(['status' => 'success', 'msg' => 'Shift type saved successfully.']);
         }
-        return json_encode(['status' => 'failed', 'msg' => 'Failed to save shift type. ' . $this->conn->error]);
+        return \App\Support\Db::fail($this->conn, 'Failed to save shift type.');
     }
 
     public function save_shift_assignment()

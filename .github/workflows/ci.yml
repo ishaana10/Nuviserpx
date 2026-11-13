@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+
+jobs:
+  lint-and-tests:
+    name: Lint & Test Suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mysqli
+          tools: phpunit:^11
+
+      - name: PHP syntax check (whole repo)
+        run: |
+          set -e
+          find . -name '*.php' -not -path './vendor/*' -print0 \
+            | xargs -0 -n1 -P4 php -l > /dev/null
+          echo "All files lint clean."
+
+      - name: Run the test suite (PHPUnit bridge)
+        run: phpunit -c phpunit.xml
+
+  static-analysis:
+    name: PHPStan (level 5, src/)
+    runs-on: ubuntu-latest
+    # Advisory while findings are worked down; flip to false to make it blocking.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mysqli
+          tools: phpstan
+      - name: PHPStan
+        run: phpstan analyse -c phpstan.neon --no-progress

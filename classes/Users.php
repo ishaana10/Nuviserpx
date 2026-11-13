@@ -338,6 +338,7 @@ Class Users extends DBConnection {
 	}
 
 	public function save_client(){
+		$this->settings->require_csrf();
 		$oldpassword = $_POST['oldpassword'] ?? null;
 		$id = isset($_POST['id']) ? (int)$_POST['id'] : 0;
 		$this->guardClient($id);
@@ -380,7 +381,7 @@ Class Users extends DBConnection {
 				$resp['status'] = "success";
 			}else{
 				$resp['status'] = "failed";
-				$resp['msg'] = "An error occurred while saving the data. Error: ". $this->conn->error;
+				$resp['msg'] = "An error occurred while saving the data."; \App\Support\Db::log($this->conn);
 			}
 
 		}else{
@@ -395,7 +396,7 @@ Class Users extends DBConnection {
 				$resp['status'] = "success";
 			}else{
 				$resp['status'] = "failed";
-				$resp['msg'] = "An error occurred while saving the data. Error: ". $this->conn->error;
+				$resp['msg'] = "An error occurred while saving the data."; \App\Support\Db::log($this->conn);
 			}
 			
 		}
@@ -500,6 +501,7 @@ Class Users extends DBConnection {
 	 */
 	public function change_password(){
 		$this->settings->require_login();
+		$this->settings->require_csrf();
 
 		$user_id = (int)$this->settings->userdata('id');
 		$current = $_POST['current_password'] ?? '';

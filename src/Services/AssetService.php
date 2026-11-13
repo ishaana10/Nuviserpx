@@ -172,7 +172,7 @@ class AssetService
                     $a = number_format($amt, 4, '.', '');
                     $ins->bind_param('iiss', $t, $assetId, $end, $a);
                     if (!$ins->execute()) {
-                        throw new \RuntimeException($this->conn->error);
+                        throw new \RuntimeException(\App\Support\Db::oops($this->conn));
                     }
                 }
                 $this->conn->commit();

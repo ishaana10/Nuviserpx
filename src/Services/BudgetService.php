@@ -177,7 +177,7 @@ class BudgetService
                         $amt = number_format($v, 4, '.', '');
                         $up->bind_param('iissi', $tenant, $accId, $m, $amt, $userId);
                         if (!$up->execute()) {
-                            throw new \RuntimeException($this->conn->error);
+                            throw new \RuntimeException(\App\Support\Db::oops($this->conn));
                         }
                         $saved++;
                     } else {

@@ -174,7 +174,7 @@ class SalesOrderService
         } else {
             $resp['status'] = 'failed';
             $resp['msg'] = "An error occurred while saving sales order.";
-            $resp['err'] = $this->conn->error;
+            \App\Support\Db::log($this->conn);
         }
 
         return json_encode($resp);

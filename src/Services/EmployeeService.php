@@ -67,7 +67,7 @@ class EmployeeService
             } else {
                 $resp['status'] = 'failed';
                 $resp['msg'] = "An error occurred.";
-                $resp['err'] = $this->conn->error;
+                \App\Support\Db::log($this->conn);
             }
         }
         if ($resp['status'] === 'success') {
@@ -96,7 +96,7 @@ class EmployeeService
             $this->settings->set_flashdata('success', " Employee has been deleted successfully.");
         } else {
             $resp['status'] = 'failed';
-            $resp['error'] = $this->conn->error;
+            \App\Support\Db::log($this->conn);
         }
         return json_encode($resp);
     }
@@ -144,7 +144,7 @@ class EmployeeService
         } else {
             $resp['status'] = 'failed';
             $resp['msg'] = "An error occurred while saving attendance.";
-            $resp['err'] = $this->conn->error;
+            \App\Support\Db::log($this->conn);
         }
         if ($resp['status'] === 'success') {
             $this->settings->set_flashdata('success', $resp['msg']);
@@ -163,7 +163,7 @@ class EmployeeService
             $this->settings->set_flashdata('success', " Attendance record deleted successfully.");
         } else {
             $resp['status'] = 'failed';
-            $resp['error'] = $this->conn->error;
+            \App\Support\Db::log($this->conn);
         }
         return json_encode($resp);
     }
@@ -244,7 +244,7 @@ class EmployeeService
         } else {
             $resp['status'] = 'failed';
             $resp['msg'] = "An error occurred while saving leave request.";
-            $resp['err'] = $this->conn->error;
+            \App\Support\Db::log($this->conn);
         }
         if ($resp['status'] === 'success') {
             $this->settings->set_flashdata('success', $resp['msg']);
@@ -298,7 +298,7 @@ class EmployeeService
             $this->settings->set_flashdata('success', " Leave request has been {$status}.");
             return json_encode(['status' => 'success']);
         }
-        return json_encode(['status' => 'failed', 'msg' => 'An error occurred.', 'error' => $this->conn->error]);
+        return \App\Support\Db::fail($this->conn, 'An error occurred.');
     }
 
     /**
@@ -332,7 +332,7 @@ class EmployeeService
             $this->settings->set_flashdata('success', " Leave request has been cancelled.");
             return json_encode(['status' => 'success']);
         }
-        return json_encode(['status' => 'failed', 'msg' => 'An error occurred.', 'error' => $this->conn->error]);
+        return \App\Support\Db::fail($this->conn, 'An error occurred.');
     }
 
     public function deleteLeave(int $id): string
@@ -346,7 +346,7 @@ class EmployeeService
             $this->settings->set_flashdata('success', " Leave request deleted successfully.");
         } else {
             $resp['status'] = 'failed';
-            $resp['error'] = $this->conn->error;
+            \App\Support\Db::log($this->conn);
         }
         return json_encode($resp);
     }

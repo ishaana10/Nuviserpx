@@ -70,7 +70,7 @@ class HelpdeskService
                 return json_encode(['status' => 'success', 'id' => $target_id, 'msg' => 'Ticket updated successfully.']);
             }
         }
-        return json_encode(['status' => 'failed', 'msg' => 'Failed to save ticket. ' . $this->conn->error]);
+        return \App\Support\Db::fail($this->conn, 'Failed to save ticket.');
     }
 
     public function reply_ticket()

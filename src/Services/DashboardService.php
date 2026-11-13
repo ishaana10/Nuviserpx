@@ -1099,7 +1099,7 @@ class DashboardService
         }
         $stmt = $this->conn->prepare($sql);
         if (!$stmt) {
-            $this->failures[] = $this->conn->error;
+            $this->failures[] = \App\Support\Db::oops($this->conn);
             error_log('Dashboard query failed: ' . $this->conn->error);
             return [];
         }

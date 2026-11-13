@@ -169,12 +169,12 @@ class PaymentService
                 $payId = (int)$this->conn->insert_id;
             }
             if (!$ok || $payId <= 0) {
-                throw new \RuntimeException($this->conn->error ?: 'The receipt could not be saved.');
+                throw new \RuntimeException(\App\Support\Db::oops($this->conn, 'The receipt could not be saved.'));
             }
             foreach ($alloc as $invId => $amt) {
                 $affected[] = $invId;
                 if (!$this->conn->query("INSERT INTO `payment_allocations` SET `payment_id` = '{$payId}', `invoice_id` = '{$invId}', `amount` = '" . number_format($amt, 2, '.', '') . "'")) {
-                    throw new \RuntimeException($this->conn->error);
+                    throw new \RuntimeException(\App\Support\Db::oops($this->conn));
                 }
             }
             foreach (array_unique($affected) as $invId) {
@@ -548,7 +548,7 @@ class PaymentService
         try {
             if (!$this->conn->query("DELETE FROM `payment_allocations` WHERE payment_id = '{$id}'")
                 || !$this->conn->query("UPDATE `payment_list` SET `status` = 'cancelled' WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'")) {
-                throw new \RuntimeException($this->conn->error);
+                throw new \RuntimeException(\App\Support\Db::oops($this->conn));
             }
             foreach (array_unique($affected) as $invId) {
                 $this->refreshInvoice($invId);

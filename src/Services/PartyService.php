@@ -98,7 +98,7 @@ class PartyService
         } else {
             $resp['status'] = 'failed';
             $resp['msg'] = "An error occurred while saving party.";
-            $resp['err'] = $this->conn->error;
+            \App\Support\Db::log($this->conn);
         }
         return json_encode($resp);
     }
@@ -115,7 +115,7 @@ class PartyService
             $this->settings->set_flashdata('success', " Party deleted successfully.");
         } else {
             $resp['status'] = 'failed';
-            $resp['error'] = $this->conn->error;
+            \App\Support\Db::log($this->conn);
         }
         return json_encode($resp);
     }

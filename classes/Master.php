@@ -509,7 +509,7 @@ class Master extends DBConnection
             $this->settings->log_audit("Created Salary Component", "Payroll", "Code: {$c_code}, Name: {$c_name}");
             return json_encode(['status' => 'success', 'msg' => 'Salary component created successfully.']);
         }
-        return json_encode(['status' => 'failed', 'msg' => 'Failed to save salary component. ' . $this->conn->error]);
+        return \App\Support\Db::fail($this->conn, 'Failed to save salary component.');
     }
 
     public function assign_salary_component()
@@ -1382,7 +1382,7 @@ class Master extends DBConnection
             return json_encode(['status' => 'success', 'msg' => 'Invoice template customization saved successfully!']);
         }
 
-        return json_encode(['status' => 'failed', 'msg' => 'Failed to save template settings: ' . $this->conn->error]);
+        return \App\Support\Db::fail($this->conn, 'Failed to save template settings:');
     }
 }
 
