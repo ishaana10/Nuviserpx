@@ -17,6 +17,12 @@
                                         </a>
                                     </li>
                                     <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=developer/dev_guide" class="nav-link nav-developer_dev_guide tree-item">
+                                            <i class="nav-icon fas fa-book text-success"></i>
+                                            <p>Developer Guide</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=developer/customer_plans" class="nav-link nav-developer_customer_plans tree-item">
                                             <i class="nav-icon fas fa-layer-group text-primary"></i>
                                             <p>Customer Plans</p>
