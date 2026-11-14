@@ -36,7 +36,7 @@ try {
 	</div>
 	<div class="card-body">
 		<div class="container-fluid">
-			<table class="table table-hover table-striped table-bordered" id="list">
+			<table class="table table-hover table-striped table-bordered" id="list" data-nv-cards>
 				<colgroup>
 					<col width="5%">
 					<col width="12%">
