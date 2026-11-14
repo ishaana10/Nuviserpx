@@ -4,23 +4,6 @@ declare(strict_types=1);
 
 namespace App\Support;
 
-require_once dirname(__DIR__, 2) . '/libs/fpdf/fpdf.php';
-
-/** Page frame for the statement: running footer with page numbers. */
-final class StatementPdfDoc extends \FPDF
-{
-    public string $footerText = '';
-
-    public function Footer(): void
-    {
-        $this->SetY(-14);
-        $this->SetFont('Helvetica', '', 8);
-        $this->SetTextColor(120, 130, 145);
-        $this->Cell(0, 5, $this->footerText, 0, 0, 'L');
-        $this->Cell(0, 5, 'Page ' . $this->PageNo() . ' of {nb}', 0, 0, 'R');
-    }
-}
-
 /**
  * A customer's unpaid-invoices statement as a PDF.
  *
@@ -30,11 +13,9 @@ final class StatementPdfDoc extends \FPDF
  */
 final class StatementPdf
 {
-    /** Latin-1/Windows-1252 text for the core PDF fonts; anything it cannot show becomes '?'. */
     private static function t(string $s): string
     {
-        $o = @iconv('UTF-8', 'windows-1252//TRANSLIT//IGNORE', $s);
-        return $o === false ? (string)preg_replace('/[^\x20-\x7E]/', '?', $s) : $o;
+        return PdfDoc::t($s);
     }
 
     private static function money(float $v): string
@@ -55,7 +36,7 @@ final class StatementPdf
      */
     public static function render(array $c, string $asOf, array $brand, string $currency, string $note = ''): string
     {
-        $pdf = new StatementPdfDoc('P', 'mm', 'A4');
+        $pdf = new PdfDoc('P', 'mm', 'A4');
         $pdf->SetMargins(15, 15, 15);
         $pdf->SetAutoPageBreak(true, 20);
         $pdf->AliasNbPages('{nb}');
@@ -63,33 +44,7 @@ final class StatementPdf
         $pdf->footerText = self::t('Generated ' . date('j M Y') . ' - ' . (string)($brand['name'] ?? ''));
         $pdf->AddPage();
 
-        // Letterhead: logo (optional), company name and contact, then the statement title on the right.
-        $x = 15;
-        $logo = (string)($brand['logo'] ?? '');
-        $logoFile = ($logo !== '' && defined('base_app')) ? base_app . ltrim(explode('?', $logo)[0], '/') : '';
-        if ($logoFile !== '' && is_file($logoFile) && filesize($logoFile) <= 1572864
-            && in_array(strtolower(pathinfo($logoFile, PATHINFO_EXTENSION)), ['jpg', 'jpeg', 'png', 'gif'], true) && @getimagesize($logoFile)) {
-            try {
-                $pdf->Image($logoFile, 15, 14, 0, 16);
-                $x = 15;
-                $pdf->SetY(32);
-            } catch (\Throwable $e) {
-                $pdf->SetY(15);
-            }
-        }
-        $pdf->SetX($x);
-        $pdf->SetFont('Helvetica', 'B', 14);
-        $pdf->SetTextColor(15, 23, 42);
-        $pdf->Cell(110, 7, self::t((string)($brand['name'] ?? '')), 0, 1);
-        $pdf->SetFont('Helvetica', '', 9);
-        $pdf->SetTextColor(90, 100, 115);
-        foreach (array_slice(array_filter(array_map('trim', explode("\n", (string)($brand['address'] ?? '')))), 0, 4) as $line) {
-            $pdf->Cell(110, 4.5, self::t($line), 0, 1);
-        }
-        $contact = trim((string)($brand['email'] ?? '') . '  ' . (string)($brand['phone'] ?? ''));
-        if ($contact !== '') {
-            $pdf->Cell(110, 4.5, self::t($contact), 0, 1);
-        }
+        $pdf->letterhead($brand);
 
         $pdf->Ln(6);
         $pdf->SetFont('Helvetica', 'B', 16);

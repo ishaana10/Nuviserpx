@@ -262,7 +262,7 @@ class Emailer {
     /**
      * Send Invoice Email to Customer
      */
-    public static function send_invoice_email($to, $invoice, $items, $sys_info = []) {
+    public static function send_invoice_email($to, $invoice, $items, $sys_info = [], $pdf = null) {
         $company_name = $sys_info['name'] ?? 'Nuvis ERPX';
         $subject = "Tax Invoice #" . $invoice['invoice_no'] . " from " . $company_name;
 
@@ -305,10 +305,11 @@ class Emailer {
             <p style='margin: 4px 0;'>Tax / VAT: <b>$" . number_format($invoice['tax_amount'], 2) . "</b></p>
             <h3 style='margin: 8px 0; color: #1e3a8a;'>Total Amount: $" . number_format($invoice['total'], 2) . " " . htmlspecialchars($sys_info['currency_code'] ?? '') . "</h3>
         </div>
-        <p>Please arrange payment by the due date. If you have any questions, feel free to contact us.</p>";
+        <p>Please arrange payment by the due date. If you have any questions, feel free to contact us.</p>"
+            . (is_array($pdf) ? "<p style='color:#64748b;font-size:13px'>A PDF copy of this invoice is attached.</p>" : '');
 
         $html = self::wrap_template("Tax Invoice #" . $invoice['invoice_no'], $body, $company_name);
-        return self::send_email($to, $subject, $html);
+        return self::send_email($to, $subject, $html, null, null, is_array($pdf) ? [['name' => $pdf['name'], 'mime' => 'application/pdf', 'data' => $pdf['data']]] : []);
     }
 
     /**
