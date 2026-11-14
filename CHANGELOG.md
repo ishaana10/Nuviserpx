@@ -23,6 +23,14 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
   4-hour idle lifetime.
 
 ### Added
+- **Invoices list (UX polish, slice 3)**: friendly empty state with a Create button, invoice
+  numbers link to the invoice, and unpaid/partially paid invoices past their due date show
+  "N days overdue" under the due date. (The Dashboard already had phone-tuned controls, so
+  it is unchanged.)
+- **Phone-friendly lists (UX polish, slice 1)**: tables marked `data-nv-cards` turn into
+  stacked, labelled cards below 768px (desktop unchanged); list-page action buttons are
+  full-width touch targets on phones. Piloted on the Invoices list. See
+  `docs/superpowers/specs/2026-11-14-ux-polish-design.md`.
 - **Quick jump (UX polish, slice 2)**: a search icon in the top bar (and Ctrl/Cmd+K) opens an
   overlay that jumps to any menu page or "Create new" action. It reads the already
   permission-filtered menu, so it never lists a page the user cannot open; works on phones
@@ -53,6 +61,10 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
 ## 2026-11-13
 
 ### Added
+- **Invoices list (UX polish, slice 3)**: friendly empty state with a Create button, invoice
+  numbers link to the invoice, and unpaid/partially paid invoices past their due date show
+  "N days overdue" under the due date. (The Dashboard already had phone-tuned controls, so
+  it is unchanged.)
 - **Quick jump (UX polish, slice 2)**: a search icon in the top bar (and Ctrl/Cmd+K) opens an
   overlay that jumps to any menu page or "Create new" action. It reads the already
   permission-filtered menu, so it never lists a page the user cannot open; works on phones
