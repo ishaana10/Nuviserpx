@@ -304,12 +304,16 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
                 <div class="col-md-3">
                     <span><b>FNPF Employer Contribution:</b> $<?php echo number_format($employer_fnpf, 2) ?></span>
                 </div>
+                <?php if ((float)$workcare_levy != 0): ?>
                 <div class="col-md-3">
                     <span><b>Workcare Levy:</b> $<?php echo number_format($workcare_levy, 2) ?></span>
                 </div>
+                <?php endif; ?>
+                <?php if ((float)($training_levy ?? 0) != 0): ?>
                 <div class="col-md-3">
                     <span><b>Training Levy (FNU):</b> $<?php echo number_format($training_levy ?? 0, 2) ?></span>
                 </div>
+                <?php endif; ?>
                 <div class="col-md-3 text-right">
                     <span><b>Total Employer Cost:</b> $<?php echo number_format($employer_cost > 0 ? $employer_cost : ($gross_salary + $employer_fnpf + $workcare_levy + ($training_levy ?? 0)), 2) ?></span>
                 </div>

@@ -25,6 +25,7 @@ check('employer pension 8%', near($r['employer_pension'], 268.00));
 check('legacy alias equals neutral', $r['employee_fnpf'] == $r['employee_pension'] && $r['paye_tax'] == $r['income_tax']);
 check('net = gross - pension - tax - deductions', near($r['net_salary'], 3350 - 268 - $r['income_tax'] - 50));
 check('employer cost includes levies', near($r['employer_cost'], 3350 + 268 + $r['employer_levies_total']));
+check('default preset carries no employer levies (none apply generally in Fiji)', $r['employer_levies_total'] == 0.0);
 
 // Custom rules fully replace the preset: 5%/10% pension, one 10% band over 20k, no levies.
 $rules = ['pension' => ['employee_rate' => 0.05, 'employer_rate' => 0.10],
