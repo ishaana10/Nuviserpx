@@ -31,6 +31,13 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
   stacked, labelled cards below 768px (desktop unchanged); list-page action buttons are
   full-width touch targets on phones. Piloted on the Invoices list. See
   `docs/superpowers/specs/2026-11-14-ux-polish-design.md`.
+- **Quick jump (UX polish, slice 2)**: a search icon in the top bar (and Ctrl/Cmd+K) opens an
+  overlay that jumps to any menu page or "Create new" action. It reads the already
+  permission-filtered menu, so it never lists a page the user cannot open; works on phones
+  without opening the side drawer.
+- **PHPStan CI now meaningful**: analysis scans `classes/` and a bootstrap
+  defines runtime constants, cutting 784 false positives to 77 recorded in
+  `phpstan-baseline.neon`; the job now fails only on new findings.
 - **Annual gross salary**: employee pay is captured as an annual gross
   figure; fortnightly, weekly and monthly basics derive from it
   automatically at run time (26/52/12 periods) and re-derive when the
@@ -58,6 +65,10 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
   numbers link to the invoice, and unpaid/partially paid invoices past their due date show
   "N days overdue" under the due date. (The Dashboard already had phone-tuned controls, so
   it is unchanged.)
+- **Quick jump (UX polish, slice 2)**: a search icon in the top bar (and Ctrl/Cmd+K) opens an
+  overlay that jumps to any menu page or "Create new" action. It reads the already
+  permission-filtered menu, so it never lists a page the user cannot open; works on phones
+  without opening the side drawer.
 - **Phone-friendly lists (UX polish, slice 1)**: tables marked `data-nv-cards` turn into
   stacked, labelled cards below 768px (desktop unchanged); list-page action buttons are
   full-width touch targets on phones. Piloted on the Invoices list. See
