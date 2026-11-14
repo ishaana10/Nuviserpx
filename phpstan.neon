@@ -4,4 +4,11 @@ parameters:
         - src
     bootstrapFiles:
         - vendor/autoload.php
+        - phpstan-bootstrap.php
+    # Legacy (non-namespaced) classes live in classes/ and are loaded by
+    # initialize.php at runtime, so PHPStan has to be told about them.
+    scanDirectories:
+        - classes
     reportUnmatchedIgnoredErrors: false
+includes:
+    - phpstan-baseline.neon
