@@ -74,8 +74,23 @@ class CustomerStatementService
                 $emails[(int)$r['id']] = (string)$r['email'];
             }
         }
+        $last = [];
+        try {
+            $l = $this->conn->prepare("SELECT party_id, MAX(sent_at) AS last_sent FROM customer_statement_log WHERE tenant_id = ? GROUP BY party_id");
+            if ($l) {
+                $l->bind_param('i', $tid);
+                $l->execute();
+                $lr = $l->get_result();
+                foreach ($lr ? $lr->fetch_all(MYSQLI_ASSOC) : [] as $r) {
+                    $last[(int)$r['party_id']] = (string)$r['last_sent'];
+                }
+            }
+        } catch (\Throwable $e) {
+            $last = []; // table not created yet: no history to show
+        }
         foreach ($ar['customers'] as &$c) {
             $c['email'] = $emails[$c['id']] ?? '';
+            $c['last_sent'] = $last[$c['id']] ?? null;
         }
         unset($c);
         return $ar;
@@ -127,6 +142,29 @@ class CustomerStatementService
         return json_encode(['status' => $sent > 0 ? 'success' : 'failed', 'msg' => $msg]);
     }
 
+    /** The statement as a PDF, in memory only: [name, data], or null when it cannot be built. Never written to disk. */
+    public function pdf(int $partyId, string $asOf, string $note = ''): ?array
+    {
+        $asOf = self::cleanDate($asOf, date('Y-m-d'));
+        $ar = $this->statements($asOf, $partyId);
+        if (!$ar['customers']) {
+            return null;
+        }
+        return $this->pdfFor($ar['customers'][0], $asOf, $note);
+    }
+
+    private function pdfFor(array $customer, string $asOf, string $note): ?array
+    {
+        try {
+            $b = $this->settings->tenant_branding();
+            $data = \App\Support\StatementPdf::render($customer, $asOf, $b, (string)$this->settings->currency_tag(), $note);
+            return ['name' => \App\Support\StatementPdf::filename((string)$customer['name'], $asOf), 'data' => $data];
+        } catch (\Throwable $e) {
+            error_log('[statement-pdf] ' . $e->getMessage());
+            return null;
+        }
+    }
+
     protected function deliver(array $customer, string $to, string $asOf, string $note): bool
     {
         require_once(base_app . 'classes/Emailer.php');
@@ -137,6 +175,27 @@ class CustomerStatementService
             'phone' => $b['phone'],
             'currency' => (string)$this->settings->currency_tag(),
         ];
-        return (bool)\Emailer::send_customer_statement_email($to, $customer, $asOf, $sys, mb_substr(trim($note), 0, self::MAX_NOTE));
+        $note = mb_substr(trim($note), 0, self::MAX_NOTE);
+        // The PDF is built in memory, attached, and dropped. If it cannot be built the email still goes out with the table in the body.
+        $ok = (bool)\Emailer::send_customer_statement_email($to, $customer, $asOf, $sys, $note, $this->pdfFor($customer, $asOf, $note));
+        if ($ok) {
+            $this->recordSent((int)$customer['id'], $asOf, $to, (float)$customer['total']);
+        }
+        return $ok;
+    }
+
+    private function recordSent(int $partyId, string $asOf, string $to, float $total): void
+    {
+        try {
+            $tid = (int)$this->settings->active_tenant_id();
+            $uid = (int)$this->settings->userdata('id');
+            $q = $this->conn->prepare("INSERT INTO customer_statement_log (tenant_id, party_id, as_of, sent_to, total, sent_by) VALUES (?,?,?,?,?,?)");
+            if ($q) {
+                $q->bind_param('iissdi', $tid, $partyId, $asOf, $to, $total, $uid);
+                $q->execute();
+            }
+        } catch (\Throwable $e) {
+            error_log('[statement-log] ' . $e->getMessage());
+        }
     }
 }

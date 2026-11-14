@@ -9,6 +9,8 @@ parameters:
     # initialize.php at runtime, so PHPStan has to be told about them.
     scanDirectories:
         - classes
+    scanFiles:
+        - libs/fpdf/fpdf.php
     reportUnmatchedIgnoredErrors: false
 includes:
     - phpstan-baseline.neon
