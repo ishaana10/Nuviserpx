@@ -462,6 +462,8 @@ final class Permissions
         'save_invoice'          => ['invoices', 'save'],
         'delete_invoice'        => ['invoices', 'delete'],
         'email_invoice'         => ['invoices', 'view'],
+        'email_customer_statement'      => ['invoices', 'view'],
+        'email_customer_statements_all' => ['invoices', 'edit'],
         'save_invoice_template' => ['settings_manage'],
         // Parties
         'save_party'            => ['parties', 'save'],

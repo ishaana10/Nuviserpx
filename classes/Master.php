@@ -6,6 +6,7 @@ use App\Services\EmployeeService;
 use App\Services\IntegrationService;
 use App\Services\InventoryService;
 use App\Services\InvoiceService;
+use App\Services\CustomerStatementService;
 use App\Services\JournalService;
 use App\Services\PartyService;
 use App\Services\PaymentService;
@@ -962,6 +963,16 @@ class Master extends DBConnection
         return $this->container->make(InvoiceService::class)->emailInvoice(intval($_POST['id'] ?? 0), $_POST['custom_email'] ?? null);
     }
 
+    public function email_customer_statement()
+    {
+        return $this->container->make(CustomerStatementService::class)->emailOne(intval($_POST['party_id'] ?? 0), (string)($_POST['as_of'] ?? ''), (string)($_POST['note'] ?? ''), isset($_POST['custom_email']) ? (string)$_POST['custom_email'] : null);
+    }
+
+    public function email_customer_statements_all()
+    {
+        return $this->container->make(CustomerStatementService::class)->emailAll((string)($_POST['as_of'] ?? ''), (string)($_POST['note'] ?? ''));
+    }
+
     /* Payment Actions */
     public function save_payment()
     {
@@ -1466,7 +1477,7 @@ $allowed_actions = [
     'reopen_reconciliation', 'save_stock_adjustment', 'save_api_key', 'delete_api_key',
     'save_webhook', 'delete_webhook', 'test_webhook', 'save_workflow',
     'delete_workflow', 'toggle_workflow', 'save_plan', 'delete_plan',
-    'assign_plan', 'save_role', 'delete_role', 'email_invoice',
+    'assign_plan', 'save_role', 'delete_role', 'email_invoice', 'email_customer_statement', 'email_customer_statements_all',
     'email_payment_receipt', 'save_batch_payroll', 'email_payslip', 'save_tenant',
     'delete_tenant', 'git_pull', 'git_fetch', 'get_redis_status',
     'test_redis_ping', 'start_redis_daemon', 'send_customer_invitation', 'customer_register',

@@ -23,6 +23,11 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
   4-hour idle lifetime.
 
 ### Added
+- **Customer Statements report**: Reports > Customer Statements lists every customer with unpaid
+  invoices, with a printable per-customer statement (invoices, balances, age). Email a statement to
+  one customer (address editable before sending) or to everyone who has an email address, with an
+  optional message. Sent through the company's own email settings and recorded in its email log;
+  customers without an address are listed, not skipped silently.
 - **Phone-friendly lists, the rest (UX polish, slice 6)**: Payments, Purchase Orders, Vendor Bills,
   Bank Reconciliation, Attendance, Leaves, Stock Adjustments, Roles, Tenants, API Keys and Webhooks
   lists use the stacked-card layout below 768px. (Workflows is left as-is: its "Actions" count
