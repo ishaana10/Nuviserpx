@@ -12,6 +12,19 @@
 	</div>
 	<div class="card-body">
 		<div class="container-fluid">
+			<?php
+				$tenant_id = $_settings->active_tenant_id();
+				$qry = $conn->query("SELECT i.*, p.name as party_name, p.party_code from `invoice_list` i inner join `party_list` p on i.party_id = p.id where i.tenant_id = '{$tenant_id}' order by i.id desc ");
+				$nv_has_rows = $qry && $qry->num_rows > 0;
+			?>
+			<?php if(!$nv_has_rows): ?>
+				<div class="nv-empty">
+					<div class="nv-empty-icon"><i class="fas fa-file-invoice"></i></div>
+					<div class="nv-empty-title">No invoices yet</div>
+					<div class="nv-empty-sub mb-3">Create your first invoice and it will show up here.</div>
+					<a href="./?page=invoices/manage_invoice" class="btn btn-primary"><span class="fas fa-plus"></span> Create New Invoice</a>
+				</div>
+			<?php else: ?>
 			<table class="table table-hover table-striped table-bordered" id="list" data-nv-cards>
 				<colgroup>
 					<col width="5%">
@@ -40,9 +53,13 @@
 				<tbody>
 					<?php
 					$i = 1;
-						$tenant_id = $_settings->active_tenant_id();
-						$qry = $conn->query("SELECT i.*, p.name as party_name, p.party_code from `invoice_list` i inner join `party_list` p on i.party_id = p.id where i.tenant_id = '{$tenant_id}' order by i.id desc ");
 						while($row = $qry->fetch_assoc()):
+							$nv_overdue_days = 0;
+							if(!empty($row['due_date']) && $row['balance'] > 0 && in_array($row['status'], ['unpaid','partially_paid'], true)){
+								$nv_due = new DateTime($row['due_date']);
+								$nv_today = new DateTime('today');
+								if($nv_due < $nv_today){ $nv_overdue_days = (int)$nv_due->diff($nv_today)->days; }
+							}
 							$badge_class = 'secondary';
 							if($row['status'] == 'paid') $badge_class = 'success';
 							elseif($row['status'] == 'unpaid') $badge_class = 'danger';
@@ -51,13 +68,16 @@
 					?>
 						<tr>
 							<td class="text-center"><?php echo $i++; ?></td>
-							<td><b><?php echo $row['invoice_no'] ?></b></td>
+							<td><a href="./?page=invoices/view&id=<?php echo (int)$row['id'] ?>"><b><?php echo htmlspecialchars($row['invoice_no']) ?></b></a></td>
 							<td>
 								<p class="m-0 font-weight-bold"><?php echo $row['party_name'] ?></p>
 								<small class="text-muted"><?php echo $row['party_code'] ?></small>
 							</td>
 							<td><?php echo date("d M Y", strtotime($row['invoice_date'])) ?></td>
-							<td><?php echo !empty($row['due_date']) ? date("d M Y", strtotime($row['due_date'])) : '—' ?></td>
+							<td>
+								<?php echo !empty($row['due_date']) ? date("d M Y", strtotime($row['due_date'])) : '—' ?>
+								<?php if($nv_overdue_days > 0): ?><br><small class="text-danger font-weight-bold"><i class="fas fa-exclamation-circle"></i> <?php echo $nv_overdue_days ?> day<?php echo $nv_overdue_days === 1 ? '' : 's' ?> overdue</small><?php endif; ?>
+							</td>
 							<td class="text-right font-weight-bold"><?php echo number_format($row['total'], 2) ?></td>
 							<td class="text-right font-weight-bold text-<?php echo $row['balance'] > 0 ? 'danger' : 'success' ?>"><?php echo number_format($row['balance'], 2) ?></td>
 							<td class="text-center">
@@ -85,6 +105,7 @@
 					<?php endwhile; ?>
 				</tbody>
 			</table>
+			<?php endif; ?>
 		</div>
 	</div>
 </div>
@@ -120,7 +141,7 @@
 				});
 			}
 		});
-		$('#list').dataTable({
+		if($('#list').length) $('#list').dataTable({
 			columnDefs: [
 					{ orderable: false, targets: [8] }
 			],

@@ -23,6 +23,10 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
   4-hour idle lifetime.
 
 ### Added
+- **Invoices list (UX polish, slice 3)**: friendly empty state with a Create button, invoice
+  numbers link to the invoice, and unpaid/partially paid invoices past their due date show
+  "N days overdue" under the due date. (The Dashboard already had phone-tuned controls, so
+  it is unchanged.)
 - **Phone-friendly lists (UX polish, slice 1)**: tables marked `data-nv-cards` turn into
   stacked, labelled cards below 768px (desktop unchanged); list-page action buttons are
   full-width touch targets on phones. Piloted on the Invoices list. See
@@ -50,6 +54,10 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
 ## 2026-11-13
 
 ### Added
+- **Invoices list (UX polish, slice 3)**: friendly empty state with a Create button, invoice
+  numbers link to the invoice, and unpaid/partially paid invoices past their due date show
+  "N days overdue" under the due date. (The Dashboard already had phone-tuned controls, so
+  it is unchanged.)
 - **Phone-friendly lists (UX polish, slice 1)**: tables marked `data-nv-cards` turn into
   stacked, labelled cards below 768px (desktop unchanged); list-page action buttons are
   full-width touch targets on phones. Piloted on the Invoices list. See
