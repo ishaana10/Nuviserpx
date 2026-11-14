@@ -178,6 +178,7 @@ ALTER TABLE `employee_list` ADD COLUMN `birth_count_tracker` int(3) NOT NULL DEF
 ALTER TABLE `employee_list` ADD COLUMN `ytd_opening_gross` decimal(12,2) NOT NULL DEFAULT 0.00;
 ALTER TABLE `employee_list` ADD COLUMN `ytd_opening_paye` decimal(12,2) NOT NULL DEFAULT 0.00;
 ALTER TABLE `employee_list` ADD COLUMN `fnpf_employer_voluntary` decimal(5,2) NOT NULL DEFAULT 0.00;
+ALTER TABLE `employee_list` ADD COLUMN `annual_salary` decimal(14,2) DEFAULT NULL;
 ALTER TABLE `employee_list` ADD COLUMN `tin` varchar(50) DEFAULT NULL;
 ALTER TABLE `employee_list` ADD COLUMN `fnpf_no` varchar(50) DEFAULT NULL;
 ALTER TABLE `employee_list` ADD COLUMN `tax_code` varchar(10) NOT NULL DEFAULT 'P';

@@ -54,7 +54,7 @@ try {
 						<th>Name</th>
 						<th>TIN / FNPF</th>
 						<th>Department / Designation</th>
-						<th>Monthly Salary</th>
+						<th>Annual Gross</th>
 						<th>Status</th>
 						<?php if($can_edit || $can_delete): ?><th>Action</th><?php endif; ?>
 					</tr>
@@ -77,7 +77,7 @@ try {
 								<p class="m-0"><?php echo $row['department'] ?></p>
 								<small class="text-muted"><?php echo $row['designation'] ?></small>
 							</td>
-							<td class="text-right font-weight-bold"><?php echo number_format($row['salary'], 2) ?> <?php echo htmlspecialchars($_settings->base_currency()) ?></td>
+							<td class="text-right font-weight-bold"><?php echo number_format((float)($row['annual_salary'] ?? 0) > 0 ? (float)$row['annual_salary'] : (float)$row['salary'] * 12, 2) ?> <?php echo htmlspecialchars($_settings->base_currency()) ?></td>
 							<td class="text-center">
                                 <?php if($row['status'] == 1): ?>
                                     <span class="badge badge-success px-3 rounded-pill">Active</span>
