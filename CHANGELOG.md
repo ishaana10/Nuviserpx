@@ -23,6 +23,9 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
   4-hour idle lifetime.
 
 ### Added
+- Invoices can be viewed or downloaded as a PDF (View PDF / Download on the invoice page, View PDF in the list),
+  and the invoice email now carries the PDF as an attachment. PDFs are built in memory and are never stored on the
+  server. Shared PDF layout code now lives in `src/Support/PdfDoc.php`.
 - **Statement PDFs and "Last emailed"**: Customer Statements can be viewed or downloaded as a PDF,
   and every emailed statement carries a PDF copy. PDFs are built in memory and streamed or
   attached, then discarded: they are never stored on the server (a test fails the build if any

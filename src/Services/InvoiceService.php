@@ -612,6 +612,55 @@ class InvoiceService
         return json_encode($resp);
     }
 
+    /**
+     * The invoice as a PDF, built in memory for viewing or attaching: [name, data], or null when the invoice is not
+     * this company's or the PDF cannot be built. Never written to disk.
+     */
+    public function pdf(int $id): ?array
+    {
+        $tid = (int)$this->settings->active_tenant_id();
+        try {
+            $q = $this->conn->prepare(
+                "SELECT i.*, p.name AS party_name, p.party_code, p.address AS party_address, p.tin AS party_tin, p.email AS party_email
+                   FROM invoice_list i INNER JOIN party_list p ON p.id = i.party_id AND p.tenant_id = i.tenant_id
+                  WHERE i.id = ? AND i.tenant_id = ?"
+            );
+            if (!$q) {
+                return null;
+            }
+            $q->bind_param('ii', $id, $tid);
+            $q->execute();
+            $r = $q->get_result();
+            $inv = $r ? $r->fetch_assoc() : null;
+            if (!$inv) {
+                return null;
+            }
+            $iq = $this->conn->prepare("SELECT * FROM invoice_items WHERE invoice_id = ? ORDER BY id");
+            $iq->bind_param('i', $id);
+            $iq->execute();
+            $ir = $iq->get_result();
+            $items = $ir ? $ir->fetch_all(MYSQLI_ASSOC) : [];
+
+            $tmpl = ['label_color' => '', 'footer_notes' => ''];
+            $tq = $this->conn->prepare("SELECT label_color, footer_notes FROM invoice_templates WHERE tenant_id = ? LIMIT 1");
+            if ($tq) {
+                $tq->bind_param('i', $tid);
+                $tq->execute();
+                $tr = $tq->get_result();
+                $row = $tr ? $tr->fetch_assoc() : null;
+                if ($row) {
+                    $tmpl = ['label_color' => (string)$row['label_color'], 'footer_notes' => (string)($row['footer_notes'] ?? '')];
+                }
+            }
+            $customer = ['name' => $inv['party_name'], 'party_code' => $inv['party_code'], 'address' => $inv['party_address'], 'tin' => $inv['party_tin'], 'email' => $inv['party_email']];
+            $data = \App\Support\InvoicePdf::render($inv, $items, $customer, $this->settings->tenant_branding(), $tmpl, (string)$this->settings->currency_tag());
+            return ['name' => \App\Support\InvoicePdf::filename((string)$inv['invoice_no']), 'data' => $data];
+        } catch (\Throwable $e) {
+            error_log('[invoice-pdf] ' . $e->getMessage());
+            return null;
+        }
+    }
+
     public function emailInvoice(int $id, ?string $custom_email = null): string
     {
         require_once(base_app . 'classes/Emailer.php');
@@ -648,7 +697,8 @@ class InvoiceService
             'email' => $this->settings->info('email')
         ];
 
-        $send = Emailer::send_invoice_email($email_to, $invoice, $items, $sys_info);
+        // PDF copy built in memory and attached; if it cannot be built the email still goes out without it.
+        $send = Emailer::send_invoice_email($email_to, $invoice, $items, $sys_info, $this->pdf($id));
         if ($send) {
             return json_encode(['status' => 'success', 'msg' => "Invoice #{$invoice['invoice_no']} sent successfully to {$email_to}."]);
         } else {

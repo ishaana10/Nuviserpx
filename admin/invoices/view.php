@@ -163,6 +163,12 @@ $status_class = [
             <button type="button" id="btn_email_inv" class="btn btn-sm btn-warning">
                 <i class="fa fa-envelope"></i> Email Invoice
             </button>
+            <a href="invoices/invoice_pdf.php?id=<?= (int)$invoice['id'] ?>" target="_blank" rel="noopener" class="btn btn-sm btn-info">
+                <i class="fa fa-file-pdf"></i> View PDF
+            </a>
+            <a href="invoices/invoice_pdf.php?id=<?= (int)$invoice['id'] ?>&download=1" class="btn btn-sm btn-outline-info">
+                <i class="fa fa-download"></i> Download
+            </a>
             <button onclick="window.print()" class="btn btn-sm btn-secondary">
                 <i class="fa fa-print"></i> Print Invoice
             </button>
