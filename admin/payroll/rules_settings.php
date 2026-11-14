@@ -51,6 +51,11 @@ foreach ($versions as $v) { if ($v['effective_from'] <= $today) $in_force = $v['
         </div>
 
         <div class="row">
+            <div class="col-md-3 form-group"><label class="font-weight-bold">Tax year starts in</label>
+                <select class="form-control" id="r-tym">
+                    <?php foreach(range(1,12) as $nv_m): ?><option value="<?php echo $nv_m ?>"><?php echo date('F', mktime(0,0,0,$nv_m,1)) ?></option><?php endforeach; ?>
+                </select>
+                <small class="text-muted">FRCS uses the calendar year (January).</small></div>
             <div class="col-md-3 form-group"><label class="font-weight-bold">Employee pension (%)</label><input type="number" step="0.01" min="0" max="100" class="form-control" id="r-emp"></div>
             <div class="col-md-3 form-group"><label class="font-weight-bold">Employer pension (%)</label><input type="number" step="0.01" min="0" max="100" class="form-control" id="r-empr"></div>
             <div class="col-md-3 form-group"><label class="font-weight-bold">Secondary income rate (%)</label><input type="number" step="0.01" min="0" max="100" class="form-control" id="r-sec"></div>
@@ -124,6 +129,7 @@ foreach ($versions as $v) { if ($v['effective_from'] <= $today) $in_force = $v['
         return $tr;
     }
 
+    $('#r-tym').val(String(rules.tax_year_start_month || 1));
     $('#r-emp').val(pct(rules.pension.employee_rate));
     $('#r-empr').val(pct(rules.pension.employer_rate));
     $('#r-sec').val(pct(rules.secondary_income_rate));
@@ -161,6 +167,7 @@ foreach ($versions as $v) { if ($v['effective_from'] <= $today) $in_force = $v['
     }
     function collect(){
         return {
+            tax_year_start_month: parseInt($('#r-tym').val(), 10) || 1,
             pension: {employee_rate: frac($('#r-emp').val()), employer_rate: frac($('#r-empr').val())},
             secondary_income_rate: frac($('#r-sec').val()),
             redundancy: {exempt_up_to: parseFloat($('#r-red-cap').val()), rate: frac($('#r-red-rate').val())},

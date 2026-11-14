@@ -30,8 +30,7 @@ jobs:
   static-analysis:
     name: PHPStan (level 5, src/)
     runs-on: ubuntu-latest
-    # Advisory while findings are worked down; flip to false to make it blocking.
-    continue-on-error: true
+    # Blocking for NEW findings; existing ones are recorded in phpstan-baseline.neon.
     steps:
       - uses: actions/checkout@v4
       - uses: shivammathur/setup-php@v2

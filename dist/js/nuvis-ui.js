@@ -443,6 +443,25 @@
                 $(this).addClass('nv-row-editable').attr('title', 'Double-click to edit');
             }
         });
+        labelCells(api);
+    }
+
+    // Card mode (phones): tables marked data-nv-cards get each cell's column
+    // heading as a data-label, which the CSS shows beside the value. Labels are
+    // attributes, never HTML. Utility columns (#, Action) stay unlabelled.
+    function labelCells(api) {
+        var $table = $(api.table().node());
+        if (!$table.is('[data-nv-cards]')) { return; }
+        var heads = [];
+        $(api.table().header()).find('th').each(function (i) {
+            heads[i] = isUtilityHeader(this) || isIndexHeader(this) ? '' : $.trim($(this).text());
+        });
+        $(api.rows().nodes()).each(function () {
+            if ($(this).find('td.dataTables_empty').length) { return; }
+            $(this).children('td').each(function (i) {
+                $(this).attr('data-label', heads[i] || '');
+            });
+        });
     }
 
     NV.applyDensity = applyDensity;

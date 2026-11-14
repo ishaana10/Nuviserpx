@@ -528,6 +528,43 @@ table.nv-table.dtr-inline.collapsed > tbody > tr > th.dtr-control::before {
   .content-wrapper .container-fluid { padding-left: .5rem; padding-right: .5rem; }
 }
 
+/* --------------------------------------------------------------------------
+   Card mode: tables marked data-nv-cards become stacked cards on phones.
+   Desktop tables are untouched. Labels come from nuvis-ui.js (data-label).
+   -------------------------------------------------------------------------- */
+@media (max-width: 767.98px) {
+  table.nv-table[data-nv-cards] thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  table.nv-table[data-nv-cards],
+  table.nv-table[data-nv-cards] tbody { display: block; width: 100% !important; }
+  table.nv-table[data-nv-cards] tbody tr:not(.child) {
+    display: block; margin: 0 0 .7rem; padding: .35rem .8rem;
+    background: var(--nv-surface); border: 1px solid var(--nv-border); border-radius: var(--nv-radius); box-shadow: var(--nv-shadow);
+  }
+  table.nv-table[data-nv-cards] tbody td {
+    display: flex; justify-content: space-between; align-items: center; gap: .75rem;
+    width: auto !important; padding: .42rem 0 !important; border: 0 !important; border-bottom: 1px solid var(--nv-border-soft) !important;
+    text-align: right !important;
+  }
+  table.nv-table[data-nv-cards] tbody td:last-child { border-bottom: 0 !important; justify-content: flex-end; }
+  table.nv-table[data-nv-cards] tbody td::before {
+    content: attr(data-label); flex: 0 0 auto; max-width: 45%; text-align: left;
+    font-size: .7rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--nv-muted);
+  }
+  table.nv-table[data-nv-cards] tbody td[data-label=""]::before { content: none; }
+  table.nv-table[data-nv-cards] tbody td.dataTables_empty { display: block; text-align: center !important; }
+  table.nv-table[data-nv-cards] tbody td.dataTables_empty::before { content: none; }
+  table.nv-table[data-nv-cards] colgroup { display: none; }
+}
+
+.content-wrapper .card.card-outline > .card-header::after, .content-wrapper .card.card-outline > .card-header::before { display: none; }
+/* Action bar: card headers on list pages keep the title left and the primary action right;
+   on phones the action fills the row and every control is a comfortable touch target. */
+.nv-card-actions, .content-wrapper .card.card-outline > .card-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .5rem; }
+@media (max-width: 767.98px) {
+  .content-wrapper .card.card-outline > .card-header .card-tools .btn { min-height: 40px; display: inline-flex; align-items: center; justify-content: center; gap: .4rem; }
+  .content-wrapper .card.card-outline > .card-header .card-tools .btn-primary { width: 100%; }
+}
+
 @media print {
   .nv-dt-toolbar, .nv-dt-footer, table.nv-table td:last-child .dropdown-menu { display: none !important; }
 }
