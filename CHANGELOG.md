@@ -23,6 +23,9 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
   4-hour idle lifetime.
 
 ### Added
+- **PHPStan CI now meaningful**: analysis scans `classes/` and a bootstrap
+  defines runtime constants, cutting 784 false positives to 77 recorded in
+  `phpstan-baseline.neon`; the job now fails only on new findings.
 - **Annual gross salary**: employee pay is captured as an annual gross
   figure; fortnightly, weekly and monthly basics derive from it
   automatically at run time (26/52/12 periods) and re-derive when the

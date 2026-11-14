@@ -1,0 +1,163 @@
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Negated boolean expression is always false\.$#'
+			identifier: booleanNot.alwaysFalse
+			count: 44
+			path: src/Database/LegacySchemaCatchup.php
+
+		-
+			message: '#^Offset int\<2, max\> on non\-empty\-string on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 3
+			path: src/Database/MigrationRunner.php
+
+		-
+			message: '#^Offset ''type'' on non\-empty\-array in isset\(\) always exists and is not nullable\.$#'
+			identifier: isset.offset
+			count: 1
+			path: src/Services/AccountService.php
+
+		-
+			message: '#^Offset ''1010''\|''1020''\|''1100''\|''1110''\|''1200''\|''1300''\|''1500''\|''1590''\|''2010''\|''2020''\|''2030''\|''2500''\|''3010''\|''3020''\|''3999''\|''4010''\|''4900''\|''5010''\|''5020''\|''5100''\|''5200''\|''5300''\|''5400''\|''5900''\|''5990'' on array\<string, int\> on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 2
+			path: src/Services/ChartProvisioner.php
+
+		-
+			message: '#^Offset ''1010''\|''1020''\|''1100''\|''1110''\|''1200''\|''1300''\|''1500''\|''1590''\|''2010''\|''2020''\|''2030''\|''2500''\|''3010''\|''3020''\|''3999''\|''4010''\|''4900''\|''5010''\|''5020''\|''5100''\|''5200''\|''5300''\|''5400''\|''5900''\|''5990'' on array\<string, true\> in isset\(\) does not exist\.$#'
+			identifier: isset.offset
+			count: 1
+			path: src/Services/ChartProvisioner.php
+
+		-
+			message: '#^Property App\\Services\\ContractService\:\:\$container is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: src/Services/ContractService.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between float\|int\|string and null will always evaluate to true\.$#'
+			identifier: notIdentical.alwaysTrue
+			count: 2
+			path: src/Services/CreditControlService.php
+
+		-
+			message: '#^Property App\\Services\\CurrencyService\:\:\$container is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: src/Services/CurrencyService.php
+
+		-
+			message: '#^Property App\\Services\\CustomerPortalService\:\:\$container is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: src/Services/CustomerPortalService.php
+
+		-
+			message: '#^Offset ''day_fraction'' on non\-empty\-array\<''day_fraction''\|''employee_id''\|''end_date''\|''leave_type''\|''reason''\|''start_date''\|''status'', mixed\> on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Services/EmployeeService.php
+
+		-
+			message: '#^Property App\\Services\\ExtrafieldService\:\:\$container is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: src/Services/ExtrafieldService.php
+
+		-
+			message: '#^Property App\\Services\\FiscalizationService\:\:\$container is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: src/Services/FiscalizationService.php
+
+		-
+			message: '#^Property App\\Services\\FixedAssetService\:\:\$container is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: src/Services/FixedAssetService.php
+
+		-
+			message: '#^Variable \$hasSettlement might not be defined\.$#'
+			identifier: variable.undefined
+			count: 1
+			path: src/Services/InvoiceService.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between mixed and null will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: src/Services/LeaveBalanceService.php
+
+		-
+			message: '#^Offset int on array\{\} on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Services/LedgerService.php
+
+		-
+			message: '#^Parameter \#1 \$array of function array_values contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 2
+			path: src/Services/LedgerService.php
+
+		-
+			message: '#^Parameter \#1 \$array of function usort contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 2
+			path: src/Services/LedgerService.php
+
+		-
+			message: '#^Parameter \#2 \$callback of function usort contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 2
+			path: src/Services/LedgerService.php
+
+		-
+			message: '#^Parameter \#1 \$array \(list\<int\<1, 365\>\>\) of array_values is already a list, call has no effect\.$#'
+			identifier: arrayValues.list
+			count: 1
+			path: src/Services/PaymentReminderService.php
+
+		-
+			message: '#^Offset ''day_fraction'' on array\{leave_type\: ''unpaid'', start_date\: string, end_date\: string\} in isset\(\) does not exist\.$#'
+			identifier: isset.offset
+			count: 1
+			path: src/Services/PayrollAttendanceService.php
+
+		-
+			message: '#^Offset ''leave_type'' on array\{leave_type\: string, start_date\: string, end_date\: string\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/Services/PayrollAttendanceService.php
+
+		-
+			message: '#^Result of && is always false\.$#'
+			identifier: booleanAnd.alwaysFalse
+			count: 1
+			path: src/Services/PayrollAttendanceService.php
+
+		-
+			message: '#^If condition is always true\.$#'
+			identifier: if.alwaysTrue
+			count: 1
+			path: src/Services/PayrollService.php
+
+		-
+			message: '#^Property App\\Services\\ShiftRosterService\:\:\$container is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: src/Services/ShiftRosterService.php
+
+		-
+			message: '#^PHPDoc tag @param references unknown parameter\: \$payload$#'
+			identifier: parameter.notFound
+			count: 1
+			path: src/Services/WebhookService.php
+
+		-
+			message: '#^Call to an undefined method DOMNameSpaceNode\|DOMNode\:\:getAttribute\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: src/Support/MenuFilter.php
