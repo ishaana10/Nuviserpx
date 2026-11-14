@@ -23,6 +23,12 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
   4-hour idle lifetime.
 
 ### Added
+- **Statement PDFs and "Last emailed"**: Customer Statements can be viewed or downloaded as a PDF,
+  and every emailed statement carries a PDF copy. PDFs are built in memory and streamed or
+  attached, then discarded: they are never stored on the server (a test fails the build if any
+  code writes a PDF to disk). The list shows when each customer was last emailed, and "Email all"
+  warns how many were already emailed in the last 7 days. Emails now support in-memory
+  attachments (5 MB cap). Bundles FPDF 1.9 (`libs/fpdf`, Helvetica only).
 - **Customer Statements report**: Reports > Customer Statements lists every customer with unpaid
   invoices, with a printable per-customer statement (invoices, balances, age). Email a statement to
   one customer (address editable before sending) or to everyone who has an email address, with an

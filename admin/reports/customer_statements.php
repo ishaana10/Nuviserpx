@@ -27,6 +27,18 @@ foreach ($ar['customers'] as $c) {
     }
 }
 $single = $party_id > 0 && count($ar['customers']) === 1 ? $ar['customers'][0] : null;
+$recent = 0; // customers already emailed a statement in the last 7 days
+foreach ($ar['customers'] as $c) {
+    if (!empty($c['last_sent']) && strtotime($c['last_sent']) >= strtotime('-7 days')) {
+        $recent++;
+    }
+}
+$nv_last = function (?string $d): string {
+    return $d ? date('j M Y', strtotime($d)) : 'Never';
+};
+$pdf_url = function (int $pid, bool $download = false) use ($as_of): string {
+    return base_url . 'admin/reports/customer_statement_pdf.php?party_id=' . $pid . '&as_of=' . urlencode($as_of) . ($download ? '&download=1' : '');
+};
 
 nvr_header([
     'page' => 'reports/customer_statements',
@@ -43,6 +55,10 @@ nvr_header([
     <div class="d-print-none mb-3 d-flex flex-wrap" style="gap:.5rem">
         <a class="btn btn-default" href="./?page=reports/customer_statements&as_of=<?= urlencode($as_of) ?>"><i class="fas fa-arrow-left"></i> All customers</a>
         <?php if ($can_email): ?>
+            <a class="btn btn-default" href="<?= htmlspecialchars($pdf_url((int)$c['id'])) ?>" target="_blank" rel="noopener"><i class="fas fa-file-pdf"></i> View PDF</a>
+            <a class="btn btn-default" href="<?= htmlspecialchars($pdf_url((int)$c['id'], true)) ?>"><i class="fas fa-download"></i> Download PDF</a>
+        <?php endif; ?>
+        <?php if ($can_email): ?>
             <button type="button" class="btn btn-primary" id="nvs-email-one" data-party="<?= (int)$c['id'] ?>" data-email="<?= htmlspecialchars((string)$c['email']) ?>" data-name="<?= htmlspecialchars($c['name']) ?>"><i class="fas fa-envelope"></i> Email this statement</button>
         <?php endif; ?>
     </div>
@@ -57,6 +73,7 @@ nvr_header([
             <div class="muted" style="font-size:.75rem;text-transform:uppercase;letter-spacing:.05em">Statement for</div>
             <b><?= htmlspecialchars($c['name']) ?></b> <span class="muted"><?= htmlspecialchars($c['code']) ?></span>
             <div class="muted" style="font-size:.85rem"><?= $c['email'] !== '' ? htmlspecialchars($c['email']) : 'No email on file' ?></div>
+            <div class="muted d-print-none" style="font-size:.8rem">Last emailed: <?= htmlspecialchars($nv_last($c['last_sent'] ?? null)) ?></div>
         </div>
     </div>
     <div class="nvr-scroll">
@@ -93,12 +110,12 @@ nvr_header([
         <div class="d-print-none mb-3" style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:flex-end">
             <div style="flex:1;min-width:220px"><label class="mb-1" style="font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;color:#64748b;font-weight:600">Message to include (optional)</label>
                 <input type="text" id="nvs-note" class="form-control" maxlength="<?= CustomerStatementService::MAX_NOTE ?>" placeholder="e.g. Please settle by the end of the month."></div>
-            <button type="button" class="btn btn-primary" id="nvs-email-all" data-count="<?= count($ar['customers']) - $no_email ?>"><i class="fas fa-paper-plane"></i> Email all (<?= count($ar['customers']) - $no_email ?>)</button>
+            <button type="button" class="btn btn-primary" id="nvs-email-all" data-count="<?= count($ar['customers']) - $no_email ?>" data-recent="<?= (int)$recent ?>"><i class="fas fa-paper-plane"></i> Email all (<?= count($ar['customers']) - $no_email ?>)</button>
         </div>
         <?php endif; ?>
         <div class="nvr-scroll">
         <table class="nvr-table">
-            <thead><tr><th>Customer</th><th>Email</th><th class="num">Unpaid invoices</th><th class="num">Overdue</th><th class="num">Total owed</th><th class="d-print-none"></th></tr></thead>
+            <thead><tr><th>Customer</th><th>Email</th><th class="num">Unpaid invoices</th><th class="num">Overdue</th><th class="num">Total owed</th><th>Last emailed</th><th class="d-print-none"></th></tr></thead>
             <tbody>
             <?php foreach ($ar['customers'] as $c): $od = $c['total'] - $c['current']; $ok = CustomerStatementService::validEmail($c['email']) !== null; ?>
                 <tr class="acct">
@@ -107,20 +124,22 @@ nvr_header([
                     <td class="num"><?= count($c['invoices']) ?></td>
                     <td class="num<?= $od > 0 ? ' neg' : '' ?>"><?= nvr_money($od) ?></td>
                     <td class="num"><b><?= nvr_money($c['total']) ?></b></td>
+                    <td><?php if (!empty($c['last_sent']) && strtotime($c['last_sent']) >= strtotime('-7 days')): ?><span class="nvr-pill" title="Emailed in the last 7 days"><?= htmlspecialchars($nv_last($c['last_sent'])) ?></span><?php else: ?><span class="muted"><?= htmlspecialchars($nv_last($c['last_sent'] ?? null)) ?></span><?php endif; ?></td>
                     <td class="d-print-none" style="white-space:nowrap">
                         <a class="btn btn-sm btn-default" href="./?page=reports/customer_statements&party_id=<?= (int)$c['id'] ?>&as_of=<?= urlencode($as_of) ?>"><i class="fas fa-eye"></i> Statement</a>
+                        <?php if ($can_email): ?><a class="btn btn-sm btn-default" href="<?= htmlspecialchars($pdf_url((int)$c['id'])) ?>" target="_blank" rel="noopener" title="View PDF"><i class="fas fa-file-pdf"></i></a><?php endif; ?>
                         <?php if ($can_email): ?><button type="button" class="btn btn-sm btn-primary nvs-email" data-party="<?= (int)$c['id'] ?>" data-email="<?= htmlspecialchars((string)$c['email']) ?>" data-name="<?= htmlspecialchars($c['name']) ?>"><i class="fas fa-envelope"></i> Email</button><?php endif; ?>
                     </td>
                 </tr>
             <?php endforeach; ?>
             </tbody>
-            <tfoot><tr class="grand"><td colspan="4">Total</td><td class="num"><?= nvr_money($t['total'], false) ?></td><td class="d-print-none"></td></tr></tfoot>
+            <tfoot><tr class="grand"><td colspan="4">Total</td><td class="num"><?= nvr_money($t['total'], false) ?></td><td></td><td class="d-print-none"></td></tr></tfoot>
         </table>
         </div>
     <?php endif; ?>
 <?php endif; ?>
 <?php
-nvr_footer(['Balances are as they stand today for invoices issued on or before the selected date. Each email is recorded in Settings &gt; Company Email &gt; Email log.'], false);
+nvr_footer(['Balances are as they stand today for invoices issued on or before the selected date. Each email, with a PDF copy attached, is recorded in Settings &gt; Company Email &gt; Email log. PDFs are made on the spot and never stored on the server.'], false);
 ?>
 <script>
 $(function(){
@@ -138,8 +157,9 @@ $(function(){
         if (to) { send('email_customer_statement', { party_id: $b.attr('data-party'), as_of: asOf, custom_email: to, note: $('#nvs-note').val() || '' }); }
     });
     $('#nvs-email-all').on('click', function(){
-        var n = $(this).attr('data-count');
-        if (n > 0 && confirm("Email a statement to " + n + " customer(s) who have an email address?")) {
+        var n = $(this).attr('data-count'), r = parseInt($(this).attr('data-recent'), 10) || 0;
+        var warn = r > 0 ? "\n\n" + r + " of them were already emailed a statement in the last 7 days." : "";
+        if (n > 0 && confirm("Email a statement (with PDF) to " + n + " customer(s) who have an email address?" + warn)) {
             send('email_customer_statements_all', { as_of: asOf, note: $('#nvs-note').val() || '' });
         }
     });

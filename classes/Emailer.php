@@ -13,10 +13,12 @@ class Emailer {
     /** Last transport error, for the per-tenant email log. */
     protected static $last_error = '';
 
-    public static function send_email($to, $subject, $body_html, $from_email = null, $from_name = null) {
+    public static function send_email($to, $subject, $body_html, $from_email = null, $from_name = null, $attachments = []) {
         global $_settings, $conn;
 
         if (empty($to)) return false;
+        $attachments = self::clean_attachments($attachments);
+        if ($attachments === false) { self::$last_error = 'attachment too large or invalid'; return false; }
 
         $has = isset($_settings) && method_exists($_settings, 'info');
         $tenant_id = ($has && method_exists($_settings, 'active_tenant_id')) ? (int)$_settings->active_tenant_id() : 0;
@@ -48,14 +50,14 @@ class Emailer {
         $ok = false; $used = 'mail()'; $errors = [];
         foreach ($attempts as $a) {
             self::$last_error = '';
-            if (self::send_smtp($to, $subject, $body_html, $a[1], $a[2], $a[3], $a[4], $a[5], $a[6], $a[7])) {
+            if (self::send_smtp($to, $subject, $body_html, $a[1], $a[2], $a[3], $a[4], $a[5], $a[6], $a[7], $attachments)) {
                 $ok = true; $used = $a[0];
                 break;
             }
             $errors[] = $a[0] . ': ' . (self::$last_error ?: 'send failed');
         }
         if (!$ok && $attempts === []) {
-            $ok = self::send_native($to, $subject, $body_html, $sys_from_email, $sys_from_name);
+            $ok = self::send_native($to, $subject, $body_html, $sys_from_email, $sys_from_name, $attachments);
             if (!$ok) { $errors[] = 'mail(): refused by the local mailer'; }
         }
 
@@ -68,7 +70,7 @@ class Emailer {
     /**
      * Socket SMTP Sender
      */
-    protected static function send_smtp($to, $subject, $body_html, $host, $port, $user, $pass, $encryption, $from_email, $from_name) {
+    protected static function send_smtp($to, $subject, $body_html, $host, $port, $user, $pass, $encryption, $from_email, $from_name, $attachments = []) {
         try {
             $prefix = ($encryption == 'ssl') ? 'ssl://' : '';
             $socket = @fsockopen($prefix . $host, $port, $errno, $errstr, 15);
@@ -109,8 +111,9 @@ class Emailer {
             fputs($socket, "DATA\r\n");
             self::expect($socket, '354', 'DATA');
 
+            [$ctype, $mime_body] = self::mime_body($body_html, $attachments);
             $headers  = "MIME-Version: 1.0\r\n";
-            $headers .= "Content-Type: text/html; charset=UTF-8\r\n";
+            $headers .= $ctype . "\r\n";
             $headers .= "From: {$from_name} <{$from_email}>\r\n";
             $headers .= "To: <{$to}>\r\n";
             $headers .= "Subject: {$subject}\r\n";
@@ -119,7 +122,7 @@ class Emailer {
             $headers .= "Message-ID: <" . bin2hex(random_bytes(16)) . "@" . $from_domain . ">\r\n";
             $headers .= "Reply-To: {$from_email}\r\n";
 
-            $message  = $headers . "\r\n" . $body_html . "\r\n.\r\n";
+            $message  = $headers . "\r\n" . $mime_body . "\r\n.\r\n";
 
             fputs($socket, $message);
             self::expect($socket, '250', 'message delivery');
@@ -155,13 +158,48 @@ class Emailer {
     /**
      * Native mail() Fallback
      */
-    protected static function send_native($to, $subject, $body_html, $from_email, $from_name) {
+    protected static function send_native($to, $subject, $body_html, $from_email, $from_name, $attachments = []) {
+        [$ctype, $mime_body] = self::mime_body($body_html, $attachments);
         $headers  = "MIME-Version: 1.0" . "\r\n";
-        $headers .= "Content-type:text/html;charset=UTF-8" . "\r\n";
+        $headers .= $ctype . "\r\n";
         $headers .= "From: {$from_name} <{$from_email}>" . "\r\n";
         $headers .= "Reply-To: {$from_email}" . "\r\n";
 
-        return @mail($to, $subject, $body_html, $headers);
+        return @mail($to, $subject, $mime_body, $headers);
+    }
+
+    /** Largest total attachment size we will send (bytes). */
+    const MAX_ATTACHMENT_BYTES = 5242880;
+
+    /**
+     * Attachments are [['name' => 'x.pdf', 'mime' => 'application/pdf', 'data' => <bytes>]]. They live only in memory
+     * for the duration of the send: nothing is written to disk. Returns the cleaned list, or false when it is unsafe.
+     */
+    protected static function clean_attachments($attachments) {
+        if (!is_array($attachments) || !$attachments) return [];
+        $out = []; $total = 0;
+        foreach ($attachments as $a) {
+            if (!is_array($a) || !isset($a['data']) || !is_string($a['data']) || $a['data'] === '') return false;
+            $mime = (string)($a['mime'] ?? 'application/octet-stream');
+            if (!preg_match('~^[a-z]+/[a-z0-9.+-]+$~i', $mime)) return false;
+            $name = trim((string)preg_replace('/[^A-Za-z0-9._ -]/', '_', (string)($a['name'] ?? 'attachment')));
+            $total += strlen($a['data']);
+            if ($total > self::MAX_ATTACHMENT_BYTES) return false;
+            $out[] = ['name' => $name !== '' ? $name : 'attachment', 'mime' => $mime, 'data' => $a['data']];
+        }
+        return $out;
+    }
+
+    /** [Content-Type header, body]: plain HTML, or multipart/mixed with base64 attachments. */
+    protected static function mime_body($body_html, array $attachments) {
+        if (!$attachments) return ['Content-Type: text/html; charset=UTF-8', $body_html];
+        $b = '=_nv_' . bin2hex(random_bytes(12));
+        $body = "--{$b}\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n" . $body_html . "\r\n";
+        foreach ($attachments as $a) {
+            $body .= "--{$b}\r\nContent-Type: {$a['mime']}; name=\"{$a['name']}\"\r\nContent-Transfer-Encoding: base64\r\n"
+                . "Content-Disposition: attachment; filename=\"{$a['name']}\"\r\n\r\n" . chunk_split(base64_encode($a['data']), 76, "\r\n");
+        }
+        return ["Content-Type: multipart/mixed; boundary=\"{$b}\"", $body . "--{$b}--"];
     }
 
     /**
@@ -303,7 +341,7 @@ class Emailer {
      * Statement of all unpaid invoices for one customer. $customer is a row from
      * LedgerService::agedReceivables (name, invoices[], aging buckets, total). Everything is HTML-escaped.
      */
-    public static function send_customer_statement_email($to, $customer, $asOf, $sys_info = [], $note = '') {
+    public static function send_customer_statement_email($to, $customer, $asOf, $sys_info = [], $note = '', $pdf = null) {
         $company = (string)($sys_info['name'] ?? 'Nuvis ERPX');
         $cur = htmlspecialchars((string)($sys_info['currency'] ?? ''));
         $h = function ($v) { return htmlspecialchars((string)$v); };
@@ -331,10 +369,11 @@ class Emailer {
         <tfoot><tr><td colspan='4' style='text-align:right'><b>Total outstanding</b></td><td style='text-align:right'><b>" . $cur . number_format((float)$customer['total'], 2) . "</b></td></tr></tfoot></table>
         " . ($aging !== '' ? "<p style='margin-bottom:0'><b>By age</b></p><table><tbody>{$aging}</tbody></table>" : '') . "
         {$noteHtml}
-        <p>If you have already paid, please disregard this statement. Otherwise please arrange payment{$contact}.</p>";
+        <p>If you have already paid, please disregard this statement. Otherwise please arrange payment{$contact}.</p>"
+            . (is_array($pdf) ? "<p style='color:#64748b;font-size:13px'>A PDF copy of this statement is attached.</p>" : '');
         $subject = \App\Services\CustomerStatementService::subject($company, (string)$asOf);
         $html = self::wrap_template("Statement of unpaid invoices", $body, $h($company));
-        return self::send_email($to, $subject, $html);
+        return self::send_email($to, $subject, $html, null, null, is_array($pdf) ? [['name' => $pdf['name'], 'mime' => 'application/pdf', 'data' => $pdf['data']]] : []);
     }
 
     public static function send_payment_receipt_email($to, $payment, $allocations, $sys_info = []) {
