@@ -23,6 +23,10 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
   4-hour idle lifetime.
 
 ### Added
+- **Quick jump (UX polish, slice 2)**: a search icon in the top bar (and Ctrl/Cmd+K) opens an
+  overlay that jumps to any menu page or "Create new" action. It reads the already
+  permission-filtered menu, so it never lists a page the user cannot open; works on phones
+  without opening the side drawer.
 - **PHPStan CI now meaningful**: analysis scans `classes/` and a bootstrap
   defines runtime constants, cutting 784 false positives to 77 recorded in
   `phpstan-baseline.neon`; the job now fails only on new findings.
@@ -49,6 +53,10 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
 ## 2026-11-13
 
 ### Added
+- **Quick jump (UX polish, slice 2)**: a search icon in the top bar (and Ctrl/Cmd+K) opens an
+  overlay that jumps to any menu page or "Create new" action. It reads the already
+  permission-filtered menu, so it never lists a page the user cannot open; works on phones
+  without opening the side drawer.
 - **Phone-friendly lists (UX polish, slice 1)**: tables marked `data-nv-cards` turn into
   stacked, labelled cards below 768px (desktop unchanged); list-page action buttons are
   full-width touch targets on phones. Piloted on the Invoices list. See

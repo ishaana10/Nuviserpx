@@ -18,6 +18,9 @@
           <li class="nav-item">
             <a class="nav-link" data-widget="pushmenu" href="#" role="button"><i class="fas fa-bars"></i></a>
           </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#" id="nvPaletteBtn" role="button" aria-label="Quick jump (Ctrl+K)" title="Quick jump (Ctrl+K)"><i class="fas fa-search"></i></a>
+          </li>
 
 <?php ob_start(); ?>
           <!-- Quick "Create New" (+) Dropdown Menu (Inspired by Xero / Nuvis ERP) -->
