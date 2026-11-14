@@ -145,7 +145,9 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
                                 </tr>
                                 <?php foreach (($pay_components ?? []) as $pc): if ($pc['type'] !== 'earning') continue; ?>
                                 <tr>
-                                    <td><?php echo htmlspecialchars($pc['name']) ?><?php echo empty($pc['is_taxable']) ? ' <span class="badge badge-light border">non-taxable</span>' : '' ?></td>
+                                    <td><?php echo htmlspecialchars($pc['name']) ?><?php echo empty($pc['is_taxable']) ? ' <span class="badge badge-light border">non-taxable</span>' : '' ?>
+                                        <?php if(!empty($pc['description'])): ?><br><small class="text-muted"><?php echo htmlspecialchars($pc['description']) ?></small><?php endif; ?>
+                                    </td>
                                     <td class="text-right"><?php echo number_format($pc['amount'], 2) ?></td>
                                 </tr>
                                 <?php endforeach; ?>
@@ -210,7 +212,9 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
                                 <?php endif; ?>
                                 <?php foreach (($pay_components ?? []) as $pc): if ($pc['type'] !== 'deduction') continue; ?>
                                 <tr>
-                                    <td><?php echo htmlspecialchars($pc['name']) ?></td>
+                                    <td><?php echo htmlspecialchars($pc['name']) ?>
+                                        <?php if(!empty($pc['description'])): ?><br><small class="text-muted"><?php echo htmlspecialchars($pc['description']) ?></small><?php endif; ?>
+                                    </td>
                                     <td class="text-right text-danger"><?php echo number_format($pc['amount'], 2) ?></td>
                                 </tr>
                                 <?php endforeach; ?>

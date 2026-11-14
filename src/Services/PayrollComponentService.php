@@ -43,6 +43,7 @@ class PayrollComponentService
                 'type' => ($r['type'] ?? 'earning') === 'deduction' ? 'deduction' : 'earning',
                 'is_taxable' => (int)!empty($r['is_taxable']),
                 'is_fnpf_subject' => (int)!empty($r['is_fnpf_subject']),
+                'description' => trim((string)($r['description'] ?? '')),
                 'amount' => $amt,
             ];
         }
@@ -53,7 +54,8 @@ class PayrollComponentService
     public function assignedFor(int $employeeId, string $asAt): array
     {
         $t = (int)$this->settings->active_tenant_id();
-        $q = $this->conn->prepare("SELECT a.component_id, a.amount, c.code, c.name, c.type, c.is_taxable, c.is_fnpf_subject, c.default_amount
+        $q = $this->conn->prepare("SELECT a.component_id, a.amount, c.code, c.name, c.type, c.is_taxable, c.is_fnpf_subject, c.default_amount,
+                TRIM(CONCAT_WS(' - ', NULLIF(c.description, ''), NULLIF(a.note, ''))) AS description
             FROM employee_salary_components a
             JOIN salary_components c ON c.id = a.component_id AND c.tenant_id = a.tenant_id AND c.status = 1
             WHERE a.tenant_id = ? AND a.employee_id = ? AND (a.start_date IS NULL OR a.start_date <= ?) AND (a.end_date IS NULL OR a.end_date >= ?)
@@ -69,7 +71,7 @@ class PayrollComponentService
     /** The lines stored with a payroll. */
     public function forPayroll(int $payrollId): array
     {
-        $q = $this->conn->prepare("SELECT i.component_id, i.loan_id, i.amount, i.code, i.name, i.type, i.is_taxable, i.is_fnpf_subject
+        $q = $this->conn->prepare("SELECT i.component_id, i.loan_id, i.amount, i.code, i.name, i.type, i.is_taxable, i.is_fnpf_subject, i.description
             FROM payroll_component_items i JOIN payroll_list p ON p.id = i.payroll_id AND p.tenant_id = ? WHERE i.payroll_id = ? ORDER BY i.id");
         if (!$q) {
             return [];
@@ -86,11 +88,11 @@ class PayrollComponentService
         $d = $this->conn->prepare("DELETE FROM payroll_component_items WHERE payroll_id = ?");
         $d->bind_param('i', $payrollId);
         $d->execute();
-        $i = $this->conn->prepare("INSERT INTO payroll_component_items (payroll_id, component_id, loan_id, code, name, type, is_taxable, is_fnpf_subject, amount) VALUES (?,?,?,?,?,?,?,?,?)");
+        $i = $this->conn->prepare("INSERT INTO payroll_component_items (payroll_id, component_id, loan_id, code, name, type, is_taxable, is_fnpf_subject, amount, description) VALUES (?,?,?,?,?,?,?,?,?,?)");
         foreach ($lines as $l) {
             $cid = (int)$l['component_id']; $loanId = (int)($l['loan_id'] ?? 0) ?: null; $code = (string)$l['code']; $name = (string)$l['name']; $type = (string)$l['type'];
-            $tax = (int)$l['is_taxable']; $fn = (int)$l['is_fnpf_subject']; $amt = (string)$l['amount'];
-            $i->bind_param('iiisssiis', $payrollId, $cid, $loanId, $code, $name, $type, $tax, $fn, $amt);
+            $tax = (int)$l['is_taxable']; $fn = (int)$l['is_fnpf_subject']; $amt = (string)$l['amount']; $desc = (string)($l['description'] ?? '');
+            $i->bind_param('iiisssiiss', $payrollId, $cid, $loanId, $code, $name, $type, $tax, $fn, $amt, $desc);
             if (!$i->execute()) {
                 throw new \RuntimeException('Salary component lines could not be saved.');
             }
@@ -101,7 +103,7 @@ class PayrollComponentService
     public function assignments(): array
     {
         $t = (int)$this->settings->active_tenant_id();
-        $q = $this->conn->prepare("SELECT a.id, a.amount, a.start_date, a.end_date, c.code, c.name comp_name, c.type, c.default_amount,
+        $q = $this->conn->prepare("SELECT a.id, a.employee_id, a.amount, a.start_date, a.end_date, a.note, c.code, c.name comp_name, c.type, c.default_amount, c.description,
                 CONCAT(e.firstname, ' ', e.lastname) emp_name, e.employee_code
             FROM employee_salary_components a
             JOIN salary_components c ON c.id = a.component_id AND c.tenant_id = a.tenant_id
@@ -143,8 +145,9 @@ class PayrollComponentService
         $s = $start === '' ? null : $start;
         $e = $end === '' ? null : $end;
         $amt = $amount === null ? null : (string)$amount;
-        $i = $this->conn->prepare("INSERT INTO employee_salary_components (tenant_id, employee_id, component_id, amount, start_date, end_date) VALUES (?,?,?,?,?,?)");
-        $i->bind_param('iiisss', $t, $emp, $comp, $amt, $s, $e);
+        $note = mb_substr(trim((string)($post['note'] ?? '')), 0, 255);
+        $i = $this->conn->prepare("INSERT INTO employee_salary_components (tenant_id, employee_id, component_id, amount, start_date, end_date, note) VALUES (?,?,?,?,?,?,?)");
+        $i->bind_param('iiissss', $t, $emp, $comp, $amt, $s, $e, $note);
         if (!$i->execute()) {
             return $this->fail('The component could not be assigned.');
         }

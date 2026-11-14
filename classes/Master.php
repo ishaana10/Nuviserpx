@@ -488,6 +488,7 @@ class Master extends DBConnection
         $is_taxable = $_POST['is_taxable'] ?? null;
         $is_fnpf_subject = $_POST['is_fnpf_subject'] ?? null;
         $default_amount = $_POST['default_amount'] ?? null;
+        $description = trim((string)($_POST['description'] ?? ''));
 
         if (empty($code) || empty($name)) {
             return json_encode(['status' => 'failed', 'msg' => 'Component Code and Name are required.']);
@@ -499,10 +500,11 @@ class Master extends DBConnection
         $c_tax = isset($is_taxable) ? 1 : 0;
         $c_fnpf = isset($is_fnpf_subject) ? 1 : 0;
         $c_amt = floatval($default_amount ?? 0);
+        $c_desc = $this->conn->real_escape_string(mb_substr($description, 0, 255));
 
         $save = $this->conn->query("
-            INSERT INTO `salary_components` (`tenant_id`, `code`, `name`, `type`, `is_taxable`, `is_fnpf_subject`, `default_amount`, `status`)
-            VALUES ('{$tenant_id}', '{$c_code}', '{$c_name}', '{$c_type}', '{$c_tax}', '{$c_fnpf}', '{$c_amt}', 1)
+            INSERT INTO `salary_components` (`tenant_id`, `code`, `name`, `type`, `is_taxable`, `is_fnpf_subject`, `default_amount`, `description`, `status`)
+            VALUES ('{$tenant_id}', '{$c_code}', '{$c_name}', '{$c_type}', '{$c_tax}', '{$c_fnpf}', '{$c_amt}', '{$c_desc}', 1)
         ");
 
         if ($save) {
