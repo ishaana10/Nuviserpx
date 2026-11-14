@@ -370,6 +370,16 @@ class PayrollEngine {
         $gYtdPrior = floatval($input['g_ytd_prior'] ?? 0);
         $tYtdPrior = floatval($input['t_ytd_prior'] ?? 0);
 
+        // No year-to-date history (no earlier pays recorded, no opening
+        // balances): projecting from history would spread the pay over only
+        // the remaining periods and under-withhold - a November start on a
+        // taxable salary would see no PAYE at all. The FRCS period tables
+        // annualise the period's pay (W x periods per year), which is the
+        // same as treating this as period 1.
+        if ($gYtdPrior <= 0 && $tYtdPrior <= 0) {
+            $n = 1;
+        }
+
         $W_n = floatval($input['regular_pay'] ?? 0);
         $O_n = floatval($input['overtime_pay'] ?? 0);
         $L_n = floatval($input['lump_sum_pay'] ?? 0);

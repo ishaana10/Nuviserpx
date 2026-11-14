@@ -121,9 +121,10 @@ for ($n = 1; $n <= 12; $n++) {
 check('steady salary: same tax every month with year-to-date inputs', $same);
 $annual = PayrollEngine::tax_lookup($monthly * 12, true);
 check('steady salary: year total equals annual tax', abs($prevT - $annual) < 0.2);
-// Without prior pay, a mid-year run under-withholds; with it, the catch-up appears.
+// Without any YTD history, a mid-year run annualises the period's pay
+// (FRCS period tables) instead of projecting only the remaining periods.
 $noPrior = PayrollEngine::calculate(['basic_salary' => $monthly, 'pay_period_n' => 7])['income_tax'];
-check('mid-year without prior pay differs from steady tax', abs($noPrior - $tax1) > 0.5);
+check('mid-year with no history withholds the annualised (steady) tax', abs($noPrior - $tax1) < 0.02);
 check('rule: tax year start month validated', count(PayrollEngine::validate_rules(['tax_year_start_month' => 13] + PayrollEngine::default_rules())) === 1);
 
 echo $fail ? "\n$fail FAILED\n" : "\nAll payroll engine tests passed\n";
