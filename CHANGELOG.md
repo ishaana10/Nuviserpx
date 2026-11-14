@@ -23,6 +23,10 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
   4-hour idle lifetime.
 
 ### Added
+- **Quick jump (UX polish, slice 2)**: a search icon in the top bar (and Ctrl/Cmd+K) opens an
+  overlay that jumps to any menu page or "Create new" action. It reads the already
+  permission-filtered menu, so it never lists a page the user cannot open; works on phones
+  without opening the side drawer.
 - **Annual gross salary**: employee pay is captured as an annual gross
   figure; fortnightly, weekly and monthly basics derive from it
   automatically at run time (26/52/12 periods) and re-derive when the
@@ -46,6 +50,10 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
 ## 2026-11-13
 
 ### Added
+- **Quick jump (UX polish, slice 2)**: a search icon in the top bar (and Ctrl/Cmd+K) opens an
+  overlay that jumps to any menu page or "Create new" action. It reads the already
+  permission-filtered menu, so it never lists a page the user cannot open; works on phones
+  without opening the side drawer.
 - **Module system**: full dependency graph between tenant modules, wired per
   company; activation pulls requirements in, deactivation switches dependents
   off, and switches now apply to every user tier. Read-only "Modules &

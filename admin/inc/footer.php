@@ -73,6 +73,7 @@
     </script>
     <!-- Nuvis UI layer: table toolbar, form validation, modal behaviour -->
     <script src="<?php echo base_url ?>dist/js/nuvis-ui.js?v=<?php echo class_exists('AppVersion') ? urlencode(AppVersion::get('commit')) : '1.0' ?>"></script>
+    <script src="<?php echo base_url ?>dist/js/nuvis-palette.js?v=<?php echo class_exists('AppVersion') ? urlencode(AppVersion::get('commit')) : '1.0' ?>"></script>
     <script src="<?php echo base_url ?>plugins/moment/moment.min.js"></script>
     <script src="<?php echo base_url ?>plugins/fullcalendar/main.js"></script>
     <!-- overlayScrollbars -->

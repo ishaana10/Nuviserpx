@@ -594,3 +594,20 @@ table.nv-table .badge.badge-primary { background: var(--nv-primary-soft) !import
 table.nv-table .badge.badge-secondary { background: #f1f5f9 !important; color: #475569 !important; }
 table.nv-table .badge.badge-dark { background: #e2e8f0 !important; color: #1e293b !important; }
 table.nv-table .badge.badge-light { background: #f8fafc !important; color: #475569 !important; border: 1px solid var(--nv-border); }
+
+/* --------------------------------------------------------------------------
+   Quick jump overlay (dist/js/nuvis-palette.js): top-bar search icon / Ctrl+K
+   -------------------------------------------------------------------------- */
+.nv-palette { position: fixed; inset: 0; z-index: 2000; background: rgba(15, 23, 42, .45); display: flex; justify-content: center; align-items: flex-start; padding: 8vh .75rem 0; }
+.nv-palette[hidden] { display: none; }
+.nv-palette-box { width: 100%; max-width: 560px; background: var(--nv-surface); color: var(--nv-text); border: 1px solid var(--nv-border); border-radius: 14px; box-shadow: var(--nv-shadow-lg); overflow: hidden; }
+.nv-palette-field { display: flex; align-items: center; gap: .6rem; padding: .35rem 1rem; border-bottom: 1px solid var(--nv-border); color: var(--nv-muted); }
+.nv-palette-field input { flex: 1; border: 0; outline: 0; background: transparent; color: var(--nv-text); font-size: 1rem; min-height: 44px; }
+.nv-palette-list { list-style: none; margin: 0; padding: .35rem; max-height: min(52vh, 420px); overflow-y: auto; }
+.nv-palette-item { display: flex; justify-content: space-between; align-items: center; gap: .75rem; padding: .6rem .75rem; border-radius: 8px; cursor: pointer; min-height: 44px; }
+.nv-palette-item.is-active, .nv-palette-item:hover { background: var(--nv-primary-soft); }
+.nv-palette-title { font-weight: 600; }
+.nv-palette-group { font-size: .72rem; color: var(--nv-muted); text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; }
+.nv-palette-empty { padding: 1rem; text-align: center; color: var(--nv-muted); }
+.nv-palette-hint { display: flex; gap: 1rem; justify-content: center; padding: .5rem; border-top: 1px solid var(--nv-border); font-size: .72rem; color: var(--nv-muted); }
+@media (max-width: 767.98px) { .nv-palette-hint { display: none; } .nv-palette { padding-top: 3.5rem; } }
