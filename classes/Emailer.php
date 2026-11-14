@@ -299,6 +299,44 @@ class Emailer {
     /**
      * Send Payment Receipt Email to Customer
      */
+    /**
+     * Statement of all unpaid invoices for one customer. $customer is a row from
+     * LedgerService::agedReceivables (name, invoices[], aging buckets, total). Everything is HTML-escaped.
+     */
+    public static function send_customer_statement_email($to, $customer, $asOf, $sys_info = [], $note = '') {
+        $company = (string)($sys_info['name'] ?? 'Nuvis ERPX');
+        $cur = htmlspecialchars((string)($sys_info['currency'] ?? ''));
+        $h = function ($v) { return htmlspecialchars((string)$v); };
+        $rows = '';
+        foreach ($customer['invoices'] as $i) {
+            $late = ($i['due_date'] ?? null) && $i['bucket'] !== 'current';
+            $rows .= "<tr><td>#" . $h($i['invoice_no']) . "</td><td>" . date('d M Y', strtotime((string)$i['invoice_date'])) . "</td><td>"
+                . (!empty($i['due_date']) ? date('d M Y', strtotime((string)$i['due_date'])) : '-') . "</td><td style='text-align:right'>"
+                . $cur . number_format((float)$i['total'], 2) . "</td><td style='text-align:right" . ($late ? ";color:#dc2626" : "") . "'><b>"
+                . $cur . number_format((float)$i['balance'], 2) . "</b></td></tr>";
+        }
+        $aging = '';
+        foreach (\App\Services\LedgerService::AGING_BUCKETS as $k => $label) {
+            if (($customer[$k] ?? 0) > 0) {
+                $aging .= "<tr><td>" . $h($label) . "</td><td style='text-align:right'>" . $cur . number_format((float)$customer[$k], 2) . "</td></tr>";
+            }
+        }
+        $noteHtml = trim((string)$note) !== '' ? "<p>" . nl2br($h($note)) . "</p>" : '';
+        $contact = trim((string)($sys_info['email'] ?? '')) !== '' ? " or contact us at " . $h($sys_info['email']) . (trim((string)($sys_info['phone'] ?? '')) !== '' ? " / " . $h($sys_info['phone']) : '') : '';
+        $body = "
+        <h3>Dear " . $h($customer['name']) . ",</h3>
+        <p>Here is a statement of the invoices on your account that are still unpaid as at <b>" . date('d M Y', strtotime((string)$asOf)) . "</b>.</p>
+        <table><thead><tr><th>Invoice</th><th>Date</th><th>Due</th><th style='text-align:right'>Invoice total</th><th style='text-align:right'>Balance due</th></tr></thead>
+        <tbody>{$rows}</tbody>
+        <tfoot><tr><td colspan='4' style='text-align:right'><b>Total outstanding</b></td><td style='text-align:right'><b>" . $cur . number_format((float)$customer['total'], 2) . "</b></td></tr></tfoot></table>
+        " . ($aging !== '' ? "<p style='margin-bottom:0'><b>By age</b></p><table><tbody>{$aging}</tbody></table>" : '') . "
+        {$noteHtml}
+        <p>If you have already paid, please disregard this statement. Otherwise please arrange payment{$contact}.</p>";
+        $subject = \App\Services\CustomerStatementService::subject($company, (string)$asOf);
+        $html = self::wrap_template("Statement of unpaid invoices", $body, $h($company));
+        return self::send_email($to, $subject, $html);
+    }
+
     public static function send_payment_receipt_email($to, $payment, $allocations, $sys_info = []) {
         $company_name = $sys_info['name'] ?? 'Nuvis ERPX';
         $subject = "Payment Receipt #" . $payment['payment_no'] . " from " . $company_name;

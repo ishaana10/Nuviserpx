@@ -126,6 +126,7 @@ class HelpContent
                     'Cash Flow and Equity Changes - where money and ownership moved.',
                     'General Ledger - every posting, account by account.',
                     'AR / AP Aging - who owes you and whom you owe, by how long overdue.',
+                    'Customer Statements - each customer\'s unpaid invoices as a printable statement; email one customer, or everyone with an email address, with an optional message.',
                     'Budget vs Actual, Inventory Valuation, Reorder and Payroll Accounting cover their own areas.',
                 ], 'tips' => ['If a figure looks wrong, drill into the General Ledger for the account - every line links back to its source document.']],
             ],

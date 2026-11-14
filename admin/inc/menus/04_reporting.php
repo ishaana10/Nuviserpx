@@ -64,6 +64,12 @@
                                         </a>
                                     </li>
                                     <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=reports/customer_statements" class="nav-link nav-reports_customer_statements tree-item">
+                                            <i class="nav-icon fas fa-file-invoice-dollar"></i>
+                                            <p>Customer Statements</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=reports/ap_aging" class="nav-link nav-reports_ap_aging tree-item">
                                             <i class="nav-icon fas fa-hourglass-half"></i>
                                             <p>AP Aging</p>
