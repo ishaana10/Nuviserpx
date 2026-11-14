@@ -30,7 +30,7 @@ if ($_settings->chk_flashdata('success')):
 			</div>
 		<?php else: ?>
 		<div class="container-fluid">
-			<table class="table table-hover table-striped table-bordered" id="list">
+			<table class="table table-hover table-striped table-bordered" id="list" data-nv-cards>
 				<thead>
 					<tr>
 						<th>#</th>
