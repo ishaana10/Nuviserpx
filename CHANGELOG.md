@@ -49,6 +49,10 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
 ## 2026-11-13
 
 ### Added
+- **Phone-friendly lists (UX polish, slice 1)**: tables marked `data-nv-cards` turn into
+  stacked, labelled cards below 768px (desktop unchanged); list-page action buttons are
+  full-width touch targets on phones. Piloted on the Invoices list. See
+  `docs/superpowers/specs/2026-11-14-ux-polish-design.md`.
 - **Module system**: full dependency graph between tenant modules, wired per
   company; activation pulls requirements in, deactivation switches dependents
   off, and switches now apply to every user tier. Read-only "Modules &
