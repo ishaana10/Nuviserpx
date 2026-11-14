@@ -23,6 +23,9 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
   4-hour idle lifetime.
 
 ### Added
+- **Invoice form save bar (UX polish, slice 5)**: on phones the Save / Back bar stays pinned
+  to the bottom of the screen while the long invoice form scrolls. (The employee and payroll
+  forms are modals whose Save button is already pinned, so they are unchanged.)
 - **More phone-friendly lists (UX polish, slice 4)**: Sales Orders, Parties, Products,
   Employees and Payroll lists now use the stacked-card layout below 768px.
 - **Invoices list (UX polish, slice 3)**: friendly empty state with a Create button, invoice
@@ -58,25 +61,11 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
   per-tenant email log records every send - recipient, transport, sent or
   failed with the exact server error - with a Send Test Email button.
 - Continuous integration (GitHub Actions): repo-wide `php -l`, the full test
-  suite under a PHPUnit bridge, and PHPStan level 5 on `src/` (advisory).
+  suite under a PHPUnit bridge, and PHPStan level 5 on `src/` (blocking for new findings; existing ones are baselined).
 
 ## 2026-11-13
 
 ### Added
-- **More phone-friendly lists (UX polish, slice 4)**: Sales Orders, Parties, Products,
-  Employees and Payroll lists now use the stacked-card layout below 768px.
-- **Invoices list (UX polish, slice 3)**: friendly empty state with a Create button, invoice
-  numbers link to the invoice, and unpaid/partially paid invoices past their due date show
-  "N days overdue" under the due date. (The Dashboard already had phone-tuned controls, so
-  it is unchanged.)
-- **Quick jump (UX polish, slice 2)**: a search icon in the top bar (and Ctrl/Cmd+K) opens an
-  overlay that jumps to any menu page or "Create new" action. It reads the already
-  permission-filtered menu, so it never lists a page the user cannot open; works on phones
-  without opening the side drawer.
-- **Phone-friendly lists (UX polish, slice 1)**: tables marked `data-nv-cards` turn into
-  stacked, labelled cards below 768px (desktop unchanged); list-page action buttons are
-  full-width touch targets on phones. Piloted on the Invoices list. See
-  `docs/superpowers/specs/2026-11-14-ux-polish-design.md`.
 - **Module system**: full dependency graph between tenant modules, wired per
   company; activation pulls requirements in, deactivation switches dependents
   off, and switches now apply to every user tier. Read-only "Modules &

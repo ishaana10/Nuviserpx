@@ -365,9 +365,9 @@ while($ac = $accounts_qry->fetch_assoc()){
             </div>
 
             <!-- Footer Save Actions Bar -->
-            <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
-                <a href="./?page=invoices" class="btn btn-sm btn-outline-secondary font-weight-bold px-4">
-                    <i class="fas fa-arrow-left mr-1"></i> Back to Invoices List
+            <div class="nv-save-bar">
+                <a href="./?page=invoices" class="btn btn-sm btn-outline-secondary font-weight-bold px-4 nv-bar-back" aria-label="Back to Invoices List">
+                    <i class="fas fa-arrow-left mr-1"></i> <span class="nv-bar-label">Back to Invoices List</span>
                 </a>
                 <button type="submit" class="btn btn-primary bg-gradient-primary font-weight-bold px-4 shadow-sm">
                     <i class="fas fa-save mr-1"></i> Save Invoice
