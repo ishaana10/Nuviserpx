@@ -45,7 +45,7 @@ $prod_where = ($product_filter != 'all' && $product_filter > 0) ? " AND l.produc
 		</div>
 
 		<div class="container-fluid">
-			<table class="table table-hover table-striped table-bordered" id="list">
+			<table class="table table-hover table-striped table-bordered" id="list" data-nv-cards>
 				<colgroup>
 					<col width="5%">
 					<col width="12%">

@@ -16,7 +16,7 @@ $tenant_id = $_settings->active_tenant_id();
 	</div>
 	<div class="card-body">
 		<p class="text-muted small mb-3">Webhooks push a signed JSON payload to an external URL whenever a subscribed event occurs. Deliveries are queued and retried automatically. Verify the <code>X-ERPX-Signature</code> header (HMAC-SHA256 of the raw body using the secret token) on your receiving endpoint.</p>
-		<table class="table table-hover table-striped table-bordered" id="list">
+		<table class="table table-hover table-striped table-bordered" id="list" data-nv-cards>
 			<thead>
 				<tr>
 					<th>#</th>

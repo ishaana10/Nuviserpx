@@ -23,6 +23,10 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
   4-hour idle lifetime.
 
 ### Added
+- **Phone-friendly lists, the rest (UX polish, slice 6)**: Payments, Purchase Orders, Vendor Bills,
+  Bank Reconciliation, Attendance, Leaves, Stock Adjustments, Roles, Tenants, API Keys and Webhooks
+  lists use the stacked-card layout below 768px. (Workflows is left as-is: its "Actions" count
+  column would be mistaken for the row-action menu.)
 - **Invoice form save bar (UX polish, slice 5)**: on phones the Save / Back bar stays pinned
   to the bottom of the screen while the long invoice form scrolls. (The employee and payroll
   forms are modals whose Save button is already pinned, so they are unchanged.)
