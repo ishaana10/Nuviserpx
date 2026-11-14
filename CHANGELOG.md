@@ -23,6 +23,8 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
   4-hour idle lifetime.
 
 ### Added
+- **More phone-friendly lists (UX polish, slice 4)**: Sales Orders, Parties, Products,
+  Employees and Payroll lists now use the stacked-card layout below 768px.
 - **Invoices list (UX polish, slice 3)**: friendly empty state with a Create button, invoice
   numbers link to the invoice, and unpaid/partially paid invoices past their due date show
   "N days overdue" under the due date. (The Dashboard already had phone-tuned controls, so
@@ -54,6 +56,8 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
 ## 2026-11-13
 
 ### Added
+- **More phone-friendly lists (UX polish, slice 4)**: Sales Orders, Parties, Products,
+  Employees and Payroll lists now use the stacked-card layout below 768px.
 - **Invoices list (UX polish, slice 3)**: friendly empty state with a Create button, invoice
   numbers link to the invoice, and unpaid/partially paid invoices past their due date show
   "N days overdue" under the due date. (The Dashboard already had phone-tuned controls, so
