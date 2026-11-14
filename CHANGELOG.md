@@ -5,6 +5,10 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
 
 ## [Unreleased] - 2026-11-14
 
+### Fixed
+- Dashboard on phones: the header (date range, Customize, New invoice) and dashboard tabs no longer stretch the page
+  wider than the screen, so the greeting no longer runs under the profile picture and nothing is cut off at the right.
+
 ### Security
 - Tenant isolation: the payments API verifies an invoice belongs to the API
   key's company before allocating against it; by-id API follow-up queries
