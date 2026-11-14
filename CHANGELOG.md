@@ -23,6 +23,13 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
   4-hour idle lifetime.
 
 ### Added
+- **Annual gross salary**: employee pay is captured as an annual gross
+  figure; fortnightly, weekly and monthly basics derive from it
+  automatically at run time (26/52/12 periods) and re-derive when the
+  run's frequency changes. Existing monthly figures migrated (x12).
+- **Fiji-standard payslip**: named FNPF/P.A.Y.E./SRT deductions with tax
+  code, year-to-date balances, FNPF superannuation (employee + employer),
+  leave balances, employer levies by name, net pay in words, company logo.
 - **Per-tenant branding**: each company sets its own name, contact details
   and logo (Settings > Company Profile), carried on its invoices, receipts,
   payslips and customer emails. The platform's own branding (System

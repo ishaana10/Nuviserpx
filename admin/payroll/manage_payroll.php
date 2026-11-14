@@ -107,7 +107,8 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
 								<small class="text-muted">TIN: <?php echo !empty($emp['tin']) ? $emp['tin'] : 'N/A' ?> | Bank: <?php echo strtoupper($emp['bank_code']) ?></small>
 							</td>
 							<td>
-								<input type="number" step="any" name="emp_basic[<?php echo $eid ?>]" class="form-control form-control-sm text-right rounded-0" value="<?php echo $emp['salary'] ?>">
+								<?php $nv_annual = (float)($emp['annual_salary'] ?? 0) > 0 ? (float)$emp['annual_salary'] : (float)$emp['salary'] * 12; ?>
+								<input type="number" step="any" name="emp_basic[<?php echo $eid ?>]" class="form-control form-control-sm text-right rounded-0 emp-basic" data-annual="<?php echo $nv_annual ?>" value="<?php echo number_format($nv_annual / 12, 2, '.', '') ?>">
 							</td>
 							<td>
 								<input type="number" step="any" name="emp_overtime[<?php echo $eid ?>]" class="form-control form-control-sm text-right rounded-0" value="0">
@@ -153,7 +154,7 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
 					while($row = $emp_qry->fetch_assoc()):
 					?>
 					<option value="<?php echo $row['id'] ?>"
-						data-salary="<?php echo $row['salary'] ?>"
+						data-annual="<?php echo (float)($row['annual_salary'] ?? 0) > 0 ? (float)$row['annual_salary'] : (float)$row['salary'] * 12 ?>"
 						data-resident="<?php echo $row['is_resident'] ?>"
 						data-tin="<?php echo $row['tin'] ?>"
 						data-fnpf="<?php echo $row['fnpf_no'] ?>"
@@ -370,11 +371,40 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
 			$('.emp-checkbox, #check_master').prop('checked', false);
 		});
 
+		// Batch run: changing the frequency re-derives every basic from the
+		// employee's annual gross (26 fortnights, 52 weeks, 12 months...).
+		$('#batch-payroll-form #pay_frequency').change(function(){
+			var p = nv_periods($(this).val());
+			$('#batch-payroll-form .emp-basic').each(function(){
+				var annual = parseFloat($(this).attr('data-annual')) || 0;
+				if(annual > 0){ $(this).val((annual / p).toFixed(2)); }
+			});
+		});
+
+		// Single run: frequency changes re-derive the selected employee's basic.
+		$('#payroll-form #pay_frequency').change(function(){
+			var annual = parseFloat($('#employee_id').find(':selected').attr('data-annual')) || 0;
+			if(annual > 0){
+				$('#basic_salary').val((annual / nv_periods($(this).val())).toFixed(2));
+				calculate_payroll_live();
+			}
+		});
+
+		// Per-period basic = annual gross / pay periods of the chosen frequency.
+		function nv_periods(freq){
+			switch(String(freq || 'Monthly').toLowerCase()){
+				case 'fortnightly': return 26;
+				case 'weekly': return 52;
+				case 'bi-weekly':
+				case 'semi-monthly': return 24;
+				default: return 12;
+			}
+		}
 		$('#employee_id').change(function(){
-			var sal = $(this).find(':selected').attr('data-salary');
+			var annual = parseFloat($(this).find(':selected').attr('data-annual')) || 0;
 			var res = $(this).find(':selected').attr('data-resident');
-			if(sal){
-				$('#basic_salary').val(sal);
+			if(annual > 0){
+				$('#basic_salary').val((annual / nv_periods($('#pay_frequency').val())).toFixed(2));
 			}
 			if(res !== undefined){
 				$('#is_resident').val(res);

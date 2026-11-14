@@ -1822,6 +1822,13 @@ class LegacySchemaCatchup
             @$this->conn->query("ALTER TABLE `users` ADD COLUMN `role_id` int(30) DEFAULT NULL AFTER `type` ");
         }
 
+        // Annual gross salary (mirror of migration 041)
+        $nv_res = @$this->conn->query("SHOW COLUMNS FROM `employee_list` LIKE 'annual_salary'");
+        if ($nv_res && $nv_res->num_rows == 0) {
+            @$this->conn->query("ALTER TABLE `employee_list` ADD COLUMN `annual_salary` decimal(14,2) DEFAULT NULL");
+            @$this->conn->query("UPDATE `employee_list` SET `annual_salary` = `salary` * 12 WHERE (`annual_salary` IS NULL OR `annual_salary` = 0) AND `salary` > 0");
+        }
+
         // Tenant logo column (mirror of migration 040)
         $nv_res = @$this->conn->query("SHOW COLUMNS FROM `tenants` LIKE 'logo'");
         if ($nv_res && $nv_res->num_rows == 0) {

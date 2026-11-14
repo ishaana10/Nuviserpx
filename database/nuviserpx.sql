@@ -462,6 +462,7 @@ CREATE TABLE `employee_list` (
   `designation` varchar(100) DEFAULT NULL,
   `date_of_joining` date DEFAULT NULL,
   `salary` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `annual_salary` decimal(14,2) DEFAULT NULL,
   `tin` varchar(50) DEFAULT NULL,
   `fnpf_no` varchar(50) DEFAULT NULL,
   `tax_code` varchar(10) NOT NULL DEFAULT 'P',

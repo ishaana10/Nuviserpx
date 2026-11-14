@@ -237,7 +237,11 @@ class PayrollService
         }
         $emp_data = $emp_qry->fetch_assoc();
 
-        $basic_salary = isset($basic_salary) ? (float)$basic_salary : (float)($emp_data['salary'] ?? 0);
+        // No basic posted: derive the period's pay from the annual gross at
+        // this run's frequency (falling back to the legacy monthly figure).
+        $nv_annual = (float)($emp_data['annual_salary'] ?? 0);
+        if ($nv_annual <= 0) { $nv_annual = (float)($emp_data['salary'] ?? 0) * 12; }
+        $basic_salary = isset($basic_salary) ? (float)$basic_salary : round($nv_annual / max(1, (int)\PayrollEngine::get_periods_per_year($pay_frequency)), 2);
         $overtime = isset($overtime) ? (float)$overtime : 0.0;
         $allowances = isset($allowances) ? (float)$allowances : 0.0;
         $other_earnings = isset($other_earnings) ? (float)$other_earnings : 0.0;

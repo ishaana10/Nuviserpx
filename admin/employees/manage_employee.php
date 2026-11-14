@@ -63,8 +63,20 @@ $readonly = isset($id) && !$can_edit && $scope !== null;
 		</div>
 		<div class="row">
 			<div class="col-md-6 form-group">
-				<label for="salary" class="control-label">Basic Monthly Salary<?php echo $_settings->currency_tag() ?></label>
-				<input type="number" step="any" name="salary" id="salary" class="form-control form-control-sm rounded-0 text-right" value="<?php echo isset($salary) ? $salary : 0; ?>" required/>
+				<label for="annual_salary" class="control-label">Annual Gross Salary<?php echo $_settings->currency_tag() ?></label>
+				<input type="number" step="any" min="0" name="annual_salary" id="annual_salary" class="form-control form-control-sm rounded-0 text-right" value="<?php echo isset($annual_salary) && $annual_salary !== null && $annual_salary !== '' ? $annual_salary : (isset($salary) && (float)$salary > 0 ? number_format((float)$salary * 12, 2, '.', '') : 0); ?>" required/>
+				<small class="text-muted" id="salary-breakdown"></small>
+				<script>
+					$(function(){
+						function nv_breakdown(){
+							var a = parseFloat($('#annual_salary').val()) || 0;
+							$('#salary-breakdown').text(a > 0
+								? '≈ ' + (a/12).toFixed(2) + ' monthly · ' + (a/26).toFixed(2) + ' fortnightly · ' + (a/52).toFixed(2) + ' weekly'
+								: 'Per-period pay is worked out from this figure at run time.');
+						}
+						$('#annual_salary').on('input', nv_breakdown); nv_breakdown();
+					});
+				</script>
 			</div>
 		</div>
 

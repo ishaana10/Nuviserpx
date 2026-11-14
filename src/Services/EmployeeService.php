@@ -22,6 +22,12 @@ class EmployeeService
         $id = isset($id) ? intval($id) : 0;
         $dataStr = "";
         $before = $id > 0 ? ($this->conn->query("SELECT * FROM `employee_list` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'")->fetch_assoc() ?: []) : [];
+        // Pay is captured as annual gross; the monthly figure is derived and
+        // kept in step so every older consumer still reads a correct value.
+        if (isset($post['annual_salary']) && $post['annual_salary'] !== '') {
+            $post['annual_salary'] = round((float)$post['annual_salary'], 2);
+            $post['salary'] = round($post['annual_salary'] / 12, 2);
+        }
         // Only real, editable columns are written: a posted field name is never used as SQL unless it is one of them.
         foreach (self::editableFields($post, $this->employeeColumns()) as $k => $v) {
             if (!in_array($k, ['id'])) {
@@ -389,7 +395,7 @@ class EmployeeService
         $diff = \App\Support\AuditDiff::changes(
             $before,
             $post,
-            ['employee_code', 'firstname', 'lastname', 'email', 'phone', 'department', 'designation', 'date_of_joining', 'salary', 'tax_code', 'is_resident', 'bank_code', 'approver_id', 'termination_date', 'status', 'fnpf_employer_voluntary', 'tin', 'fnpf_no', 'bank_account'],
+            ['employee_code', 'firstname', 'lastname', 'email', 'phone', 'department', 'designation', 'date_of_joining', 'salary', 'annual_salary', 'tax_code', 'is_resident', 'bank_code', 'approver_id', 'termination_date', 'status', 'fnpf_employer_voluntary', 'tin', 'fnpf_no', 'bank_account'],
             ['tin', 'fnpf_no', 'bank_account']
         );
         $this->settings->log_audit('Updated Employee', 'HR & Attendance', "Updated {$who} (#{$id}): {$diff}.");
