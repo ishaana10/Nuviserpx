@@ -1822,6 +1822,18 @@ class LegacySchemaCatchup
             @$this->conn->query("ALTER TABLE `users` ADD COLUMN `role_id` int(30) DEFAULT NULL AFTER `type` ");
         }
 
+        // Component descriptions / assignment notes (mirror of migration 042)
+        foreach ([
+            ['salary_components', 'description', "ADD COLUMN `description` varchar(255) DEFAULT NULL"],
+            ['employee_salary_components', 'note', "ADD COLUMN `note` varchar(255) DEFAULT NULL"],
+            ['payroll_component_items', 'description', "ADD COLUMN `description` varchar(255) DEFAULT NULL"],
+        ] as [$nv_tbl, $nv_col, $nv_ddl]) {
+            $nv_res = @$this->conn->query("SHOW COLUMNS FROM `{$nv_tbl}` LIKE '{$nv_col}'");
+            if ($nv_res && $nv_res->num_rows == 0) {
+                @$this->conn->query("ALTER TABLE `{$nv_tbl}` {$nv_ddl}");
+            }
+        }
+
         // Annual gross salary (mirror of migration 041)
         $nv_res = @$this->conn->query("SHOW COLUMNS FROM `employee_list` LIKE 'annual_salary'");
         if ($nv_res && $nv_res->num_rows == 0) {

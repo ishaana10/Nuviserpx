@@ -103,6 +103,7 @@ $__comps = $conn->query("SELECT id, code, name, type FROM `salary_components` WH
             <div class="col-md-2 form-group"><label class="text-sm font-weight-bold">Amount</label><input type="number" step="0.01" min="0" name="amount" class="form-control form-control-sm text-right" placeholder="default"></div>
             <div class="col-md-2 form-group"><label class="text-sm font-weight-bold">From</label><input type="date" name="start_date" class="form-control form-control-sm"></div>
             <div class="col-md-2 form-group"><label class="text-sm font-weight-bold">To</label><input type="date" name="end_date" class="form-control form-control-sm"></div>
+            <div class="col-md-4 form-group"><label class="text-sm font-weight-bold">Note <small class="text-muted">(shown on the payslip)</small></label><input type="text" name="note" maxlength="255" class="form-control form-control-sm" placeholder="e.g. Policy FC-20331"></div>
             <div class="col-12 form-group"><button type="submit" class="btn btn-sm btn-info btn-flat"><i class="fas fa-link mr-1"></i> Assign</button></div>
         </form>
         <table class="table table-sm table-bordered table-striped">
@@ -112,7 +113,7 @@ $__comps = $conn->query("SELECT id, code, name, type FROM `salary_components` WH
                 <tr>
                     <td><?= htmlspecialchars($a['employee_code'] . ' - ' . $a['emp_name']) ?></td>
                     <td><?= htmlspecialchars($a['code'] . ' - ' . $a['comp_name']) ?> <?= $a['type'] === 'deduction' ? '<span class="badge badge-danger">Deduction</span>' : '' ?></td>
-                    <td class="text-right"><?= number_format((float)($a['amount'] ?? $a['default_amount']), 2) ?><?= $a['amount'] === null ? ' <small class="text-muted">default</small>' : '' ?></td>
+                    <td class="text-right"><?= number_format((float)($a['amount'] ?? $a['default_amount']), 2) ?><?= $a['amount'] === null ? ' <small class="text-muted">default</small>' : '' ?><?= !empty($a['note']) ? '<br><small class="text-muted">' . htmlspecialchars($a['note']) . '</small>' : '' ?></td>
                     <td><?= htmlspecialchars((string)($a['start_date'] ?? '')) ?></td>
                     <td><?= htmlspecialchars((string)($a['end_date'] ?? '')) ?></td>
                     <td class="text-center"><button type="button" class="btn btn-xs btn-outline-danger btn-flat unassign_component" data-id="<?= (int)$a['id'] ?>"><i class="fas fa-unlink"></i></button></td>
@@ -156,6 +157,10 @@ $__comps = $conn->query("SELECT id, code, name, type FROM `salary_components` WH
                     <div class="form-group">
                         <label for="comp_default_amount" class="font-weight-bold text-dark text-sm">Default Amount ($)</label>
                         <input type="number" step="0.01" name="default_amount" id="comp_default_amount" class="form-control form-control-sm text-right" value="0.00">
+                    </div>
+                    <div class="form-group">
+                        <label for="comp_description" class="font-weight-bold text-dark text-sm">Description</label>
+                        <input type="text" name="description" id="comp_description" maxlength="255" class="form-control form-control-sm" placeholder="e.g. Fiji Care group medical cover - shown on the payslip">
                     </div>
 
                     <div class="form-group">

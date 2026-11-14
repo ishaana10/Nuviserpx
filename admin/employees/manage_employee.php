@@ -81,6 +81,74 @@ $readonly = isset($id) && !$can_edit && $scope !== null;
 		</div>
 
 		<hr class="my-3">
+		<h6 class="text-navy font-weight-bold"><i class="fas fa-sliders-h"></i> Fixed Allowances & Deductions</h6>
+		<?php if(!empty($id) && (int)$id > 0):
+			$nv_comp_svc = new \App\Services\PayrollComponentService($conn, $_settings);
+			// This employee's current assignments only
+			$nv_assigned = array_values(array_filter($nv_comp_svc->assignments(), fn($a) => (int)($a['employee_id'] ?? 0) === (int)$id));
+			$nv_comp_opts = $conn->query("SELECT id, code, name, type, default_amount FROM `salary_components` WHERE tenant_id = '".(int)$_settings->active_tenant_id()."' AND status = 1 ORDER BY type, name");
+		?>
+		<p class="text-muted small mb-2">Recurring pay items for this employee - e.g. an acting allowance or an insurance deduction. Each applies to every new payroll and prints on the payslip with its description.</p>
+		<table class="table table-sm table-bordered mb-2" id="emp-components">
+			<thead><tr><th>Component</th><th class="text-right">Amount</th><th>Note</th><th style="width:40px"></th></tr></thead>
+			<tbody>
+				<?php foreach($nv_assigned as $nv_a): ?>
+				<tr>
+					<td><?php echo htmlspecialchars($nv_a['comp_name']) ?> <small class="text-muted">(<?php echo $nv_a['type'] === 'deduction' ? 'deduction' : 'allowance' ?>)</small>
+						<?php if(!empty($nv_a['description'])): ?><br><small class="text-muted"><?php echo htmlspecialchars($nv_a['description']) ?></small><?php endif; ?>
+					</td>
+					<td class="text-right"><?php echo number_format((float)($nv_a['amount'] ?? $nv_a['default_amount']), 2) ?><?php echo $nv_a['amount'] === null ? ' <small class="text-muted">default</small>' : '' ?></td>
+					<td><small><?php echo htmlspecialchars((string)($nv_a['note'] ?? '')) ?></small></td>
+					<td class="text-center"><button type="button" class="btn btn-xs btn-outline-danger emp-unassign" data-id="<?php echo (int)$nv_a['id'] ?>"><i class="fas fa-unlink"></i></button></td>
+				</tr>
+				<?php endforeach; if(!$nv_assigned): ?>
+				<tr><td colspan="4" class="text-center text-muted py-2">None yet.</td></tr>
+				<?php endif; ?>
+			</tbody>
+		</table>
+		<div class="form-row align-items-end mb-2">
+			<div class="col-md-4 form-group mb-1">
+				<select id="emp-comp-id" class="form-control form-control-sm rounded-0">
+					<option value="">Add a component...</option>
+					<?php while($nv_comp_opts && $nv_c = $nv_comp_opts->fetch_assoc()): ?>
+						<option value="<?php echo (int)$nv_c['id'] ?>"><?php echo htmlspecialchars($nv_c['name'] . ($nv_c['type'] === 'deduction' ? ' (deduction)' : ' (allowance)')) ?></option>
+					<?php endwhile; ?>
+				</select>
+			</div>
+			<div class="col-md-2 form-group mb-1"><input type="number" step="0.01" min="0" id="emp-comp-amount" class="form-control form-control-sm rounded-0 text-right" placeholder="default amt"></div>
+			<div class="col-md-4 form-group mb-1"><input type="text" id="emp-comp-note" maxlength="255" class="form-control form-control-sm rounded-0" placeholder="Note, e.g. Policy FC-20331"></div>
+			<div class="col-md-2 form-group mb-1"><button type="button" id="emp-comp-add" class="btn btn-sm btn-info btn-block rounded-0"><i class="fas fa-plus"></i> Add</button></div>
+		</div>
+		<script>
+			$(function(){
+				$('#emp-comp-add').click(function(){
+					var cid = $('#emp-comp-id').val();
+					if(!cid){ alert_toast('Pick a component first.', 'error'); return; }
+					start_loader();
+					$.post(_base_url_ + 'classes/Master.php?f=assign_salary_component', {
+						employee_id: <?php echo (int)$id ?>, component_id: cid,
+						amount: $('#emp-comp-amount').val(), note: $('#emp-comp-note').val()
+					}, function(resp){
+						alert_toast(resp.msg || 'Done', resp.status === 'success' ? 'success' : 'error');
+						end_loader();
+						if(resp.status === 'success'){ setTimeout(function(){ location.reload(); }, 900); }
+					}, 'json').fail(function(){ alert_toast('An error occurred.', 'error'); end_loader(); });
+				});
+				$('.emp-unassign').click(function(){
+					start_loader();
+					$.post(_base_url_ + 'classes/Master.php?f=unassign_salary_component', {id: $(this).data('id')}, function(resp){
+						alert_toast(resp.msg || 'Done', resp.status === 'success' ? 'success' : 'error');
+						end_loader();
+						if(resp.status === 'success'){ setTimeout(function(){ location.reload(); }, 900); }
+					}, 'json').fail(function(){ alert_toast('An error occurred.', 'error'); end_loader(); });
+				});
+			});
+		</script>
+		<?php else: ?>
+		<p class="text-muted small">Save the employee first, then reopen to add recurring allowances and deductions (managed too under Payroll &gt; Salary Components).</p>
+		<?php endif; ?>
+
+		<hr class="my-3">
 		<h6 class="text-navy font-weight-bold"><i class="fas fa-file-invoice"></i> Tax & FNPF Information</h6>
 
 		<div class="row">
