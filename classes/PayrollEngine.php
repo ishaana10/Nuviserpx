@@ -48,10 +48,10 @@ class PayrollEngine {
             ],
             // Days worked per week (5 = Mon-Fri, 6 = Mon-Sat, 7 = every day): sets the daily rate for unpaid days.
             'attendance' => ['working_days_per_week' => 5, 'prorate_joiners' => true],
-            'employer_levies' => [
-                ['key' => 'workcare_levy', 'label' => 'Employer levy 1', 'rate' => 0.01],
-                ['key' => 'training_levy', 'label' => 'Employer levy 2', 'rate' => 0.01],
-            ],
+            // Fiji has no general employer payroll levy, so none by default.
+            // Companies that are liable (e.g. the FNU training levy for large
+            // employers) add theirs under Payroll Rules Settings.
+            'employer_levies' => [],
         ];
     }
 

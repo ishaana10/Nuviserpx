@@ -118,7 +118,7 @@ foreach ($versions as $v) { if ($v['effective_from'] <= $today) $in_force = $v['
         var $tr = $('<tr>');
         $tr.append($('<td>').append($('<input type="text" maxlength="60" class="form-control form-control-sm lbl">').val(l.label)));
         $tr.append($('<td>').append($('<input type="number" step="0.01" min="0" max="100" class="form-control form-control-sm rate">').val(pct(l.rate))));
-        var $s = $('<select class="form-control form-control-sm key"><option value="">Not shown separately</option><option value="workcare_levy">Employer levy 1</option><option value="training_levy">Employer levy 2</option></select>').val(l.key || '');
+        var $s = $('<select class="form-control form-control-sm key"><option value="">Not shown separately</option><option value="workcare_levy">Workcare Levy</option><option value="training_levy">Training Levy (FNU)</option></select>').val(l.key || '');
         $tr.append($('<td>').append($s));
         $tr.append($('<td>').append('<button type="button" class="btn btn-xs btn-outline-danger rm"><i class="fas fa-times"></i></button>'));
         return $tr;
