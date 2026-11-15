@@ -9,7 +9,7 @@ $isMgr = $scope === null;
 $tag = $_settings->currency_tag();
 $h = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
 
-$status = in_array($_GET['status'] ?? 'all', ['all', 'pending', 'approved', 'reimbursed', 'rejected'], true) ? $_GET['status'] : 'all';
+$status = in_array($_GET['status'] ?? 'all', ['all', 'pending', 'approved', 'reimbursed', 'rejected'], true) ? ($_GET['status'] ?? 'all') : 'all';
 $sql = "SELECT er.*, e.firstname, e.lastname, e.employee_code FROM `expense_reports` er LEFT JOIN `employee_list` e ON er.employee_id = e.id WHERE er.tenant_id = ?";
 $types = 'i'; $args = [$tenant_id];
 if (!$isMgr) { $sql .= " AND er.employee_id = ?"; $types .= 'i'; $args[] = (int)$scope; }

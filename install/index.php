@@ -1,4 +1,7 @@
 <?php
+ini_set('session.cookie_httponly', 1);
+ini_set('session.use_only_cookies', 1);
+ini_set('session.cookie_samesite', 'Lax');
 session_start();
 
 $lock_file = __DIR__ . '/installed.lock';
