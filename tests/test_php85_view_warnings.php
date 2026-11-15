@@ -10,4 +10,9 @@ check('payslip answers 404 when the payslip does not exist', strpos($slip, 'Pays
 $reg = file_get_contents("$root/portal/register.php");
 check('portal activation does not read a non-existent users.name column', strpos($reg, "\$user['name']") === false);
 check('portal activation shows the company name read-only', strpos($reg, "\$user['party_name']") !== false && strpos($reg, 'readonly') !== false);
+foreach (['login', 'register'] as $pg) {
+    $src = file_get_contents("$root/portal/$pg.php");
+    check("portal/$pg.php shows the company logo", strpos($src, "validate_image(\$_settings->info('logo'))") !== false);
+    check("portal/$pg.php title is not the white link style (invisible on the white card)", strpos($src, 'class="h1"') === false && strpos($src, 'Customer Portal</h1>') !== false);
+}
 exit($fail ? 1 : 0);
