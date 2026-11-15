@@ -172,4 +172,35 @@ class ChartProvisioner
         }
         return $added;
     }
+
+    /**
+     * For a brand-new company only: the SQL dump ships ~50 untyped demo accounts from 2022 (Cash, Accounts Receivable ...)
+     * that the schema catch-up then labels "Expense", so a new customer would start with no asset, liability or income
+     * accounts. Replace them with the standard chart. Refuses (returns -1) as soon as the books hold anything: a journal,
+     * an invoice, a payment or any account default, so it can never touch a live company.
+     *
+     * @return int accounts in the chart afterwards, or -1 when nothing was changed
+     */
+    public static function replaceDemoSeed(mysqli $conn, int $tenantId): int
+    {
+        foreach (['journal_entries', 'journal_items', 'invoice_list', 'payment_list', 'account_defaults'] as $t) {
+            $r = $conn->query("SELECT COUNT(*) n FROM `{$t}`");
+            if (!$r || (int)$r->fetch_assoc()['n'] > 0) {
+                return -1;
+            }
+        }
+        $conn->begin_transaction();
+        $del = $conn->prepare("DELETE FROM account_list WHERE tenant_id = ? AND name <> 'Opening Balance Equity'");
+        $del->bind_param('i', $tenantId);
+        if (!$del->execute()) {
+            $conn->rollback();   // something still points at an account: leave the chart exactly as it was
+            return -1;
+        }
+        self::fill($conn, $tenantId);
+        $conn->commit();
+        $n = $conn->prepare("SELECT COUNT(*) n FROM account_list WHERE tenant_id = ? AND delete_flag = 0");
+        $n->bind_param('i', $tenantId);
+        $n->execute();
+        return (int)$n->get_result()->fetch_assoc()['n'];
+    }
 }

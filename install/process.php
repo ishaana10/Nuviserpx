@@ -95,6 +95,14 @@ try {
     exit;
 }
 
+// 3b. A new company starts from the standard chart of accounts, not the untyped 2022 demo accounts in the dump.
+//     Only ever replaces a chart with no transactions; on any doubt it leaves the chart as it is.
+try {
+    \App\Services\ChartProvisioner::replaceDemoSeed($conn, 1);
+} catch (\Throwable $e) {
+    error_log('[nuviserpx installer] chart setup skipped: ' . $e->getMessage());
+}
+
 // 4. Update system_info branding
 $conn->query("UPDATE `system_info` SET `meta_value` = '" . $conn->real_escape_string($app_name) . "' WHERE `meta_field` = 'name'");
 $conn->query("UPDATE `system_info` SET `meta_value` = '" . $conn->real_escape_string($short_name) . "' WHERE `meta_field` = 'short_name'");
