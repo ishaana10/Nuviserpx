@@ -14,6 +14,8 @@ function run(string $uri, bool $admin): string {
 check('employee portal page, no staff session: not redirected', strpos(run('/nuviserpx/portal/employee.php', false), 'REDIRECT') === false);
 check('employee login, signed-in admin: not bounced to admin', strpos(run('/nuviserpx/portal/employee_login.php?token=abc', true), 'REDIRECT') === false);
 check('customer portal page: not redirected', strpos(run('/portal/index.php', false), 'REDIRECT') === false);
+check('portal folder URL (/portal/), the dashboard address, is not redirected', strpos(run('/portal/', false), 'REDIRECT') === false);
+check('portal folder URL with a nested base path is not redirected', strpos(run('/nuviserpx/portal/', false), 'REDIRECT') === false);
 check('staff page without session still goes to staff login', strpos(run('/nuviserpx/admin/index.php', false), 'REDIRECT:admin/login.php') !== false);
 check('a path merely containing "portal" is not exempt', strpos(run('/nuviserpx/admin/portal_settings.php', false), 'REDIRECT:admin/login.php') !== false);
 exit($fail ? 1 : 0);
