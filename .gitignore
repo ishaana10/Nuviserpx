@@ -11,3 +11,6 @@ uploads/temp/
 # Deployment state and maintenance switch (per server)
 maintenance.flag
 .deploy/
+
+# Written by the installer on a real install - never commit it (a committed copy makes fresh clones skip the wizard)
+install/installed.lock
