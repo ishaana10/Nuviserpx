@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use mysqli;
+use App\Support\ProposalLink;
 use SystemSettings;
 
 /**
@@ -161,7 +162,7 @@ class DeliveryService
     public function notesFor(int $orderId): array
     {
         $t = $this->tenantId();
-        $stmt = $this->conn->prepare("SELECT d.*, (SELECT COUNT(*) FROM delivery_note_items x WHERE x.delivery_note_id = d.id AND x.invoice_id IS NOT NULL) invoiced_lines
+        $stmt = $this->conn->prepare("SELECT d.id, d.tenant_id, d.dn_no, d.sales_order_id, d.party_id, d.delivery_date, d.warehouse_id, d.status, d.stock_journal_id, d.notes, d.created_by, d.date_created, d.received_by, d.received_at, (SELECT COUNT(*) FROM delivery_note_items x WHERE x.delivery_note_id = d.id AND x.invoice_id IS NOT NULL) invoiced_lines
             FROM delivery_notes d WHERE d.tenant_id = ? AND d.sales_order_id = ? ORDER BY d.id");
         $stmt->bind_param('ii', $t, $orderId);
         $stmt->execute();
@@ -172,7 +173,7 @@ class DeliveryService
     public function all(): array
     {
         $t = $this->tenantId();
-        $stmt = $this->conn->prepare("SELECT d.*, o.order_no, p.name party_name,
+        $stmt = $this->conn->prepare("SELECT d.id, d.tenant_id, d.dn_no, d.sales_order_id, d.party_id, d.delivery_date, d.warehouse_id, d.status, d.stock_journal_id, d.notes, d.created_by, d.date_created, d.received_by, d.received_at, o.order_no, p.name party_name,
                 (SELECT COALESCE(SUM(x.qty), 0) FROM delivery_note_items x WHERE x.delivery_note_id = d.id) units,
                 (SELECT COUNT(*) FROM delivery_note_items x WHERE x.delivery_note_id = d.id AND x.invoice_id IS NOT NULL) invoiced_lines
             FROM delivery_notes d INNER JOIN sales_order_list o ON o.id = d.sales_order_id INNER JOIN party_list p ON p.id = d.party_id
@@ -368,6 +369,51 @@ class DeliveryService
     }
 
     /** Cancel a delivery that has not been invoiced: the stock goes back and the quantities are open to deliver again. */
+    /**
+     * Receiver's proof of delivery: a typed name plus a drawn signature (PNG from the signature pad).
+     * One signature per note: once captured it is locked, and a cancelled note cannot be signed.
+     * Pure check, used by signNote() and unit-tested without a database.
+     */
+    public static function signProblem(string $status, bool $alreadySigned, string $name, string $signature): ?string
+    {
+        if ($status === 'cancelled') {
+            return 'A cancelled delivery note cannot be signed.';
+        }
+        if ($alreadySigned) {
+            return 'This delivery note has already been signed.';
+        }
+        $len = function_exists('mb_strlen') ? mb_strlen($name) : strlen($name);
+        if ($len < 2 || $len > 150) {
+            return 'Type the name of the person who received the goods (2 to 150 characters).';
+        }
+        if (!ProposalLink::validSignatureImage($signature)) {
+            return 'Draw the receiver\'s signature in the box before saving.';
+        }
+        return null;
+    }
+
+    public function signNote(int $id, string $receiverName, string $signature, int $userId): string
+    {
+        $d = $this->note($id);
+        if (!$d) {
+            return $this->fail('Delivery note not found.');
+        }
+        $name = trim((string)preg_replace('/\s+/u', ' ', strip_tags($receiverName)));
+        if ($msg = self::signProblem((string)$d['status'], !empty($d['received_at']), $name, $signature)) {
+            return $this->fail($msg);
+        }
+        $t = $this->tenantId();
+        // "received_at IS NULL" keeps two simultaneous saves from overwriting each other.
+        $stmt = $this->conn->prepare("UPDATE delivery_notes SET received_by = ?, receiver_signature = ?, received_at = NOW(), signed_by_user_id = ?
+            WHERE id = ? AND tenant_id = ? AND received_at IS NULL AND status <> 'cancelled'");
+        $stmt->bind_param('ssiii', $name, $signature, $userId, $id, $t);
+        $stmt->execute();
+        if ($stmt->affected_rows !== 1) {
+            return $this->fail('This delivery note has already been signed.');
+        }
+        return json_encode(['status' => 'success', 'msg' => 'Signature saved.']);
+    }
+
     public function cancelDelivery(int $id): string
     {
         $t = $this->tenantId();

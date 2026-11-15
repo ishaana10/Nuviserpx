@@ -54,7 +54,7 @@ $notes = $svc->all();
           <td><?= $e($n['order_no']) ?></td>
           <td><?= $e($n['party_name']) ?></td>
           <td class="text-right"><?= $e(rtrim(rtrim(number_format((float)$n['units'], 4, '.', ''), '0'), '.') ?: '0') ?></td>
-          <td><span class="badge badge-<?= $n['status'] === 'delivered' ? ((int)$n['invoiced_lines'] > 0 ? 'success' : 'primary') : 'dark' ?>"><?= $n['status'] === 'delivered' && (int)$n['invoiced_lines'] > 0 ? 'INVOICED' : $e(strtoupper($n['status'])) ?></span></td>
+          <td><span class="badge badge-<?= $n['status'] === 'delivered' ? ((int)$n['invoiced_lines'] > 0 ? 'success' : 'primary') : 'dark' ?>"><?= $n['status'] === 'delivered' && (int)$n['invoiced_lines'] > 0 ? 'INVOICED' : $e(strtoupper($n['status'])) ?></span><?php if (!empty($n['received_at'])): ?> <span class="badge badge-light border" title="Signed by <?= $e($n['received_by']) ?>"><i class="fa fa-signature"></i> SIGNED</span><?php endif; ?></td>
           <td class="text-right"><?php if ($n['status'] === 'delivered' && (int)$n['invoiced_lines'] === 0): ?><button class="btn btn-xs btn-outline-danger cancel-dn" data-id="<?= (int)$n['id'] ?>" data-no="<?= $e($n['dn_no']) ?>">Cancel</button><?php endif; ?></td>
         </tr>
       <?php endforeach; ?>
