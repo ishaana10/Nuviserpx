@@ -19,6 +19,7 @@ $c->query("INSERT INTO users (id, firstname, lastname, username, password) VALUE
 $c->query("INSERT INTO party_list (id,tenant_id,party_code,name,email,type) VALUES (1,1,'C1','Alpha Ltd','a@example.com','customer'),(2,1,'C2','Bravo Ltd','b@example.com','customer')");
 $c->query("INSERT INTO sales_order_list (id,tenant_id,order_no,party_id,order_date,type,status) VALUES (1,1,'SO-1',1,CURDATE(),'sales','confirmed')");
 $c->query("INSERT INTO delivery_notes (id,tenant_id,dn_no,sales_order_id,party_id,delivery_date,status) VALUES (1,1,'DN-1',1,1,CURDATE(),'delivered'),(2,1,'DN-2',1,1,CURDATE(),'cancelled')");
+$c->query("UPDATE delivery_notes SET created_by = 1 WHERE id = 1");
 
 check('migration 049 added the proof-of-delivery columns', $c->query("SHOW COLUMNS FROM delivery_notes LIKE 'receiver_signature'")->num_rows === 1
     && $c->query("SHOW COLUMNS FROM delivery_notes LIKE 'received_by'")->num_rows === 1);
@@ -41,6 +42,8 @@ check('typed name is cleaned (markup stripped, spaces collapsed)', $row['receive
 check('a signed note is locked against a second signature', $sign(1, 'Someone Else', $png)['status'] === 'failed'
     && $c->query("SELECT received_by FROM delivery_notes WHERE id=1")->fetch_row()[0] === 'Jane Receiver');
 check('the note is returned with its signature for the printout', ($svc->note(1)['received_by'] ?? '') === 'Jane Receiver');
+check('Delivered by is the login username of whoever created the note', ($svc->note(1)['delivered_by'] ?? '') === 'u' && array_key_exists('delivered_by', $svc->note(2)) && $svc->note(2)['delivered_by'] === null);
+check('the PDF and the printout show the username', strpos((string)file_get_contents(__DIR__ . '/../../src/Support/DeliveryNotePdf.php'), "['delivered_by']") !== false && strpos((string)file_get_contents(__DIR__ . '/../../admin/delivery_notes/view.php'), "['delivered_by']") !== false);
 check('the list query does not carry signature images', !array_key_exists('receiver_signature', $svc->all()[0]) && !array_key_exists('receiver_signature', $svc->notesFor(1)[0]));
 
 // --- signed delivery note PDF + email rules -------------------------------------------------------------------------
