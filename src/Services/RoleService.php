@@ -109,14 +109,17 @@ class RoleService
         $status = isset($status) ? (int)$status : 1;
 
         if (empty($id)) {
-            $api_key = 'erpx_' . bin2hex(random_bytes(16));
-            $api_secret = bin2hex(random_bytes(32));
+            // Only the hash is stored; the key itself is returned once, below, and never again.
+            $newKey = \App\Support\ApiKey::generate();
+            $api_key = $newKey['display'];
 
             $sql = "INSERT INTO `api_keys` SET
 				`tenant_id` = '{$tenant_id}',
 				`name` = '{$name}',
 				`api_key` = '{$api_key}',
-				`api_secret` = '{$api_secret}',
+				`key_hash` = '{$newKey['hash']}',
+				`key_prefix` = '{$newKey['prefix']}',
+				`api_secret` = '',
 				`permissions` = '{$permissions}',
 				`status` = '{$status}',
 				`created_by` = '{$user_id}'";
@@ -136,6 +139,9 @@ class RoleService
             $this->settings->log_audit(empty($id) ? 'Created API Key' : 'Updated API Key', 'API & Integrations', "API key '" . ($post['name'] ?? '') . "' (#{$keyId}): {$scope}, " . ($status ? 'active' : 'disabled') . '.');
             $resp['status'] = 'success';
             $resp['msg'] = empty($id) ? " API Key generated successfully." : " API Key updated successfully.";
+            if (empty($id)) {
+                $resp['api_key'] = $newKey['key']; // the only time the key is ever visible
+            }
             $this->settings->set_flashdata('success', $resp['msg']);
         } else {
             $resp['status'] = 'failed';

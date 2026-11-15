@@ -25,6 +25,8 @@ require_once('initialize.php');
 if (!headers_sent() && php_sapi_name() !== 'cli') {
 	header('X-Content-Type-Options: nosniff');
 	header('X-Frame-Options: SAMEORIGIN');
+	// Only the directives that do not need the app's inline scripts rewritten: no plugins, framing by this site only.
+	header("Content-Security-Policy: object-src 'none'; frame-ancestors 'self'");
 	header('Referrer-Policy: strict-origin-when-cross-origin');
 	if (!empty($nv_https)) {
 		header('Strict-Transport-Security: max-age=31536000');

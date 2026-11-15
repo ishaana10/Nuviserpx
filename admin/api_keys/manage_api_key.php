@@ -27,14 +27,9 @@ $permissions_list = isset($permissions) ? explode(',', $permissions) : ['*'];
 
 		<?php if(isset($api_key)): ?>
 		<div class="form-group bg-light p-3 border rounded">
-			<label class="control-label text-navy font-weight-bold"><i class="fas fa-key"></i> Active API Key</label>
-			<div class="input-group">
-				<input type="text" class="form-control form-control-sm rounded-0 font-weight-bold" value="<?php echo htmlspecialchars($api_key) ?>" readonly id="key_field">
-				<div class="input-group-append">
-					<button class="btn btn-sm btn-outline-secondary" type="button" onclick="navigator.clipboard.writeText($('#key_field').val()); alert_toast('API Key copied!', 'info');"><i class="fas fa-copy"></i> Copy</button>
-				</div>
-			</div>
-			<small class="text-muted d-block mt-1">API Secret Token: <code><?php echo htmlspecialchars($api_secret ?? 'Hidden') ?></code></small>
+			<label class="control-label text-navy font-weight-bold"><i class="fas fa-key"></i> API Key</label>
+			<div><code><?php echo htmlspecialchars(\App\Support\ApiKey::display(get_defined_vars())) ?></code></div>
+			<small class="text-muted d-block mt-1">For security the full key is shown only once, when it is created. If it is lost, create a new key and revoke this one.</small>
 		</div>
 		<?php endif; ?>
 
@@ -128,7 +123,14 @@ $permissions_list = isset($permissions) ? explode(',', $permissions) : ['*'];
 					end_loader();
 				},
 				success:function(resp){
-					if(typeof resp =='object' && resp.status == 'success'){
+					if(typeof resp =='object' && resp.status == 'success' && resp.api_key){
+						$('#uni_modal .modal-body').html('<div class="container-fluid"><p class="font-weight-bold text-navy"><i class="fas fa-key"></i> Copy your new API key now</p><div class="input-group"><input type="text" class="form-control form-control-sm" readonly id="new_key_field"><div class="input-group-append"><button class="btn btn-sm btn-outline-secondary" type="button" id="copy_new_key"><i class="fas fa-copy"></i> Copy</button></div></div><small class="text-danger d-block mt-2">This is the only time it will be shown. It cannot be recovered later.</small><div class="text-right mt-3"><button type="button" class="btn btn-primary btn-sm" id="key_done">I have saved it</button></div></div>');
+						$('#new_key_field').val(resp.api_key);
+						$('#copy_new_key').on('click', function(){ navigator.clipboard.writeText($('#new_key_field').val()); alert_toast('API Key copied!', 'info'); });
+						$('#uni_modal .modal-footer').hide();
+						$('#key_done').on('click', function(){ location.reload(); });
+						end_loader();
+					}else if(typeof resp =='object' && resp.status == 'success'){
 						location.reload()
 					}else if(resp.status == 'failed' && !!resp.msg){
                         var el = $('<div>')

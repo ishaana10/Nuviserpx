@@ -14,9 +14,10 @@
 		<div class="container-fluid">
 			<?php
 				$tenant_id = $_settings->active_tenant_id();
-				$qry = $conn->query("SELECT i.*, p.name as party_name, p.party_code from `invoice_list` i inner join `party_list` p on i.party_id = p.id where i.tenant_id = '{$tenant_id}' order by i.id desc ");
+				$qry = $conn->query("SELECT i.*, p.name as party_name, p.party_code from `invoice_list` i inner join `party_list` p on i.party_id = p.id where i.tenant_id = '{$tenant_id}' order by i.id desc " . \App\Support\ListWindow::limitSql());
 				$nv_has_rows = $qry && $qry->num_rows > 0;
 			?>
+			<?= \App\Support\ListWindow::banner($conn, 'invoice_list', (int)$tenant_id, 'invoices') ?>
 			<?php if(!$nv_has_rows): ?>
 				<div class="nv-empty">
 					<div class="nv-empty-icon"><i class="fas fa-file-invoice"></i></div>
