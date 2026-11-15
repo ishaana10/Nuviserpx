@@ -64,12 +64,9 @@ if(empty($api_key)){
     exit;
 }
 
-$key_stmt = $conn->prepare("SELECT * FROM `api_keys` WHERE api_key = ? AND status = 1 LIMIT 1");
-$key_stmt->bind_param('s', $api_key);
-$key_stmt->execute();
-$key_qry = $key_stmt->get_result();
+$api_user = \App\Support\ApiKey::find($conn, $api_key);
 
-if(!$key_qry || $key_qry->num_rows == 0){
+if($api_user === null){
     http_response_code(401);
     echo json_encode([
         'status' => 'unauthorized',
@@ -78,7 +75,6 @@ if(!$key_qry || $key_qry->num_rows == 0){
     exit;
 }
 
-$api_user = $key_qry->fetch_assoc();
 $api_tenant_id = (int)$api_user['tenant_id'];
 $api_key_id = (int)$api_user['id'];
 

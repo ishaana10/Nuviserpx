@@ -44,7 +44,7 @@
 							<td class="text-center"><?php echo $i++; ?></td>
 							<td><b><?php echo htmlspecialchars($row['name']) ?></b></td>
 							<td>
-								<code><?php echo htmlspecialchars($row['api_key']) ?></code>
+								<code><?php echo htmlspecialchars(\App\Support\ApiKey::display($row)) ?></code>
 							</td>
 							<td>
 								<small class="badge badge-light border text-navy"><?php echo htmlspecialchars($row['permissions']) ?></small>

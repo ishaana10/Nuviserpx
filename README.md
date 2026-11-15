@@ -92,7 +92,7 @@ The browser installer does the database and configuration for you. Nothing needs
    rm -r install/
    chmod 640 .env
    ```
-7. **Set up backups, cron and monitoring** before entering real data: follow [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) (the checklist at the end is the short version).
+7. **Set up backups, cron and monitoring** before entering real data: follow [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) (the checklist at the end is the short version). Before the first real customer, work through [docs/PILOT.md](docs/PILOT.md).
 
 All settings live in `.env` (see `.env.example`); `initialize.php` only reads them.
 

@@ -12,6 +12,7 @@
 	</div>
 	<div class="card-body">
 		<div class="container-fluid">
+			<?= \App\Support\ListWindow::banner($conn, 'sales_order_list', (int)$_settings->active_tenant_id(), 'sales_orders') ?>
 			<table class="table table-hover table-striped table-bordered" id="list" data-nv-cards>
 				<colgroup>
 					<col width="5%">
@@ -39,7 +40,7 @@
 					<?php
 					$i = 1;
 						$tenant_id = $_settings->active_tenant_id();
-						$qry = $conn->query("SELECT s.*, p.name as party_name, p.party_code from `sales_order_list` s inner join `party_list` p on s.party_id = p.id where s.tenant_id = '{$tenant_id}' order by s.id desc ");
+						$qry = $conn->query("SELECT s.*, p.name as party_name, p.party_code from `sales_order_list` s inner join `party_list` p on s.party_id = p.id where s.tenant_id = '{$tenant_id}' order by s.id desc " . \App\Support\ListWindow::limitSql());
 						while($row = $qry->fetch_assoc()):
 							$badge_class = 'info';
 							if($row['status'] == 'confirmed') $badge_class = 'primary';

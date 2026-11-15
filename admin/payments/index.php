@@ -12,6 +12,7 @@
 	</div>
 	<div class="card-body">
 		<div class="container-fluid">
+			<?= \App\Support\ListWindow::banner($conn, 'payment_list', (int)$_settings->active_tenant_id(), 'payments') ?>
 			<table class="table table-hover table-striped table-bordered" id="list" data-nv-cards>
 				<colgroup>
 					<col width="5%">
@@ -39,7 +40,7 @@
 					<?php
 					$i = 1;
 						$tenant_id = $_settings->active_tenant_id();
-						$qry = $conn->query("SELECT p.*, pt.name as party_name, pt.party_code from `payment_list` p inner join `party_list` pt on p.party_id = pt.id where p.tenant_id = '{$tenant_id}' order by p.id desc ");
+						$qry = $conn->query("SELECT p.*, pt.name as party_name, pt.party_code from `payment_list` p inner join `party_list` pt on p.party_id = pt.id where p.tenant_id = '{$tenant_id}' order by p.id desc " . \App\Support\ListWindow::limitSql());
 						while($row = $qry->fetch_assoc()):
 							$badge_class = 'success';
 							if($row['status'] == 'draft') $badge_class = 'secondary';
