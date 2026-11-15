@@ -57,7 +57,8 @@ $status_class = [
 <body onload="<?php echo isset($_GET['print']) ? 'window.print()' : '' ?>">
 <div class="container py-4">
     <div class="no-print mb-3 text-right">
-        <button onclick="window.print()" class="btn btn-primary btn-sm font-weight-bold"><i class="fas fa-print mr-1"></i> Print / Save as PDF</button>
+        <a href="invoice_pdf.php?id=<?php echo (int)$id ?>&download=1" class="btn btn-primary btn-sm font-weight-bold"><i class="fas fa-file-pdf mr-1"></i> Download PDF</a>
+        <button onclick="window.print()" class="btn btn-outline-secondary btn-sm font-weight-bold ml-1"><i class="fas fa-print mr-1"></i> Print</button>
         <button onclick="window.close()" class="btn btn-secondary btn-sm ml-1"><i class="fas fa-times mr-1"></i> Close Window</button>
     </div>
 

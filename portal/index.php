@@ -163,8 +163,8 @@ $view_order_id   = $_GET['order_id'] ?? null;
           <div class="card-header no-print d-flex justify-content-between align-items-center">
             <h3 class="card-title font-weight-bold m-0"><i class="fas fa-file-invoice text-primary mr-2"></i> Tax Invoice #<?php echo htmlspecialchars($inv['invoice_no']) ?></h3>
             <div class="card-tools">
-              <a href="view_invoice.php?id=<?php echo $inv['id'] ?>&print=1" target="_blank" class="btn btn-sm btn-primary font-weight-bold mr-1">
-                <i class="fas fa-file-pdf mr-1"></i> Download PDF / Print
+              <a href="invoice_pdf.php?id=<?php echo (int)$inv['id'] ?>&download=1" class="btn btn-sm btn-primary font-weight-bold mr-1">
+                <i class="fas fa-file-pdf mr-1"></i> Download PDF
               </a>
               <button onclick="window.print()" class="btn btn-sm btn-outline-secondary font-weight-bold">
                 <i class="fas fa-print mr-1"></i> Print View
@@ -428,7 +428,7 @@ $view_order_id   = $_GET['order_id'] ?? null;
                     </td>
                     <td class="text-center">
                       <a href="index.php?invoice_id=<?php echo $row['id'] ?>" class="btn btn-sm btn-outline-primary"><i class="fas fa-eye mr-1"></i> View Invoice</a>
-                      <a href="view_invoice.php?id=<?php echo $row['id'] ?>&print=1" target="_blank" class="btn btn-sm btn-outline-secondary ml-1"><i class="fas fa-file-pdf mr-1"></i> PDF</a>
+                      <a href="invoice_pdf.php?id=<?php echo (int)$row['id'] ?>&download=1" class="btn btn-sm btn-outline-secondary ml-1"><i class="fas fa-file-pdf mr-1"></i> PDF</a>
                     </td>
                   </tr>
                   <?php

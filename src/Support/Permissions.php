@@ -496,6 +496,8 @@ final class Permissions
         'confirm_for_delivery'  => ['sales_orders', 'edit'],
         'save_delivery_note'    => ['sales_orders', 'edit'],
         'cancel_delivery_note'  => ['sales_orders', 'edit'],
+        'sign_delivery_note'    => ['sales_orders', 'edit'],
+        'email_delivery_note'   => ['sales_orders', 'edit'],
         'invoice_delivered'     => ['invoices', 'save'],
         // Purchases
         'save_purchase_order'   => ['purchases', 'save'],

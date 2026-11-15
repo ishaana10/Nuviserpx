@@ -37,6 +37,45 @@ final class PdfDoc extends \FPDF
             ? [hexdec($m[1]), hexdec($m[2]), hexdec($m[3])] : $fallback;
     }
 
+    /**
+     * Draw a PNG held in memory (no temp file). Alpha is flattened onto white with GD, because FPDF cannot read
+     * transparent PNGs (a signature pad draws on a transparent canvas). Returns false when it cannot be drawn.
+     */
+    public function pngFromString(string $png, float $x, float $y, float $w, float $h): bool
+    {
+        if (!function_exists('imagecreatefromstring')) {
+            return false;
+        }
+        try {
+            $src = @imagecreatefromstring($png);
+            if (!$src) {
+                return false;
+            }
+            $sw = imagesx($src);
+            $sh = imagesy($src);
+            $flat = imagecreatetruecolor($sw, $sh);
+            imagefill($flat, 0, 0, imagecolorallocate($flat, 255, 255, 255));
+            imagecopy($flat, $src, 0, 0, 0, 0, $sw, $sh);
+            ob_start();
+            imagepng($flat);
+            $flatPng = (string)ob_get_clean();
+            $key = 'mem' . md5($flatPng);
+            if (!isset($this->images[$key])) {
+                $f = fopen('php://memory', 'r+b');
+                fwrite($f, $flatPng);
+                rewind($f);
+                $info = $this->_parsepngstream($f, $key);
+                fclose($f);
+                $info['i'] = count($this->images) + 1;
+                $this->images[$key] = $info;
+            }
+            $this->Image($key, $x, $y, $w, $h);
+            return true;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
     /** Company letterhead: optional logo, name, address, contact. Leaves the cursor below it. */
     public function letterhead(array $brand): void
     {

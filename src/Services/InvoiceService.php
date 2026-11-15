@@ -617,22 +617,63 @@ class InvoiceService
     }
 
     /**
-     * The invoice as a PDF, built in memory for viewing or attaching: [name, data], or null when the invoice is not
-     * this company's or the PDF cannot be built. Never written to disk.
+     * The invoice as a PDF for the signed-in staff member's company, or null when it is not found or the PDF cannot
+     * be built. Never written to disk.
      */
     public function pdf(int $id): ?array
     {
         $tid = (int)$this->settings->active_tenant_id();
+        return $this->buildPdf($id, $tid, null, $this->settings->tenant_branding(), (string)$this->settings->currency_tag());
+    }
+
+    /**
+     * The invoice PDF for a customer portal visitor: only that customer's own invoices, in the statuses the portal
+     * shows (never drafts or cancelled), branded for the company that owns the invoice. Null when not theirs.
+     */
+    public function pdfForPortal(int $id, int $partyId, int $tenantId): ?array
+    {
+        $brand = ['name' => '', 'email' => '', 'phone' => '', 'address' => '', 'logo' => ''];
+        $q = $this->conn->prepare("SELECT name, email, phone, address, logo FROM tenants WHERE id = ?");
+        if ($q) {
+            $q->bind_param('i', $tenantId);
+            $q->execute();
+            $r = $q->get_result();
+            if ($r && ($row = $r->fetch_assoc())) {
+                foreach (array_keys($brand) as $k) {
+                    $brand[$k] = (string)($row[$k] ?? '');
+                }
+            }
+        }
+        if ($brand['logo'] === '') {
+            $q2 = $this->conn->prepare("SELECT logo_path FROM invoice_templates WHERE tenant_id = ? LIMIT 1");
+            if ($q2) {
+                $q2->bind_param('i', $tenantId);
+                $q2->execute();
+                $r2 = $q2->get_result();
+                $brand['logo'] = (string)(($r2 ? $r2->fetch_assoc() : null)['logo_path'] ?? '');
+            }
+        }
+        return $this->buildPdf($id, $tenantId, $partyId, $brand, (string)$this->settings->currency_tag($tenantId));
+    }
+
+    private function buildPdf(int $id, int $tid, ?int $onlyPartyId, array $brand, string $currency): ?array
+    {
         try {
-            $q = $this->conn->prepare(
-                "SELECT i.*, p.name AS party_name, p.party_code, p.address AS party_address, p.tin AS party_tin, p.email AS party_email
-                   FROM invoice_list i INNER JOIN party_list p ON p.id = i.party_id AND p.tenant_id = i.tenant_id
-                  WHERE i.id = ? AND i.tenant_id = ?"
-            );
+            $sql = "SELECT i.*, p.name AS party_name, p.party_code, p.address AS party_address, p.tin AS party_tin, p.email AS party_email
+                      FROM invoice_list i INNER JOIN party_list p ON p.id = i.party_id AND p.tenant_id = i.tenant_id
+                     WHERE i.id = ? AND i.tenant_id = ?";
+            if ($onlyPartyId !== null) {
+                $sql .= ' AND i.party_id = ? AND ' . \App\Support\CustomerPortal::invoiceStatusSql('i`.`status');
+            }
+            $q = $this->conn->prepare($sql);
             if (!$q) {
                 return null;
             }
-            $q->bind_param('ii', $id, $tid);
+            if ($onlyPartyId !== null) {
+                $q->bind_param('iii', $id, $tid, $onlyPartyId);
+            } else {
+                $q->bind_param('ii', $id, $tid);
+            }
             $q->execute();
             $r = $q->get_result();
             $inv = $r ? $r->fetch_assoc() : null;
@@ -657,7 +698,7 @@ class InvoiceService
                 }
             }
             $customer = ['name' => $inv['party_name'], 'party_code' => $inv['party_code'], 'address' => $inv['party_address'], 'tin' => $inv['party_tin'], 'email' => $inv['party_email']];
-            $data = \App\Support\InvoicePdf::render($inv, $items, $customer, $this->settings->tenant_branding(), $tmpl, (string)$this->settings->currency_tag());
+            $data = \App\Support\InvoicePdf::render($inv, $items, $customer, $brand, $tmpl, $currency);
             return ['name' => \App\Support\InvoicePdf::filename((string)$inv['invoice_no']), 'data' => $data];
         } catch (\Throwable $e) {
             error_log('[invoice-pdf] ' . $e->getMessage());

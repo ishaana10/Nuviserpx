@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use mysqli;
+use App\Support\ProposalLink;
 use SystemSettings;
 
 /**
@@ -161,7 +162,7 @@ class DeliveryService
     public function notesFor(int $orderId): array
     {
         $t = $this->tenantId();
-        $stmt = $this->conn->prepare("SELECT d.*, (SELECT COUNT(*) FROM delivery_note_items x WHERE x.delivery_note_id = d.id AND x.invoice_id IS NOT NULL) invoiced_lines
+        $stmt = $this->conn->prepare("SELECT d.id, d.tenant_id, d.dn_no, d.sales_order_id, d.party_id, d.delivery_date, d.warehouse_id, d.status, d.stock_journal_id, d.notes, d.created_by, d.date_created, d.received_by, d.received_at, d.last_emailed_at, d.last_emailed_to, (SELECT COUNT(*) FROM delivery_note_items x WHERE x.delivery_note_id = d.id AND x.invoice_id IS NOT NULL) invoiced_lines
             FROM delivery_notes d WHERE d.tenant_id = ? AND d.sales_order_id = ? ORDER BY d.id");
         $stmt->bind_param('ii', $t, $orderId);
         $stmt->execute();
@@ -172,7 +173,7 @@ class DeliveryService
     public function all(): array
     {
         $t = $this->tenantId();
-        $stmt = $this->conn->prepare("SELECT d.*, o.order_no, p.name party_name,
+        $stmt = $this->conn->prepare("SELECT d.id, d.tenant_id, d.dn_no, d.sales_order_id, d.party_id, d.delivery_date, d.warehouse_id, d.status, d.stock_journal_id, d.notes, d.created_by, d.date_created, d.received_by, d.received_at, d.last_emailed_at, d.last_emailed_to, o.order_no, p.name party_name,
                 (SELECT COALESCE(SUM(x.qty), 0) FROM delivery_note_items x WHERE x.delivery_note_id = d.id) units,
                 (SELECT COUNT(*) FROM delivery_note_items x WHERE x.delivery_note_id = d.id AND x.invoice_id IS NOT NULL) invoiced_lines
             FROM delivery_notes d INNER JOIN sales_order_list o ON o.id = d.sales_order_id INNER JOIN party_list p ON p.id = d.party_id
@@ -185,7 +186,7 @@ class DeliveryService
     public function note(int $id): ?array
     {
         $t = $this->tenantId();
-        $stmt = $this->conn->prepare("SELECT d.*, o.order_no, p.name party_name, p.address party_address FROM delivery_notes d
+        $stmt = $this->conn->prepare("SELECT d.*, o.order_no, p.name party_name, p.address party_address, p.email party_email FROM delivery_notes d
             INNER JOIN sales_order_list o ON o.id = d.sales_order_id INNER JOIN party_list p ON p.id = d.party_id
             WHERE d.id = ? AND d.tenant_id = ?");
         $stmt->bind_param('ii', $id, $t);
@@ -368,6 +369,104 @@ class DeliveryService
     }
 
     /** Cancel a delivery that has not been invoiced: the stock goes back and the quantities are open to deliver again. */
+    /**
+     * Receiver's proof of delivery: a typed name plus a drawn signature (PNG from the signature pad).
+     * One signature per note: once captured it is locked, and a cancelled note cannot be signed.
+     * Pure check, used by signNote() and unit-tested without a database.
+     */
+    public static function signProblem(string $status, bool $alreadySigned, string $name, string $signature): ?string
+    {
+        if ($status === 'cancelled') {
+            return 'A cancelled delivery note cannot be signed.';
+        }
+        if ($alreadySigned) {
+            return 'This delivery note has already been signed.';
+        }
+        $len = function_exists('mb_strlen') ? mb_strlen($name) : strlen($name);
+        if ($len < 2 || $len > 150) {
+            return 'Type the name of the person who received the goods (2 to 150 characters).';
+        }
+        if (!ProposalLink::validSignatureImage($signature)) {
+            return 'Draw the receiver\'s signature in the box before saving.';
+        }
+        return null;
+    }
+
+    public function signNote(int $id, string $receiverName, string $signature, int $userId): string
+    {
+        $d = $this->note($id);
+        if (!$d) {
+            return $this->fail('Delivery note not found.');
+        }
+        $name = trim((string)preg_replace('/\s+/u', ' ', strip_tags($receiverName)));
+        if ($msg = self::signProblem((string)$d['status'], !empty($d['received_at']), $name, $signature)) {
+            return $this->fail($msg);
+        }
+        $t = $this->tenantId();
+        // "received_at IS NULL" keeps two simultaneous saves from overwriting each other.
+        $stmt = $this->conn->prepare("UPDATE delivery_notes SET received_by = ?, receiver_signature = ?, received_at = NOW(), signed_by_user_id = ?
+            WHERE id = ? AND tenant_id = ? AND received_at IS NULL AND status <> 'cancelled'");
+        $stmt->bind_param('ssiii', $name, $signature, $userId, $id, $t);
+        $stmt->execute();
+        if ($stmt->affected_rows !== 1) {
+            return $this->fail('This delivery note has already been signed.');
+        }
+        return json_encode(['status' => 'success', 'msg' => 'Signature saved.']);
+    }
+
+    /** The signed delivery note as a PDF, in memory only: [name, data], or null when it cannot be built. */
+    public function pdf(int $id): ?array
+    {
+        $d = $this->note($id);
+        if (!$d) {
+            return null;
+        }
+        try {
+            return ['name' => \App\Support\DeliveryNotePdf::filename((string)$d['dn_no']),
+                'data' => \App\Support\DeliveryNotePdf::render($d, $this->noteItems($id), $this->settings->tenant_branding())];
+        } catch (\Throwable $e) {
+            error_log('[delivery-note-pdf] ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /** Pure: why a note cannot be emailed yet (it must be signed and not cancelled), or null. */
+    public static function emailProblem(string $status, bool $signed): ?string
+    {
+        if ($status === 'cancelled') {
+            return 'A cancelled delivery note cannot be emailed.';
+        }
+        return $signed ? null : 'Get the receiver to sign the delivery note before emailing it to the customer.';
+    }
+
+    /** Email the signed delivery note (PDF attached) to the customer's address, or to $override when given. */
+    public function emailNote(int $id, ?string $override = null): string
+    {
+        $d = $this->note($id);
+        if (!$d) {
+            return $this->fail('Delivery note not found.');
+        }
+        if ($msg = self::emailProblem((string)$d['status'], !empty($d['received_at']))) {
+            return $this->fail($msg);
+        }
+        $override = trim((string)$override);
+        $to = CustomerStatementService::validEmail($override !== '' ? $override : (string)$d['party_email']);
+        if ($to === null) {
+            return $this->fail($override !== '' ? 'That email address is not valid.'
+                : 'No valid email address is saved for ' . $d['party_name'] . '. Enter one to send the delivery note.');
+        }
+        require_once base_app . 'classes/Emailer.php';
+        $sys = ['name' => $this->settings->info('name'), 'email' => $this->settings->info('email')];
+        if (!\Emailer::send_delivery_note_email($to, $d, $sys, $this->pdf($id))) {
+            return $this->fail('The email to ' . $to . ' could not be sent. Check Settings > Company Email, and the email log for the reason.');
+        }
+        $t = $this->tenantId();
+        $stmt = $this->conn->prepare("UPDATE delivery_notes SET last_emailed_at = NOW(), last_emailed_to = ? WHERE id = ? AND tenant_id = ?");
+        $stmt->bind_param('sii', $to, $id, $t);
+        $stmt->execute();
+        return json_encode(['status' => 'success', 'msg' => 'Signed delivery note sent to ' . $d['party_name'] . ' (' . $to . ').']);
+    }
+
     public function cancelDelivery(int $id): string
     {
         $t = $this->tenantId();
