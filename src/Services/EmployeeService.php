@@ -302,9 +302,32 @@ class EmployeeService
         if ($update) {
             $this->settings->log_audit($status === 'approved' ? 'Approved Leave' : 'Rejected Leave', 'HR & Attendance', "Leave #{$id} for employee #{$leave['employee_id']} ({$leave['leave_type']}, {$leave['start_date']} to {$leave['end_date']}) {$status}.");
             $this->settings->set_flashdata('success', " Leave request has been {$status}.");
+            $this->emailLeaveDecision($leave, $status);
             return json_encode(['status' => 'success']);
         }
         return \App\Support\Db::fail($this->conn, 'An error occurred.');
+    }
+
+    /** Best effort: tell the employee. A failure to email never undoes or blocks the decision. */
+    private function emailLeaveDecision(array $leave, string $status): void
+    {
+        try {
+            $tenant_id = (int)$this->settings->active_tenant_id();
+            $eid = (int)$leave['employee_id'];
+            $q = $this->conn->prepare("SELECT firstname, lastname, email FROM employee_list WHERE id = ? AND tenant_id = ?");
+            $q->bind_param('ii', $eid, $tenant_id);
+            $q->execute();
+            $e = $q->get_result()->fetch_assoc();
+            $to = trim((string)($e['email'] ?? ''));
+            if (!$e || !filter_var($to, FILTER_VALIDATE_EMAIL)) {
+                return;
+            }
+            require_once(base_app . 'classes/Emailer.php');
+            $sys = ['name' => (string)($this->settings->tenant_branding()['name'] ?? '')];
+            \Emailer::send_leave_decision_email($to, trim($e['firstname'] . ' ' . $e['lastname']), $leave, $status, $sys);
+        } catch (\Throwable $ex) {
+            error_log('[leave-email] ' . $ex->getMessage());
+        }
     }
 
     /**

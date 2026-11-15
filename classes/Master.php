@@ -1253,6 +1253,36 @@ class Master extends DBConnection
         return $this->employee_portal_start($svc->activate((string)($_POST['token'] ?? ''), $pw, (string)($_SERVER['REMOTE_ADDR'] ?? '')));
     }
 
+    /** The signed-in portal employee as [portal user id, tenant, employee], or null (also when HR has revoked access). */
+    private function employee_portal_identity(): ?array
+    {
+        $p = $_SESSION['employee_portal'] ?? null;
+        if (!is_array($p) || empty($p['employee_id']) || empty($p['tenant_id']) || empty($p['id'])) {
+            return null;
+        }
+        $svc = new \App\Services\EmployeePortalService($this->conn, $this->settings);
+        return $svc->stillActive((int)$p['id'], (int)$p['tenant_id'], (int)$p['employee_id'])
+            ? [(int)$p['id'], (int)$p['tenant_id'], (int)$p['employee_id']] : null;
+    }
+
+    public function employee_portal_leave_apply()
+    {
+        $who = $this->employee_portal_identity();
+        if ($who === null) {
+            return json_encode(['status' => 'failed', 'msg' => 'Please sign in again.']);
+        }
+        return (new \App\Services\PortalLeaveService($this->conn, $who[1], $who[2]))->apply($_POST);
+    }
+
+    public function employee_portal_leave_cancel()
+    {
+        $who = $this->employee_portal_identity();
+        if ($who === null) {
+            return json_encode(['status' => 'failed', 'msg' => 'Please sign in again.']);
+        }
+        return (new \App\Services\PortalLeaveService($this->conn, $who[1], $who[2]))->cancel((int)($_POST['id'] ?? 0));
+    }
+
     public function delete_employee()
     {
         return $this->container->make(EmployeeService::class)->deleteEmployee(intval($_POST['id'] ?? 0));
@@ -1463,7 +1493,7 @@ $allowed_actions = [
     'delete_journal', 'cancel_journal', 'save_employee', 'delete_employee',
     'save_public_holiday', 'delete_public_holiday', 'save_leave_entitlement', 'save_leave_policy',
     'save_leave_adjustment', 'leave_balance_info', 'leave_payout_suggestion', 'invite_employee_portal',
-    'revoke_employee_portal', 'employee_portal_login', 'employee_portal_activate', 'save_attendance',
+    'revoke_employee_portal', 'employee_portal_login', 'employee_portal_activate', 'employee_portal_leave_apply', 'employee_portal_leave_cancel', 'save_attendance',
     'delete_attendance', 'save_leave', 'update_leave_status', 'cancel_leave',
     'delete_leave', 'calculate_payroll_ajax', 'save_payroll_rules', 'delete_payroll_rules_version',
     'reset_payroll_rules', 'save_payroll', 'delete_payroll', 'save_party',

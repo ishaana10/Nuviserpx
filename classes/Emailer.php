@@ -488,6 +488,30 @@ class Emailer {
         return self::send_email($to, $subject, $html);
     }
 
+    /** Tells an employee their leave request was approved or rejected. */
+    public static function send_leave_decision_email($to, $employee_name, $leave, $status, $sys_info = []) {
+        $company_name = $sys_info['name'] ?? 'Nuvis ERPX';
+        $approved = $status === 'approved';
+        $subject = 'Your leave request was ' . ($approved ? 'approved' : 'not approved') . ' - ' . $company_name;
+        $types = ['casual' => 'Casual leave', 'sick' => 'Sick leave', 'paid' => 'Annual / paid leave', 'unpaid' => 'Unpaid leave'];
+        $type = $types[$leave['leave_type'] ?? ''] ?? ucfirst((string)($leave['leave_type'] ?? 'Leave'));
+        $range = date('D j M Y', strtotime((string)$leave['start_date']));
+        if (($leave['end_date'] ?? '') !== ($leave['start_date'] ?? '')) {
+            $range .= ' to ' . date('D j M Y', strtotime((string)$leave['end_date']));
+        }
+        $colour = $approved ? '#166534' : '#b91c1c';
+        $body = "
+        <h3>Dear " . htmlspecialchars((string)$employee_name) . ",</h3>
+        <p>Your leave request has been <b style='color:{$colour}'>" . ($approved ? 'approved' : 'declined') . "</b>.</p>
+        <div style='background:#f8fafc;padding:15px;border-radius:6px;margin:16px 0'>
+            <p style='margin:4px 0'><b>Type:</b> " . htmlspecialchars($type) . "</p>
+            <p style='margin:4px 0'><b>Dates:</b> " . htmlspecialchars($range) . "</p>
+        </div>
+        <p style='font-size:13px;color:#666'>You can see all your requests and balances in the Employee Portal: <a href='" . htmlspecialchars(base_url . 'portal/employee_login.php') . "'>" . htmlspecialchars(base_url . 'portal/employee_login.php') . "</a></p>";
+        $html = self::wrap_template('Leave request ' . ($approved ? 'approved' : 'declined'), $body, $company_name);
+        return self::send_email($to, $subject, $html);
+    }
+
     public static function send_payslip_email($to, $payroll, $sys_info = []) {
         $company_name = $sys_info['name'] ?? 'Nuvis ERPX';
         $subject = "Confidential Salary Slip - " . $payroll['salary_month'] . " (" . $company_name . ")";
