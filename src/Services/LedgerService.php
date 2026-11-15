@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Support\Money;
 use mysqli;
 
 /**
@@ -258,7 +259,7 @@ class LedgerService
             'debit' => round($tdr, 2),
             'credit' => round($tcr, 2),
             'difference' => round($tdr - $tcr, 2),
-            'balanced' => abs($tdr - $tcr) < 0.005,
+            'balanced' => Money::cents($tdr) === Money::cents($tcr),
         ];
     }
 
@@ -390,7 +391,7 @@ class LedgerService
             'current_year_earnings' => $current,
             'retained_earnings' => $retained,
             'difference' => round($netAssets - $tot['equity'], 2),
-            'balanced' => abs($netAssets - $tot['equity']) < 0.005,
+            'balanced' => Money::cents($netAssets) === Money::cents($tot['equity']),
         ];
     }
 
@@ -751,12 +752,12 @@ class LedgerService
     public static function validateLines(array $lines, ?array $validAccountIds = null, bool $requireBalanced = true): array
     {
         $errors = [];
-        $dr = $cr = 0.0;
+        $drC = $crC = 0; // whole cents: exact, no float drift on long journals
         $count = 0;
         foreach ($lines as $i => $l) {
             $n = $i + 1;
-            $d = round((float)($l['debit'] ?? 0), 2);
-            $c = round((float)($l['credit'] ?? 0), 2);
+            $d = Money::toFloat(Money::cents($l['debit'] ?? 0));
+            $c = Money::toFloat(Money::cents($l['credit'] ?? 0));
             $acc = (int)($l['account_id'] ?? 0);
             if ($acc === 0 && $d == 0.0 && $c == 0.0) {
                 continue; // blank row
@@ -777,8 +778,8 @@ class LedgerService
             if ($d == 0.0 && $c == 0.0) {
                 $errors[] = "Line {$n}: enter an amount.";
             }
-            $dr += $d;
-            $cr += $c;
+            $drC += Money::cents($l['debit'] ?? 0);
+            $crC += Money::cents($l['credit'] ?? 0);
             $count++;
         }
         if (!$requireBalanced) {
@@ -788,8 +789,8 @@ class LedgerService
         if ($count < 2) {
             $errors[] = 'A journal needs at least two lines.';
         }
-        if (abs($dr - $cr) >= 0.005) {
-            $errors[] = sprintf('Debits (%s) and credits (%s) must be equal — out by %s.', number_format($dr, 2), number_format($cr, 2), number_format(abs($dr - $cr), 2));
+        if ($drC !== $crC) {
+            $errors[] = sprintf('Debits (%s) and credits (%s) must be equal — out by %s.', number_format($drC / 100, 2), number_format($crC / 100, 2), number_format(abs($drC - $crC) / 100, 2));
         }
         return $errors;
     }

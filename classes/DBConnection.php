@@ -45,21 +45,46 @@ class DBConnection{
                 @$this->conn->query("SET time_zone = '" . date('P') . "'");
             }
 
-            // Auto-install schema if system_info table is missing
-            $check_tbl = @$this->conn->query("SHOW TABLES LIKE 'system_info'");
-            if (!$check_tbl || $check_tbl->num_rows == 0) {
-                $this->auto_install_schema();
+            if (getenv('AUTO_MIGRATE') === '0') {
+                // Production mode: a request never changes the schema. Updates are applied by `php bin/migrate.php`
+                // (bin/deploy.sh does it). One cheap query makes sure the code and the database belong together.
+                $this->assertSchemaCurrent();
             } else {
-                (new \App\Database\LegacySchemaCatchup($this->conn))->run();
-            }
-
-            // Run versioned migrations
-            if (class_exists('App\Database\MigrationRunner')) {
-                $runner = new \App\Database\MigrationRunner($this->conn);
-                $runner->run(base_app . 'database/migrations');
+                // Development and older installs: bring the schema up to date on connect, as before, but a failing
+                // migration is now logged and left unrecorded instead of being marked as done.
+                $check_tbl = @$this->conn->query("SHOW TABLES LIKE 'system_info'");
+                if (!$check_tbl || $check_tbl->num_rows == 0) {
+                    $this->auto_install_schema();
+                } else {
+                    (new \App\Database\LegacySchemaCatchup($this->conn))->run();
+                }
+                try {
+                    (new \App\Database\MigrationRunner($this->conn))->run(base_app . 'database/migrations');
+                } catch (\App\Database\MigrationFailed $e) {
+                    // Already written to the error log by the runner; serve the request, retry on the next one.
+                }
             }
         }    
         
+    }
+
+    /** Stops the request with a 503 when the database is behind the code (migrations not yet applied). */
+    private function assertSchemaCurrent(): void
+    {
+        $dir = base_app . 'database/migrations';
+        $latest = \App\Database\MigrationRunner::latestFile($dir);
+        $done = (new \App\Database\MigrationRunner($this->conn))->latestApplied();
+        if ($latest !== null && ($done === null || strcmp($done, $latest) < 0)) {
+            error_log("[nuviserpx] Database is behind the code (applied: " . ($done ?? 'none') . ", needed: {$latest}). Run: php bin/migrate.php");
+            if (!headers_sent()) {
+                http_response_code(503);
+                header('Retry-After: 120');
+            }
+            die("<div style='padding:20px; font-family:sans-serif; background:#fef3c7; border:1px solid #f59e0b; color:#92400e; border-radius:8px;'>
+                <h3 style='margin-top:0;'>Update in progress</h3>
+                <p>The system is being updated. Please try again in a few minutes.</p>
+            </div>");
+        }
     }
 
     /** Kept for compatibility: the implementation lives in LegacySchemaCatchup. */

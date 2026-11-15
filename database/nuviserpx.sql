@@ -168,10 +168,7 @@ CREATE TABLE `journal_entries` (
 -- Dumping data for table `journal_entries`
 --
 
-INSERT INTO `journal_entries` (`id`, `code`, `journal_date`, `description`, `user_id`, `date_created`, `date_updated`) VALUES
-(3, '202202-00001', '2022-02-01', 'Capital', 1, '2022-02-01 14:08:50', NULL),
-(4, '202202-00002', '2022-02-01', 'Sample', 1, '2022-02-01 15:55:46', NULL),
-(5, '202202-00003', '2022-02-01', 'Sample 102', 1, '2022-02-01 15:59:34', NULL);
+-- (no sample journal entries: a new company starts with empty books)
 
 -- --------------------------------------------------------
 
@@ -191,14 +188,7 @@ CREATE TABLE `journal_items` (
 -- Dumping data for table `journal_items`
 --
 
-INSERT INTO `journal_items` (`journal_id`, `account_id`, `group_id`, `amount`, `date_created`) VALUES
-(3, 1, 1, 15000, '2022-02-01 14:52:56'),
-(3, 14, 5, 15000, '2022-02-01 14:52:56'),
-(4, 42, 3, 5000, '2022-02-01 15:55:46'),
-(4, 11, 4, 5000, '2022-02-01 15:55:46'),
-(5, 31, 2, 5000, '2022-02-01 15:59:34'),
-(5, 31, 2, 3000, '2022-02-01 15:59:34'),
-(5, 4, 1, 8000, '2022-02-01 15:59:34');
+-- (no sample journal lines)
 
 -- --------------------------------------------------------
 

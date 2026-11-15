@@ -53,7 +53,7 @@ GRANT ALL PRIVILEGES ON nuviserpx.* TO 'nuvis_app'@'localhost';
 GRANT ALL PRIVILEGES ON `nuviserpx\_restorecheck`.* TO 'nuvis_app'@'localhost';
 ```
 
-`GRANT ALL` on that one database is needed today because the application still applies schema changes (ALTER/CREATE) itself when it starts. Once migrations are moved fully out of web requests, the runtime user can be reduced to `SELECT, INSERT, UPDATE, DELETE, LOCK TABLES` and a second user used only by `bin/migrate.php`. Until then, do not give the user access to any other database.
+With `AUTO_MIGRATE=0` (the default for new installs) web requests never change the schema, so the runtime user needs only `SELECT, INSERT, UPDATE, DELETE, LOCK TABLES` on that database; use a second user with `ALTER, CREATE, INDEX, DROP, REFERENCES` for `bin/migrate.php` and `bin/deploy.sh`. Older installs that still run with `AUTO_MIGRATE=1` need `GRANT ALL` on the one database until you switch. Never give either user access to any other database.
 
 ## Cron
 
