@@ -6,6 +6,9 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
 ## [Unreleased] - 2026-11-14
 
 ### Fixed
+- Employee and customer portal pages no longer redirect to the staff login: the staff session check ran on every portal
+  page, so employees were sent to the main login after setting their password, and a signed-in admin was bounced away
+  from the portal sign-in page.
 - Employees were confused about where to sign in: the staff login page now links to the Employee Portal sign-in, and the
   invitation email gives the portal sign-in address.
 - Employee portal: the sign-in username (the employee's email address) is now shown on the set-password page and the
