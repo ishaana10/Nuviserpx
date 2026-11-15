@@ -31,4 +31,10 @@ $svc = file_get_contents(__DIR__ . '/../src/Services/CustomerPortalService.php')
 check('invitation link points at the activation page', strpos($svc, 'portal/register.php?token=') !== false && strpos($svc, 'portal/login.php?token=') === false);
 check('invitation tokens are stored hashed', strpos($svc, 'tokenHash($token)') !== false);
 check('login page forwards old invitation links', strpos(file_get_contents(__DIR__ . '/../portal/login.php'), 'register.php?token=') !== false);
+check('change password: new and confirmation must match', P::changePasswordProblem('Old12345x', 'New12345x', 'Other12345') !== null);
+check('change password: weak new password refused', P::changePasswordProblem('Old12345x', 'short1', 'short1') !== null);
+check('change password: same as current refused', P::changePasswordProblem('Old12345x', 'Old12345x', 'Old12345x') !== null);
+check('change password: a good new password passes', P::changePasswordProblem('Old12345x', 'New12345x', 'New12345x') === null);
+check('sign-in page links to the change-password page', strpos(file_get_contents(__DIR__ . '/../portal/login.php'), 'href="change_password.php"') !== false);
+check('change_password is a public action (no staff login needed)', in_array('customer_change_password', \App\Support\Permissions::PUBLIC_ACTIONS, true));
 exit($fail ? 1 : 0);

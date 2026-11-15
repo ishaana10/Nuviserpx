@@ -194,6 +194,57 @@ class CustomerPortalService
         return json_encode(['status' => 'failed', 'msg' => 'Invalid email address or password.']);
     }
 
+    /**
+     * Change the password from the sign-in page: email + current password + new password. Does not sign the
+     * customer in. Rate-limited per email like sign-in, and unknown emails cost the same as a wrong password.
+     * Pure rules (matching, strength, must differ) are in CustomerPortal::changePasswordProblem().
+     */
+    public function customer_change_password()
+    {
+        $email   = trim((string)($_POST['email'] ?? ''));
+        $current = (string)($_POST['current'] ?? '');
+        $new     = (string)($_POST['password'] ?? '');
+        $confirm = (string)($_POST['confirm_password'] ?? '');
+
+        if ($email === '' || $current === '' || $new === '') {
+            return json_encode(['status' => 'failed', 'msg' => 'Please fill in all the fields.']);
+        }
+        if ($msg = \App\Support\CustomerPortal::changePasswordProblem($current, $new, $confirm)) {
+            return json_encode(['status' => 'failed', 'msg' => $msg]);
+        }
+
+        $throttle = new \App\Services\AuthThrottleService($this->conn);
+        $wait = $throttle->check('customer_login', $email);
+        if ($wait > 0) {
+            return json_encode(['status' => 'locked', 'retry_after' => $wait,
+                'msg' => 'Too many failed attempts. Try again in ' . \App\Services\AuthThrottleService::waitText($wait) . '.']);
+        }
+
+        $stmt = $this->conn->prepare("SELECT * FROM `customer_portal_users` WHERE `email` = ? AND `status` = 1 LIMIT 1");
+        $stmt->bind_param('s', $email);
+        $stmt->execute();
+        $user = $stmt->get_result()->fetch_assoc();
+
+        if (!$user || !password_verify($current, (string)$user['password'])) {
+            if (!$user) {
+                password_verify($current, '$2y$10$4atYI/I54Zf2duldz2eoGeLt85rsTV2yvoQVc7oLbm1JwmpyG6aDK');
+            }
+            $throttle->record('customer_login', $email);
+            return json_encode(['status' => 'failed', 'msg' => 'Your email address or current password is not correct.']);
+        }
+
+        $hash = password_hash($new, PASSWORD_BCRYPT);
+        $uid = (int)$user['id'];
+        $upd = $this->conn->prepare("UPDATE `customer_portal_users` SET `password` = ? WHERE id = ?");
+        $upd->bind_param('si', $hash, $uid);
+        if (!$upd->execute()) {
+            return json_encode(['status' => 'failed', 'msg' => 'Could not change the password. Please try again.']);
+        }
+        $throttle->clear('customer_login', $email);
+        $this->log_portal_activity($user['tenant_id'], $user['party_id'], $user['id'], 'password_changed', 'Customer changed their portal password');
+        return json_encode(['status' => 'success', 'msg' => 'Password changed. You can now sign in with the new password.']);
+    }
+
     public function get_portal_logs()
     {
         $tenant_id = $this->settings->active_tenant_id();
