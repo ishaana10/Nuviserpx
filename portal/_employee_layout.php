@@ -35,6 +35,19 @@ if ($cq) { $cq->bind_param('i', $tenantId); $cq->execute(); $company = (string)(
 if ($company === '') { $company = (string)$_settings->info('name'); }
 $leaveOn = $leave->enabled();
 
+/**
+ * The same payslip HR sees in payroll (logo, year-to-date, leave balances, employer contributions), for this employee only.
+ * It is included from inside a function so its many working variables do not leak into the page, and it runs with
+ * PortalSettings, which restricts it to the signed-in employee's own posted payslips.
+ */
+function emp_render_payslip(int $payrollId): void
+{
+    global $conn, $tenantId, $employeeId;
+    $_settings = new \App\Support\PortalSettings($conn, $tenantId, $employeeId);
+    $_GET['id'] = (string)$payrollId;
+    include(__DIR__ . '/../admin/payroll/view_payslip.php');
+}
+
 function emp_header(string $title, string $active): void
 {
     global $h, $company, $me, $leaveOn, $_settings;

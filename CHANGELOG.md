@@ -6,6 +6,13 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
 ## [Unreleased] - 2026-11-14
 
 ### Added
+- Employee Portal: My Payslips now shows the same payslip as payroll (company logo, year-to-date, leave balances,
+  employer contributions). My Leave has Balances / New Request / View Requests / Calendar tabs; the request form checks
+  the balance, working days, public holidays and overlaps live and will not submit a request that cannot be granted, and
+  a calendar shows your pending and approved leave and public holidays and can be used to pick dates.
+- Leave requests can carry one attachment (e.g. a sick-leave medical certificate): PDF, JPG or PNG up to 2 MB, photos
+  are shrunk to 1600 px, stored privately in uploads/leave_docs/ (not web-accessible) and shown to HR and the approver.
+  The file is deleted when the request is cancelled or deleted, to save server space. Migration 044.
 - Employee Portal v2: a side menu (Home, My Leave, My Payslips, My Details) that works on phones. Home shows leave balances
   and the latest payslip. Employees apply for leave, see balances and request history, and cancel pending requests
   (same rules as staff entry: balance check, half days, public holidays). My Details is read-only. Employees are emailed

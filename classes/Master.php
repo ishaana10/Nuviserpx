@@ -1271,7 +1271,16 @@ class Master extends DBConnection
         if ($who === null) {
             return json_encode(['status' => 'failed', 'msg' => 'Please sign in again.']);
         }
-        return (new \App\Services\PortalLeaveService($this->conn, $who[1], $who[2]))->apply($_POST);
+        return (new \App\Services\PortalLeaveService($this->conn, $who[1], $who[2]))->apply($_POST, $_FILES['attachment'] ?? null);
+    }
+
+    public function employee_portal_leave_preview()
+    {
+        $who = $this->employee_portal_identity();
+        if ($who === null) {
+            return json_encode(['status' => 'failed', 'msg' => 'Please sign in again.']);
+        }
+        return json_encode((new \App\Services\PortalLeaveService($this->conn, $who[1], $who[2]))->preview($_POST));
     }
 
     public function employee_portal_leave_cancel()
@@ -1493,7 +1502,7 @@ $allowed_actions = [
     'delete_journal', 'cancel_journal', 'save_employee', 'delete_employee',
     'save_public_holiday', 'delete_public_holiday', 'save_leave_entitlement', 'save_leave_policy',
     'save_leave_adjustment', 'leave_balance_info', 'leave_payout_suggestion', 'invite_employee_portal',
-    'revoke_employee_portal', 'employee_portal_login', 'employee_portal_activate', 'employee_portal_leave_apply', 'employee_portal_leave_cancel', 'save_attendance',
+    'revoke_employee_portal', 'employee_portal_login', 'employee_portal_activate', 'employee_portal_leave_apply', 'employee_portal_leave_cancel', 'employee_portal_leave_preview', 'save_attendance',
     'delete_attendance', 'save_leave', 'update_leave_status', 'cancel_leave',
     'delete_leave', 'calculate_payroll_ajax', 'save_payroll_rules', 'delete_payroll_rules_version',
     'reset_payroll_rules', 'save_payroll', 'delete_payroll', 'save_party',

@@ -246,6 +246,7 @@ class EmployeeService
         if ($save) {
             $this->settings->log_audit(empty($id) ? 'Submitted Leave' : 'Updated Leave', 'HR & Attendance', "Leave #{$leaveId} for employee #" . ($post['employee_id'] ?? '?') . ' (' . ($post['leave_type'] ?? '') . ', ' . ($post['start_date'] ?? '') . ' to ' . ($post['end_date'] ?? '') . ', ' . ($post['day_fraction'] ?? 'full') . ').');
             $resp['status'] = 'success';
+            $resp['id'] = $leaveId;
             $resp['msg'] = empty($id) ? " Leave request submitted successfully." : " Leave request updated successfully.";
         } else {
             $resp['status'] = 'failed';
@@ -308,6 +309,31 @@ class EmployeeService
         return \App\Support\Db::fail($this->conn, 'An error occurred.');
     }
 
+    /** Free the disk space: delete a request's attached file (and forget it when $clearRow). Never blocks the caller. */
+    private function dropAttachment(int $leaveId, int $tenantId, bool $clearRow = true): void
+    {
+        try {
+            $q = $this->conn->prepare("SELECT attachment_path FROM leave_list WHERE id = ? AND tenant_id = ?");
+            if (!$q) {
+                return;
+            }
+            $q->bind_param('ii', $leaveId, $tenantId);
+            $q->execute();
+            $path = (string)($q->get_result()->fetch_assoc()['attachment_path'] ?? '');
+            if ($path === '') {
+                return;
+            }
+            \App\Support\LeaveAttachment::remove($path);
+            if ($clearRow) {
+                $u = $this->conn->prepare("UPDATE leave_list SET attachment_path = NULL, attachment_name = NULL, attachment_size = NULL WHERE id = ? AND tenant_id = ?");
+                $u->bind_param('ii', $leaveId, $tenantId);
+                $u->execute();
+            }
+        } catch (\Throwable $e) {
+            error_log('[leave-attachment] ' . $e->getMessage());
+        }
+    }
+
     /** Best effort: tell the employee. A failure to email never undoes or blocks the decision. */
     private function emailLeaveDecision(array $leave, string $status): void
     {
@@ -357,6 +383,7 @@ class EmployeeService
 
         $update = $this->conn->query("UPDATE `leave_list` set `status` = 'cancelled' where id = '{$id}' and tenant_id = '{$tenant_id}'");
         if ($update) {
+            $this->dropAttachment($id, $tenant_id);
             $this->settings->log_audit('Cancelled Leave', 'HR & Attendance', "Leave #{$id} for employee #{$leave['employee_id']} cancelled.");
             $this->settings->set_flashdata('success', " Leave request has been cancelled.");
             return json_encode(['status' => 'success']);
@@ -368,6 +395,7 @@ class EmployeeService
     {
         $tenant_id = $this->settings->active_tenant_id();
         $was = $this->conn->query("SELECT employee_id, leave_type, start_date, end_date, status FROM `leave_list` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'")->fetch_assoc() ?: [];
+        $this->dropAttachment($id, (int)$tenant_id, false);
         $del = $this->conn->query("DELETE FROM `leave_list` where id = '{$id}' and tenant_id = '{$tenant_id}'");
         if ($del) {
             $this->settings->log_audit('Deleted Leave', 'HR & Attendance', "Deleted leave #{$id}: employee #" . ($was['employee_id'] ?? '?') . ' ' . ($was['leave_type'] ?? '') . ' ' . ($was['start_date'] ?? '') . ' to ' . ($was['end_date'] ?? '') . ' (' . ($was['status'] ?? '') . ').');
