@@ -1,6 +1,22 @@
+# Cross-origin access is NOT opened for the whole site. API callers from a browser are allowed per origin
+# through API_CORS_ORIGINS in .env (see api/v1/auth.php).
 <IfModule mod_headers.c>
-    Header set Access-Control-Allow-Origin "*"
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
 </IfModule>
+
+# Never serve dotfiles, dumps, logs, lock files or dependency manifests.
+<FilesMatch "^(\.env.*|\.git.*|composer\.(json|lock)|phpunit\.xml|phpstan.*\.neon|.*\.(sql|log|bak|lock|md))$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
 
 <IfModule mod_rewrite.c>
     RewriteEngine on

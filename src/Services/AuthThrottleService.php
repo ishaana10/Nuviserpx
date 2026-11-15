@@ -22,6 +22,7 @@ class AuthThrottleService
     public const WINDOW = 900;
     public const LIMITS = [
         'login'       => ['pair' => 5, 'user' => 20, 'ip' => 30],
+        'customer_login' => ['pair' => 5, 'user' => 20, 'ip' => 30],
         'otp_request' => ['pair' => 3, 'user' => 5,  'ip' => 10],
         'otp_verify'  => ['pair' => 5, 'user' => 10, 'ip' => 20],
     ];

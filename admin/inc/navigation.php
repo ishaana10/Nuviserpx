@@ -73,7 +73,7 @@ if($t_qry && $t_qry->num_rows > 0){
 
 <script>
 $(document).ready(function(){
-    var page = '<?php echo isset($_GET['page']) ? $_GET['page'] : 'home' ?>';
+    var page = <?php $nv_page = \App\Support\PageRoute::clean($_GET['page'] ?? null); echo json_encode($nv_page === \App\Support\PageRoute::INVALID ? 'home' : $nv_page, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
     page = page.replace(/\//gi,'_');
 
     if($('.nav-link.nav-'+page).length > 0){

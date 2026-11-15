@@ -97,6 +97,12 @@ class Login extends DBConnection {
 	function client_login(){
 		$email = $_POST['email'] ?? null;
 		$password = $_POST['password'] ?? null;
+		$throttle = $this->throttle();
+		$wait = $throttle->check('customer_login', (string)$email);
+		if($wait > 0){
+			return json_encode(array('status'=>'locked', 'retry_after'=>$wait,
+				'msg'=>'Too many failed attempts. Try again in ' . \App\Services\AuthThrottleService::waitText($wait) . '.'));
+		}
 		$stmt = $this->conn->prepare("SELECT *,concat(lastname,', ',firstname,' ',middlename) as fullname from client_list where email = ? LIMIT 1");
 		$stmt->bind_param('s',$email);
 		$stmt->execute();
@@ -109,20 +115,25 @@ class Login extends DBConnection {
 				$res = $qry->fetch_array();
 				if (password_verify($password, $res['password'])) {
 					if($res['status'] == 1){
+						session_regenerate_id(true);
 						foreach($res as $k => $v){
+							if($k === 'password') continue; // the hash never goes into the session
 							$this->settings->set_userdata($k,$v);
 						}
 						$this->settings->set_userdata('login_type',2);
+						$throttle->clear('customer_login', (string)$email);
 						$resp['status'] = 'success';
 					}else{
 						$resp['status'] = 'failed';
 						$resp['msg'] = "Your Account has been blocked. Contact the management.";
 					}
 				}else{
+					$throttle->record('customer_login', (string)$email);
 					$resp['status'] = 'failed';
 					$resp['msg'] = "Invalid email or password.";
 				}
 			}else{
+				$throttle->record('customer_login', (string)$email);
 				$resp['status'] = 'failed';
 				$resp['msg'] = "Invalid email or password.";
 			}

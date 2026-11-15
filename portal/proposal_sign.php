@@ -2,8 +2,10 @@
 require_once(__DIR__ . '/../config.php');
 
 $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
-if($id <= 0){
-    die("Invalid Sales Order / Proposal Reference ID.");
+$sign_token = (string)($_GET['t'] ?? '');
+if($id <= 0 || $sign_token === ''){
+    http_response_code(404);
+    die("This proposal link is not valid.");
 }
 
 $qry = $conn->query("
@@ -13,11 +15,12 @@ $qry = $conn->query("
     WHERE s.id = '{$id}'
 ");
 
-if(!$qry || $qry->num_rows <= 0){
-    die("Sales Order / Proposal record not found.");
+$proposal = ($qry && $qry->num_rows > 0) ? $qry->fetch_assoc() : null;
+// Same answer for "no such proposal" and "wrong token", so ids cannot be probed.
+if(!$proposal || !\App\Support\ProposalLink::matches($proposal['sign_token'] ?? null, $sign_token)){
+    http_response_code(404);
+    die("This proposal link is not valid.");
 }
-
-$proposal = $qry->fetch_assoc();
 $tenant_id = $proposal['tenant_id'];
 
 // Check existing signature
@@ -143,6 +146,7 @@ $items = $conn->query("SELECT * FROM `sales_order_items` WHERE sales_order_id = 
             <div class="card-body">
                 <form id="e-sign-form">
                     <input type="hidden" name="sales_order_id" value="<?= $id ?>">
+                    <input type="hidden" name="sign_token" value="<?= htmlspecialchars($sign_token, ENT_QUOTES) ?>">
                     <input type="hidden" name="tenant_id" value="<?= $tenant_id ?>">
                     <input type="hidden" name="signature_data" id="signature_data">
 

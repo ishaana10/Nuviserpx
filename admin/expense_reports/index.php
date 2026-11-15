@@ -67,7 +67,7 @@ $badge = ['pending' => 'warning', 'approved' => 'info', 'reimbursed' => 'success
                         <td class="align-middle text-right font-weight-bold"><?= number_format((float)$row['amount'], 2) ?></td>
                         <td class="align-middle text-center">
                             <?php if (!empty($row['attachment_path'])): ?>
-                                <a href="<?= $h(base_url . $row['attachment_path']) ?>" target="_blank" rel="noopener" class="btn btn-xs btn-outline-info"><i class="fas fa-paperclip mr-1"></i> Receipt</a>
+                                <a href="<?= $h(base_url . 'admin/attachments/file.php?type=expense&id=' . (int)$row['id']) ?>" target="_blank" rel="noopener" class="btn btn-xs btn-outline-info"><i class="fas fa-paperclip mr-1"></i> Receipt</a>
                             <?php else: ?><span class="text-muted text-xs">None</span><?php endif; ?>
                         </td>
                         <td class="text-center align-middle">

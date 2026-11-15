@@ -135,25 +135,38 @@ class CustomerPortalService
             return json_encode(['status' => 'failed', 'msg' => 'Please enter your email and password.']);
         }
 
-        $email_esc = $this->conn->real_escape_string($email);
-        $qry = $this->conn->query("SELECT * FROM `customer_portal_users` WHERE `email` = '{$email_esc}' AND `status` = 1 LIMIT 1");
-
-        if ($qry && $qry->num_rows > 0) {
-            $user = $qry->fetch_assoc();
-            if (password_verify($password, $user['password'])) {
-                $_SESSION['customer_portal'] = [
-                    'id' => $user['id'],
-                    'tenant_id' => $user['tenant_id'],
-                    'party_id' => $user['party_id'],
-                    'email' => $user['email']
-                ];
-
-                $this->conn->query("UPDATE `customer_portal_users` SET `last_login` = NOW() WHERE id = '{$user['id']}'");
-                $this->log_portal_activity($user['tenant_id'], $user['party_id'], $user['id'], 'customer_login', "Customer logged into portal");
-
-                return json_encode(['status' => 'success', 'msg' => 'Login successful!']);
-            }
+        $throttle = new \App\Services\AuthThrottleService($this->conn);
+        $wait = $throttle->check('customer_login', $email);
+        if ($wait > 0) {
+            return json_encode(['status' => 'locked', 'retry_after' => $wait,
+                'msg' => 'Too many failed attempts. Try again in ' . \App\Services\AuthThrottleService::waitText($wait) . '.']);
         }
+
+        $stmt = $this->conn->prepare("SELECT * FROM `customer_portal_users` WHERE `email` = ? AND `status` = 1 LIMIT 1");
+        $stmt->bind_param('s', $email);
+        $stmt->execute();
+        $user = $stmt->get_result()->fetch_assoc();
+
+        if ($user && password_verify($password, $user['password'])) {
+            session_regenerate_id(true); // a session id planted before sign-in is useless afterwards
+            $_SESSION['customer_portal'] = [
+                'id' => $user['id'],
+                'tenant_id' => $user['tenant_id'],
+                'party_id' => $user['party_id'],
+                'email' => $user['email']
+            ];
+
+            $this->conn->query("UPDATE `customer_portal_users` SET `last_login` = NOW() WHERE id = '" . (int)$user['id'] . "'");
+            $this->log_portal_activity($user['tenant_id'], $user['party_id'], $user['id'], 'customer_login', "Customer logged into portal");
+            $throttle->clear('customer_login', $email);
+
+            return json_encode(['status' => 'success', 'msg' => 'Login successful!']);
+        }
+        if (!$user) {
+            // Unknown emails cost the same time as wrong passwords.
+            password_verify($password, '$2y$10$4atYI/I54Zf2duldz2eoGeLt85rsTV2yvoQVc7oLbm1JwmpyG6aDK');
+        }
+        $throttle->record('customer_login', $email);
 
         return json_encode(['status' => 'failed', 'msg' => 'Invalid email address or password.']);
     }

@@ -88,14 +88,16 @@ class ContractService
         $signer_email = $_POST['signer_email'] ?? null;
         $signature_data = $_POST['signature_data'] ?? null;
         $so_id = intval($sales_order_id ?? 0);
+        $given_token = (string)($_POST['sign_token'] ?? '');
 
         if ($so_id <= 0 || empty($signer_name) || empty($signer_email) || empty($signature_data)) {
             return json_encode(['status' => 'failed', 'msg' => 'Signer Name, Email, and Signature drawing are required.']);
         }
 
         // The quote itself decides the company, and only an open, current, unexpired quote can be accepted.
-        $quoteRow = $this->conn->query("SELECT tenant_id, status, type, valid_until FROM `sales_order_list` WHERE id = '{$so_id}'")->fetch_assoc();
-        if (!$quoteRow || !\App\Services\QuotationService::isQuote((string)$quoteRow['type'])) {
+        $quoteRow = $this->conn->query("SELECT tenant_id, status, type, valid_until, sign_token FROM `sales_order_list` WHERE id = '{$so_id}'")->fetch_assoc();
+        if (!$quoteRow || !\App\Support\ProposalLink::matches($quoteRow['sign_token'] ?? null, $given_token)
+            || !\App\Services\QuotationService::isQuote((string)$quoteRow['type'])) {
             return json_encode(['status' => 'failed', 'msg' => 'This proposal could not be found.']);
         }
         $t_id = (int)$quoteRow['tenant_id'];
@@ -124,6 +126,26 @@ class ContractService
             return json_encode(['status' => 'success', 'msg' => 'Proposal signed and confirmed successfully.']);
         }
         return \App\Support\Db::fail($this->conn, 'Failed to save digital signature.');
+    }
+
+    /**
+     * Staff action: the customer-facing signing link for one of this company's quotes. The secret token is
+     * created the first time and reused afterwards, so a link already sent keeps working.
+     */
+    public function get_proposal_link()
+    {
+        $id = (int)($_POST['id'] ?? 0);
+        $tenant_id = (int)$this->settings->active_tenant_id();
+        $row = $this->conn->query("SELECT type, sign_token FROM `sales_order_list` WHERE id = {$id} AND tenant_id = '{$tenant_id}'")->fetch_assoc();
+        if (!$row || !\App\Services\QuotationService::isQuote((string)$row['type'])) {
+            return json_encode(['status' => 'failed', 'msg' => 'Quote not found.']);
+        }
+        $token = (string)($row['sign_token'] ?? '');
+        if (!preg_match('/^[a-f0-9]{64}$/', $token)) {
+            $token = \App\Support\ProposalLink::newToken();
+            $this->conn->query("UPDATE `sales_order_list` SET `sign_token` = '{$token}' WHERE id = {$id} AND tenant_id = '{$tenant_id}'");
+        }
+        return json_encode(['status' => 'success', 'url' => base_url . 'portal/proposal_sign.php?id=' . $id . '&t=' . $token]);
     }
 
     /* Dolibarr Inspired Helpdesk Ticket Methods */

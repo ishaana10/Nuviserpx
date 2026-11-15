@@ -6,6 +6,11 @@ if ($_settings->userdata('type') != 1) {
     exit;
 }
 
+if (!\App\Support\WebGit::enabled()) {
+    echo '<div class="alert alert-warning my-4"><i class="fas fa-lock mr-2"></i> Updating from the web is turned off on this server. Set <code>ALLOW_WEB_GIT=1</code> in <code>.env</code> on a development machine to use this screen. Production is updated by your deployment process.</div>';
+    return;
+}
+
 $current_branch = trim((string)shell_exec('git rev-parse --abbrev-ref HEAD 2>&1'));
 $last_commit = trim((string)shell_exec('git log -1 --pretty=format:"%h - %s (%cr) <%an>" 2>&1'));
 $working_status = trim((string)shell_exec('git status --short 2>&1'));

@@ -21,6 +21,15 @@ if (session_status() === PHP_SESSION_NONE) {
 
 require_once('initialize.php');
 
+if (!headers_sent() && php_sapi_name() !== 'cli') {
+	header('X-Content-Type-Options: nosniff');
+	header('X-Frame-Options: SAMEORIGIN');
+	header('Referrer-Policy: strict-origin-when-cross-origin');
+	if (!empty($nv_https)) {
+		header('Strict-Transport-Security: max-age=31536000');
+	}
+}
+
 // Server-side PHP errors are kept in logs/php_errors.log and shown under
 // Developer > Error Logs. The folder is blocked from the web (.htaccess).
 $__nv_logs = base_app . 'logs';
