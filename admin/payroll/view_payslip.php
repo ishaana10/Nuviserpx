@@ -9,6 +9,8 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
         foreach($qry->fetch_assoc() as $k => $v){
             $$k=$v;
         }
+        // A payslip without a pay date is shown as dated today (as the header already did); every date use below follows.
+        if (empty($pay_date)) { $pay_date = date('Y-m-d'); }
         $pay_components = (new \App\Services\PayrollComponentService($conn, $_settings))->forPayroll($id);
 
         // Year-to-date balances for the FRCS tax year (calendar year), up to
@@ -55,6 +57,12 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
         $nv_brand = $_settings->tenant_branding();
     }
 }
+// No payslip (missing/invalid id, or one the signed-in user may not see): say so instead of rendering an empty slip.
+if (!isset($employee_id)) {
+    http_response_code(404);
+    echo '<div class="alert alert-warning m-3">Payslip not found.</div>';
+    return;
+}
 ?>
 <style>
     @media print {
@@ -81,9 +89,9 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
                     <img src="<?php echo validate_image($nv_brand['logo']) ?>" alt="Logo" class="mr-3" style="max-height:65px;width:auto;object-fit:contain;">
                 <?php endif; ?>
                 <div>
-                    <h3 class="font-weight-bold text-navy mb-0"><?php echo htmlspecialchars($nv_brand['name'] ?: $_settings->info('name')) ?></h3>
-                    <p class="text-muted mb-1 small"><?php echo htmlspecialchars($nv_brand['address']) ?></p>
-                    <p class="text-muted mb-0 small"><b>Contact:</b> <?php echo htmlspecialchars($nv_brand['phone']) ?> | <b>Email:</b> <?php echo htmlspecialchars($nv_brand['email']) ?></p>
+                    <h3 class="font-weight-bold text-navy mb-0"><?php echo htmlspecialchars((string)(($nv_brand['name'] ?? '') ?: $_settings->info('name'))) ?></h3>
+                    <p class="text-muted mb-1 small"><?php echo htmlspecialchars((string)($nv_brand['address'] ?? '')) ?></p>
+                    <p class="text-muted mb-0 small"><b>Contact:</b> <?php echo htmlspecialchars((string)($nv_brand['phone'] ?? '')) ?> | <b>Email:</b> <?php echo htmlspecialchars((string)($nv_brand['email'] ?? '')) ?></p>
                 </div>
             </div>
             <div class="col-4 text-right">
@@ -123,25 +131,25 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
                             <tbody>
                                 <tr>
                                     <td>Basic Salary</td>
-                                    <td class="text-right font-weight-bold"><?php echo number_format($basic_salary, 2) ?></td>
+                                    <td class="text-right font-weight-bold"><?php echo number_format((float)($basic_salary ?? 0), 2) ?></td>
                                 </tr>
                                 <tr>
                                     <td>Overtime</td>
-                                    <td class="text-right"><?php echo number_format($overtime, 2) ?></td>
+                                    <td class="text-right"><?php echo number_format((float)($overtime ?? 0), 2) ?></td>
                                 </tr>
                                 <tr>
                                     <td>Allowances</td>
-                                    <td class="text-right"><?php echo number_format($allowances, 2) ?></td>
+                                    <td class="text-right"><?php echo number_format((float)($allowances ?? 0), 2) ?></td>
                                 </tr>
                                 <?php if (!empty($retro_pay) && (float)$retro_pay != 0): ?>
                                 <tr>
                                     <td>Retroactive Pay</td>
-                                    <td class="text-right"><?php echo number_format($retro_pay, 2) ?></td>
+                                    <td class="text-right"><?php echo number_format((float)($retro_pay ?? 0), 2) ?></td>
                                 </tr>
                                 <?php endif; ?>
                                 <tr>
                                     <td>Other Earnings</td>
-                                    <td class="text-right"><?php echo number_format($other_earnings, 2) ?></td>
+                                    <td class="text-right"><?php echo number_format((float)($other_earnings ?? 0), 2) ?></td>
                                 </tr>
                                 <?php foreach (($pay_components ?? []) as $pc): if ($pc['type'] !== 'earning') continue; ?>
                                 <tr>
@@ -154,19 +162,19 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
                                 <?php if (!empty($leave_payout) && (float)$leave_payout > 0): ?>
                                 <tr>
                                     <td>Leave payout</td>
-                                    <td class="text-right"><?php echo number_format($leave_payout, 2) ?></td>
+                                    <td class="text-right"><?php echo number_format((float)($leave_payout ?? 0), 2) ?></td>
                                 </tr>
                                 <?php endif; ?>
                                 <?php if (!empty($redundancy_pay) && (float)$redundancy_pay > 0): ?>
                                 <tr>
                                     <td>Redundancy / severance</td>
-                                    <td class="text-right"><?php echo number_format($redundancy_pay, 2) ?></td>
+                                    <td class="text-right"><?php echo number_format((float)($redundancy_pay ?? 0), 2) ?></td>
                                 </tr>
                                 <?php endif; ?>
                                 <?php if (!empty($unpaid_deduction) && (float)$unpaid_deduction > 0): ?>
                                 <tr>
                                     <td>Unpaid days (<?php echo rtrim(rtrim(number_format((float)$unpaid_days, 2), '0'), '.') ?> day<?php echo (float)$unpaid_days == 1.0 ? '' : 's' ?>)</td>
-                                    <td class="text-right text-danger">-<?php echo number_format($unpaid_deduction, 2) ?></td>
+                                    <td class="text-right text-danger">-<?php echo number_format((float)($unpaid_deduction ?? 0), 2) ?></td>
                                 </tr>
                                 <?php endif; ?>
                             </tbody>
@@ -192,22 +200,22 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
                             <tbody>
                                 <tr>
                                     <td>FNPF Employee Contribution</td>
-                                    <td class="text-right text-info"><?php echo number_format($employee_fnpf, 2) ?></td>
+                                    <td class="text-right text-info"><?php echo number_format((float)($employee_fnpf ?? 0), 2) ?></td>
                                 </tr>
                                 <tr>
                                     <td>P.A.Y.E. (Tax Code <?php echo htmlspecialchars(!empty($tax_code) ? $tax_code : 'P') ?>)</td>
-                                    <td class="text-right text-warning"><?php echo number_format($paye_tax, 2) ?></td>
+                                    <td class="text-right text-warning"><?php echo number_format((float)($paye_tax ?? 0), 2) ?></td>
                                 </tr>
                                 <?php if ((float)$srt_tax != 0): ?>
                                 <tr>
                                     <td>Social Responsibility Tax (SRT)</td>
-                                    <td class="text-right text-warning"><?php echo number_format($srt_tax, 2) ?></td>
+                                    <td class="text-right text-warning"><?php echo number_format((float)($srt_tax ?? 0), 2) ?></td>
                                 </tr>
                                 <?php endif; ?>
                                 <?php $nv_other_ded = max(0, (float)$deductions - (float)($component_deductions ?? 0)); if ($nv_other_ded > 0): ?>
                                 <tr>
                                     <td>Other Deductions</td>
-                                    <td class="text-right text-danger"><?php echo number_format($nv_other_ded, 2) ?></td>
+                                    <td class="text-right text-danger"><?php echo number_format((float)($nv_other_ded ?? 0), 2) ?></td>
                                 </tr>
                                 <?php endif; ?>
                                 <?php foreach (($pay_components ?? []) as $pc): if ($pc['type'] !== 'deduction') continue; ?>
@@ -239,7 +247,7 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
                     <small class="text-light">Direct credit to employee account<?php echo $_settings->currency_tag() ?></small>
                 </div>
                 <div class="col-4 text-right">
-                    <h3 class="m-0 font-weight-bold text-warning">$<?php echo number_format($net_salary, 2) ?></h3>
+                    <h3 class="m-0 font-weight-bold text-warning">$<?php echo number_format((float)($net_salary ?? 0), 2) ?></h3>
                 </div>
             </div>
             <div class="border-top border-secondary mt-2 pt-2">
@@ -302,11 +310,11 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
             <h6 class="font-weight-bold text-secondary mb-2"><i class="fas fa-building"></i> Employer Statutory Contributions Summary</h6>
             <div class="row small">
                 <div class="col-md-3">
-                    <span><b>FNPF Employer Contribution:</b> $<?php echo number_format($employer_fnpf, 2) ?></span>
+                    <span><b>FNPF Employer Contribution:</b> $<?php echo number_format((float)($employer_fnpf ?? 0), 2) ?></span>
                 </div>
                 <?php if ((float)$workcare_levy != 0): ?>
                 <div class="col-md-3">
-                    <span><b>Workcare Levy:</b> $<?php echo number_format($workcare_levy, 2) ?></span>
+                    <span><b>Workcare Levy:</b> $<?php echo number_format((float)($workcare_levy ?? 0), 2) ?></span>
                 </div>
                 <?php endif; ?>
                 <?php if ((float)($training_levy ?? 0) != 0): ?>

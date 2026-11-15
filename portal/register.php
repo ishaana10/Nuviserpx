@@ -41,8 +41,8 @@ if (!empty($token)) {
             </div>
 
             <div class="form-group mb-3">
-              <label class="text-muted text-xs">Your Full Name</label>
-              <input type="text" class="form-control" name="name" value="<?php echo htmlspecialchars($user['name'] ?: $user['party_name']) ?>" required>
+              <label class="text-muted text-xs">Account</label>
+              <input type="text" class="form-control" value="<?php echo htmlspecialchars((string)$user['party_name']) ?>" readonly>
             </div>
 
             <div class="form-group mb-3">
