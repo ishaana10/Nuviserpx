@@ -54,7 +54,10 @@ class PortalLeaveService
     {
         $q = $this->conn->prepare("SELECT id, leave_type, start_date, end_date, day_fraction, reason, status, date_created
             FROM leave_list WHERE tenant_id = ? AND employee_id = ? ORDER BY start_date DESC, id DESC LIMIT ?");
-        $q->bind_param('iii', $this->tenantId, $this->employeeId, $limit);
+        // bind_param takes references, which a readonly property cannot give: bind local copies.
+        $t = $this->tenantId;
+        $e = $this->employeeId;
+        $q->bind_param('iii', $t, $e, $limit);
         $q->execute();
         $rows = $q->get_result()->fetch_all(MYSQLI_ASSOC);
         $calc = new LeaveBalanceService($this->conn, $this->settings);
@@ -94,7 +97,9 @@ class PortalLeaveService
                 CONCAT(a.firstname, ' ', a.lastname) AS approver_name
             FROM employee_list e LEFT JOIN employee_list a ON a.id = e.approver_id AND a.tenant_id = e.tenant_id
             WHERE e.id = ? AND e.tenant_id = ?");
-        $q->bind_param('ii', $this->employeeId, $this->tenantId);
+        $e = $this->employeeId;
+        $t = $this->tenantId;
+        $q->bind_param('ii', $e, $t);
         $q->execute();
         return $q->get_result()->fetch_assoc() ?: null;
     }

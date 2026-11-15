@@ -58,4 +58,10 @@ check('decision email exists for approved and rejected', strpos($em, 'function s
 $es = $read('src/Services/EmployeeService.php');
 check('approve/reject emails the employee, best effort', strpos($es, '$this->emailLeaveDecision($leave, $status)') !== false && preg_match('~function emailLeaveDecision.*?catch \(\\\\Throwable~s', $es) === 1);
 check('email goes only to a valid address, company-scoped lookup', strpos($es, 'FILTER_VALIDATE_EMAIL') !== false && strpos($es, 'FROM employee_list WHERE id = ? AND tenant_id = ?') !== false);
+// bind_param needs references; readonly/promoted properties cannot be passed that way (a fatal error, HTTP 500).
+$bad = [];
+foreach (['src/Services/PortalLeaveService.php', 'src/Support/PortalSettings.php', 'src/Services/EmployeePortalService.php'] as $f) {
+    if (preg_match('~bind_param\([^;]*\$this->~', $read($f))) { $bad[] = $f; }
+}
+check('no bind_param call binds a property directly', $bad === []);
 exit($fail ? 1 : 0);
