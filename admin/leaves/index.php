@@ -78,7 +78,9 @@
 								<small><b>To:</b> <?php echo date("M d, Y", strtotime($row['end_date'])) ?></small>
 								<?php if(isset($row['day_fraction']) && (float)$row['day_fraction'] == 0.5): ?><small class="d-block text-info">Half day</small><?php endif; ?>
 							</td>
-							<td><p class="m-0 text-truncate" style="max-width: 200px;"><?php echo $row['reason'] ?></p></td>
+							<td><p class="m-0 text-truncate" style="max-width: 200px;"><?php echo $row['reason'] ?></p>
+								<?php if(!empty($row['attachment_path'])): ?><a class="small" href="leaves/leave_doc.php?id=<?php echo (int)$row['id'] ?>" target="_blank" rel="noopener"><span class="fa fa-paperclip"></span> <?php echo htmlspecialchars($row['attachment_name'] ?: 'Attachment') ?></a><?php endif; ?>
+							</td>
 							<td class="text-center">
                                 <?php if($status == 'approved'): ?>
                                     <span class="badge badge-success px-3 rounded-pill">Approved</span>
