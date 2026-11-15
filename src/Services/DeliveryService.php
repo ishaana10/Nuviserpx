@@ -186,8 +186,9 @@ class DeliveryService
     public function note(int $id): ?array
     {
         $t = $this->tenantId();
-        $stmt = $this->conn->prepare("SELECT d.*, o.order_no, p.name party_name, p.address party_address, p.email party_email FROM delivery_notes d
+        $stmt = $this->conn->prepare("SELECT d.*, o.order_no, p.name party_name, p.address party_address, p.email party_email, u.username delivered_by FROM delivery_notes d
             INNER JOIN sales_order_list o ON o.id = d.sales_order_id INNER JOIN party_list p ON p.id = d.party_id
+            LEFT JOIN users u ON u.id = d.created_by
             WHERE d.id = ? AND d.tenant_id = ?");
         $stmt->bind_param('ii', $id, $t);
         $stmt->execute();

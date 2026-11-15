@@ -6,6 +6,7 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
 ## [Unreleased] - 2026-11-15 (3)
 
 ### Fixed
+- **Delivery notes print "Delivered by" automatically.** The name is the login username of the user who created the delivery note, on both the printout and the PDF (blank line if unknown).
 - **Customer portal sign-in/activation pages had an invisible title and no logo.** The title was white on the white card; both pages now show the company logo, a dark "Customer Portal" title and the company name.
 - **Portal menu invisible on narrow screens.** The header bar stayed at a fixed height, so the opened hamburger menu (account name, Log Out) spilled out as white text on the light page. The bar now grows to fit.
 - **Customer portal dashboard sent visitors to the staff login.** The staff-session guard exempted `/portal/<page>.php` but not the folder address `/portal/` that login and the brand link use, so the portal menu and Log Out seemed dead. The folder address is now exempt too.

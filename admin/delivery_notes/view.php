@@ -31,7 +31,7 @@ $fmt = fn ($n) => rtrim(rtrim(number_format((float)$n, 4, '.', ''), '0'), '.') ?
     <?php if ($d['notes']): ?><p><b>Notes:</b> <?= $e($d['notes']) ?></p><?php endif; ?>
     <?php $signed = !empty($d['received_at']) && \App\Support\ProposalLink::validSignatureImage((string)$d['receiver_signature']); ?>
     <div class="row mt-5">
-      <div class="col-6">Delivered by: ______________________</div>
+      <div class="col-6">Delivered by: <?= ($d['delivered_by'] ?? '') !== '' ? '<b>' . $e($d['delivered_by']) . '</b>' : '______________________' ?></div>
       <div class="col-6 text-right">
         <?php if ($signed): ?>
           <div><img src="<?= $e($d['receiver_signature']) ?>" alt="Receiver signature" style="max-height:90px;max-width:100%"></div>

@@ -104,7 +104,8 @@ final class DeliveryNotePdf
         $y = $pdf->GetY();
         $pdf->SetFont('Helvetica', '', 9.5);
         $pdf->SetTextColor(51, 65, 85);
-        $pdf->Cell(90, 6, 'Delivered by: ______________________', 0, 0);
+        $by = trim((string)($note['delivered_by'] ?? ''));
+        $pdf->Cell(90, 6, 'Delivered by: ' . ($by !== '' ? $by : '______________________'), 0, 0);
         $signed = !empty($note['received_at']) && trim((string)($note['received_by'] ?? '')) !== '';
         if ($signed) {
             $sig = (string)($note['receiver_signature'] ?? '');
