@@ -92,6 +92,7 @@
 				                  </button>
 				                  <div class="dropdown-menu" role="menu">
 				                    <a class="dropdown-item" href="./?page=invoices/view&id=<?php echo $row['id'] ?>"><span class="fa fa-eye text-info"></span> View Invoice</a>
+				                    <a class="dropdown-item" href="invoices/invoice_pdf.php?id=<?php echo (int)$row['id'] ?>" target="_blank" rel="noopener"><span class="fa fa-file-pdf text-danger"></span> View PDF</a>
 				                    <a class="dropdown-item send_email" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>" data-email="<?php echo htmlspecialchars($row['party_email'] ?? '') ?>"><span class="fa fa-envelope text-warning"></span> Send Email</a>
 				                    <a class="dropdown-item" href="./?page=invoices/manage_invoice&id=<?php echo $row['id'] ?>"><span class="fa fa-edit text-primary"></span> Edit</a>
 				                    <?php if($row['balance'] > 0): ?>
