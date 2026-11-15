@@ -6,7 +6,7 @@ function check($label, $ok) { global $fail; echo ($ok ? "PASS" : "FAIL") . ": $l
 $r = fn($f) => file_get_contents($root . $f);
 
 $l = $r('portal/employee_login.php');
-check('login shows the company logo', strpos($l, "validate_image(\$_settings->info('logo'))") !== false);
+check('login shows the company logo (or the NuvisERPX default)', strpos($l, 'PortalBranding::logoUrl') !== false);
 check('title has its own dark colour (not a theme link colour)', strpos($l, '.ep-title { color: #0f172a') !== false && strpos($l, 'class="h1"') === false);
 check('link back to the main portal', strpos($l, 'admin/login.php') !== false && strpos($l, 'Back to main portal') !== false);
 check('both views still wired', strpos($l, "wire('#emp-login-frm'") !== false && strpos($l, "wire('#activate-frm'") !== false);

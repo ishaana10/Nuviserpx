@@ -12,7 +12,7 @@ check('portal activation does not read a non-existent users.name column', strpos
 check('portal activation shows the company name read-only', strpos($reg, "\$user['party_name']") !== false && strpos($reg, 'readonly') !== false);
 foreach (['login', 'register'] as $pg) {
     $src = file_get_contents("$root/portal/$pg.php");
-    check("portal/$pg.php shows the company logo", strpos($src, "validate_image(\$_settings->info('logo'))") !== false);
+    check("portal/$pg.php shows the company logo (or the NuvisERPX default)", strpos($src, 'PortalBranding::logoUrl') !== false);
     check("portal/$pg.php title is not the white link style (invisible on the white card)", strpos($src, 'class="h1"') === false && strpos($src, 'Customer Portal</h1>') !== false);
 }
 $idx = file_get_contents("$root/portal/index.php");
