@@ -93,7 +93,9 @@ class EmployeePortalService
         $url = base_url . 'portal/employee_login.php?token=' . $token;
         $name = trim($emp['firstname'] . ' ' . $emp['lastname']);
         $sent = false;
-        if (class_exists('Emailer')) {
+        {
+            // Emailer is not autoloaded; without this the invitation was never even attempted.
+            require_once(base_app . 'classes/Emailer.php');
             $sys = [];
             $r = $this->conn->query("SELECT meta_field, meta_value FROM system_info");
             while ($r && $row = $r->fetch_assoc()) {
@@ -103,7 +105,7 @@ class EmployeePortalService
         }
         $this->log($t, $employeeId, 'invited', 'Invitation ' . ($sent ? 'emailed' : 'created, email not sent'));
         $this->settings->log_audit('Invited employee to self-service', 'Payroll', "Employee #{$employeeId}");
-        return json_encode(['status' => 'success', 'msg' => $sent ? "Invitation emailed to {$email}. The link is valid for " . self::INVITE_DAYS . ' days.'
+        return json_encode(['status' => 'success', 'sent' => $sent, 'link' => $sent ? '' : $url, 'username' => $email, 'name' => $name, 'msg' => $sent ? "Invitation emailed to {$email}. The link is valid for " . self::INVITE_DAYS . ' days.'
             : "The email could not be sent. Give {$name} this link instead (valid for " . self::INVITE_DAYS . " days): {$url}"]);
     }
 

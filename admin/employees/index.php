@@ -132,6 +132,28 @@ try {
 		})
 		<?php endif; ?>
 		<?php if($can_edit): ?>
+		// The email could not be sent: show the link in a box HR can copy (a browser alert() cannot be copied from on a phone).
+		function show_invite_link(resp){
+			$('#inviteLinkModal').remove();
+			var $m = $('<div class="modal fade" id="inviteLinkModal" tabindex="-1" role="dialog"><div class="modal-dialog modal-dialog-centered" role="document"><div class="modal-content">' +
+				'<div class="modal-header"><h5 class="modal-title">Share the sign-up link</h5><button type="button" class="close" data-dismiss="modal" aria-label="Close"><span>&times;</span></button></div>' +
+				'<div class="modal-body"><p class="text-danger mb-2"><i class="fa fa-exclamation-triangle"></i> The email could not be sent, so give this link to the employee yourself. It is valid for 7 days and works once.</p>' +
+				'<div class="input-group mb-2"><input type="text" class="form-control" id="inviteLinkInput" readonly><div class="input-group-append"><button type="button" class="btn btn-primary" id="inviteLinkCopy"><i class="fa fa-copy"></i> Copy</button></div></div>' +
+				'<p class="mb-0 text-sm text-muted">Their username for signing in is their email address: <strong id="inviteLinkUser"></strong></p></div>' +
+				'<div class="modal-footer"><button type="button" class="btn btn-default" data-dismiss="modal">Done</button></div></div></div></div>');
+			$m.find('#inviteLinkInput').val(resp.link);
+			$m.find('#inviteLinkUser').text(resp.username || '');
+			$('body').append($m);
+			$m.on('hidden.bs.modal', function(){ location.reload(); });
+			$m.find('#inviteLinkCopy').on('click', function(){
+				var el = $m.find('#inviteLinkInput')[0]; el.focus(); el.select(); el.setSelectionRange(0, 99999);
+				var done = function(){ alert_toast('Link copied','success'); };
+				if(navigator.clipboard && window.isSecureContext){ navigator.clipboard.writeText(resp.link).then(done, function(){ document.execCommand('copy'); done(); }); }
+				else { try { document.execCommand('copy'); done(); } catch(e){} }
+			});
+			$m.modal('show');
+			setTimeout(function(){ $m.find('#inviteLinkInput').trigger('focus').select(); }, 400);
+		}
 		function portal_call(f, id, ask){
 			if(ask && !confirm(ask)) return;
 			start_loader();
@@ -140,7 +162,8 @@ try {
 				error:function(){ alert_toast("An error occurred.",'error'); end_loader(); },
 				success:function(resp){
 					end_loader();
-					if(resp.status=='success'){ alert(resp.msg); location.reload(); }
+					if(resp.status=='success' && resp.link){ show_invite_link(resp); }
+					else if(resp.status=='success'){ alert_toast(resp.msg,'success'); setTimeout(function(){ location.reload() }, 1200); }
 					else { alert(resp.msg || "An error occurred."); }
 				}
 			})

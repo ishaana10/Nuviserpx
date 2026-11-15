@@ -66,7 +66,7 @@ class CustomerPortalService
             }
 
             $invite_url = base_url . "portal/login.php?token=" . $token;
-            require_once(__DIR__ . '/Emailer.php');
+            require_once(base_app . 'classes/Emailer.php');
             $sys = [];
             $sys_qry = $this->conn->query("SELECT meta_field, meta_value FROM `system_info`");
             while ($r = $sys_qry->fetch_assoc()) $sys[$r['meta_field']] = $r['meta_value'];

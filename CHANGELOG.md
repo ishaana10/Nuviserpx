@@ -5,6 +5,12 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
 
 ## [Unreleased] - 2026-11-14
 
+### Fixed
+- Employee portal invitations were never emailed: the code skipped sending when the mail class was not loaded. It now
+  always attempts the send. The customer portal invitation had a wrong file path for the same class and is fixed too.
+- When an invitation email cannot be sent, HR now gets the sign-up link in a copyable box (with a Copy button) and the
+  username, instead of a browser popup that could not be copied from.
+
 ### Security
 - Tenant isolation: the payments API verifies an invoice belongs to the API
   key's company before allocating against it; by-id API follow-up queries
