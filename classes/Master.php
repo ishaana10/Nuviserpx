@@ -764,6 +764,11 @@ class Master extends DBConnection
         );
     }
 
+    public function email_delivery_note()
+    {
+        return $this->container->make(\App\Services\DeliveryService::class)->emailNote((int)($_POST['id'] ?? 0), (string)($_POST['email'] ?? ''));
+    }
+
     public function cancel_delivery_note()
     {
         return $this->container->make(\App\Services\DeliveryService::class)->cancelDelivery((int)($_POST['id'] ?? 0));
@@ -1552,7 +1557,7 @@ $allowed_actions = [
     'reject_bill', 'approve_journal', 'reject_journal', 'save_approval_policy',
     'save_price_list', 'delete_price_list', 'save_price_list_item', 'delete_price_list_item',
     'assign_price_list', 'lookup_prices', 'revise_quote', 'decline_quote',
-    'extend_quote', 'confirm_for_delivery', 'save_delivery_note', 'cancel_delivery_note', 'sign_delivery_note',
+    'extend_quote', 'confirm_for_delivery', 'save_delivery_note', 'cancel_delivery_note', 'sign_delivery_note', 'email_delivery_note',
     'invoice_delivered', 'save_default_accounts', 'provision_chart', 'save_tenant_smtp', 'test_tenant_smtp', 'save_company_profile', 'save_inventory_accounting', 'file_tax_return',
     'void_tax_return', 'save_tax_code', 'delete_tax_code', 'set_period_lock',
     'delete_journal', 'cancel_journal', 'save_employee', 'delete_employee',

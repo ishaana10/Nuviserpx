@@ -16,7 +16,7 @@ $fmt = fn ($n) => rtrim(rtrim(number_format((float)$n, 4, '.', ''), '0'), '.') ?
 <div class="card card-outline card-primary">
   <div class="card-header no-print">
     <h3 class="card-title">Delivery note <b><?= $e($d['dn_no']) ?></b> <?= $d['status'] === 'cancelled' ? '<span class="badge badge-dark">CANCELLED</span>' : '' ?></h3>
-    <div class="card-tools"><button class="btn btn-sm btn-secondary" onclick="window.print()"><i class="fa fa-print"></i> Print</button> <a href="./?page=delivery_notes" class="btn btn-sm btn-default">Back</a></div>
+    <div class="card-tools"><?php if (!empty($d['received_at']) && $d['status'] !== 'cancelled'): ?><a href="delivery_notes/note_pdf.php?id=<?= (int)$d['id'] ?>&amp;download=1" class="btn btn-sm btn-outline-primary"><i class="fa fa-file-pdf"></i> PDF</a> <button class="btn btn-sm btn-primary" id="email-dn"><i class="fa fa-envelope"></i> Email to customer</button> <?php endif; ?><button class="btn btn-sm btn-secondary" onclick="window.print()"><i class="fa fa-print"></i> Print</button> <a href="./?page=delivery_notes" class="btn btn-sm btn-default">Back</a></div>
   </div>
   <div class="card-body">
     <h3 class="font-weight-bold">DELIVERY NOTE</h3>
@@ -42,6 +42,24 @@ $fmt = fn ($n) => rtrim(rtrim(number_format((float)$n, 4, '.', ''), '0'), '.') ?
         <?php endif; ?>
       </div>
     </div>
+
+    <?php if (!empty($d['last_emailed_at'])): ?><p class="no-print text-muted small mt-3"><i class="fa fa-envelope"></i> Last emailed to <?= $e($d['last_emailed_to']) ?> on <?= date('d M Y, H:i', strtotime((string)$d['last_emailed_at'])) ?></p><?php endif; ?>
+    <?php if (!empty($d['received_at']) && $d['status'] !== 'cancelled'): ?>
+    <script>
+    $('#email-dn').on('click', function () {
+      var btn = $(this);
+      var to = prompt('Send the signed delivery note (PDF attached) to this email address:', <?= json_encode((string)($d['party_email'] ?? '')) ?>);
+      if (to === null) { return; }
+      btn.prop('disabled', true); start_loader();
+      $.ajax({ url: _base_url_ + 'classes/Master.php?f=email_delivery_note', method: 'POST', dataType: 'json', data: { id: <?= (int)$d['id'] ?>, email: to },
+        error: function () { alert_toast('An error occurred', 'error'); btn.prop('disabled', false); end_loader(); },
+        success: function (r) {
+          if (r.status === 'success') { alert_toast(r.msg, 'success'); setTimeout(function () { location.reload(); }, 1200); }
+          else { alert_toast(r.msg || 'Could not send the email', 'error'); btn.prop('disabled', false); end_loader(); }
+        } });
+    });
+    </script>
+    <?php endif; ?>
 
     <?php if (!$signed && $d['status'] !== 'cancelled' && $_settings->can_access('sales_orders_edit')): ?>
     <div class="card mt-4 no-print" id="sign-card">
