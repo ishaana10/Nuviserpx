@@ -8,6 +8,11 @@
     Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
 </IfModule>
 
+# No directory listings anywhere.
+<IfModule mod_autoindex.c>
+    Options -Indexes
+</IfModule>
+
 # Never serve dotfiles, dumps, logs, lock files or dependency manifests.
 <FilesMatch "^(\.env.*|\.git.*|composer\.(json|lock)|phpunit\.xml|phpstan.*\.neon|.*\.(sql|log|bak|lock|md))$">
     <IfModule mod_authz_core.c>

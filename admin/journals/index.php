@@ -13,6 +13,58 @@ $own_only = $_settings->userdata('type') != 1;
 $uid = (int)$_settings->userdata('id');
 $side = LedgerService::SIDE_SQL;
 
+$norm = function ($s): string {
+    $s = strtolower((string)$s);
+    if (in_array($s, ['cancelled', 'canceled', 'void', '2', '3'], true)) { return 'cancelled'; }
+    if ($s === 'pending_approval') { return 'pending'; }
+    return $s === 'draft' ? 'draft' : 'posted';
+};
+// Status values behind each tab. The column is case-insensitive, so plain comparisons need no LOWER() and an index
+// can answer them. Posted is "anything that is not one of the others".
+$cancelledVals = ['cancelled', 'canceled', 'void', '2', '3'];
+$tabValues = ['cancelled' => $cancelledVals, 'pending' => ['pending_approval'], 'draft' => ['draft']];
+$postedExclude = "'" . implode("','", array_merge($cancelledVals, ['pending_approval', 'draft'])) . "'";
+$scope = "j.tenant_id = ? AND j.journal_date BETWEEN ? AND ?" . ($own_only ? " AND j.user_id = ?" : "");
+$scopeTypes = 'iss' . ($own_only ? 'i' : '');
+$scopeArgs = $own_only ? [$tenant_id, $from, $to, $uid] : [$tenant_id, $from, $to];
+
+// 1) Tab counts: grouped on the index (tenant, date, status) - the journal rows and their lines are never read.
+$counts = ['all' => 0, 'posted' => 0, 'draft' => 0, 'pending' => 0, 'cancelled' => 0];
+$cstmt = $conn->prepare("SELECT j.status st, COUNT(*) n FROM journal_entries j WHERE {$scope} GROUP BY j.status");
+if ($cstmt) {
+    $cstmt->bind_param($scopeTypes, ...$scopeArgs);
+    $cstmt->execute();
+    foreach ($cstmt->get_result()->fetch_all(MYSQLI_ASSOC) as $c) {
+        $counts[$norm($c['st'])] += (int)$c['n'];
+        $counts['all'] += (int)$c['n'];
+    }
+}
+
+// 2) The list: pick the newest ids for the chosen tab from the index alone, then read only those rows and sum only their lines.
+$cap = \App\Support\ListWindow::cap();
+$limit = $cap === null ? '' : ' LIMIT ' . (int)$cap;
+$order = ' ORDER BY j.journal_date DESC, j.id DESC';
+// Pick the ids of the journals to show from the index alone. One equality lookup per status value keeps every
+// branch on the (tenant, date, status) index; a multi-value IN would make MariaDB read every journal row instead.
+if ($status_tab === 'all') {
+    $pick = "SELECT j.id FROM journal_entries j WHERE {$scope}{$order}{$limit}";
+    $types = $scopeTypes; $args = $scopeArgs;
+} elseif ($status_tab === 'posted') {
+    $pick = "SELECT j.id FROM journal_entries j WHERE {$scope} AND j.status NOT IN ({$postedExclude}){$order}{$limit}";
+    $types = $scopeTypes; $args = $scopeArgs;
+} else {
+    $vals = $tabValues[$status_tab];
+    $branches = []; $types = ''; $args = [];
+    foreach ($vals as $v) {
+        $branches[] = "(SELECT j.id, j.journal_date FROM journal_entries j WHERE {$scope} AND j.status = ?{$order}{$limit})";
+        $types .= $scopeTypes . 's';
+        $args = array_merge($args, $scopeArgs, [$v]);
+    }
+    $pick = count($vals) === 1
+        ? "SELECT j.id FROM journal_entries j WHERE {$scope} AND j.status = ?{$order}{$limit}"
+        : "SELECT ub.id FROM (" . implode(' UNION ALL ', $branches) . ") ub ORDER BY ub.journal_date DESC, ub.id DESC" . ($cap === null ? '' : ' LIMIT ' . (int)$cap);
+    if (count($vals) === 1) { $types = $scopeTypes . 's'; $args = array_merge($scopeArgs, [$vals[0]]); }
+}
 $sql = "SELECT j.id, j.code, j.journal_date, j.description, j.status, j.user_id, j.reverses_id,
                MAX(CONCAT(u.firstname, ' ', u.lastname)) author,
                COUNT(ji.id) line_count,
@@ -21,40 +73,36 @@ $sql = "SELECT j.id, j.code, j.journal_date, j.description, j.status, j.user_id,
                (SELECT i.invoice_no FROM invoice_list i WHERE i.journal_id = j.id LIMIT 1) src_invoice,
                (SELECT p.payment_no FROM payment_list p WHERE p.journal_id = j.id LIMIT 1) src_payment,
                (SELECT pr.id FROM payroll_list pr WHERE pr.journal_id = j.id LIMIT 1) src_payroll
-        FROM journal_entries j
+        FROM ({$pick}) pick
+        INNER JOIN journal_entries j ON j.id = pick.id
         LEFT JOIN journal_items ji ON ji.journal_id = j.id
         LEFT JOIN group_list g ON g.id = ji.group_id
         LEFT JOIN users u ON u.id = j.user_id
-        WHERE j.tenant_id = ? AND j.journal_date BETWEEN ? AND ?" . ($own_only ? " AND j.user_id = ?" : "") . "
         GROUP BY j.id
         ORDER BY j.journal_date DESC, j.id DESC";
 $stmt = $conn->prepare($sql);
 $rows = [];
 if ($stmt) {
-    $own_only ? $stmt->bind_param('issi', $tenant_id, $from, $to, $uid) : $stmt->bind_param('iss', $tenant_id, $from, $to);
+    $stmt->bind_param($types, ...$args);
     $stmt->execute();
     $res = $stmt->get_result();
     $rows = $res ? $res->fetch_all(MYSQLI_ASSOC) : [];
 }
 
-$norm = function ($s): string {
-    $s = strtolower((string)$s);
-    if (in_array($s, ['cancelled', 'canceled', 'void', '2', '3'], true)) { return 'cancelled'; }
-    if ($s === 'pending_approval') { return 'pending'; }
-    return $s === 'draft' ? 'draft' : 'posted';
-};
-$counts = ['all' => count($rows), 'posted' => 0, 'draft' => 0, 'pending' => 0, 'cancelled' => 0];
+// Totals are over the journals on screen. Only posted journals affect the ledger, so the posted total and the
+// out-of-balance warning apply to the All and Posted tabs; an unbalanced draft is just unfinished.
+$tab_total = $counts[$status_tab] ?? $counts['all'];
+$capped = $tab_total > count($rows);
 $posted_total = 0.0;
-foreach ($rows as $r) {
-    $st = $norm($r['status']);
-    $counts[$st]++;
-    if ($st === 'posted') { $posted_total += (float)$r['debit']; }
+$unbalanced = 0;
+if (in_array($status_tab, ['all', 'posted'], true)) {
+    foreach ($rows as $r) {
+        if ($norm($r['status']) !== 'posted') { continue; }
+        $posted_total += (float)$r['debit'];
+        if (abs((float)$r['debit'] - (float)$r['credit']) >= 0.005) { $unbalanced++; }
+    }
 }
-// Only posted journals affect the ledger; an unbalanced draft is just unfinished.
-$unbalanced = count(array_filter($rows, fn ($r) => $norm($r['status']) === 'posted' && abs((float)$r['debit'] - (float)$r['credit']) >= 0.005));
-if ($status_tab !== 'all') {
-    $rows = array_values(array_filter($rows, fn ($r) => $norm($r['status']) === $status_tab));
-}
+$window_notice = \App\Support\ListWindow::notice(count($rows), $tab_total, './?' . http_build_query(['page' => 'journals', 'from' => $from, 'to' => $to, 'status' => $status_tab, 'all' => 1]));
 $due_reversals = $_settings->can_access('journals_create') ? count((new \App\Services\AutoReversalService($conn, $_settings))->due(date('Y-m-d'))) : 0;
 $qs = fn (array $over) => './?' . http_build_query(array_merge(['page' => 'journals', 'from' => $from, 'to' => $to, 'status' => $status_tab], $over));
 ?>
@@ -85,7 +133,7 @@ $qs = fn (array $over) => './?' . http_build_query(array_merge(['page' => 'journ
     </div>
     <div class="card-body">
         <?php if ($unbalanced): ?>
-        <div class="d-flex align-items-center mb-3" style="gap:10px;padding:10px 14px;border-radius:10px;background:#fef2f2;border:1px solid #fecaca;color:#991b1b;font-size:.88rem"><i class="fas fa-exclamation-triangle"></i> <span><b><?= $unbalanced ?> posted journal<?= $unbalanced === 1 ? ' is' : 's are' ?> out of balance</b> in this period, so your trial balance won’t agree. Open <?= $unbalanced === 1 ? 'it' : 'them' ?> to correct the lines.</span></div>
+        <div class="d-flex align-items-center mb-3" style="gap:10px;padding:10px 14px;border-radius:10px;background:#fef2f2;border:1px solid #fecaca;color:#991b1b;font-size:.88rem"><i class="fas fa-exclamation-triangle"></i> <span><b><?= $unbalanced ?> posted journal<?= $unbalanced === 1 ? ' is' : 's are' ?> out of balance</b> <?= $capped ? 'among the journals shown' : 'in this period' ?>, so your trial balance won’t agree. Open <?= $unbalanced === 1 ? 'it' : 'them' ?> to correct the lines.</span></div>
         <?php endif; ?>
         <div class="jl-tabs">
             <?php foreach (['all' => 'All', 'posted' => 'Posted', 'draft' => 'Draft', 'pending' => 'Awaiting approval', 'cancelled' => 'Cancelled'] as $k => $lbl): ?>
@@ -98,8 +146,9 @@ $qs = fn (array $over) => './?' . http_build_query(array_merge(['page' => 'journ
             <div><label for="jl-from">From</label><input type="date" id="jl-from" name="from" value="<?= $from ?>" class="form-control form-control-sm"></div>
             <div><label for="jl-to">To</label><input type="date" id="jl-to" name="to" value="<?= $to ?>" class="form-control form-control-sm"></div>
             <div><button class="btn btn-default" style="height:36px"><i class="fas fa-filter mr-1"></i> Apply</button></div>
-            <div class="ml-auto jl-note">Posted in period: <b><?= number_format($posted_total, 2) ?></b></div>
+            <?php if (in_array($status_tab, ['all', 'posted'], true)): ?><div class="ml-auto jl-note"><?= $capped ? 'Posted (journals shown)' : 'Posted in period' ?>: <b><?= number_format($posted_total, 2) ?></b></div><?php endif; ?>
         </form>
+        <?= $window_notice ?>
         <table class="table table-hover" id="journal-list">
             <thead>
                 <tr>
