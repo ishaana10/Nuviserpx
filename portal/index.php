@@ -57,6 +57,8 @@ $view_order_id   = $_GET['order_id'] ?? null;
 <?php require_once('../admin/inc/header.php') ?>
 <style>
   .portal-header {
+    height: auto !important; /* AdminLTE fixes the bar at 56px; on narrow screens the opened menu spilled out as white-on-white */
+    min-height: 57px;
     background-color: <?php echo htmlspecialchars($portal_theme_color) ?> !important;
   }
   @media print {

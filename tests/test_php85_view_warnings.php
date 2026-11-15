@@ -10,4 +10,6 @@ check('payslip answers 404 when the payslip does not exist', strpos($slip, 'Pays
 $reg = file_get_contents("$root/portal/register.php");
 check('portal activation does not read a non-existent users.name column', strpos($reg, "\$user['name']") === false);
 check('portal activation shows the company name read-only', strpos($reg, "\$user['party_name']") !== false && strpos($reg, 'readonly') !== false);
+$idx = file_get_contents("$root/portal/index.php");
+check('portal header grows with the opened mobile menu (AdminLTE fixes it at 56px)', preg_match('/\.portal-header\s*\{[^}]*height:\s*auto\s*!important/', $idx) === 1);
 exit($fail ? 1 : 0);
