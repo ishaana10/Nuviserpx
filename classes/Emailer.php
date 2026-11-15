@@ -452,6 +452,7 @@ class Emailer {
             <a href='" . htmlspecialchars($invite_url) . "' style='background-color: #0284c7; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px; display: inline-block;'>Set Up My Account &rarr;</a>
         </div>
 
+        <p style='background:#f1f5f9;padding:10px 14px;border-radius:6px'>After you choose a password, sign in to the portal with your <strong>username: " . htmlspecialchars($to) . "</strong> (your email address) and the password you set.</p>
         <p style='font-size: 13px; color: #666;'>Or copy and paste this URL into your browser:<br><a href='" . htmlspecialchars($invite_url) . "'>" . htmlspecialchars($invite_url) . "</a></p>
         <p style='font-size: 13px; color: #666;'>This link is valid for 7 days and can be used once. If you did not expect this email, you can ignore it.</p>";
 

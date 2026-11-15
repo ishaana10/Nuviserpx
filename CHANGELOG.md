@@ -5,6 +5,10 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
 
 ## [Unreleased] - 2026-11-14
 
+### Fixed
+- Employee portal: the sign-in username (the employee's email address) is now shown on the set-password page and the
+  sign-in page, included in the invitation email, and added to the "email could not be sent" message HR sees.
+
 ### Security
 - Tenant isolation: the payments API verifies an invoice belongs to the API
   key's company before allocating against it; by-id API follow-up queries
