@@ -6,6 +6,7 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
 ## [Unreleased] - 2026-11-14
 
 ### Added
+- Employee Portal: employees can change their own password (Change Password in the menu). It asks for the current password, applies the usual password rules, and wrong guesses count towards the sign-in lock-out.
 - Employee Portal: My Payslips now shows the same payslip as payroll (company logo, year-to-date, leave balances,
   employer contributions). My Leave has Balances / New Request / View Requests / Calendar tabs; the request form checks
   the balance, working days, public holidays and overlaps live and will not submit a request that cannot be granted, and
@@ -20,6 +21,7 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
   revoked by HR takes effect immediately, even for a signed-in employee.
 
 ### Fixed
+- Employee Portal pages looked unstyled after an update because the browser kept an old stylesheet for the rest of the day; the CSS and script are now versioned by file change. My Leave tabs, form and calendar spacing polished.
 - Employee Portal pages returned HTTP 500: the leave queries bound read-only properties by reference, which PHP rejects.
 - Employee and customer portal pages no longer redirect to the staff login: the staff session check ran on every portal
   page, so employees were sent to the main login after setting their password, and a signed-in admin was bounced away
