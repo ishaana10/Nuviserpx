@@ -10,6 +10,10 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
   sign-in page, included in the invitation email, and added to the "email could not be sent" message HR sees.
 - Dashboard on phones: the header (date range, Customize, New invoice) and dashboard tabs no longer stretch the page
   wider than the screen, so the greeting no longer runs under the profile picture and nothing is cut off at the right.
+- Employee portal invitations were never emailed: the code skipped sending when the mail class was not loaded. It now
+  always attempts the send. The customer portal invitation had a wrong file path for the same class and is fixed too.
+- When an invitation email cannot be sent, HR now gets the sign-up link in a copyable box (with a Copy button) and the
+  username, instead of a browser popup that could not be copied from.
 
 ### Security
 - Tenant isolation: the payments API verifies an invoice belongs to the API
