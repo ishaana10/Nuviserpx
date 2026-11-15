@@ -403,7 +403,7 @@ final class Permissions
 
     // Customer-portal actions that run under a customer session (login_type 2),
     // not an admin session — exempt from the admin access-control gate.
-    public const PUBLIC_ACTIONS = ['customer_login', 'customer_register', 'save_proposal_signature', 'employee_portal_login', 'employee_portal_activate', 'employee_portal_leave_apply', 'employee_portal_leave_cancel', 'employee_portal_leave_preview'];
+    public const PUBLIC_ACTIONS = ['customer_login', 'customer_register', 'save_proposal_signature', 'employee_portal_login', 'employee_portal_activate', 'employee_portal_leave_apply', 'employee_portal_leave_cancel', 'employee_portal_leave_preview', 'employee_portal_change_password'];
 
     private const ACTION_MAP = [
         // Accounting - chart of accounts, groups, banks

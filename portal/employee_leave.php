@@ -92,4 +92,4 @@ emp_header('My Leave', 'leave');
 
 <?php
 $data = json_encode(['cal' => $cal], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
-emp_footer("<script>window.PP_CAL = {$data}.cal;</script><script src=\"" . base_url . "dist/js/nuvis-portal-leave.js?v=" . date('Ymd') . "\"></script>");
+emp_footer("<script>window.PP_CAL = {$data}.cal;</script><script src=\"" . base_url . "dist/js/nuvis-portal-leave.js?v=" . (int)@filemtime(base_app . 'dist/js/nuvis-portal-leave.js') . "\"></script>");

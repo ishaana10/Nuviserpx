@@ -224,6 +224,45 @@ class EmployeePortalService
         return ['id' => (int)$u['id'], 'tenant_id' => (int)$u['tenant_id'], 'employee_id' => (int)$u['employee_id'], 'email' => (string)$u['email']];
     }
 
+    /**
+     * The signed-in employee changes their own password. The current password must be right (wrong guesses count towards the
+     * same lock-out as sign-in), the new one must meet the usual rules and differ from the old one.
+     *
+     * @return array{ok:bool,msg:string}
+     */
+    public function changePassword(int $portalUserId, int $tenantId, int $employeeId, string $current, string $new, string $confirm, string $ip): array
+    {
+        $q = $this->conn->prepare("SELECT id, email, password, locked_until FROM employee_portal_users WHERE id = ? AND tenant_id = ? AND employee_id = ? AND status = 1");
+        $q->bind_param('iii', $portalUserId, $tenantId, $employeeId);
+        $q->execute();
+        $u = $q->get_result()->fetch_assoc();
+        if (!$u) {
+            return ['ok' => false, 'msg' => 'Please sign in again.'];
+        }
+        if (self::isLocked($u['locked_until'], time())) {
+            return ['ok' => false, 'msg' => 'Too many wrong attempts. Please try again later.'];
+        }
+        if (strlen($current) > 200 || strlen($new) > 200 || empty($u['password']) || !password_verify($current, (string)$u['password'])) {
+            $this->fail_attempt($portalUserId, $tenantId, $employeeId, $ip);
+            return ['ok' => false, 'msg' => 'Your current password is not right.'];
+        }
+        if ($new !== $confirm) {
+            return ['ok' => false, 'msg' => 'The two new passwords do not match.'];
+        }
+        if ($new === $current) {
+            return ['ok' => false, 'msg' => 'Choose a new password that is different from your current one.'];
+        }
+        if ($err = self::passwordErrors($new, (string)$u['email'])) {
+            return ['ok' => false, 'msg' => implode(' ', $err)];
+        }
+        $hash = password_hash($new, PASSWORD_BCRYPT);
+        $up = $this->conn->prepare("UPDATE employee_portal_users SET password = ?, failed_attempts = 0, locked_until = NULL WHERE id = ? AND tenant_id = ?");
+        $up->bind_param('sii', $hash, $portalUserId, $tenantId);
+        $up->execute();
+        $this->log($tenantId, $employeeId, 'password_changed', 'Employee changed their own password', $ip);
+        return ['ok' => true, 'msg' => 'Your password has been changed.'];
+    }
+
     /** Is this portal account still switched on? (HR can revoke access while an employee is signed in.) */
     public function stillActive(int $portalUserId, int $tenantId, int $employeeId): bool
     {

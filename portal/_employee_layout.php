@@ -55,13 +55,14 @@ function emp_header(string $title, string $active): void
     $full = trim($first . ' ' . (string)($me['lastname'] ?? ''));
     $initials = strtoupper(substr($first, 0, 1) . substr((string)($me['lastname'] ?? ''), 0, 1));
     $menu = [['home', 'employee.php', 'fa-home', 'Home'], ['leave', 'employee_leave.php', 'fa-calendar-check', 'My Leave'],
-        ['payslips', 'employee_payslips.php', 'fa-file-invoice-dollar', 'My Payslips'], ['details', 'employee_details.php', 'fa-id-card', 'My Details']];
+        ['payslips', 'employee_payslips.php', 'fa-file-invoice-dollar', 'My Payslips'], ['details', 'employee_details.php', 'fa-id-card', 'My Details'],
+        ['password', 'employee_password.php', 'fa-key', 'Change Password']];
     ?>
 <!DOCTYPE html>
 <html lang="en">
 <?php require_once(__DIR__ . '/../admin/inc/header.php') ?>
 <body class="pp hold-transition">
-<link rel="stylesheet" href="<?php echo base_url ?>dist/css/nuvis-portal.css?v=<?php echo $h(date('Ymd')) ?>">
+<link rel="stylesheet" href="<?php echo base_url ?>dist/css/nuvis-portal.css?v=<?php echo (int)@filemtime(base_app . 'dist/css/nuvis-portal.css') ?>">
 <header class="pp-top d-print-none">
   <button class="pp-burger" type="button" id="ppBurger" aria-label="Menu"><i class="fa fa-bars"></i></button>
   <span class="pp-brand"><?php echo $h($company) ?></span>
