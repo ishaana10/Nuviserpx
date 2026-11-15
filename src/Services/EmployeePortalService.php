@@ -224,6 +224,15 @@ class EmployeePortalService
         return ['id' => (int)$u['id'], 'tenant_id' => (int)$u['tenant_id'], 'employee_id' => (int)$u['employee_id'], 'email' => (string)$u['email']];
     }
 
+    /** Is this portal account still switched on? (HR can revoke access while an employee is signed in.) */
+    public function stillActive(int $portalUserId, int $tenantId, int $employeeId): bool
+    {
+        $q = $this->conn->prepare("SELECT 1 FROM employee_portal_users WHERE id = ? AND tenant_id = ? AND employee_id = ? AND status = 1 LIMIT 1");
+        $q->bind_param('iii', $portalUserId, $tenantId, $employeeId);
+        $q->execute();
+        return $q->get_result()->num_rows === 1;
+    }
+
     /** The employee's payslips, newest first: posted payroll only. */
     public function payslips(int $tenantId, int $employeeId): array
     {

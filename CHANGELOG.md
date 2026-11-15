@@ -5,6 +5,13 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
 
 ## [Unreleased] - 2026-11-14
 
+### Added
+- Employee Portal v2: a side menu (Home, My Leave, My Payslips, My Details) that works on phones. Home shows leave balances
+  and the latest payslip. Employees apply for leave, see balances and request history, and cancel pending requests
+  (same rules as staff entry: balance check, half days, public holidays). My Details is read-only. Employees are emailed
+  when a leave request is approved or rejected. Company and employee come only from the portal sign-in, and access
+  revoked by HR takes effect immediately, even for a signed-in employee.
+
 ### Fixed
 - Employee and customer portal pages no longer redirect to the staff login: the staff session check ran on every portal
   page, so employees were sent to the main login after setting their password, and a signed-in admin was bounced away

@@ -34,8 +34,10 @@ foreach (['invite_employee_portal', 'revoke_employee_portal', 'employee_portal_l
     check("Master routes $a", strpos($m, "'$a',") !== false);
 }
 check('session regenerated on sign-in', strpos($m, 'session_regenerate_id(true)') !== false);
-$page = file_get_contents("$root/portal/employee.php");
-check('portal takes employee from the session, not the request', strpos($page, "\$_SESSION['employee_portal']['employee_id']") !== false && !preg_match('/\$_(GET|POST|REQUEST)\[.employee/', $page));
+$page = file_get_contents("$root/portal/_employee_layout.php");
+$allPages = $page;
+foreach (['employee', 'employee_leave', 'employee_payslips', 'employee_details'] as $pg) { $allPages .= file_get_contents("$root/portal/$pg.php"); }
+check('portal takes employee from the session, not the request', strpos($page, "\$__p['employee_id']") !== false && strpos($page, "\$_SESSION['employee_portal']") !== false && !preg_match('/\$_(GET|POST|REQUEST)\[.(employee|tenant)/', $allPages));
 $mig = file_get_contents("$root/database/migrations/019_employee_portal.sql");
 check('migration adds email and portal tables', strpos($mig, 'ADD COLUMN `email`') !== false && strpos($mig, 'employee_portal_users') !== false && strpos($mig, 'UNIQUE KEY `portal_employee`') !== false);
 check('migration comments have no semicolons', !preg_match('/^--.*;/m', $mig));
