@@ -116,14 +116,14 @@ Example: `0 7 * * * php /path/to/nuviserpx/cron/payment_reminders.php >> /var/lo
 
 ## Database Migrations
 
-Schema changes live in `database/migrations/*.sql` and are applied in order by `src/Database/MigrationRunner.php`; legacy catch-up checks in `src/Database/LegacySchemaCatchup.php` create core tables first. The runner currently applies pending files when the application connects. On a live system, apply them from the command line during a deployment instead (`bin/deploy.sh` does this in maintenance mode):
+Schema changes live in `database/migrations/*.sql` and are applied in order by `src/Database/MigrationRunner.php`; legacy catch-up checks in `src/Database/LegacySchemaCatchup.php` create core tables first. The runner is strict: it takes a lock so only one process migrates at a time, stops at the first real error (naming the file and the SQL), and records a migration only after every statement in it has succeeded, with a checksum so a file edited after it was applied is flagged. A fresh install builds the schema with `SchemaInstaller` and verifies the required tables exist. On a live system set `AUTO_MIGRATE=0` in `.env` (the installer does this for new installs) so web requests never change the schema; if the database is behind the code, the site shows an "update in progress" page until you apply migrations from the command line (`bin/deploy.sh` does this in maintenance mode):
 
 ```bash
 php bin/migrate.php --status   # lists applied and pending migrations, changes nothing
 php bin/migrate.php            # applies anything pending
 ```
 
-`php health.php` also reports pending migrations. Statement splitting ignores semicolons in comments, and column additions are checked against `information_schema` so the same files run on MySQL and MariaDB. Known limitation: a failed statement inside a migration is not yet reported reliably, so after every upgrade check `php health.php` and the PHP error log.
+`php health.php` also reports pending migrations. Statement splitting ignores semicolons in comments, and column additions are checked against `information_schema` so the same files run on MySQL and MariaDB. If a migration fails, `bin/migrate.php` exits non-zero and prints the failing file and statement; fix it and run it again, it resumes where it stopped (statements that already took effect are recognised and skipped).
 
 ---
 

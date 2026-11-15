@@ -81,34 +81,18 @@ if (!$conn->query($create_db_sql)) {
 
 $conn->select_db($db_name);
 
-// 3. Import Schema nuviserpx.sql
-$sql_file = __DIR__ . '/../database/nuviserpx.sql';
-if (!file_exists($sql_file)) {
+// 3. Build the complete schema (base dump, catch-up, every migration) or stop with the reason.
+require_once __DIR__ . '/../vendor/autoload.php';
+try {
+    \App\Database\SchemaInstaller::install($conn, __DIR__ . '/../database/nuviserpx.sql', __DIR__ . '/../database/migrations');
+} catch (\Throwable $e) {
+    error_log('[nuviserpx installer] ' . $e->getMessage());
     echo json_encode([
         'status' => 'error',
-        'message' => 'Database schema file database/nuviserpx.sql not found.'
+        'message' => 'The database could not be set up: ' . $e->getMessage() . ' The installation was not completed; fix the problem and run the installer again.'
     ]);
     $conn->close();
     exit;
-}
-
-$sql_content = file_get_contents($sql_file);
-if (!empty($sql_content)) {
-    if (@$conn->multi_query($sql_content)) {
-        do {
-            if ($result = $conn->store_result()) {
-                $result->free();
-            }
-        } while ($conn->more_results() && $conn->next_result());
-    } else {
-        $queries = preg_split("/;[\r\n]+/", $sql_content);
-        foreach ($queries as $query) {
-            $query = trim($query);
-            if (!empty($query)) {
-                @$conn->query($query);
-            }
-        }
-    }
 }
 
 // 4. Update system_info branding
@@ -162,6 +146,7 @@ $env_content = "APP_NAME=\"" . addslashes($app_name) . "\"\n" .
                "DB_PASSWORD=\"" . addslashes($db_password) . "\"\n" .
                "DB_NAME=\"" . addslashes($db_name) . "\"\n" .
                "APP_ENV=production\n" .
+               "AUTO_MIGRATE=0\n" .
                "APP_DEBUG=false\n" .
                "APP_KEY=" . bin2hex(random_bytes(32)) . "\n" .
                "SESSION_DRIVER=file\n" .

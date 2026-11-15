@@ -40,3 +40,44 @@ jobs:
           tools: phpstan
       - name: PHPStan
         run: phpstan analyse -c phpstan.neon --no-progress
+
+  database-tests:
+    name: Real-database tests (${{ matrix.db.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        db:
+          - { name: 'MySQL 8.0', image: 'mysql:8.0', health: 'mysqladmin ping -h 127.0.0.1 -uroot -proot' }
+          - { name: 'MariaDB 10.11', image: 'mariadb:10.11', health: 'healthcheck.sh --connect --innodb_initialized' }
+    services:
+      db:
+        image: ${{ matrix.db.image }}
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MARIADB_ROOT_PASSWORD: root
+        ports: [ '3306:3306' ]
+        options: >-
+          --health-cmd="${{ matrix.db.health }}"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+    env:
+      NV_TEST_DB_SERVER: 127.0.0.1
+      NV_TEST_DB_USER: root
+      NV_TEST_DB_PASS: root
+      NV_TEST_DB_REQUIRED: '1'   # no database = failure, never a silent skip
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mysqli
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+      - name: Fresh install, strict migrations, accounting rules
+        run: |
+          set -e
+          for t in tests/db/test_*.php; do
+            echo "=== $t"
+            php "$t" | tee /tmp/out.txt
+            ! grep -q '^FAIL' /tmp/out.txt
+          done

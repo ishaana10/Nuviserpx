@@ -119,16 +119,16 @@ ALTER TABLE `tenants` ADD COLUMN IF NOT EXISTS `plan_status` enum('trial','activ
 
 -- Seed default plans.
 INSERT INTO `tenant_plans` (`code`,`name`,`description`,`price`,`billing_cycle`,`max_users`,`max_invoices`,`max_api_calls`,`features`,`sort_order`)
-SELECT * FROM (SELECT
-  'starter','Starter','For small businesses getting started',0.00,'monthly',3,50,1000,'["Invoicing","Accounting","1 Tenant"]',1) AS t
-WHERE NOT EXISTS (SELECT 1 FROM `tenant_plans` WHERE `code` = 'starter');
+SELECT
+  'starter','Starter','For small businesses getting started',0.00,'monthly',3,50,1000,'["Invoicing","Accounting","1 Tenant"]',1
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM `tenant_plans` WHERE `code` = 'starter');
 
 INSERT INTO `tenant_plans` (`code`,`name`,`description`,`price`,`billing_cycle`,`max_users`,`max_invoices`,`max_api_calls`,`features`,`sort_order`)
-SELECT * FROM (SELECT
-  'professional','Professional','Growing teams with automation needs',99.00,'monthly',15,1000,50000,'["Everything in Starter","Webhooks","Workflow Automation","API Access"]',2) AS t
-WHERE NOT EXISTS (SELECT 1 FROM `tenant_plans` WHERE `code` = 'professional');
+SELECT
+  'professional','Professional','Growing teams with automation needs',99.00,'monthly',15,1000,50000,'["Everything in Starter","Webhooks","Workflow Automation","API Access"]',2
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM `tenant_plans` WHERE `code` = 'professional');
 
 INSERT INTO `tenant_plans` (`code`,`name`,`description`,`price`,`billing_cycle`,`max_users`,`max_invoices`,`max_api_calls`,`features`,`sort_order`)
-SELECT * FROM (SELECT
-  'enterprise','Enterprise','Full platform with unlimited scale',299.00,'monthly',0,0,0,'["Everything in Professional","Unlimited Users","Unlimited Invoices","Priority Support"]',3) AS t
-WHERE NOT EXISTS (SELECT 1 FROM `tenant_plans` WHERE `code` = 'enterprise');
+SELECT
+  'enterprise','Enterprise','Full platform with unlimited scale',299.00,'monthly',0,0,0,'["Everything in Professional","Unlimited Users","Unlimited Invoices","Priority Support"]',3
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM `tenant_plans` WHERE `code` = 'enterprise');
