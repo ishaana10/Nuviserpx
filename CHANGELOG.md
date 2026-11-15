@@ -10,6 +10,12 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
 - **Portal menu invisible on narrow screens.** The header bar stayed at a fixed height, so the opened hamburger menu (account name, Log Out) spilled out as white text on the light page. The bar now grows to fit.
 - **Customer portal dashboard sent visitors to the staff login.** The staff-session guard exempted `/portal/<page>.php` but not the folder address `/portal/` that login and the brand link use, so the portal menu and Log Out seemed dead. The folder address is now exempt too.
 
+## [Unreleased] - 2026-11-16
+
+### Added
+- **Real PDF download in the customer portal.** The portal's PDF buttons now download a server-built invoice PDF (company letterhead, colours, tax lines), instead of opening the browser's print dialog. A customer can only fetch their own issued invoices (never drafts or cancelled); nothing is stored on the server.
+- **Digital signing on delivery notes.** On a delivery note, staff type the receiver's name and capture their signature on a signature pad (finger, stylus or mouse). The signed name, date and signature replace the blank lines on the printout, and the delivery note list shows a SIGNED badge. A signature is locked once saved; cancelled notes cannot be signed. Migration 049 adds the columns.
+
 ## [Unreleased] - 2026-11-15 (2)
 
 ### Fixed
