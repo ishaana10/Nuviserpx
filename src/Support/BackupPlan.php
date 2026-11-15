@@ -25,6 +25,17 @@ final class BackupPlan
         return "[client]\nuser=" . $q($user) . "\npassword=" . $q($password) . "\nhost=" . $q($hp['host']) . "\nport=" . $hp['port'] . "\n";
     }
 
+    /**
+     * Shell check that a gzipped dump is intact and really holds tables. It reads the whole stream (grep -c) on purpose:
+     * `grep -m1 -q` quits at the first match, gzip then dies of a broken pipe, and with pipefail that made every dump
+     * larger than the pipe buffer (about 64 KB uncompressed) look "damaged" and be thrown away.
+     */
+    public static function dumpCheckCommand(string $file): string
+    {
+        $f = escapeshellarg($file);
+        return 'gzip -t ' . $f . ' && [ "$(gzip -dc ' . $f . ' | grep -c "CREATE TABLE")" -gt 0 ]';
+    }
+
     public static function fileName(string $kind, int $now): string
     {
         $ext = ['db' => 'sql.gz', 'files' => 'tar.gz'][$kind] ?? 'bin';

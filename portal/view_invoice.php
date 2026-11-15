@@ -1,16 +1,25 @@
 <?php
 require_once('../config.php');
 
-if (!isset($_SESSION['customer_portal']) && !isset($_SESSION['customer_id'])) {
+$portalCtx = \App\Support\CustomerPortal::context($conn);
+if (!$portalCtx) {
+    \App\Support\CustomerPortal::clearSession();
     redirect('portal/login.php');
+    exit;
 }
+$party_id = (int)$portalCtx['party_id'];
+$portal_tenant_id = (int)$portalCtx['tenant_id'];
+$cur_code = (string)$_settings->base_currency($portal_tenant_id);
+$fmt = function ($v) use ($cur_code) { return ($cur_code !== '' ? htmlspecialchars($cur_code) . ' ' : '') . number_format((float)$v, 2); };
+$inv_vis = \App\Support\CustomerPortal::invoiceStatusSql('status');
+$inv_vis_i = \App\Support\CustomerPortal::invoiceStatusSql('i`.`status');
 
 $id = intval($_GET['id'] ?? 0);
-$party_id = $_SESSION['customer_portal']['party_id'] ?? $_SESSION['customer_party_id'] ?? $_SESSION['customer_client_id'] ?? 0;
 
-$qry = $conn->query("SELECT i.*, p.party_code, p.name as customer_name, p.email as customer_email, p.phone as customer_phone, p.tin as customer_tin, p.address as customer_address FROM `invoice_list` i LEFT JOIN `party_list` p ON i.party_id = p.id WHERE i.id = '{$id}' AND i.party_id = '{$party_id}'");
+$qry = $conn->query("SELECT i.*, p.party_code, p.name as customer_name, p.email as customer_email, p.phone as customer_phone, p.tin as customer_tin, p.address as customer_address FROM `invoice_list` i LEFT JOIN `party_list` p ON i.party_id = p.id WHERE i.id = {$id} AND i.party_id = {$party_id} AND {$inv_vis_i}");
 
 if (!$qry || $qry->num_rows == 0) {
+    http_response_code(404);
     die("Invoice not found or access denied.");
 }
 
@@ -147,30 +156,30 @@ $status_class = [
         <div class="card border shadow-none bg-light p-3">
           <div class="d-flex justify-content-between mb-2">
             <span class="text-muted">Subtotal:</span>
-            <strong class="text-dark">$<?php echo number_format($inv['subtotal'], 2) ?></strong>
+            <strong class="text-dark"><?php echo $fmt($inv['subtotal']) ?></strong>
           </div>
           <div class="d-flex justify-content-between mb-2">
             <span class="text-muted">Tax / VAT Amount:</span>
-            <strong class="text-dark">$<?php echo number_format($inv['tax_amount'], 2) ?></strong>
+            <strong class="text-dark"><?php echo $fmt($inv['tax_amount']) ?></strong>
           </div>
           <?php if($inv['discount'] > 0): ?>
           <div class="d-flex justify-content-between mb-2">
             <span class="text-muted">Discount:</span>
-            <strong class="text-danger">-$<?php echo number_format($inv['discount'], 2) ?></strong>
+            <strong class="text-danger">-<?php echo $fmt($inv['discount']) ?></strong>
           </div>
           <?php endif; ?>
           <hr class="my-2">
           <div class="d-flex justify-content-between mb-2">
             <span class="font-weight-bold h6">Grand Total:</span>
-            <strong class="font-weight-bold h5 text-navy">$<?php echo number_format($inv['total'], 2) ?></strong>
+            <strong class="font-weight-bold h5 text-navy"><?php echo $fmt($inv['total']) ?></strong>
           </div>
           <div class="d-flex justify-content-between mb-2">
             <span class="text-muted">Amount Paid:</span>
-            <strong class="text-success">$<?php echo number_format($inv['paid_amount'], 2) ?></strong>
+            <strong class="text-success"><?php echo $fmt($inv['paid_amount']) ?></strong>
           </div>
           <div class="d-flex justify-content-between pt-2 border-top">
             <span class="font-weight-bold h6 text-danger">Balance Due:</span>
-            <strong class="font-weight-bold h5 text-danger">$<?php echo number_format($inv['balance'], 2) ?></strong>
+            <strong class="font-weight-bold h5 text-danger"><?php echo $fmt($inv['balance']) ?></strong>
           </div>
         </div>
       </div>

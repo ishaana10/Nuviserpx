@@ -3,6 +3,17 @@
 All notable changes to Nuvis ERPX. Versions are stamped automatically on each
 release build (see `src/Support/AppVersion.php`); dates are Fiji time.
 
+## [Unreleased] - 2026-11-15
+
+### Fixed
+- **Backups were being discarded on any real database.** The check that a database dump is intact quit early and, with `pipefail`, reported every dump larger than about 64 KB as damaged, so `bin/backup.php` failed. The check now reads the whole dump. Test uses a 2 MB dump.
+- **Customer Portal invitation emails linked to the sign-in page**, which ignored the token, so customers could not activate their account. The link now opens the activation page, and old links are forwarded there.
+- **Customer Portal showed draft and cancelled invoices and payments** (draft invoices as "Unpaid"), and the balance counted them. Customers now see issued invoices and posted payments only; Balance Due is the sum of open invoice balances (credit notes included). Amounts show the company currency instead of a hard-coded `$`.
+- Customer Portal: revoking a portal user or deleting the customer now ends a signed-in session at once; activation is rate-limited, signs in with a fresh session id, and needs a password of 8+ characters with a letter and a number. Invitation tokens are stored hashed (invitations already sent keep working until they expire). An email address containing an apostrophe no longer breaks sending an invitation.
+- Proposal signing page: a stored script injection through the signature field. Only a PNG signature image is accepted and it is escaped on display; signer name and email are validated.
+- Web server: directory listings are off and `tests/` and `database/` are not served. The installer's session cookie is HttpOnly. Expense Reports no longer logs a PHP warning when no status filter is given.
+- Static analysis (PHPStan) is green again on `main`.
+
 ## [Unreleased] - 2026-11-14
 
 ### Added

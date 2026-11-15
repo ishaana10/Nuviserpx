@@ -49,23 +49,30 @@ class CustomerPortalService
         }
 
         $token = bin2hex(random_bytes(24));
+        $token_hash = \App\Support\CustomerPortal::tokenHash($token);
         $expires = date('Y-m-d H:i:s', strtotime('+7 days'));
 
-        $chk = $this->conn->query("SELECT id FROM `customer_portal_users` WHERE tenant_id = '{$tenant_id}' AND party_id = '{$party_id}'");
-        if ($chk && $chk->num_rows > 0) {
-            $portal_user = $chk->fetch_assoc();
-            $portal_user_id = $portal_user['id'];
-            $sql = "UPDATE `customer_portal_users` SET `email` = '{$email}', `invite_token` = '{$token}', `invite_expires_at` = '{$expires}', `status` = 0 WHERE id = '{$portal_user_id}'";
+        $chk = $this->conn->prepare("SELECT id FROM `customer_portal_users` WHERE tenant_id = ? AND party_id = ?");
+        $chk->bind_param('ii', $tenant_id, $party_id);
+        $chk->execute();
+        $existing = $chk->get_result()->fetch_assoc();
+        $portal_user_id = 0;
+        if ($existing) {
+            $portal_user_id = (int)$existing['id'];
+            // Re-inviting also signs out and disables the old password until the customer activates again.
+            $st = $this->conn->prepare("UPDATE `customer_portal_users` SET `email` = ?, `invite_token` = ?, `invite_expires_at` = ?, `status` = 0 WHERE id = ?");
+            $st->bind_param('sssi', $email, $token_hash, $expires, $portal_user_id);
         } else {
-            $sql = "INSERT INTO `customer_portal_users` (`tenant_id`, `party_id`, `email`, `invite_token`, `invite_expires_at`, `status`) VALUES ('{$tenant_id}', '{$party_id}', '{$email}', '{$token}', '{$expires}', 0)";
+            $st = $this->conn->prepare("INSERT INTO `customer_portal_users` (`tenant_id`, `party_id`, `email`, `invite_token`, `invite_expires_at`, `status`) VALUES (?, ?, ?, ?, ?, 0)");
+            $st->bind_param('iisss', $tenant_id, $party_id, $email, $token_hash, $expires);
         }
 
-        if ($this->conn->query($sql)) {
-            if (empty($portal_user_id)) {
-                $portal_user_id = $this->conn->insert_id;
+        if ($st->execute()) {
+            if ($portal_user_id === 0) {
+                $portal_user_id = (int)$this->conn->insert_id;
             }
 
-            $invite_url = base_url . "portal/login.php?token=" . $token;
+            $invite_url = base_url . "portal/register.php?token=" . $token;
             require_once(base_app . 'classes/Emailer.php');
             $sys = [];
             $sys_qry = $this->conn->query("SELECT meta_field, meta_value FROM `system_info`");
@@ -94,23 +101,39 @@ class CustomerPortalService
             return json_encode(['status' => 'failed', 'msg' => 'Please fill in all required fields.']);
         }
 
-        if (strlen($password) < 6) {
-            return json_encode(['status' => 'failed', 'msg' => 'Password must be at least 6 characters long.']);
+        if ((string)($_POST['confirm_password'] ?? $password) !== $password) {
+            return json_encode(['status' => 'failed', 'msg' => 'The two passwords do not match.']);
+        }
+        $errs = \App\Support\CustomerPortal::passwordErrors($password);
+        if ($errs) {
+            return json_encode(['status' => 'failed', 'msg' => $errs[0]]);
         }
 
-        $token_esc = $this->conn->real_escape_string($token);
-        $qry = $this->conn->query("SELECT * FROM `customer_portal_users` WHERE `invite_token` = '{$token_esc}' AND `invite_expires_at` >= NOW() LIMIT 1");
+        $throttle = new \App\Services\AuthThrottleService($this->conn);
+        $wait = $throttle->check('customer_register', $_SERVER['REMOTE_ADDR'] ?? 'cli');
+        if ($wait > 0) {
+            return json_encode(['status' => 'locked', 'retry_after' => $wait,
+                'msg' => 'Too many attempts. Try again in ' . \App\Services\AuthThrottleService::waitText($wait) . '.']);
+        }
 
-        if (!$qry || $qry->num_rows == 0) {
+        // Tokens are stored hashed. Links sent before hashing was introduced are plain in the database and are still
+        // accepted until they expire (7 days at most).
+        $hash = \App\Support\CustomerPortal::tokenHash($token);
+        $q = $this->conn->prepare("SELECT * FROM `customer_portal_users` WHERE (`invite_token` = ? OR `invite_token` = ?) AND `invite_expires_at` >= NOW() LIMIT 1");
+        $q->bind_param('ss', $hash, $token);
+        $q->execute();
+        $user = $q->get_result()->fetch_assoc();
+
+        if (!$user) {
+            $throttle->record('customer_register', $_SERVER['REMOTE_ADDR'] ?? 'cli');
             return json_encode(['status' => 'failed', 'msg' => 'Invalid or expired invitation link.']);
         }
-
-        $user = $qry->fetch_assoc();
         $hashed_pass = password_hash($password, PASSWORD_BCRYPT);
-        $pass_esc = $this->conn->real_escape_string($hashed_pass);
-
-        $upd = "UPDATE `customer_portal_users` SET `password` = '{$pass_esc}', `status` = 1, `invite_token` = NULL, `invite_expires_at` = NULL WHERE id = '{$user['id']}'";
-        if ($this->conn->query($upd)) {
+        $uid = (int)$user['id'];
+        $upd = $this->conn->prepare("UPDATE `customer_portal_users` SET `password` = ?, `status` = 1, `invite_token` = NULL, `invite_expires_at` = NULL WHERE id = ?");
+        $upd->bind_param('si', $hashed_pass, $uid);
+        if ($upd->execute()) {
+            if (session_status() === PHP_SESSION_ACTIVE) { session_regenerate_id(true); }
             $_SESSION['customer_portal'] = [
                 'id' => $user['id'],
                 'tenant_id' => $user['tenant_id'],
@@ -148,7 +171,7 @@ class CustomerPortalService
         $user = $stmt->get_result()->fetch_assoc();
 
         if ($user && password_verify($password, $user['password'])) {
-            session_regenerate_id(true); // a session id planted before sign-in is useless afterwards
+            if (session_status() === PHP_SESSION_ACTIVE) { session_regenerate_id(true); } // a session id planted before sign-in is useless afterwards
             $_SESSION['customer_portal'] = [
                 'id' => $user['id'],
                 'tenant_id' => $user['tenant_id'],

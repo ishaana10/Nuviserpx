@@ -19,4 +19,11 @@ final class ProposalLink
         }
         return hash_equals($stored, $given);
     }
+
+    /** The signature pad produces a PNG data URL. Anything else (markup, other schemes, huge blobs) is refused. */
+    public static function validSignatureImage(string $data): bool
+    {
+        return strlen($data) <= 400000
+            && preg_match('#^data:image/png;base64,[A-Za-z0-9+/]+={0,2}$#', $data) === 1;
+    }
 }

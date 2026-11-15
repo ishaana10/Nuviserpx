@@ -134,7 +134,7 @@ $items = $conn->query("SELECT * FROM `sales_order_items` WHERE sales_order_id = 
             <h5 class="font-weight-bold"><i class="fas fa-check-circle mr-2"></i> Proposal Accepted & Digitally Signed</h5>
             <p class="mb-2">Signed by: <strong><?= htmlspecialchars($existing_sig['signer_name']) ?></strong> (<?= htmlspecialchars($existing_sig['signer_email']) ?>) on <?= date("d M Y H:i", strtotime($existing_sig['signed_at'])) ?></p>
             <div class="bg-white p-3 rounded border d-inline-block">
-                <img src="<?= $existing_sig['signature_data'] ?>" alt="Client Signature" style="max-height: 100px;">
+                <img src="<?= \App\Support\ProposalLink::validSignatureImage((string)$existing_sig['signature_data']) ? htmlspecialchars($existing_sig['signature_data'], ENT_QUOTES) : '' ?>" alt="Client Signature" style="max-height: 100px;">
             </div>
         </div>
     <?php elseif (!$blocked): ?>

@@ -4,10 +4,13 @@ $token = $_GET['token'] ?? '';
 $user = null;
 
 if (!empty($token)) {
-    $token_esc = $conn->real_escape_string($token);
-    $qry = $conn->query("SELECT u.*, p.name as party_name, p.email as party_email FROM `customer_portal_users` u JOIN `party_list` p ON u.party_id = p.id WHERE u.invite_token = '{$token_esc}'");
-    if ($qry && $qry->num_rows > 0) {
-        $user = $qry->fetch_assoc();
+    $hash = \App\Support\CustomerPortal::tokenHash((string)$token);
+    $st = $conn->prepare("SELECT u.*, p.name as party_name, p.email as party_email FROM `customer_portal_users` u JOIN `party_list` p ON u.party_id = p.id WHERE (u.invite_token = ? OR u.invite_token = ?) AND u.invite_expires_at >= NOW()");
+    if ($st) {
+        $tok = (string)$token;
+        $st->bind_param('ss', $hash, $tok);
+        $st->execute();
+        $user = $st->get_result()->fetch_assoc() ?: null;
     }
 }
 ?>
@@ -44,12 +47,12 @@ if (!empty($token)) {
 
             <div class="form-group mb-3">
               <label class="text-muted text-xs">Password</label>
-              <input type="password" class="form-control" name="password" placeholder="Set Password" required minlength="6">
+              <input type="password" class="form-control" name="password" placeholder="Set Password (8+ characters, letters and numbers)" required minlength="8">
             </div>
 
             <div class="form-group mb-3">
               <label class="text-muted text-xs">Confirm Password</label>
-              <input type="password" class="form-control" name="confirm_password" placeholder="Confirm Password" required minlength="6">
+              <input type="password" class="form-control" name="confirm_password" placeholder="Confirm Password" required minlength="8">
             </div>
 
             <div class="row">

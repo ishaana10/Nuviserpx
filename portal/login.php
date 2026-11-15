@@ -1,4 +1,11 @@
-<?php require_once('../config.php'); ?>
+<?php
+require_once('../config.php');
+// Invitations sent before the link was corrected pointed here; hand them on to the activation page.
+if (!empty($_GET['token']) && is_string($_GET['token'])) {
+    header('Location: register.php?token=' . rawurlencode($_GET['token']), true, 302);
+    exit;
+}
+?>
 <!DOCTYPE html>
 <html lang="en" class="" style="height: auto;">
 <?php require_once('../admin/inc/header.php') ?>

@@ -93,6 +93,14 @@ class ContractService
         if ($so_id <= 0 || empty($signer_name) || empty($signer_email) || empty($signature_data)) {
             return json_encode(['status' => 'failed', 'msg' => 'Signer Name, Email, and Signature drawing are required.']);
         }
+        $signer_name = trim((string)$signer_name);
+        $signer_email = trim((string)$signer_email);
+        if (mb_strlen($signer_name) > 150 || !filter_var($signer_email, FILTER_VALIDATE_EMAIL) || strlen($signer_email) > 150) {
+            return json_encode(['status' => 'failed', 'msg' => 'Please enter your name and a valid email address.']);
+        }
+        if (!\App\Support\ProposalLink::validSignatureImage((string)$signature_data)) {
+            return json_encode(['status' => 'failed', 'msg' => 'The signature drawing is not valid. Please draw your signature again.']);
+        }
 
         // The quote itself decides the company, and only an open, current, unexpired quote can be accepted.
         $quoteRow = $this->conn->query("SELECT tenant_id, status, type, valid_until, sign_token FROM `sales_order_list` WHERE id = '{$so_id}'")->fetch_assoc();

@@ -15,7 +15,7 @@ namespace App\Support;
  */
 final class InstallState
 {
-    /** @param array<string,string> $env */
+    /** @return array<string,string> */
     public static function parseEnv(string $contents): array
     {
         $env = [];
