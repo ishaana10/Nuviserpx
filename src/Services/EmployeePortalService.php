@@ -104,7 +104,7 @@ class EmployeePortalService
         $this->log($t, $employeeId, 'invited', 'Invitation ' . ($sent ? 'emailed' : 'created, email not sent'));
         $this->settings->log_audit('Invited employee to self-service', 'Payroll', "Employee #{$employeeId}");
         return json_encode(['status' => 'success', 'msg' => $sent ? "Invitation emailed to {$email}. The link is valid for " . self::INVITE_DAYS . ' days.'
-            : "The email could not be sent. Give {$name} this link instead (valid for " . self::INVITE_DAYS . " days): {$url}"]);
+            : "The email could not be sent (check Email settings and the Email log). Give {$name} this link instead (valid for " . self::INVITE_DAYS . " days): {$url}\n\nTheir username for signing in is their email address: {$email}"]);
     }
 
     public function revoke(int $employeeId): string

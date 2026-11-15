@@ -6,6 +6,8 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
 ## [Unreleased] - 2026-11-14
 
 ### Fixed
+- Employee portal: the sign-in username (the employee's email address) is now shown on the set-password page and the
+  sign-in page, included in the invitation email, and added to the "email could not be sent" message HR sees.
 - Dashboard on phones: the header (date range, Customize, New invoice) and dashboard tabs no longer stretch the page
   wider than the screen, so the greeting no longer runs under the profile picture and nothing is cut off at the right.
 
