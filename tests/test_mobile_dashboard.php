@@ -14,7 +14,7 @@ check(strpos($js, 'function enableTouchDrag') !== false && strpos($js, 'enableTo
 check(strpos($js, "sm: 'col-6 col-sm-6 col-xl-3'") !== false, 'small widgets are two per row on phones');
 check(strpos($js, 'function syncOrderButtons') !== false, 'first/last move buttons are disabled');
 check(strpos($css, 'touch-action: none') !== false, 'drag handle blocks page scroll while dragging');
-check(strpos($css, 'grid-template-columns: 44px 44px 1fr 1fr') !== false, 'dashboard controls use a phone grid');
+check(strpos($css, 'grid-template-columns: 44px 44px minmax(0, 1fr) minmax(0, 1fr)') !== false, 'dashboard controls use a phone grid');
 check(strpos($css, 'position: sticky') !== false, 'edit banner stays visible while customising');
 check(strpos($ui, '.sidebar-mini-md .content-wrapper') !== false && strpos($ui, 'margin-left: 0 !important') !== false, 'no empty left gutter on phones');
 check(strpos($top, 'user-name') !== false && strpos($ui, '.main-header .user-name { display: none; }') !== false, 'top bar user name hidden on phones');
