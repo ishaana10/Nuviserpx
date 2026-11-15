@@ -3,6 +3,11 @@
 All notable changes to Nuvis ERPX. Versions are stamped automatically on each
 release build (see `src/Support/AppVersion.php`); dates are Fiji time.
 
+## [Unreleased] - 2026-11-15 (3)
+
+### Fixed
+- **Customer portal dashboard sent visitors to the staff login.** The staff-session guard exempted `/portal/<page>.php` but not the folder address `/portal/` that login and the brand link use, so the portal menu and Log Out seemed dead. The folder address is now exempt too.
+
 ## [Unreleased] - 2026-11-15 (2)
 
 ### Fixed
