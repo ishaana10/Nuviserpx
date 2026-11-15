@@ -136,6 +136,7 @@
           </div>
           <button type="submit" class="btn btn-primary btn-block btn-custom text-white mb-3">Sign In to Dashboard</button>
         </form>
+        <p class="text-center small text-muted-custom mb-0">Employee viewing payslips? <a href="<?php echo base_url ?>portal/employee_login.php" class="link-custom">Use the Employee Portal sign-in</a></p>
       </div>
 
       <!-- Forgot Password View -->

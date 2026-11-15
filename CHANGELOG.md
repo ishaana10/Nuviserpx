@@ -6,6 +6,8 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
 ## [Unreleased] - 2026-11-14
 
 ### Fixed
+- Employees were confused about where to sign in: the staff login page now links to the Employee Portal sign-in, and the
+  invitation email gives the portal sign-in address.
 - Employee portal: the sign-in username (the employee's email address) is now shown on the set-password page and the
   sign-in page, included in the invitation email, and added to the "email could not be sent" message HR sees.
 - Dashboard on phones: the header (date range, Customize, New invoice) and dashboard tabs no longer stretch the page
