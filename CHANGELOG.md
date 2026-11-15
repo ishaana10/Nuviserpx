@@ -6,6 +6,10 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
 ## [Unreleased] - 2026-11-14
 
 ### Fixed
+- Employee portal: the sign-in username (the employee's email address) is now shown on the set-password page and the
+  sign-in page, included in the invitation email, and added to the "email could not be sent" message HR sees.
+- Dashboard on phones: the header (date range, Customize, New invoice) and dashboard tabs no longer stretch the page
+  wider than the screen, so the greeting no longer runs under the profile picture and nothing is cut off at the right.
 - Employee portal invitations were never emailed: the code skipped sending when the mail class was not loaded. It now
   always attempts the send. The customer portal invitation had a wrong file path for the same class and is fixed too.
 - When an invitation email cannot be sent, HR now gets the sign-up link in a copyable box (with a Copy button) and the
@@ -29,6 +33,9 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
   4-hour idle lifetime.
 
 ### Added
+- Invoices can be viewed or downloaded as a PDF (View PDF / Download on the invoice page, View PDF in the list),
+  and the invoice email now carries the PDF as an attachment. PDFs are built in memory and are never stored on the
+  server. Shared PDF layout code now lives in `src/Support/PdfDoc.php`.
 - **Statement PDFs and "Last emailed"**: Customer Statements can be viewed or downloaded as a PDF,
   and every emailed statement carries a PDF copy. PDFs are built in memory and streamed or
   attached, then discarded: they are never stored on the server (a test fails the build if any

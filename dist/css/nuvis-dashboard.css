@@ -2,7 +2,8 @@
    Nuvis ERPX — customisable dashboards
    ========================================================================== */
 
-.nv-dash { padding: 4px 2px 24px; }
+.nv-dash { padding: 4px 2px 24px; max-width: 100%; min-width: 0; }
+.nv-dash-head > * { min-width: 0; }
 
 /* Header ------------------------------------------------------------------ */
 .nv-dash-head {
@@ -300,14 +301,18 @@
   .nv-dash-title { font-size: 1.3rem; line-height: 1.2; }
   .nv-dash-sub { font-size: .8rem; gap: 2px 6px; }
   /* Controls: date range on its own row, then refresh, theme, Customize, New invoice. */
-  .nv-dash-actions { width: 100%; display: grid; grid-template-columns: 44px 44px 1fr 1fr; gap: 8px; }
+  /* minmax(0, 1fr): without it the buttons' text forces the columns wider than the screen and the page scrolls sideways. */
+  .nv-dash { overflow-x: clip; }
+  .nv-dash-title { overflow-wrap: anywhere; }
+  .nv-dash-actions { width: 100%; max-width: 100%; display: grid; grid-template-columns: 44px 44px minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+  .nv-dash-actions > * { min-width: 0; }
   .nv-dash-actions .nv-range-wrap { grid-column: 1 / -1; }
   .nv-dash-actions .custom-select { width: 100%; min-width: 0; height: 44px; }
-  .nv-dash-actions .btn { height: 44px; justify-content: center; padding-left: 8px; padding-right: 8px; white-space: nowrap; }
+  .nv-dash-actions .btn { height: 44px; justify-content: center; padding-left: 8px; padding-right: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: .82rem; }
   .nv-dash-actions .btn#nvRefresh, .nv-dash-actions .btn#nvThemeBtn { padding: 0; }
   .nv-save-state { display: none; }
-  .nv-dash-tabs { margin-left: -4px; margin-right: -4px; -webkit-mask-image: linear-gradient(to right, #000 90%, transparent); mask-image: linear-gradient(to right, #000 90%, transparent); }
-  .nv-dash-tab { padding: 11px 12px; }
+  .nv-dash-tabs { margin-left: -4px; margin-right: -4px; max-width: calc(100% + 8px); -webkit-overflow-scrolling: touch; scrollbar-width: none; -webkit-mask-image: linear-gradient(to right, #000 90%, transparent); mask-image: linear-gradient(to right, #000 90%, transparent); }
+  .nv-dash-tab { padding: 11px 12px; flex: 0 0 auto; }
   .nv-notice { font-size: .8rem; padding: 8px 10px; align-items: flex-start; }
   /* Small widgets (metrics) sit two to a row instead of one huge card each. */
   .nv-dash-grid { margin-left: -5px; margin-right: -5px; }

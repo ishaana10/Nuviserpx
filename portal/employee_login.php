@@ -28,6 +28,7 @@ if ($token !== '') {
       <div class="card-body">
         <?php if ($invitation): ?>
         <p class="login-box-msg">Welcome, <?php echo htmlspecialchars($invitation['name']) ?>. Choose a password to activate your account.</p>
+        <div class="alert alert-info py-2 text-sm">Your username for signing in is your email address:<br><strong><?php echo htmlspecialchars((string)$invitation['email']) ?></strong></div>
         <form id="activate-frm" action="" method="post">
           <input type="hidden" name="token" value="<?php echo htmlspecialchars($token) ?>">
           <div class="input-group mb-3">
@@ -43,9 +44,10 @@ if ($token !== '') {
         <div class="alert alert-warning py-2 text-sm">This invitation link is invalid, already used or has expired. Ask HR to send a new one, or sign in below if your account is already active.</div>
         <?php endif; ?>
         <p class="login-box-msg">Sign in to view your payslips</p>
+        <p class="text-muted text-sm text-center">Your username is the email address HR has on file for you.</p>
         <form id="emp-login-frm" action="" method="post">
           <div class="input-group mb-3">
-            <input type="email" class="form-control" name="email" placeholder="Email" autocomplete="username" required>
+            <input type="email" class="form-control" name="email" placeholder="Username (your email address)" autocomplete="username" required>
           </div>
           <div class="input-group mb-3">
             <input type="password" class="form-control" name="password" placeholder="Password" autocomplete="current-password" required>
