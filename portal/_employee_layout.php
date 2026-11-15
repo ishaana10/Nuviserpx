@@ -50,7 +50,7 @@ function emp_render_payslip(int $payrollId): void
 
 function emp_header(string $title, string $active): void
 {
-    global $h, $company, $me, $leaveOn, $_settings;
+    global $h, $company, $me, $leaveOn, $_settings, $conn, $tenantId;
     $first = (string)($me['firstname'] ?? '');
     $full = trim($first . ' ' . (string)($me['lastname'] ?? ''));
     $initials = strtoupper(substr($first, 0, 1) . substr((string)($me['lastname'] ?? ''), 0, 1));
@@ -65,7 +65,7 @@ function emp_header(string $title, string $active): void
 <link rel="stylesheet" href="<?php echo base_url ?>dist/css/nuvis-portal.css?v=<?php echo (int)@filemtime(base_app . 'dist/css/nuvis-portal.css') ?>">
 <header class="pp-top d-print-none">
   <button class="pp-burger" type="button" id="ppBurger" aria-label="Menu"><i class="fa fa-bars"></i></button>
-  <span class="pp-brand"><?php echo $h($company) ?></span>
+  <span class="pp-brand"><img src="<?php echo $h(\App\Support\PortalBranding::logoUrl($conn, $tenantId)) ?>" alt="" style="height:28px;width:28px;object-fit:contain;background:#fff;border-radius:7px;padding:2px;margin-right:8px;vertical-align:middle"><?php echo $h($company) ?></span>
   <span class="pp-user"><span class="pp-avatar"><?php echo $h($initials) ?></span>
     <span class="pp-who"><b><?php echo $h($full) ?></b><small><?php echo $h($me['designation'] ?? '') ?></small></span></span>
 </header>
