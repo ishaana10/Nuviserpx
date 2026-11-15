@@ -13,11 +13,12 @@ if (!empty($_GET['token']) && is_string($_GET['token'])) {
   <script>
     start_loader()
   </script>
-  <div class="login-box" style="width: 400px;">
+  <div class="login-box" style="width: 400px; max-width: 92%;">
     <div class="card card-outline card-primary shadow">
-      <div class="card-header text-center">
-        <a href="./" class="h1"><b>Customer Portal</b></a>
-        <p class="text-muted text-sm mb-0"><?php echo $_settings->info('name') ?></p>
+      <div class="card-header text-center border-0 pt-4">
+        <img src="<?php echo validate_image($_settings->info('logo')) ?>" alt="Logo" style="width:76px;height:76px;object-fit:contain;background:#fff;padding:6px;border-radius:50%;border:1px solid #e2e8f0;box-shadow:0 8px 18px -8px rgba(15,23,42,.25)" class="mb-2">
+        <h1 class="h3 font-weight-bold mb-1" style="color:#0f172a">Customer Portal</h1>
+        <p class="text-muted text-sm mb-0"><?php echo htmlspecialchars((string)$_settings->info('name')) ?></p>
       </div>
       <div class="card-body">
         <p class="login-box-msg">Sign in to view your invoices and statements</p>
