@@ -15,4 +15,6 @@ foreach (['login', 'register'] as $pg) {
     check("portal/$pg.php shows the company logo", strpos($src, "validate_image(\$_settings->info('logo'))") !== false);
     check("portal/$pg.php title is not the white link style (invisible on the white card)", strpos($src, 'class="h1"') === false && strpos($src, 'Customer Portal</h1>') !== false);
 }
+$idx = file_get_contents("$root/portal/index.php");
+check('portal header grows with the opened mobile menu (AdminLTE fixes it at 56px)', preg_match('/\.portal-header\s*\{[^}]*height:\s*auto\s*!important/', $idx) === 1);
 exit($fail ? 1 : 0);
