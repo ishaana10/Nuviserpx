@@ -6,6 +6,12 @@ $lock_file = __DIR__ . '/install/installed.lock';
 $env_file = __DIR__ . '/.env';
 $uri = $_SERVER['REQUEST_URI'] ?? '';
 
+if (!file_exists($lock_file) && file_exists($env_file) && php_sapi_name() !== 'cli') {
+    // No lock, but .env points at a database that already holds a system (e.g. the lock was removed by an update).
+    require_once __DIR__ . '/src/Support/InstallState.php';
+    \App\Support\InstallState::adoptExisting($lock_file, $env_file);
+}
+
 if ((!file_exists($lock_file) || !file_exists($env_file)) && strpos($uri, '/install/') === false && php_sapi_name() !== 'cli') {
     $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? "https://" : "http://";
     $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
