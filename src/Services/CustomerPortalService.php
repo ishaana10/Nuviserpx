@@ -194,55 +194,89 @@ class CustomerPortalService
         return json_encode(['status' => 'failed', 'msg' => 'Invalid email address or password.']);
     }
 
+    /** Same answer whether or not the email belongs to a portal account, so the form cannot be used to find customers. */
+    public const FORGOT_REPLY = 'If that email address has a customer portal account, we have sent it a link to choose a new password. The link is valid for 1 hour.';
+
     /**
-     * Change the password from the sign-in page: email + current password + new password. Does not sign the
-     * customer in. Rate-limited per email like sign-in, and unknown emails cost the same as a wrong password.
-     * Pure rules (matching, strength, must differ) are in CustomerPortal::changePasswordProblem().
+     * "Forgot password" on the sign-in page: emails a one-hour reset link to an activated portal account. Every
+     * request counts toward a rate limit (email + address), and the reply never reveals whether the email exists.
      */
-    public function customer_change_password()
+    public function customer_forgot_password()
     {
-        $email   = trim((string)($_POST['email'] ?? ''));
-        $current = (string)($_POST['current'] ?? '');
-        $new     = (string)($_POST['password'] ?? '');
-        $confirm = (string)($_POST['confirm_password'] ?? '');
-
-        if ($email === '' || $current === '' || $new === '') {
-            return json_encode(['status' => 'failed', 'msg' => 'Please fill in all the fields.']);
+        $email = trim((string)($_POST['email'] ?? ''));
+        if ($email === '' || strlen($email) > 150 || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return json_encode(['status' => 'failed', 'msg' => 'Enter the email address of your portal account.']);
         }
-        if ($msg = \App\Support\CustomerPortal::changePasswordProblem($current, $new, $confirm)) {
-            return json_encode(['status' => 'failed', 'msg' => $msg]);
-        }
-
         $throttle = new \App\Services\AuthThrottleService($this->conn);
-        $wait = $throttle->check('customer_login', $email);
+        $wait = $throttle->check('customer_forgot', $email);
         if ($wait > 0) {
             return json_encode(['status' => 'locked', 'retry_after' => $wait,
-                'msg' => 'Too many failed attempts. Try again in ' . \App\Services\AuthThrottleService::waitText($wait) . '.']);
+                'msg' => 'Too many requests. Try again in ' . \App\Services\AuthThrottleService::waitText($wait) . '.']);
         }
+        $throttle->record('customer_forgot', $email);
 
-        $stmt = $this->conn->prepare("SELECT * FROM `customer_portal_users` WHERE `email` = ? AND `status` = 1 LIMIT 1");
+        $stmt = $this->conn->prepare("SELECT u.id, u.tenant_id, u.party_id, p.name FROM `customer_portal_users` u
+            INNER JOIN `party_list` p ON p.id = u.party_id WHERE u.`email` = ? AND u.`status` = 1 LIMIT 1");
         $stmt->bind_param('s', $email);
         $stmt->execute();
         $user = $stmt->get_result()->fetch_assoc();
-
-        if (!$user || !password_verify($current, (string)$user['password'])) {
-            if (!$user) {
-                password_verify($current, '$2y$10$4atYI/I54Zf2duldz2eoGeLt85rsTV2yvoQVc7oLbm1JwmpyG6aDK');
+        if ($user) {
+            $token = bin2hex(random_bytes(24));
+            $hash = \App\Support\CustomerPortal::tokenHash($token);
+            $expires = date('Y-m-d H:i:s', time() + \App\Support\CustomerPortal::RESET_TTL);
+            $uid = (int)$user['id'];
+            // A reset link uses the same token columns as an invitation; an activated account has no other use for them.
+            $upd = $this->conn->prepare("UPDATE `customer_portal_users` SET `invite_token` = ?, `invite_expires_at` = ? WHERE id = ? AND `status` = 1");
+            $upd->bind_param('ssi', $hash, $expires, $uid);
+            if ($upd->execute()) {
+                require_once(base_app . 'classes/Emailer.php');
+                $sys = [];
+                $q = $this->conn->query("SELECT meta_field, meta_value FROM `system_info`");
+                while ($q && ($r = $q->fetch_assoc())) { $sys[$r['meta_field']] = $r['meta_value']; }
+                \Emailer::send_customer_password_reset($email, (string)$user['name'], base_url . 'portal/reset_password.php?token=' . $token, $sys);
+                $this->log_portal_activity($user['tenant_id'], $user['party_id'], $user['id'], 'password_reset_requested', 'Password reset link emailed');
             }
-            $throttle->record('customer_login', $email);
-            return json_encode(['status' => 'failed', 'msg' => 'Your email address or current password is not correct.']);
         }
+        return json_encode(['status' => 'success', 'msg' => self::FORGOT_REPLY]);
+    }
 
-        $hash = password_hash($new, PASSWORD_BCRYPT);
+    /** Choose a new password with the emailed link. Does not sign the customer in. */
+    public function customer_reset_password()
+    {
+        $token = trim((string)($_POST['token'] ?? ''));
+        $new = (string)($_POST['password'] ?? '');
+        $confirm = (string)($_POST['confirm_password'] ?? '');
+        if ($token === '' || $new === '') {
+            return json_encode(['status' => 'failed', 'msg' => 'Please fill in all the fields.']);
+        }
+        if ($msg = \App\Support\CustomerPortal::resetPasswordProblem($new, $confirm)) {
+            return json_encode(['status' => 'failed', 'msg' => $msg]);
+        }
+        $throttle = new \App\Services\AuthThrottleService($this->conn);
+        $who = \App\Services\AuthThrottleService::clientIp() ?: 'cli';
+        $wait = $throttle->check('customer_reset', $who);
+        if ($wait > 0) {
+            return json_encode(['status' => 'locked', 'retry_after' => $wait,
+                'msg' => 'Too many attempts. Try again in ' . \App\Services\AuthThrottleService::waitText($wait) . '.']);
+        }
+        $hash = \App\Support\CustomerPortal::tokenHash($token);
+        $q = $this->conn->prepare("SELECT * FROM `customer_portal_users` WHERE `invite_token` = ? AND `invite_expires_at` >= NOW() AND `status` = 1 LIMIT 1");
+        $q->bind_param('s', $hash);
+        $q->execute();
+        $user = $q->get_result()->fetch_assoc();
+        if (!$user) {
+            $throttle->record('customer_reset', $who);
+            return json_encode(['status' => 'failed', 'msg' => 'This reset link is invalid or has expired. Request a new one from the sign-in page.']);
+        }
+        $pw = password_hash($new, PASSWORD_BCRYPT);
         $uid = (int)$user['id'];
-        $upd = $this->conn->prepare("UPDATE `customer_portal_users` SET `password` = ? WHERE id = ?");
-        $upd->bind_param('si', $hash, $uid);
+        $upd = $this->conn->prepare("UPDATE `customer_portal_users` SET `password` = ?, `invite_token` = NULL, `invite_expires_at` = NULL WHERE id = ?");
+        $upd->bind_param('si', $pw, $uid);
         if (!$upd->execute()) {
             return json_encode(['status' => 'failed', 'msg' => 'Could not change the password. Please try again.']);
         }
-        $throttle->clear('customer_login', $email);
-        $this->log_portal_activity($user['tenant_id'], $user['party_id'], $user['id'], 'password_changed', 'Customer changed their portal password');
-        return json_encode(['status' => 'success', 'msg' => 'Password changed. You can now sign in with the new password.']);
+        $this->log_portal_activity($user['tenant_id'], $user['party_id'], $user['id'], 'password_reset', 'Customer chose a new password with a reset link');
+        return json_encode(['status' => 'success', 'msg' => 'Your password has been changed. You can now sign in.']);
     }
 
     public function get_portal_logs()

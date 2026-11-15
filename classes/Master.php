@@ -1460,9 +1460,14 @@ class Master extends DBConnection
         return $this->container->make(\App\Services\CustomerPortalService::class)->customer_register();
     }
 
-    public function customer_change_password()
+    public function customer_forgot_password()
     {
-        return $this->container->make(\App\Services\CustomerPortalService::class)->customer_change_password();
+        return $this->container->make(\App\Services\CustomerPortalService::class)->customer_forgot_password();
+    }
+
+    public function customer_reset_password()
+    {
+        return $this->container->make(\App\Services\CustomerPortalService::class)->customer_reset_password();
     }
 
     public function customer_login()
@@ -1586,7 +1591,7 @@ $allowed_actions = [
     'email_payment_receipt', 'save_batch_payroll', 'email_payslip', 'save_tenant',
     'delete_tenant', 'git_pull', 'git_fetch', 'get_redis_status',
     'test_redis_ping', 'start_redis_daemon', 'send_customer_invitation', 'customer_register',
-    'customer_login', 'customer_change_password', 'get_portal_logs', 'save_invoice_template', 'save_asset',
+    'customer_login', 'customer_forgot_password', 'customer_reset_password', 'get_portal_logs', 'save_invoice_template', 'save_asset',
     'delete_asset', 'save_bank_account', 'save_opportunity', 'delete_opportunity',
     'save_crm_contact', 'delete_crm_contact', 'move_opportunity_stage', 'convert_opportunity',
     'save_crm_activity', 'toggle_crm_activity', 'delete_crm_activity', 'save_proposal_signature', 'get_proposal_link',

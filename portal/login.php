@@ -54,7 +54,7 @@ if (!empty($_GET['token']) && is_string($_GET['token'])) {
             </div>
           </div>
         </form>
-        <p class="text-center mt-3 mb-0"><a href="change_password.php"><i class="fas fa-key mr-1"></i> Change password</a></p>
+        <p class="text-center mt-3 mb-0"><a href="forgot_password.php">Forgot password?</a></p>
       </div>
     </div>
   </div>
