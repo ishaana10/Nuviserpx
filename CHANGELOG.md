@@ -13,6 +13,7 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
   revoked by HR takes effect immediately, even for a signed-in employee.
 
 ### Fixed
+- Employee Portal pages returned HTTP 500: the leave queries bound read-only properties by reference, which PHP rejects.
 - Employee and customer portal pages no longer redirect to the staff login: the staff session check ran on every portal
   page, so employees were sent to the main login after setting their password, and a signed-in admin was bounced away
   from the portal sign-in page.
