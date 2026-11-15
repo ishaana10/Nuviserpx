@@ -10,6 +10,13 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
 - **Portal menu invisible on narrow screens.** The header bar stayed at a fixed height, so the opened hamburger menu (account name, Log Out) spilled out as white text on the light page. The bar now grows to fit.
 - **Customer portal dashboard sent visitors to the staff login.** The staff-session guard exempted `/portal/<page>.php` but not the folder address `/portal/` that login and the brand link use, so the portal menu and Log Out seemed dead. The folder address is now exempt too.
 
+## [Unreleased] - 2026-11-16 (2)
+
+### Changed
+- **Portals show the NuvisERPX logo when the company has none.** The customer and employee portals (sign-in, activation, headers, invoice view) show the company's own logo, and fall back to the NuvisERPX logo instead of a generic placeholder or nothing. The portal headers now show the logo too.
+
+### Fixed
+- **Invisible text on the portal sign-in/activation cards.** The sign-in message, activation alerts and the "Back to Login" line were white on the white card.
 ## [Unreleased] - 2026-11-16
 
 ### Added

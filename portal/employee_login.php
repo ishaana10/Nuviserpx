@@ -33,7 +33,7 @@ if ($token !== '') {
   <div class="login-box ep-box">
     <div class="ep-card">
       <div class="text-center mb-3">
-        <img src="<?php echo validate_image($_settings->info('logo')) ?>" alt="Logo" class="ep-logo">
+        <img src="<?php echo htmlspecialchars(\App\Support\PortalBranding::logoUrl($conn)) ?>" alt="Logo" class="ep-logo">
         <h1 class="ep-title">Employee Portal</h1>
         <p class="ep-company"><?php echo htmlspecialchars((string)$_settings->info('name')) ?></p>
       </div>

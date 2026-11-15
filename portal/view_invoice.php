@@ -65,8 +65,8 @@ $status_class = [
     <!-- Header Banner -->
     <div class="row border-bottom pb-3 mb-4 align-items-center">
       <div class="col-7 d-flex align-items-center">
-        <?php if(!empty($_settings->info('logo'))): ?>
-          <img src="<?php echo validate_image($_settings->info('logo')) ?>" alt="Logo" class="mr-3 rounded" style="max-height: 75px; width: auto; object-fit: contain;">
+        <?php if (true): ?>
+          <img src="<?php echo htmlspecialchars(\App\Support\PortalBranding::logoUrl($conn, $portal_tenant_id)) ?>" alt="Logo" class="mr-3 rounded" style="max-height: 75px; width: auto; object-fit: contain;">
         <?php endif; ?>
         <div>
           <h3 class="font-weight-bold text-navy mb-1"><?php echo htmlspecialchars($sys['name'] ?? 'Nuvis ERPX') ?></h3>

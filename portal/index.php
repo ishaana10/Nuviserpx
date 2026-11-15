@@ -21,6 +21,7 @@ $fmt = function ($v) use ($cur_code) { return ($cur_code !== '' ? htmlspecialcha
 $inv_vis = \App\Support\CustomerPortal::invoiceStatusSql('status');
 $inv_vis_i = \App\Support\CustomerPortal::invoiceStatusSql('i`.`status');
 $customer_name = $_SESSION['customer_name'] ?? '';
+$portal_logo = \App\Support\PortalBranding::logoUrl($conn, $portal_tenant_id);
 
 // Fetch party info
 $party = $conn->query("SELECT * FROM `party_list` WHERE id = {$party_id}")->fetch_assoc();
@@ -75,6 +76,7 @@ $view_order_id   = $_GET['order_id'] ?? null;
   <nav class="main-header navbar navbar-expand-md navbar-dark portal-header shadow-sm no-print">
     <div class="container">
       <a href="<?php echo base_url ?>portal/" class="navbar-brand">
+        <img src="<?php echo htmlspecialchars($portal_logo) ?>" alt="" style="height:30px;width:30px;object-fit:contain;background:#fff;border-radius:8px;padding:2px" class="mr-2">
         <span class="brand-text font-weight-bold text-white"><?php echo $_settings->info('name') ?></span>
         <span class="badge badge-light ml-2">Customer Portal (Read-Only)</span>
       </a>
@@ -173,8 +175,8 @@ $view_order_id   = $_GET['order_id'] ?? null;
             <!-- Header Banner Matching Attachment Image -->
             <div class="row border-bottom pb-3 mb-4 align-items-center">
               <div class="col-sm-7 d-flex align-items-center">
-                <?php if(!empty($_settings->info('logo'))): ?>
-                  <img src="<?php echo validate_image($_settings->info('logo')) ?>" alt="Logo" class="mr-3 rounded" style="max-height: 70px; width: auto; object-fit: contain;">
+                <?php if (true): ?>
+                  <img src="<?php echo htmlspecialchars($portal_logo) ?>" alt="Logo" class="mr-3 rounded" style="max-height: 70px; width: auto; object-fit: contain;">
                 <?php endif; ?>
                 <div>
                   <h3 class="font-weight-bold text-navy mb-1"><?php echo htmlspecialchars($sys['name'] ?? 'Nuvis ERPX') ?></h3>

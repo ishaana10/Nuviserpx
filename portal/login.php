@@ -10,13 +10,22 @@ if (!empty($_GET['token']) && is_string($_GET['token'])) {
 <html lang="en" class="" style="height: auto;">
 <?php require_once('../admin/inc/header.php') ?>
 <body class="hold-transition login-page bg-dark">
+  <style>
+    /* The dark login-page theme paints text white; these cards are white, so keep their text readable. */
+    .login-page .card-body, .login-page .card-body p, .login-page .login-box-msg { color: #334155; }
+    .login-page .card-body a:not(.btn) { color: #2563eb; }
+    .login-page .card-body .alert-danger { color: #991b1b; }
+    .login-page .card-body .alert-success { color: #166534; }
+    .login-page .card-body .alert-info { color: #075985; }
+    .login-page .card-body .alert-warning { color: #854d0e; }
+  </style>
   <script>
     start_loader()
   </script>
   <div class="login-box" style="width: 400px; max-width: 92%;">
     <div class="card card-outline card-primary shadow">
       <div class="card-header text-center border-0 pt-4">
-        <img src="<?php echo validate_image($_settings->info('logo')) ?>" alt="Logo" style="width:76px;height:76px;object-fit:contain;background:#fff;padding:6px;border-radius:50%;border:1px solid #e2e8f0;box-shadow:0 8px 18px -8px rgba(15,23,42,.25)" class="mb-2">
+        <img src="<?php echo htmlspecialchars(\App\Support\PortalBranding::logoUrl($conn)) ?>" alt="Logo" style="width:76px;height:76px;object-fit:contain;background:#fff;padding:6px;border-radius:50%;border:1px solid #e2e8f0;box-shadow:0 8px 18px -8px rgba(15,23,42,.25)" class="mb-2">
         <h1 class="h3 font-weight-bold mb-1" style="color:#0f172a">Customer Portal</h1>
         <p class="text-muted text-sm mb-0"><?php echo htmlspecialchars((string)$_settings->info('name')) ?></p>
       </div>
