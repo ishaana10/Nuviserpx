@@ -1,5 +1,16 @@
 <?php
 require_once('../config.php');
+$token = (string)($_GET['token'] ?? '');
+$valid = false;
+if ($token !== '') {
+    $hash = \App\Support\CustomerPortal::tokenHash($token);
+    $st = $conn->prepare("SELECT id FROM `customer_portal_users` WHERE `invite_token` = ? AND `invite_expires_at` >= NOW() AND `status` = 1 LIMIT 1");
+    if ($st) {
+        $st->bind_param('s', $hash);
+        $st->execute();
+        $valid = (bool)$st->get_result()->fetch_assoc();
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en" class="" style="height: auto;">
@@ -23,28 +34,26 @@ require_once('../config.php');
         <p class="text-muted text-sm mb-0"><?php echo htmlspecialchars((string)$_settings->info('name')) ?></p>
       </div>
       <div class="card-body">
-        <p class="login-box-msg">Change your portal password</p>
-        <form id="portal-pw-frm" action="" method="post" novalidate>
-          <div class="input-group mb-3">
-            <input type="email" class="form-control" name="email" placeholder="Email" autocomplete="username" required>
-            <div class="input-group-append"><div class="input-group-text"><span class="fas fa-envelope"></span></div></div>
-          </div>
-          <div class="input-group mb-3">
-            <input type="password" class="form-control" name="current" placeholder="Current password" autocomplete="current-password" required>
-            <div class="input-group-append"><div class="input-group-text"><span class="fas fa-lock"></span></div></div>
-          </div>
+      <?php if (!$valid): ?>
+        <div class="alert alert-danger text-center">This reset link is invalid or has expired.</div>
+        <p class="text-center mb-0"><a href="forgot_password.php">Request a new link</a></p>
+      <?php else: ?>
+        <p class="login-box-msg">Choose a new password</p>
+        <form id="portal-reset-frm" action="" method="post" novalidate>
+          <input type="hidden" name="token" value="<?php echo htmlspecialchars($token) ?>">
           <div class="input-group mb-1">
             <input type="password" class="form-control" name="password" placeholder="New password" autocomplete="new-password" required>
-            <div class="input-group-append"><div class="input-group-text"><span class="fas fa-key"></span></div></div>
+            <div class="input-group-append"><div class="input-group-text"><span class="fas fa-lock"></span></div></div>
           </div>
           <small class="form-text text-muted mb-3">At least 8 characters, with letters and numbers.</small>
           <div class="input-group mb-3">
             <input type="password" class="form-control" name="confirm_password" placeholder="Confirm new password" autocomplete="new-password" required>
-            <div class="input-group-append"><div class="input-group-text"><span class="fas fa-key"></span></div></div>
+            <div class="input-group-append"><div class="input-group-text"><span class="fas fa-lock"></span></div></div>
           </div>
           <button type="submit" class="btn btn-primary btn-block">Change password</button>
         </form>
-        <p class="text-center mt-3 mb-0"><a href="login.php"><i class="fas fa-arrow-left mr-1"></i> Back to sign in</a></p>
+        <p class="text-center mt-3 mb-0"><a href="login.php">Back to sign in</a></p>
+      <?php endif; ?>
       </div>
     </div>
   </div>
@@ -55,16 +64,16 @@ require_once('../config.php');
   <script>
     $(document).ready(function(){
       end_loader();
-      $('#portal-pw-frm').submit(function(e){
+      $('#portal-reset-frm').submit(function(e){
         e.preventDefault();
         var f = $(this);
         if (f.find('[name=password]').val() !== f.find('[name=confirm_password]').val()) {
-          alert_toast("The two new passwords do not match", 'warning');
+          alert_toast("The two passwords do not match", 'warning');
           return;
         }
         start_loader();
         $.ajax({
-          url: _base_url_ + 'classes/Master.php?f=customer_change_password',
+          url: _base_url_ + 'classes/Master.php?f=customer_reset_password',
           method: 'POST',
           data: f.serialize(),
           dataType: 'json',

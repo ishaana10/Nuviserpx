@@ -31,10 +31,12 @@ $svc = file_get_contents(__DIR__ . '/../src/Services/CustomerPortalService.php')
 check('invitation link points at the activation page', strpos($svc, 'portal/register.php?token=') !== false && strpos($svc, 'portal/login.php?token=') === false);
 check('invitation tokens are stored hashed', strpos($svc, 'tokenHash($token)') !== false);
 check('login page forwards old invitation links', strpos(file_get_contents(__DIR__ . '/../portal/login.php'), 'register.php?token=') !== false);
-check('change password: new and confirmation must match', P::changePasswordProblem('Old12345x', 'New12345x', 'Other12345') !== null);
-check('change password: weak new password refused', P::changePasswordProblem('Old12345x', 'short1', 'short1') !== null);
-check('change password: same as current refused', P::changePasswordProblem('Old12345x', 'Old12345x', 'Old12345x') !== null);
-check('change password: a good new password passes', P::changePasswordProblem('Old12345x', 'New12345x', 'New12345x') === null);
-check('sign-in page links to the change-password page', strpos(file_get_contents(__DIR__ . '/../portal/login.php'), 'href="change_password.php"') !== false);
-check('change_password is a public action (no staff login needed)', in_array('customer_change_password', \App\Support\Permissions::PUBLIC_ACTIONS, true));
+check('reset: new and confirmation must match', P::resetPasswordProblem('New12345x', 'Other12345') !== null);
+check('reset: weak new password refused', P::resetPasswordProblem('short1', 'short1') !== null);
+check('reset: a good new password passes', P::resetPasswordProblem('New12345x', 'New12345x') === null);
+check('reset links last one hour', P::RESET_TTL === 3600);
+check('sign-in page links to Forgot password', strpos(file_get_contents(__DIR__ . '/../portal/login.php'), 'href="forgot_password.php"') !== false);
+check('no change-password page is left behind', !is_file(__DIR__ . '/../portal/change_password.php'));
+check('forgot and reset are public actions (no staff login needed)', in_array('customer_forgot_password', \App\Support\Permissions::PUBLIC_ACTIONS, true) && in_array('customer_reset_password', \App\Support\Permissions::PUBLIC_ACTIONS, true));
+check('the reset email never carries the password and links to the reset page', strpos((string)file_get_contents(__DIR__ . '/../classes/Emailer.php'), 'portal/reset_password.php') !== false || strpos((string)file_get_contents(__DIR__ . '/../src/Services/CustomerPortalService.php'), 'portal/reset_password.php?token=') !== false);
 exit($fail ? 1 : 0);

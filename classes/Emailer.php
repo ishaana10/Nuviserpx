@@ -441,6 +441,21 @@ class Emailer {
         return self::send_email($to, $subject, $html);
     }
 
+    public static function send_customer_password_reset($to, $party_name, $reset_url, $sys_info = []) {
+        $company_name = $sys_info['name'] ?? 'Nuvis ERPX';
+        $u = htmlspecialchars($reset_url);
+        $body = "
+        <h3>Dear " . htmlspecialchars($party_name) . ",</h3>
+        <p>We received a request to reset the password of your Customer Portal account.</p>
+        <div style='text-align: center; margin: 30px 0;'>
+            <a href='" . $u . "' style='background-color: #0284c7; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px; display: inline-block;'>Choose a new password &rarr;</a>
+        </div>
+        <p style='font-size: 13px; color: #666;'>Or copy and paste this URL into your browser:<br><a href='" . $u . "'>" . $u . "</a></p>
+        <p style='font-size: 13px; color: #666;'>This link is valid for 1 hour. If you did not ask for this, you can ignore this email: your password has not been changed.</p>";
+        $html = self::wrap_template("Reset your portal password", $body, $company_name);
+        return self::send_email($to, "Reset your Customer Portal password - " . $company_name, $html);
+    }
+
     public static function send_employee_portal_invitation($to, $employee_name, $invite_url, $sys_info = []) {
         $company_name = $sys_info['name'] ?? 'Nuvis ERPX';
         $subject = "Employee Self-Service Access - " . $company_name;

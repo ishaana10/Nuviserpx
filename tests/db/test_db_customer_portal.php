@@ -69,23 +69,39 @@ $_SESSION['userdata'] = ['type' => 1];
 check('super admin preview works', (P::context($c)['preview'] ?? false) === true);
 $_SESSION['userdata'] = ['type' => 2];
 check('non-super admin preview refused', P::context($c) === null);
-// --- change password from the sign-in page
-$cp = fn(array $p) => $call('customer_change_password', $p);
-$base = ['email' => 'alpha@example.com', 'current' => 'Passw0rd1', 'password' => 'NewPassw0rd2', 'confirm_password' => 'NewPassw0rd2'];
-check('change: wrong current password refused', ($cp(array_merge($base, ['current' => 'nope']))['status'] ?? '') === 'failed');
-check('change: unknown email refused (same message as wrong password)', ($cp(array_merge($base, ['email' => 'ghost@example.com']))['msg'] ?? '') === ($cp(array_merge($base, ['current' => 'nope']))['msg'] ?? 'x'));
-check('change: mismatched confirmation refused', ($cp(array_merge($base, ['confirm_password' => 'Other12345']))['status'] ?? '') === 'failed');
-check('change: weak new password refused', ($cp(array_merge($base, ['password' => 'short1', 'confirm_password' => 'short1']))['status'] ?? '') === 'failed');
-check('change: same password refused', ($cp(array_merge($base, ['password' => 'Passw0rd1', 'confirm_password' => 'Passw0rd1']))['status'] ?? '') === 'failed');
-check('change: nothing changed by refusals', password_verify('Passw0rd1', $row(1)['password']));
-$_SESSION = [];
-check('change: succeeds with the right current password', ($cp($base)['status'] ?? '') === 'success');
-check('change: new password works, old one does not', password_verify('NewPassw0rd2', $row(1)['password']) && !password_verify('Passw0rd1', $row(1)['password']));
-check('change: does not sign anyone in', empty($_SESSION['customer_portal']));
-check('change: signing in with the new password works', ($call('customer_login', ['email' => 'alpha@example.com', 'password' => 'NewPassw0rd2'])['status'] ?? '') === 'success');
-check('change: an inactive (not yet activated) account cannot use it', ($cp(array_merge($base, ['email' => "o'brien@example.com"]))['status'] ?? '') === 'failed');
-check('change: the change is logged', (int)$c->query("SELECT COUNT(*) FROM customer_portal_logs WHERE action='password_changed'")->fetch_row()[0] === 1);
+// --- forgot / reset password
 $c->query("DELETE FROM auth_attempts");
-for ($i = 0; $i < 12; $i++) { $cp(array_merge($base, ['current' => 'bad' . $i, 'email' => 'alpha@example.com'])); }
-check('change: repeated wrong attempts are locked out like sign-in', ($cp(array_merge($base, ['current' => 'NewPassw0rd2', 'password' => 'Another3Pass', 'confirm_password' => 'Another3Pass']))['status'] ?? '') === 'locked');
+$sendCap = $c->query("SELECT 1"); // (email sending itself is not exercised here; only the data effects)
+$fp = fn(string $e) => $call('customer_forgot_password', ['email' => $e]);
+$reply = $fp('alpha@example.com');
+check('forgot: known email gets the generic reply', ($reply['status'] ?? '') === 'success' && ($reply['msg'] ?? '') === \App\Services\CustomerPortalService::FORGOT_REPLY);
+check('forgot: unknown email gets the identical reply (no account enumeration)', $fp('ghost@example.com') === $reply);
+check('forgot: malformed email is asked again', ($fp('not-an-email')['status'] ?? '') === 'failed');
+$u = $row(1);
+check('forgot: a hashed token with a ~1 hour expiry is stored', strlen((string)$u['invite_token']) === 64 && strtotime($u['invite_expires_at']) > time() + 3000 && strtotime($u['invite_expires_at']) <= time() + 3700);
+check('forgot: an account that never activated gets no reset token', $fp("o'brien@example.com") === $reply && $row(2)['invite_token'] !== null /* its invitation token, untouched */ && (int)$row(2)['status'] === 0);
+// Make a token we know (the real one only exists in the emailed link).
+$tok = bin2hex(random_bytes(24));
+$c->query("UPDATE customer_portal_users SET invite_token='" . hash('sha256', $tok) . "', invite_expires_at=DATE_ADD(NOW(), INTERVAL 1 HOUR) WHERE id=" . (int)$u['id']);
+$rs = fn(array $p) => $call('customer_reset_password', array_merge(['token' => $tok, 'password' => 'Reset12345x', 'confirm_password' => 'Reset12345x'], $p));
+check('reset: mismatch refused', ($rs(['confirm_password' => 'Different12'])['status'] ?? '') === 'failed');
+check('reset: weak password refused', ($rs(['password' => 'short1', 'confirm_password' => 'short1'])['status'] ?? '') === 'failed');
+check('reset: wrong token refused', ($rs(['token' => 'nope'])['status'] ?? '') === 'failed');
+check('reset: nothing changed by refusals', password_verify('Passw0rd1', $row(1)['password']));
+$_SESSION = [];
+check('reset: succeeds with the emailed token', ($rs([])['status'] ?? '') === 'success');
+check('reset: new password works, old one does not', password_verify('Reset12345x', $row(1)['password']) && !password_verify('Passw0rd1', $row(1)['password']));
+check('reset: token is single-use', ($rs(['password' => 'Another3Pass', 'confirm_password' => 'Another3Pass'])['status'] ?? '') === 'failed' && $row(1)['invite_token'] === null);
+check('reset: does not sign anyone in', empty($_SESSION['customer_portal']));
+check('reset: signing in with the new password works', ($call('customer_login', ['email' => 'alpha@example.com', 'password' => 'Reset12345x'])['status'] ?? '') === 'success');
+$c->query("UPDATE customer_portal_users SET invite_token='" . hash('sha256', $tok) . "', invite_expires_at=DATE_SUB(NOW(), INTERVAL 1 MINUTE) WHERE id=" . (int)$u['id']);
+check('reset: an expired token is refused', ($rs(['password' => 'Another3Pass', 'confirm_password' => 'Another3Pass'])['status'] ?? '') === 'failed');
+$c->query("UPDATE customer_portal_users SET invite_token='" . hash('sha256', $tok) . "', invite_expires_at=DATE_ADD(NOW(), INTERVAL 1 HOUR), status=0 WHERE id=" . (int)$u['id']);
+check('reset: a deactivated (re-invited) account cannot use a reset token', ($rs(['password' => 'Another3Pass', 'confirm_password' => 'Another3Pass'])['status'] ?? '') === 'failed');
+check('forgot/reset are logged', (int)$c->query("SELECT COUNT(*) FROM customer_portal_logs WHERE action IN ('password_reset_requested','password_reset')")->fetch_row()[0] >= 2);
+$c->query("DELETE FROM auth_attempts");
+for ($i = 0; $i < 3; $i++) { $fp('alpha@example.com'); }
+check('forgot: repeated requests for one email are rate limited', ($fp('alpha@example.com')['status'] ?? '') === 'locked');
+for ($i = 0; $i < 6; $i++) { $rs(['token' => 'bad' . $i]); }
+check('reset: repeated bad tokens are locked out', ($rs(['token' => 'bad9'])['status'] ?? '') === 'locked');
 nv_done();

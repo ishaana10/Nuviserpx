@@ -42,20 +42,17 @@ final class CustomerPortal
     }
 
     /** @return string[] reasons the password is not acceptable (empty when fine) */
-    /** Pure: why a password change is refused (mismatch, weak, or unchanged), or null. */
-    public static function changePasswordProblem(string $current, string $new, string $confirm): ?string
+    /** How long an emailed password-reset link works, in seconds. */
+    public const RESET_TTL = 3600;
+
+    /** Pure: why a new password is refused on the reset page (mismatch or weak), or null. */
+    public static function resetPasswordProblem(string $new, string $confirm): ?string
     {
         if ($new !== $confirm) {
-            return 'The two new passwords do not match.';
+            return 'The two passwords do not match.';
         }
         $errs = self::passwordErrors($new);
-        if ($errs) {
-            return $errs[0];
-        }
-        if ($new === $current) {
-            return 'Choose a new password that is different from the current one.';
-        }
-        return null;
+        return $errs ? $errs[0] : null;
     }
 
     public static function passwordErrors(string $password): array
