@@ -13,6 +13,7 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
 ## [Unreleased] - 2026-11-16
 
 ### Added
+- **Email the signed delivery note to the customer.** Once a delivery note is signed, an "Email to customer" button sends it (with a PDF copy showing the receiver's name and signature) to the customer's registered email, which can be changed before sending. A PDF download button is added too, and the note shows when and to whom it was last emailed. Migration 050 records that.
 - **Real PDF download in the customer portal.** The portal's PDF buttons now download a server-built invoice PDF (company letterhead, colours, tax lines), instead of opening the browser's print dialog. A customer can only fetch their own issued invoices (never drafts or cancelled); nothing is stored on the server.
 - **Digital signing on delivery notes.** On a delivery note, staff type the receiver's name and capture their signature on a signature pad (finger, stylus or mouse). The signed name, date and signature replace the blank lines on the printout, and the delivery note list shows a SIGNED badge. A signature is locked once saved; cancelled notes cannot be signed. Migration 049 adds the columns.
 

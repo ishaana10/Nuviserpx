@@ -377,6 +377,21 @@ class Emailer {
         return self::send_email($to, $subject, $html, null, null, is_array($pdf) ? [['name' => $pdf['name'], 'mime' => 'application/pdf', 'data' => $pdf['data']]] : []);
     }
 
+    /** The signed delivery note, sent to the customer with a PDF copy attached. */
+    public static function send_delivery_note_email($to, $note, $sys_info = [], $pdf = null) {
+        $company = (string)($sys_info['name'] ?? 'Nuvis ERPX');
+        $h = function ($v) { return htmlspecialchars((string)$v); };
+        $contact = trim((string)($sys_info['email'] ?? '')) !== '' ? " If anything looks wrong, contact us at " . $h($sys_info['email']) . "." : '';
+        $body = "
+        <h3>Dear " . $h($note['party_name']) . ",</h3>
+        <p>Your goods were delivered on <b>" . date('d M Y', strtotime((string)$note['delivery_date'])) . "</b> (delivery note <b>" . $h($note['dn_no']) . "</b>, order " . $h($note['order_no']) . ").</p>
+        <p>Received by <b>" . $h($note['received_by']) . "</b> and signed electronically on " . date('d M Y, H:i', strtotime((string)$note['received_at'])) . ".</p>
+        <p>" . (is_array($pdf) ? "A PDF copy of the signed delivery note is attached for your records." : "This is your record of the delivery.") . $contact . "</p>";
+        $html = self::wrap_template("Signed delivery note " . $h($note['dn_no']), $body, $h($company));
+        return self::send_email($to, $company . ' - Signed delivery note ' . $note['dn_no'], $html, null, null,
+            is_array($pdf) ? [['name' => $pdf['name'], 'mime' => 'application/pdf', 'data' => $pdf['data']]] : []);
+    }
+
     public static function send_payment_receipt_email($to, $payment, $allocations, $sys_info = []) {
         $company_name = $sys_info['name'] ?? 'Nuvis ERPX';
         $subject = "Payment Receipt #" . $payment['payment_no'] . " from " . $company_name;

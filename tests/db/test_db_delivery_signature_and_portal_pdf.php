@@ -6,6 +6,7 @@ define('base_url', 'http://dn.test/');
 class SystemSettings {
     public function active_tenant_id() { return 1; }
     public function userdata($k = '') { return 1; }
+    public function info($f = '') { return $f === 'name' ? 'Acme Ltd' : ''; }
     public function tenant_branding() { return ['name' => 'Acme Ltd', 'email' => '', 'phone' => '', 'address' => '', 'logo' => '']; }
     public function currency_tag($t = null) { return ' (USD)'; }
 }
@@ -41,6 +42,26 @@ check('a signed note is locked against a second signature', $sign(1, 'Someone El
     && $c->query("SELECT received_by FROM delivery_notes WHERE id=1")->fetch_row()[0] === 'Jane Receiver');
 check('the note is returned with its signature for the printout', ($svc->note(1)['received_by'] ?? '') === 'Jane Receiver');
 check('the list query does not carry signature images', !array_key_exists('receiver_signature', $svc->all()[0]) && !array_key_exists('receiver_signature', $svc->notesFor(1)[0]));
+
+// --- signed delivery note PDF + email rules -------------------------------------------------------------------------
+$realPng = function () { $im = imagecreatetruecolor(120, 40); imagesavealpha($im, true); imagealphablending($im, false); imagefill($im, 0, 0, imagecolorallocatealpha($im, 0, 0, 0, 127));
+    imagealphablending($im, true); imageline($im, 5, 5, 110, 35, imagecolorallocate($im, 10, 20, 40)); ob_start(); imagepng($im); return 'data:image/png;base64,' . base64_encode(ob_get_clean()); };
+$c->query("INSERT INTO delivery_note_items (delivery_note_id,item_name,qty) VALUES (1,'Widget',3),(1,'Gadget',2.5)");
+$c->query("INSERT INTO delivery_notes (id,tenant_id,dn_no,sales_order_id,party_id,delivery_date,status) VALUES (3,1,'DN-3',1,1,CURDATE(),'delivered')");
+check('an unsigned note cannot be emailed', $svc->emailNote(3) !== '' && json_decode($svc->emailNote(3), true)['status'] === 'failed');
+check('a cancelled note cannot be emailed', json_decode($svc->emailNote(2), true)['status'] === 'failed');
+$c->query("UPDATE party_list SET email='' WHERE id=1");
+check('customer with no email on file: asked for an address', json_decode($svc->emailNote(1), true)['status'] === 'failed' && strpos(json_decode($svc->emailNote(1), true)['msg'], 'No valid email') !== false);
+check('an invalid typed address is refused', strpos(json_decode($svc->emailNote(1, 'not-an-email'), true)['msg'], 'not valid') !== false);
+$c->query("UPDATE party_list SET email='a@example.com' WHERE id=1");
+check('nothing is recorded as emailed after refusals', $c->query("SELECT last_emailed_at FROM delivery_notes WHERE id=1")->fetch_row()[0] === null);
+check('migration 050 added the emailed columns', $c->query("SHOW COLUMNS FROM delivery_notes LIKE 'last_emailed_to'")->num_rows === 1);
+$c->query("UPDATE delivery_notes SET receiver_signature='" . $c->real_escape_string($realPng()) . "' WHERE id=1");
+$pdf = $svc->pdf(1);
+check('signed delivery note builds a real PDF with the right name', is_array($pdf) && strncmp($pdf['data'], '%PDF-', 5) === 0 && $pdf['name'] === 'DeliveryNote-DN-1.pdf');
+check('the PDF carries the signature image (transparent PNG flattened)', is_array($pdf) && strpos($pdf['data'], '/Subtype /Image') !== false);
+check('the PDF is longer with a signature than without', strlen($pdf['data']) > strlen($svc->pdf(3)['data']));
+check('unknown note gives no PDF', $svc->pdf(99) === null);
 
 // --- customer portal PDF ---------------------------------------------------------------------------------------------
 $c->query("INSERT INTO invoice_list (id,tenant_id,invoice_no,party_id,invoice_date,subtotal,total,balance,status) VALUES
