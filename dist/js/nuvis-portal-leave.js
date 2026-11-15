@@ -74,7 +74,11 @@
   var seq = 0, ok = false;
   function post(fn, data, done, opts) {
     $.ajax($.extend({ url: _base_url_ + 'classes/Master.php?f=' + fn, method: 'POST', data: data, dataType: 'json',
-      error: function () { done({ status: 'failed', msg: 'Something went wrong. Please try again.' }); }, success: done }, opts || {}));
+      error: function (xhr) {
+        var t = String(xhr.responseText || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 140);
+        done({ status: 'failed', msg: 'Something went wrong (' + (xhr.status || 'no connection') + '). Please try again.' + (t ? ' ' + t : '') });
+      },
+      success: function (r) { if (r && r.debug) { r.msg = (r.msg || '') + ' [' + r.debug + ']'; } done(r); } }, opts || {}));
   }
   function num(v) { return (Math.round(v * 100) / 100).toString(); }
   function check() {

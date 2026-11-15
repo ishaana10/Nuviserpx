@@ -18,14 +18,26 @@ if ($token !== '') {
 <html lang="en" class="" style="height: auto;">
 <?php require_once('../admin/inc/header.php') ?>
 <body class="hold-transition login-page bg-dark">
+  <style>
+    .ep-box { width: 400px; max-width: 94%; }
+    .ep-card { background: #fff; color: #0f172a; border-radius: 1rem; box-shadow: 0 20px 45px -18px rgba(0,0,0,.45); padding: 1.6rem 1.5rem 1.2rem; }
+    .ep-logo { width: 76px; height: 76px; object-fit: contain; background: #fff; padding: 6px; border-radius: 50%; border: 1px solid #e2e8f0; box-shadow: 0 8px 18px -8px rgba(15,23,42,.25); }
+    .ep-title { color: #0f172a; font-weight: 700; font-size: 1.5rem; margin: .7rem 0 .1rem; }
+    .ep-company { color: #64748b; font-size: .9rem; margin: 0; }
+    .ep-card .form-control { min-height: 46px; background: #f8fafc; border-color: #e2e8f0; color: #0f172a; }
+    .ep-card .btn-primary { min-height: 46px; font-weight: 600; }
+    .ep-back { display: block; text-align: center; margin-top: 1rem; font-size: .9rem; color: #2563eb; }
+    .ep-back:hover { text-decoration: underline; }
+  </style>
   <script>start_loader()</script>
-  <div class="login-box" style="width: 400px;">
-    <div class="card card-outline card-primary shadow">
-      <div class="card-header text-center">
-        <a href="./employee_login.php" class="h1"><b>Employee Portal</b></a>
-        <p class="text-muted text-sm mb-0"><?php echo htmlspecialchars((string)$_settings->info('name')) ?></p>
+  <div class="login-box ep-box">
+    <div class="ep-card">
+      <div class="text-center mb-3">
+        <img src="<?php echo validate_image($_settings->info('logo')) ?>" alt="Logo" class="ep-logo">
+        <h1 class="ep-title">Employee Portal</h1>
+        <p class="ep-company"><?php echo htmlspecialchars((string)$_settings->info('name')) ?></p>
       </div>
-      <div class="card-body">
+      <div>
         <?php if ($invitation): ?>
         <p class="login-box-msg">Welcome, <?php echo htmlspecialchars($invitation['name']) ?>. Choose a password to activate your account.</p>
         <div class="alert alert-info py-2 text-sm">Your username for signing in is your email address:<br><strong><?php echo htmlspecialchars((string)$invitation['email']) ?></strong></div>
@@ -56,9 +68,10 @@ if ($token !== '') {
         </form>
         <?php endif; ?>
       </div>
+      <a class="ep-back" href="<?php echo base_url ?>admin/login.php">&larr; Back to main portal</a>
     </div>
   </div>
-  <script src="<?php echo base_url ?>plugins/jquery/jquery.min.js"></script>
+    <script src="<?php echo base_url ?>plugins/jquery/jquery.min.js"></script>
   <script src="<?php echo base_url ?>plugins/bootstrap/js/bootstrap.bundle.min.js"></script>
   <script src="<?php echo base_url ?>dist/js/adminlte.min.js"></script>
   <script>

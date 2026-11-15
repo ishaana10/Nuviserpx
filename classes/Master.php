@@ -1265,13 +1265,34 @@ class Master extends DBConnection
             ? [(int)$p['id'], (int)$p['tenant_id'], (int)$p['employee_id']] : null;
     }
 
+    /**
+     * Run a portal leave action so the browser always gets valid JSON: stray warnings are discarded and an unexpected
+     * error becomes a "failed" reply (details to the PHP error log) instead of an empty HTTP 500.
+     */
+    private function employee_portal_safely(callable $run): string
+    {
+        ob_start();
+        try {
+            $out = $run();
+            ob_end_clean();
+            return is_string($out) ? $out : (string)json_encode($out);
+        } catch (\Throwable $e) {
+            ob_end_clean();
+            error_log('[employee portal] ' . get_class($e) . ': ' . $e->getMessage() . ' @ ' . basename($e->getFile()) . ':' . $e->getLine());
+            return json_encode(['status' => 'failed', 'msg' => 'Something went wrong on the server. Please try again.', 'debug' => get_class($e) . ' in ' . basename($e->getFile()) . ':' . $e->getLine()]);
+        }
+    }
+
     public function employee_portal_leave_apply()
     {
-        $who = $this->employee_portal_identity();
-        if ($who === null) {
-            return json_encode(['status' => 'failed', 'msg' => 'Please sign in again.']);
-        }
-        return (new \App\Services\PortalLeaveService($this->conn, $who[1], $who[2]))->apply($_POST, $_FILES['attachment'] ?? null);
+        return $this->employee_portal_safely(function () {
+            $who = $this->employee_portal_identity();
+            if ($who === null) {
+                return json_encode(['status' => 'failed', 'msg' => 'Please sign in again.']);
+            }
+            $svc = new \App\Services\PortalLeaveService($this->conn, $who[1], $who[2]);
+            return $svc->apply($_POST, $_FILES['attachment'] ?? null);
+        });
     }
 
     public function employee_portal_change_password()
@@ -1290,20 +1311,26 @@ class Master extends DBConnection
 
     public function employee_portal_leave_preview()
     {
-        $who = $this->employee_portal_identity();
-        if ($who === null) {
-            return json_encode(['status' => 'failed', 'msg' => 'Please sign in again.']);
-        }
-        return json_encode((new \App\Services\PortalLeaveService($this->conn, $who[1], $who[2]))->preview($_POST));
+        return $this->employee_portal_safely(function () {
+            $who = $this->employee_portal_identity();
+            if ($who === null) {
+                return json_encode(['status' => 'failed', 'msg' => 'Please sign in again.']);
+            }
+            $svc = new \App\Services\PortalLeaveService($this->conn, $who[1], $who[2]);
+            return json_encode($svc->preview($_POST));
+        });
     }
 
     public function employee_portal_leave_cancel()
     {
-        $who = $this->employee_portal_identity();
-        if ($who === null) {
-            return json_encode(['status' => 'failed', 'msg' => 'Please sign in again.']);
-        }
-        return (new \App\Services\PortalLeaveService($this->conn, $who[1], $who[2]))->cancel((int)($_POST['id'] ?? 0));
+        return $this->employee_portal_safely(function () {
+            $who = $this->employee_portal_identity();
+            if ($who === null) {
+                return json_encode(['status' => 'failed', 'msg' => 'Please sign in again.']);
+            }
+            $svc = new \App\Services\PortalLeaveService($this->conn, $who[1], $who[2]);
+            return $svc->cancel((int)($_POST['id'] ?? 0));
+        });
     }
 
     public function delete_employee()
