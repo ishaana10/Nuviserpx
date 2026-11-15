@@ -7,3 +7,7 @@
 # Uploads and temporary files
 uploads/temp/
 *.log
+
+# Deployment state and maintenance switch (per server)
+maintenance.flag
+.deploy/
