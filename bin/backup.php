@@ -33,7 +33,7 @@ $cmd = 'mysqldump --defaults-extra-file=' . escapeshellarg($cnf) . ' --single-tr
 [$rc, $err] = nv_sh($cmd);
 @unlink($cnf);
 if ($rc !== 0) { @unlink($dbFile); nv_fail("Database dump failed: $err"); }
-[$rc] = nv_sh('gzip -t ' . escapeshellarg($dbFile) . ' && gzip -dc ' . escapeshellarg($dbFile) . ' | grep -m1 -q "CREATE TABLE"');
+[$rc] = nv_sh(\App\Support\BackupPlan::dumpCheckCommand($dbFile));
 if ($rc !== 0) { @unlink($dbFile); nv_fail('The database dump is empty or damaged, so it was discarded.'); }
 $made[] = $dbFile;
 

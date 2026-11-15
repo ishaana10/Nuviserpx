@@ -2,23 +2,28 @@
 require_once('../config.php');
 
 if (isset($_GET['action']) && $_GET['action'] == 'logout') {
-    unset($_SESSION['customer_portal']);
-    unset($_SESSION['customer_id']);
-    unset($_SESSION['customer_name']);
-    unset($_SESSION['customer_email']);
-    unset($_SESSION['customer_client_id']);
+    \App\Support\CustomerPortal::clearSession();
+    session_regenerate_id(true);
     redirect('portal/login.php');
+    exit;
 }
 
-if (!isset($_SESSION['customer_portal']) && !isset($_SESSION['customer_id'])) {
+$portalCtx = \App\Support\CustomerPortal::context($conn);
+if (!$portalCtx) {
+    \App\Support\CustomerPortal::clearSession();
     redirect('portal/login.php');
+    exit;
 }
-
-$party_id = $_SESSION['customer_portal']['party_id'] ?? $_SESSION['customer_party_id'] ?? $_SESSION['customer_client_id'] ?? 0;
+$party_id = (int)$portalCtx['party_id'];
+$portal_tenant_id = (int)$portalCtx['tenant_id'];
+$cur_code = (string)$_settings->base_currency($portal_tenant_id);
+$fmt = function ($v) use ($cur_code) { return ($cur_code !== '' ? htmlspecialchars($cur_code) . ' ' : '') . number_format((float)$v, 2); };
+$inv_vis = \App\Support\CustomerPortal::invoiceStatusSql('status');
+$inv_vis_i = \App\Support\CustomerPortal::invoiceStatusSql('i`.`status');
 $customer_name = $_SESSION['customer_name'] ?? '';
 
 // Fetch party info
-$party = $conn->query("SELECT * FROM `party_list` WHERE id = '{$party_id}'")->fetch_assoc();
+$party = $conn->query("SELECT * FROM `party_list` WHERE id = {$party_id}")->fetch_assoc();
 if ($party) {
     if (empty($customer_name)) {
         $customer_name = $party['name'];
@@ -44,7 +49,7 @@ $portal_announcement  = $_settings->info('portal_announcement');
 $portal_theme_color   = $_settings->info('portal_primary_color') ?: '#0284c7';
 
 // Handle viewing a specific invoice
-$view_invoice_id = $_GET['invoice_id'] ?? null;
+$view_invoice_id = isset($_GET['invoice_id']) ? (string)(int)$_GET['invoice_id'] : null;
 $view_order_id   = $_GET['order_id'] ?? null;
 ?>
 <!DOCTYPE html>
@@ -123,7 +128,7 @@ $view_order_id   = $_GET['order_id'] ?? null;
 
       <?php if ($view_invoice_id):
         // Fetch invoice details
-        $inv_qry = $conn->query("SELECT i.*, p.party_code, p.name as customer_name, p.email as customer_email, p.phone as customer_phone, p.tin as customer_tin, p.address as customer_address FROM `invoice_list` i LEFT JOIN `party_list` p ON i.party_id = p.id WHERE i.id = '{$conn->real_escape_string($view_invoice_id)}' AND i.party_id = '{$party_id}'");
+        $inv_qry = $conn->query("SELECT i.*, p.party_code, p.name as customer_name, p.email as customer_email, p.phone as customer_phone, p.tin as customer_tin, p.address as customer_address FROM `invoice_list` i LEFT JOIN `party_list` p ON i.party_id = p.id WHERE i.id = " . (int)$view_invoice_id . " AND i.party_id = {$party_id} AND {$inv_vis_i}");
         if (!$inv_qry || $inv_qry->num_rows == 0):
       ?>
         <div class="alert alert-danger">Invoice not found or access denied.</div>
@@ -136,7 +141,7 @@ $view_order_id   = $_GET['order_id'] ?? null;
           // Log invoice view action
           $ip = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
           $ip_esc = $conn->real_escape_string($ip);
-          $tenant_id = $_SESSION['customer_portal']['tenant_id'] ?? $inv['tenant_id'] ?? 1;
+          $tenant_id = $portal_tenant_id;
           $portal_user_id = $_SESSION['customer_portal']['id'] ?? NULL;
           $inv_code = $conn->real_escape_string($inv['invoice_no']);
           $conn->query("INSERT INTO `customer_portal_logs` (`tenant_id`, `party_id`, `portal_user_id`, `action`, `details`, `ip_address`)
@@ -271,7 +276,7 @@ $view_order_id   = $_GET['order_id'] ?? null;
                         <td><b><?php echo htmlspecialchars($pay['payment_no']) ?></b></td>
                         <td><?php echo date('d M Y', strtotime($pay['payment_date'])) ?></td>
                         <td><?php echo ucfirst($pay['method']) ?></td>
-                        <td class="text-right font-weight-bold text-success">$<?php echo number_format($pay['allocated_amount'], 2) ?></td>
+                        <td class="text-right font-weight-bold text-success"><?php echo $fmt($pay['allocated_amount']) ?></td>
                       </tr>
                       <?php endwhile; ?>
                     </tbody>
@@ -284,30 +289,30 @@ $view_order_id   = $_GET['order_id'] ?? null;
                 <div class="card border shadow-none bg-light p-3">
                   <div class="d-flex justify-content-between mb-2">
                     <span class="text-muted">Subtotal:</span>
-                    <strong class="text-dark">$<?php echo number_format($inv['subtotal'], 2) ?></strong>
+                    <strong class="text-dark"><?php echo $fmt($inv['subtotal']) ?></strong>
                   </div>
                   <div class="d-flex justify-content-between mb-2">
                     <span class="text-muted">Tax / VAT Amount:</span>
-                    <strong class="text-dark">$<?php echo number_format($inv['tax_amount'], 2) ?></strong>
+                    <strong class="text-dark"><?php echo $fmt($inv['tax_amount']) ?></strong>
                   </div>
                   <?php if($inv['discount'] > 0): ?>
                   <div class="d-flex justify-content-between mb-2">
                     <span class="text-muted">Discount:</span>
-                    <strong class="text-danger">-$<?php echo number_format($inv['discount'], 2) ?></strong>
+                    <strong class="text-danger">-<?php echo $fmt($inv['discount']) ?></strong>
                   </div>
                   <?php endif; ?>
                   <hr class="my-2">
                   <div class="d-flex justify-content-between mb-2">
                     <span class="font-weight-bold h6">Grand Total:</span>
-                    <strong class="font-weight-bold h5 text-navy">$<?php echo number_format($inv['total'], 2) ?></strong>
+                    <strong class="font-weight-bold h5 text-navy"><?php echo $fmt($inv['total']) ?></strong>
                   </div>
                   <div class="d-flex justify-content-between mb-2">
                     <span class="text-muted">Amount Paid:</span>
-                    <strong class="text-success">$<?php echo number_format($inv['paid_amount'], 2) ?></strong>
+                    <strong class="text-success"><?php echo $fmt($inv['paid_amount']) ?></strong>
                   </div>
                   <div class="d-flex justify-content-between pt-2 border-top">
                     <span class="font-weight-bold h6 text-danger">Balance Due:</span>
-                    <strong class="font-weight-bold h5 text-danger">$<?php echo number_format($inv['balance'], 2) ?></strong>
+                    <strong class="font-weight-bold h5 text-danger"><?php echo $fmt($inv['balance']) ?></strong>
                   </div>
                 </div>
               </div>
@@ -339,14 +344,15 @@ $view_order_id   = $_GET['order_id'] ?? null;
       <?php else: ?>
         <!-- Customer Account Dashboard Summary -->
         <?php if ($portal_show_kpi):
-          $tot_inv_qry = $conn->query("SELECT COUNT(*) as count, SUM(total) as total FROM `invoice_list` WHERE party_id = '{$party_id}'");
+          $tot_inv_qry = $conn->query("SELECT COUNT(*) as count, SUM(total) as total FROM `invoice_list` WHERE party_id = {$party_id} AND {$inv_vis}");
           $tot_inv = $tot_inv_qry ? $tot_inv_qry->fetch_assoc() : ['count' => 0, 'total' => 0];
 
-          $paid_qry = $conn->query("SELECT SUM(amount) as total_paid FROM `payment_list` WHERE party_id = '{$party_id}'");
+          $paid_qry = $conn->query("SELECT SUM(amount) as total_paid FROM `payment_list` WHERE party_id = {$party_id} AND `status` = 'posted'");
           $paid = $paid_qry ? $paid_qry->fetch_assoc() : ['total_paid' => 0];
           $total_paid = $paid['total_paid'] ?? 0;
           $total_invoiced = $tot_inv['total'] ?? 0;
-          $balance_due = max(0, $total_invoiced - $total_paid);
+          $due_qry = $conn->query("SELECT SUM(balance) AS due FROM `invoice_list` WHERE party_id = {$party_id} AND " . \App\Support\CustomerPortal::openStatusSql('status'));
+          $balance_due = max(0, (float)(($due_qry ? $due_qry->fetch_assoc()['due'] : 0) ?? 0));
         ?>
         <div class="row mb-4">
           <div class="col-lg-4 col-6">
@@ -361,7 +367,7 @@ $view_order_id   = $_GET['order_id'] ?? null;
           <div class="col-lg-4 col-6">
             <div class="small-box bg-warning shadow-sm">
               <div class="inner">
-                <h3>$<?php echo number_format($balance_due, 2) ?></h3>
+                <h3><?php echo $fmt($balance_due) ?></h3>
                 <p>Outstanding Balance</p>
               </div>
               <div class="icon"><i class="fas fa-hand-holding-usd"></i></div>
@@ -370,7 +376,7 @@ $view_order_id   = $_GET['order_id'] ?? null;
           <div class="col-lg-4 col-6">
             <div class="small-box bg-success shadow-sm">
               <div class="inner">
-                <h3>$<?php echo number_format($total_paid, 2) ?></h3>
+                <h3><?php echo $fmt($total_paid) ?></h3>
                 <p>Total Payments Received</p>
               </div>
               <div class="icon"><i class="fas fa-check-circle"></i></div>
@@ -399,14 +405,14 @@ $view_order_id   = $_GET['order_id'] ?? null;
                 </thead>
                 <tbody>
                   <?php
-                    $invoices = $conn->query("SELECT * FROM `invoice_list` WHERE party_id = '{$party_id}' ORDER BY date_created DESC");
+                    $invoices = $conn->query("SELECT * FROM `invoice_list` WHERE party_id = {$party_id} AND {$inv_vis} ORDER BY date_created DESC");
                     if ($invoices && $invoices->num_rows > 0):
                       while($row = $invoices->fetch_assoc()):
                   ?>
                   <tr>
                     <td><?php echo date("Y-m-d", strtotime($row['invoice_date'] ?? $row['date_created'])) ?></td>
                     <td class="font-weight-bold"><?php echo htmlspecialchars($row['invoice_no']) ?></td>
-                    <td>$<?php echo number_format($row['total'], 2) ?></td>
+                    <td><?php echo $fmt($row['total']) ?></td>
                     <td>
                       <?php if($row['status'] == 'paid' || $row['status'] == 1): ?>
                         <span class="badge badge-success">Paid</span>
@@ -455,7 +461,7 @@ $view_order_id   = $_GET['order_id'] ?? null;
                 </thead>
                 <tbody>
                   <?php
-                    $payments = $conn->query("SELECT * FROM `payment_list` WHERE party_id = '{$party_id}' ORDER BY payment_date DESC");
+                    $payments = $conn->query("SELECT * FROM `payment_list` WHERE party_id = {$party_id} AND `status` = 'posted' ORDER BY payment_date DESC");
                     if ($payments && $payments->num_rows > 0):
                       while($p_row = $payments->fetch_assoc()):
                   ?>
@@ -463,7 +469,7 @@ $view_order_id   = $_GET['order_id'] ?? null;
                     <td><?php echo date("Y-m-d", strtotime($p_row['payment_date'])) ?></td>
                     <td class="font-weight-bold"><?php echo htmlspecialchars($p_row['payment_no'] ?? $p_row['reference'] ?? 'N/A') ?></td>
                     <td><span class="badge badge-light border"><?php echo ucfirst(htmlspecialchars($p_row['method'] ?? 'cash')) ?></span></td>
-                    <td class="text-success font-weight-bold">$<?php echo number_format($p_row['amount'], 2) ?></td>
+                    <td class="text-success font-weight-bold"><?php echo $fmt($p_row['amount']) ?></td>
                   </tr>
                   <?php
                       endwhile;

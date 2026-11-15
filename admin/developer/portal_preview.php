@@ -11,7 +11,7 @@ $tenant_id = $_settings->active_tenant_id();
 // Fetch active customers
 $customers_qry = $conn->query("SELECT id, name, email FROM `party_list` WHERE tenant_id = '{$tenant_id}' AND `type` = 'customer' AND delete_flag = 0 ORDER BY name ASC");
 
-$selected_customer_id = $_GET['customer_id'] ?? null;
+$selected_customer_id = isset($_GET['customer_id']) ? (int)$_GET['customer_id'] : null;
 if (!$selected_customer_id && $customers_qry && $customers_qry->num_rows > 0) {
     $first = $customers_qry->fetch_assoc();
     $selected_customer_id = $first['id'];
@@ -20,7 +20,7 @@ if (!$selected_customer_id && $customers_qry && $customers_qry->num_rows > 0) {
 
 // Simulate session for preview if customer selected
 if ($selected_customer_id) {
-    $cust = $conn->query("SELECT * FROM `party_list` WHERE id = '{$selected_customer_id}'")->fetch_assoc();
+    $cust = $conn->query("SELECT * FROM `party_list` WHERE id = {$selected_customer_id} AND tenant_id = '{$tenant_id}' AND delete_flag = 0")->fetch_assoc();
     if ($cust) {
         $_SESSION['customer_client_id'] = $cust['id'];
         $_SESSION['customer_name'] = $cust['name'];

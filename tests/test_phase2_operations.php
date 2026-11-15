@@ -52,7 +52,7 @@ check('guard does nothing on the command line', (function () { M::on(); ob_start
 foreach (['bin/backup.php', 'bin/restore.php', 'bin/restore-check.php', 'bin/migrate.php'] as $f) { check("$f only runs on the command line", strpos($read('bin/_common.php'), "php_sapi_name() !== 'cli'") !== false && strpos($read($f), "require __DIR__ . '/_common.php'") !== false); }
 check('web access to bin/ is denied', strpos($read('bin/.htaccess'), 'Require all denied') !== false);
 $bk = $read('bin/backup.php');
-check('dump is consistent, checks itself, and password never on the command line', strpos($bk, '--single-transaction') !== false && strpos($bk, 'gzip -t') !== false && strpos($bk, 'defaults-extra-file') !== false && strpos($bk, '-p"') === false && strpos($bk, '--password') === false);
+check('dump is consistent, checks itself, and password never on the command line', strpos($bk, '--single-transaction') !== false && strpos($read('src/Support/BackupPlan.php'), 'gzip -t') !== false && strpos($bk, 'BackupPlan::dumpCheckCommand') !== false && strpos($bk, 'defaults-extra-file') !== false && strpos($bk, '-p"') === false && strpos($bk, '--password') === false);
 check('passphrase goes through the environment, not the command line', strpos($bk, '-pass env:NV_BACKUP_PASS') !== false && strpos($bk, '-pass pass:') === false);
 check('a failed off-server copy fails the run', strpos($bk, 'Copy off the server failed') !== false);
 check('backup folder may not sit inside the web root', strpos($read('bin/_common.php'), 'is inside the application folder') !== false);

@@ -21,11 +21,11 @@ final class HealthCheck
         if ((int)($f['pending_migrations'] ?? 0) > 0) {
             $problems[] = (int)$f['pending_migrations'] . ' migration(s) not applied';
         }
-        if (isset($f['disk_free_pct']) && $f['disk_free_pct'] !== null && $f['disk_free_pct'] < 10) {
+        if (isset($f['disk_free_pct']) && $f['disk_free_pct'] < 10) {
             $problems[] = 'disk almost full (' . $f['disk_free_pct'] . '% free)';
         }
         if (!empty($f['backup_required'])) {
-            if (!isset($f['backup_age_hours']) || $f['backup_age_hours'] === null) {
+            if (!isset($f['backup_age_hours'])) {
                 $problems[] = 'no database backup found';
             } elseif ($f['backup_age_hours'] > 36) {
                 $problems[] = 'last backup is ' . $f['backup_age_hours'] . ' hours old';
