@@ -21,6 +21,22 @@ use App\Support\IntegrationEvents;
 
 $__api_started = microtime(true);
 
+// Browser callers: only origins listed in API_CORS_ORIGINS (comma separated, exact match) get CORS headers.
+$__origin = (string)($_SERVER['HTTP_ORIGIN'] ?? '');
+if ($__origin !== '') {
+    $__allowed = array_filter(array_map('trim', explode(',', (string)getenv('API_CORS_ORIGINS'))));
+    if (in_array($__origin, $__allowed, true)) {
+        header('Access-Control-Allow-Origin: ' . $__origin);
+        header('Vary: Origin');
+        header('Access-Control-Allow-Headers: Authorization, Content-Type, X-API-Key');
+        header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS');
+    }
+}
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
+    http_response_code(204);
+    exit;
+}
+
 $db = new DBConnection();
 $conn = $db->conn;
 
@@ -33,7 +49,8 @@ if(empty($api_key) && isset($_SERVER['HTTP_AUTHORIZATION'])){
     }
 }
 
-if(empty($api_key) && isset($_GET['api_key'])){
+// Keys in the URL end up in server logs and browser history, so this is off unless API_ALLOW_QUERY_KEY=1.
+if(empty($api_key) && isset($_GET['api_key']) && getenv('API_ALLOW_QUERY_KEY') === '1'){
     $api_key = trim($_GET['api_key']);
 }
 
@@ -46,8 +63,10 @@ if(empty($api_key)){
     exit;
 }
 
-$api_key_clean = $conn->real_escape_string($api_key);
-$key_qry = $conn->query("SELECT * FROM `api_keys` WHERE api_key = '{$api_key_clean}' AND status = 1 LIMIT 1");
+$key_stmt = $conn->prepare("SELECT * FROM `api_keys` WHERE api_key = ? AND status = 1 LIMIT 1");
+$key_stmt->bind_param('s', $api_key);
+$key_stmt->execute();
+$key_qry = $key_stmt->get_result();
 
 if(!$key_qry || $key_qry->num_rows == 0){
     http_response_code(401);

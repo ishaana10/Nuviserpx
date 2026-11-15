@@ -13,13 +13,25 @@ class Crypto
 {
     private const PREFIX = 'enc:v1:';
 
+    /** The key used for new values: APP_KEY, or (older installs only) one derived from the database credentials. */
     private static function key(): string
     {
         $appKey = getenv('APP_KEY') ?: '';
         if ($appKey !== '') {
             return hash('sha256', $appKey, true);
         }
+        return self::legacyKey();
+    }
+
+    private static function legacyKey(): string
+    {
         return hash('sha256', 'nuviserpx|' . (getenv('DB_PASSWORD') ?: '') . '|' . (getenv('DB_NAME') ?: ''), true);
+    }
+
+    /** True when a real APP_KEY is configured. Production should always have one. */
+    public static function hasAppKey(): bool
+    {
+        return (getenv('APP_KEY') ?: '') !== '';
     }
 
     public static function encrypt(string $plain): string
@@ -47,6 +59,10 @@ class Crypto
             return '';
         }
         $plain = openssl_decrypt(substr($raw, 28), 'aes-256-gcm', self::key(), OPENSSL_RAW_DATA, substr($raw, 0, 12), substr($raw, 12, 16));
+        if ($plain === false && self::hasAppKey()) {
+            // Saved before APP_KEY was set: still readable, and re-encrypted under APP_KEY the next time it is saved.
+            $plain = openssl_decrypt(substr($raw, 28), 'aes-256-gcm', self::legacyKey(), OPENSSL_RAW_DATA, substr($raw, 0, 12), substr($raw, 12, 16));
+        }
         return $plain === false ? '' : $plain;
     }
 

@@ -70,7 +70,7 @@ foreach($res as $k => $v){
                                 <th>Attachment</th>
                                 <td>
                                     <?php if(!empty($attachment_path)): ?>
-                                        <a href="<?= base_url . $attachment_path ?>" target="_blank" class="btn btn-xs btn-outline-primary"><i class="fas fa-paperclip mr-1"></i> View File</a>
+                                        <a href="<?= base_url ?>admin/attachments/file.php?type=asset&id=<?= (int)$id ?>" target="_blank" class="btn btn-xs btn-outline-primary"><i class="fas fa-paperclip mr-1"></i> View File</a>
                                     <?php else: ?>
                                         <span class="text-muted">No attachment</span>
                                     <?php endif; ?>

@@ -213,6 +213,10 @@ class Master extends DBConnection
     {
         return $this->container->make(\App\Services\ContractService::class)->save_proposal_signature();
     }
+    public function get_proposal_link()
+    {
+        return $this->container->make(\App\Services\ContractService::class)->get_proposal_link();
+    }
     public function save_ticket()
     {
         return $this->container->make(\App\Services\HelpdeskService::class)->save_ticket();
@@ -368,21 +372,12 @@ class Master extends DBConnection
         $path = null;
         if (isset($_FILES['attachment']) && ($_FILES['attachment']['tmp_name'] ?? '') != '') {
             $f = $_FILES['attachment'];
-            $ext = strtolower(pathinfo((string)$f['name'], PATHINFO_EXTENSION));
-            if (!in_array($ext, ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'xls', 'xlsx', 'txt'], true)) {
-                return json_encode(['status' => 'failed', 'msg' => 'Invalid receipt attachment format. Allowed: PDF, Images, Documents.']);
+            if ($problem = \App\Support\PrivateFile::problem($f, ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'xls', 'xlsx', 'txt'])) {
+                return json_encode(['status' => 'failed', 'msg' => $problem]);
             }
-            if (($f['size'] ?? 0) > 10 * 1024 * 1024) {
-                return json_encode(['status' => 'failed', 'msg' => 'The receipt is larger than 10MB.']);
-            }
-            $tenant_id = (int)$this->settings->active_tenant_id();
-            $dir = base_app . 'uploads/expenses';
-            if (!is_dir($dir)) {
-                mkdir($dir, 0755, true);
-            }
-            $rel = 'uploads/expenses/claim_' . $tenant_id . '_' . bin2hex(random_bytes(8)) . '.' . $ext;
-            if (move_uploaded_file($f['tmp_name'], base_app . $rel)) {
-                $path = $rel;
+            $path = \App\Support\PrivateFile::store($f, 'expenses', 'claim', (int)$this->settings->active_tenant_id());
+            if ($path === null) {
+                return json_encode(['status' => 'failed', 'msg' => 'The receipt could not be stored. Check that the uploads folder is writable.']);
             }
         }
         return $this->expenses()->submit($_POST, $path);
@@ -1394,11 +1389,11 @@ class Master extends DBConnection
         if ($this->settings->userdata('type') != 1) {
             return json_encode(['status' => 'failed', 'msg' => 'Access denied']);
         }
-        $branch = trim((string)shell_exec('git rev-parse --abbrev-ref HEAD 2>&1'));
-        if (empty($branch)) {
-            $branch = 'main';
+        if (!\App\Support\WebGit::enabled()) {
+            return json_encode(['status' => 'failed', 'msg' => 'Updating from the web is disabled on this server. Deploy through your release process.']);
         }
-        $output = shell_exec("git pull origin {$branch} 2>&1");
+        $branch = \App\Support\WebGit::safeBranch(trim((string)shell_exec('git rev-parse --abbrev-ref HEAD 2>&1')));
+        $output = shell_exec('git pull origin ' . escapeshellarg($branch) . ' 2>&1');
         return json_encode(['status' => 'success', 'msg' => 'Git pull executed.', 'output' => $output]);
     }
 
@@ -1406,6 +1401,9 @@ class Master extends DBConnection
     {
         if ($this->settings->userdata('type') != 1) {
             return json_encode(['status' => 'failed', 'msg' => 'Access denied']);
+        }
+        if (!\App\Support\WebGit::enabled()) {
+            return json_encode(['status' => 'failed', 'msg' => 'Updating from the web is disabled on this server. Deploy through your release process.']);
         }
         $output = shell_exec("git fetch 2>&1 && git status 2>&1");
         return json_encode(['status' => 'success', 'msg' => 'Git fetch executed.', 'output' => $output]);
@@ -1468,9 +1466,16 @@ class Master extends DBConnection
 
         $logo_path = null;
         if (isset($_FILES['logo']) && $_FILES['logo']['tmp_name'] != '') {
-            $fname = 'uploads/tenant_logo_' . $tenant_id . '_' . time() . '.png';
-            $dir_path = base_app . $fname;
-            if (move_uploaded_file($_FILES['logo']['tmp_name'], $dir_path)) {
+            if ((int)$_FILES['logo']['size'] > 2 * 1024 * 1024) {
+                return json_encode(['status' => 'failed', 'msg' => 'The logo must be 2 MB or smaller.']);
+            }
+            $info = @getimagesize($_FILES['logo']['tmp_name']);
+            $ext = ['image/png' => 'png', 'image/jpeg' => 'jpg', 'image/webp' => 'webp'][$info['mime'] ?? ''] ?? null;
+            if ($ext === null) {
+                return json_encode(['status' => 'failed', 'msg' => 'The logo must be a PNG, JPG or WebP image.']);
+            }
+            $fname = 'uploads/tenant_logo_' . (int)$tenant_id . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
+            if (move_uploaded_file($_FILES['logo']['tmp_name'], base_app . $fname)) {
                 $logo_path = $fname;
             }
         }
@@ -1564,7 +1569,7 @@ $allowed_actions = [
     'customer_login', 'get_portal_logs', 'save_invoice_template', 'save_asset',
     'delete_asset', 'save_bank_account', 'save_opportunity', 'delete_opportunity',
     'save_crm_contact', 'delete_crm_contact', 'move_opportunity_stage', 'convert_opportunity',
-    'save_crm_activity', 'toggle_crm_activity', 'delete_crm_activity', 'save_proposal_signature',
+    'save_crm_activity', 'toggle_crm_activity', 'delete_crm_activity', 'save_proposal_signature', 'get_proposal_link',
     'save_ticket', 'reply_ticket', 'save_contract', 'save_sla_policies',
     'save_reminder_settings', 'run_payment_reminders', 'preview_landed_cost', 'post_landed_cost',
     'write_off_expired', 'create_stock_count', 'save_stock_counts', 'post_stock_count',

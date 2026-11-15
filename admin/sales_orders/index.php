@@ -86,6 +86,7 @@
 				                    <a class="dropdown-item" href="./?page=sales_orders/manage_sales_order&id=<?php echo $row['id'] ?>"><span class="fa fa-edit text-primary"></span> Edit</a>
 				                    <?php if($isQuote): ?>
 				                    <a class="dropdown-item extend_quote" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>"><span class="fa fa-calendar-plus text-info"></span> Extend validity</a>
+				                    <a class="dropdown-item copy_sign_link" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>"><span class="fa fa-link text-primary"></span> Copy customer signing link</a>
 				                    <a class="dropdown-item decline_quote" href="javascript:void(0)" data-id="<?php echo $row['id'] ?>"><span class="fa fa-times-circle text-warning"></span> Mark declined</a>
 				                    <?php endif; ?>
 				                    <?php endif; ?>
@@ -124,6 +125,12 @@
 		$('.revise_quote').click(function(){
 			var id = $(this).data('id');
 			if(window.confirm('Make a new version of this quote? The current version is marked superseded and can no longer be accepted.')){ quoteAction('revise_quote', {id: id}); }
+		});
+		$('.copy_sign_link').click(function(){
+			$.post(_base_url_ + 'classes/Master.php?f=get_proposal_link', {id: $(this).data('id'), csrf_token: $('meta[name="csrf-token"]').attr('content')}, function(r){
+				if(r && r.status === 'success'){ window.prompt('Send this private link to the customer:', r.url); }
+				else { alert_toast((r && r.msg) || 'Could not create the link.', 'error'); }
+			}, 'json').fail(function(){ alert_toast('An error occurred.', 'error'); });
 		});
 		$('.decline_quote').click(function(){
 			var id = $(this).data('id'), reason = window.prompt('Why was the quote declined?');

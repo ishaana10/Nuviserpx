@@ -161,12 +161,16 @@ $env_content = "APP_NAME=\"" . addslashes($app_name) . "\"\n" .
                "DB_USERNAME=\"" . addslashes($db_username) . "\"\n" .
                "DB_PASSWORD=\"" . addslashes($db_password) . "\"\n" .
                "DB_NAME=\"" . addslashes($db_name) . "\"\n" .
+               "APP_ENV=production\n" .
+               "APP_DEBUG=false\n" .
+               "APP_KEY=" . bin2hex(random_bytes(32)) . "\n" .
                "SESSION_DRIVER=file\n" .
                "REDIS_HOST=127.0.0.1\n" .
                "REDIS_PORT=6379\n" .
                "REDIS_PREFIX=nuviserpxssid:\n";
 
 @file_put_contents($env_file, $env_content);
+@chmod($env_file, 0640);
 
 // 9. Lock installer
 @file_put_contents($lock_file, date('Y-m-d H:i:s') . " - Installed successfully.\n");

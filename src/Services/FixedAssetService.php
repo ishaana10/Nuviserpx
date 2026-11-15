@@ -83,18 +83,13 @@ class FixedAssetService
         $data .= ", `created_by` = '{$user_id}' ";
 
         if (isset($_FILES['attachment']) && $_FILES['attachment']['tmp_name'] != '') {
-            $ext = strtolower(pathinfo($_FILES['attachment']['name'], PATHINFO_EXTENSION));
             $allowed_exts = ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'zip', 'txt'];
-            if (!in_array($ext, $allowed_exts)) {
-                return json_encode(['status' => 'failed', 'msg' => 'Invalid file attachment format. Allowed types: PDF, Images, Documents, Spreadsheets.']);
+            if ($problem = \App\Support\PrivateFile::problem($_FILES['attachment'], $allowed_exts)) {
+                return json_encode(['status' => 'failed', 'msg' => $problem]);
             }
-            $fname = 'uploads/assets/asset_' . $tenant_id . '_' . time() . '.' . $ext;
-            $dir_path = base_app . 'uploads/assets';
-            if (!is_dir($dir_path)) {
-                mkdir($dir_path, 0777, true);
-            }
-            if (move_uploaded_file($_FILES['attachment']['tmp_name'], base_app . $fname)) {
-                $data .= ", `attachment_path` = '{$fname}' ";
+            $fname = \App\Support\PrivateFile::store($_FILES['attachment'], 'assets', 'asset', (int)$tenant_id);
+            if ($fname !== null) {
+                $data .= ", `attachment_path` = '" . $this->conn->real_escape_string($fname) . "' ";
             }
         }
 

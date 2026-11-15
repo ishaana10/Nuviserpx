@@ -492,6 +492,7 @@ final class Permissions
         'revise_quote'          => ['sales_orders', 'edit'],
         'decline_quote'         => ['sales_orders', 'edit'],
         'extend_quote'          => ['sales_orders', 'edit'],
+        'get_proposal_link'     => ['sales_orders', 'edit'],
         'confirm_for_delivery'  => ['sales_orders', 'edit'],
         'save_delivery_note'    => ['sales_orders', 'edit'],
         'cancel_delivery_note'  => ['sales_orders', 'edit'],

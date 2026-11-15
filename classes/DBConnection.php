@@ -23,28 +23,17 @@ class DBConnection{
             @$this->conn = new mysqli($this->host, $this->username, $this->password, $this->database);
             
             if ($this->conn->connect_error) {
-                // If database does not exist or access failed, connect without database to create it
-                @$server_conn = new mysqli($this->host, $this->username, $this->password);
-                if ($server_conn->connect_error) {
-                    die("<div style='padding:20px; font-family:sans-serif; background:#fee2e2; border:1px solid #f87171; color:#991b1b; border-radius:8px;'>
-                        <h3 style='margin-top:0;'>Database Connection Failed</h3>
-                        <p>Unable to connect to the MySQL database server at <b>{$this->host}</b> with username <b>{$this->username}</b>.</p>
-                        <p><b>Error Details:</b> " . htmlspecialchars($server_conn->connect_error) . "</p>
-                        <p>Please check your database credentials in <code>initialize.php</code>.</p>
-                    </div>");
+                // The real reason goes to the server log only. Visitors never see the host, user name or error text,
+                // and a normal request never creates databases (the installer does that, once).
+                error_log('[nuviserpx] Database connection failed: ' . $this->conn->connect_error);
+                if (!headers_sent()) {
+                    http_response_code(503);
+                    header('Retry-After: 60');
                 }
-
-                // Auto-create database
-                $create_db_sql = "CREATE DATABASE IF NOT EXISTS `" . $this->database . "` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci";
-                if ($server_conn->query($create_db_sql)) {
-                    $server_conn->close();
-                    @$this->conn = new mysqli($this->host, $this->username, $this->password, $this->database);
-                } else {
-                    die("<div style='padding:20px; font-family:sans-serif; background:#fee2e2; border:1px solid #f87171; color:#991b1b; border-radius:8px;'>
-                        <h3 style='margin-top:0;'>Database Auto-Creation Failed</h3>
-                        <p>Could not auto-create database <b>{$this->database}</b>: " . htmlspecialchars($server_conn->error) . "</p>
-                    </div>");
-                }
+                die("<div style='padding:20px; font-family:sans-serif; background:#fee2e2; border:1px solid #f87171; color:#991b1b; border-radius:8px;'>
+                    <h3 style='margin-top:0;'>Service temporarily unavailable</h3>
+                    <p>The application could not reach its database. Please try again in a few minutes. If this continues, contact your administrator.</p>
+                </div>");
             }
 
             // MySQL's default sql_mode rejects queries MariaDB accepts (ONLY_FULL_GROUP_BY): relax just that.

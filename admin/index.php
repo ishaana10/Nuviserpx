@@ -18,7 +18,7 @@ ob_start();
         alert_toast("<?php echo $_settings->flashdata('success') ?>",'success')
       </script>
       <?php endif;?>    
-     <?php $page = isset($_GET['page']) ? $_GET['page'] : 'home';  ?>
+     <?php $page = \App\Support\PageRoute::clean($_GET['page'] ?? null);  ?>
       <!-- Content Wrapper. Contains page content -->
       <div class="content-wrapper pt-3" style="min-height: 567.854px;">
      
@@ -29,7 +29,7 @@ ob_start();
               // Page heading: breadcrumb + title derived from the current page.
               if($page !== 'home'){
                 $nvNames = ['crm' => 'CRM', 'hr' => 'HR', 'api_keys' => 'API Keys'];
-                $nvSegs = array_values(array_filter(explode('/', $page), fn($s) => $s !== '' && $s !== 'index'));
+                $nvSegs = $page === \App\Support\PageRoute::INVALID ? [] : array_values(array_filter(explode('/', $page), fn($s) => $s !== '' && $s !== 'index'));
                 if($nvSegs){
                   $nvLast = count($nvSegs) - 1;
                   echo '<div class="nv-page-head"><nav class="nv-breadcrumb" aria-label="breadcrumb"><a href="./">Home</a>';
@@ -65,7 +65,7 @@ ob_start();
                 echo '<div class="alert alert-danger m-3 shadow-sm"><i class="fas fa-ban mr-2"></i>'
                    . 'You don\'t have permission to access this page. Contact your administrator if you believe this is a mistake.'
                    . '</div>';
-              } elseif(file_exists($view_file)){
+              } elseif($page !== \App\Support\PageRoute::INVALID && file_exists($view_file)){
                 echo \App\Support\Permissions::hideControlsCss($page, $_settings);
                 include $view_file;
               } else {
