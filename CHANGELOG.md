@@ -3,6 +3,12 @@
 All notable changes to Nuvis ERPX. Versions are stamped automatically on each
 release build (see `src/Support/AppVersion.php`); dates are Fiji time.
 
+## [Unreleased] - 2026-11-15 (2)
+
+### Fixed
+- **Draft invoices were counted in the ledger.** Saving an invoice as a draft posted its journal, so the Trial Balance, Balance Sheet and Profit & Loss included receivables and revenue for invoices that had not been issued (the Dashboard already left them out). A draft invoice now saves a draft journal; issuing it makes it count. Migration 048 repairs existing draft invoices (journals in a closed period are left alone).
+- **New installs started with a wrong chart of accounts.** The installer left ~50 untyped demo accounts (Cash, Accounts Receivable, Accounts Payable...) labelled "Expense", so a new company had no asset, liability or income accounts and could not set Default Accounts or invoice. The installer now sets up the standard chart for a new company. It never replaces a chart that has any journal, invoice, payment or default account.
+
 ## [Unreleased] - 2026-11-15
 
 ### Fixed

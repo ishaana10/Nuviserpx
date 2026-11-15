@@ -217,7 +217,9 @@ class InvoiceService
         $arFx = $isForeign ? ['currency' => $docCurrency, 'fx_rate' => $docRate, 'amount_fc' => (float)$total_fc] : null;
 
         if (empty($id)) {
-            $j_sql = "INSERT INTO `journal_entries` (`tenant_id`, `code`, `journal_date`, `description`, `user_id`) VALUES ('{$tenant_id}', '{$journal_code}', '{$journal_date}', '{$description}', '{$user_id}')";
+            // A draft invoice has not happened yet: its journal is a draft too, which every ledger report ignores.
+            $j_status = $status === 'draft' ? 'draft' : 'posted';
+            $j_sql = "INSERT INTO `journal_entries` (`tenant_id`, `code`, `journal_date`, `description`, `status`, `user_id`) VALUES ('{$tenant_id}', '{$journal_code}', '{$journal_date}', '{$description}', '{$j_status}', '{$user_id}')";
             $this->conn->query($j_sql);
             $journal_id = $this->conn->insert_id;
 
@@ -250,7 +252,9 @@ class InvoiceService
             if ($journal_id) {
                 $trail = new JournalTrail($this->conn, $this->settings);
                 $trailBefore = $trail->snapshot((int)$journal_id);
-                $this->conn->query("UPDATE `journal_entries` SET `description` = '{$description}', `journal_date` = '{$journal_date}' WHERE id = '{$journal_id}'");
+                // Issuing a draft makes its journal count; a cancelled/reversed journal keeps its own status.
+                $j_status = $status === 'draft' ? 'draft' : 'posted';
+                $this->conn->query("UPDATE `journal_entries` SET `description` = '{$description}', `journal_date` = '{$journal_date}', `status` = IF(`status` IN ('draft','posted'), '{$j_status}', `status`) WHERE id = '{$journal_id}'");
                 $this->conn->query("DELETE FROM `journal_items` WHERE journal_id = '{$journal_id}'");
                 $this->postLines((int)$journal_id, (int)$ar_acc_id, (int)$rev_acc_id, (float)$total, (float)$tax_amount, $arFx);
                 $trail->record((int)$journal_id, 'invoice_list', (int)$id, "Invoice {$invoice_no}", $trailBefore);
