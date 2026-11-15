@@ -20,6 +20,7 @@ require_once(base_app . 'classes/ModuleManager.php');
 use App\Support\IntegrationEvents;
 
 $__api_started = microtime(true);
+\App\Support\Maintenance::guard(true);
 
 // Browser callers: only origins listed in API_CORS_ORIGINS (comma separated, exact match) get CORS headers.
 $__origin = (string)($_SERVER['HTTP_ORIGIN'] ?? '');

@@ -20,6 +20,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 require_once('initialize.php');
+\App\Support\Maintenance::guard();
 
 if (!headers_sent() && php_sapi_name() !== 'cli') {
 	header('X-Content-Type-Options: nosniff');

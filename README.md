@@ -56,7 +56,7 @@ Newest first. Each item names the pull request it shipped in.
 ## System Requirements
 
 - **PHP:** Version 8.2 or newer
-- **Database:** MySQL 5.7+ or MariaDB 10.3+
+- **Database:** MySQL 8.0+ or MariaDB 10.5+ recommended (older versions do not enforce CHECK constraints)
 - **Web Server:** Apache 2.4 (with `mod_rewrite` enabled) or Nginx
 - **Required PHP Extensions:**
   - `mysqli`
@@ -64,77 +64,37 @@ Newest first. Each item names the pull request it shipped in.
   - `mbstring`
   - `session`
   - `json`
+  - `openssl` (encrypts stored secrets)
+
+Backups additionally need the `mysqldump`, `mysql`, `gzip`, `tar` and `sha256sum` command-line tools.
 
 ---
 
-## Step-by-Step Setup & Installation Guide
+## Installation
 
-### Step 1: Download / Clone the Repository
-Clone or place the project files into your web server's root directory (e.g. `/var/www/html/nuvis-erpx` or `C:/xampp/htdocs/nuvis-erpx`).
+The browser installer does the database and configuration for you. Nothing needs to be edited by hand.
 
-```bash
-git clone https://github.com/ishaana10/nuviserpx.git nuvis-erpx
-cd nuvis-erpx
-```
-
----
-
-### Step 2: Create MySQL Database & Import Schema
-1. Open phpMyAdmin or your MySQL CLI client.
-2. Create a new database named `ajms_db` (or your preferred database name):
-   ```sql
-   CREATE DATABASE ajms_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-   ```
-3. Import the SQL file located at `database/nuviserpx.sql`:
+1. **Get the code** into the web server folder (not a world-writable one):
    ```bash
-   mysql -u root -p nuviserpx < database/nuviserpx.sql
+   git clone https://github.com/ishaana10/nuviserpx.git nuvis-erpx
+   cd nuvis-erpx
    ```
+2. **Create an empty MySQL/MariaDB database and a dedicated user** for it (do not use `root`). See [Database users](docs/DEPLOYMENT.md#database-users).
+3. **Give the web server write access only where it is needed:** `uploads/` and `logs/`, plus the app folder itself until the installer has written `.env` (take that back afterwards, step 6):
+   ```bash
+   sudo chown -R www-data:www-data uploads logs
+   sudo chmod -R u+rwX,g+rX,o-rwx uploads logs
+   ```
+4. **Enable Apache rewrite and headers** (`sudo a2enmod rewrite headers`) and set `AllowOverride All` for the folder. For Nginx see [Web server](docs/DEPLOYMENT.md#web-server).
+5. **Open the site in your browser.** It redirects to `/install/`. Enter the database details and the Super Administrator login. The installer writes `.env` (including a random `APP_KEY`), loads the schema and creates `install/installed.lock`.
+6. **After installing, remove the installer and lock the app folder:**
+   ```bash
+   rm -r install/
+   chmod 640 .env
+   ```
+7. **Set up backups, cron and monitoring** before entering real data: follow [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) (the checklist at the end is the short version).
 
----
-
-### Step 3: Configure Database & Application Settings (`initialize.php`)
-Open `initialize.php` in the root directory and update your database credentials and `base_url`:
-
-```php
-<?php
-if(!defined('base_url')) define('base_url','http://localhost/nuvis-erpx/'); // Update to match your domain or path
-if(!defined('base_app')) define('base_app', str_replace('\\','/',__DIR__).'/' );
-if(!defined('DB_SERVER')) define('DB_SERVER',"localhost");
-if(!defined('DB_USERNAME')) define('DB_USERNAME',"root");       // Your Database Username
-if(!defined('DB_PASSWORD')) define('DB_PASSWORD',"");           // Your Database Password
-if(!defined('DB_NAME')) define('DB_NAME',"ajms_db");            // Your Database Name
-?>
-```
-
----
-
-### Step 4: Set Directory Permissions
-Ensure the web server has write permissions for upload folders and directories:
-
-```bash
-chmod -R 775 uploads/
-chmod -R 775 build/
-```
-
----
-
-### Step 5: Web Server Configuration
-
-#### For Apache (`.htaccess`)
-Ensure `mod_rewrite` and `mod_headers` are enabled in Apache:
-```bash
-sudo a2enmod rewrite headers
-sudo systemctl restart apache2
-```
-
-Ensure your Apache VirtualHost or Directory allows `.htaccess` overrides:
-```apache
-<Directory /var/www/html/nuvis-erpx>
-    Options Indexes FollowSymLinks
-    AllowOverride All
-    Require all granted
-</Directory>
-```
+All settings live in `.env` (see `.env.example`); `initialize.php` only reads them.
 
 ---
 
@@ -156,7 +116,14 @@ Example: `0 7 * * * php /path/to/nuviserpx/cron/payment_reminders.php >> /var/lo
 
 ## Database Migrations
 
-Schema changes live in `database/migrations/*.sql` and are applied in order by `src/Database/MigrationRunner.php`, with runtime `check_*` methods in `classes/DBConnection.php` creating core tables first. Latest: `030_stock_counts.sql`, `031_landed_costs.sql`, `032_batches_expiry.sql`, `033_supplier_wht.sql`, `034_ticket_sla_crm_contacts.sql`. Statement splitting ignores semicolons inside comments, and column additions are checked against `information_schema` so the same files run on MySQL and MariaDB. Failed statements are logged, not fatal, so check the PHP error log after upgrading.
+Schema changes live in `database/migrations/*.sql` and are applied in order by `src/Database/MigrationRunner.php`; legacy catch-up checks in `src/Database/LegacySchemaCatchup.php` create core tables first. The runner currently applies pending files when the application connects. On a live system, apply them from the command line during a deployment instead (`bin/deploy.sh` does this in maintenance mode):
+
+```bash
+php bin/migrate.php --status   # lists applied and pending migrations, changes nothing
+php bin/migrate.php            # applies anything pending
+```
+
+`php health.php` also reports pending migrations. Statement splitting ignores semicolons in comments, and column additions are checked against `information_schema` so the same files run on MySQL and MariaDB. Known limitation: a failed statement inside a migration is not yet reported reliably, so after every upgrade check `php health.php` and the PHP error log.
 
 ---
 
@@ -183,35 +150,15 @@ password, change it under *Access & Users* now.
 
 ---
 
-## 🛠️ Troubleshooting HTTP 500 Internal Server Error
+## Troubleshooting
 
-If you encounter an **HTTP 500 Internal Server Error** after installation, follow these troubleshooting steps to identify and resolve the root cause:
+**Blank page or HTTP 500.** Errors are written to `logs/php_errors.log` (also visible under Developer > Error Logs) and to the web server log. Do not turn on `display_errors` on a live server: it shows file paths and queries to visitors. Reproduce on a staging copy instead.
 
-### 1. Enable PHP Error Display to See the Exact Error
-Open `initialize.php` or `config.php` and temporarily add the following lines at the top:
-```php
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
-```
-
-### 2. Verify Database Connection & Credentials
-HTTP 500 errors frequently occur when PHP cannot connect to MySQL due to incorrect database settings or if the database server is stopped.
-- Open `initialize.php` and verify `DB_SERVER`, `DB_USERNAME`, `DB_PASSWORD`, and `DB_NAME`.
-- Ensure MySQL service is running (`systemctl status mysql` or XAMPP Control Panel).
-- Verify database tables exist by running `SHOW TABLES;` inside MySQL.
-
-### 3. Check Apache `.htaccess` Directives
-If `mod_headers` is disabled in Apache, the `Header set Access-Control-Allow-Origin "*"` line in `.htaccess` can cause an HTTP 500 error.
-- Enable `mod_headers`: `sudo a2enmod headers && sudo systemctl restart apache2`
-- Alternatively, temporarily comment out `Header set Access-Control-Allow-Origin "*"` in `.htaccess`.
-
-### 4. Inspect Server Error Logs
-Check your web server error logs for detailed PHP stack traces:
-- **Apache Log (Ubuntu/Debian):** `/var/log/apache2/error.log`
-- **Apache Log (CentOS/RHEL):** `/var/log/httpd/error_log`
-- **XAMPP Log:** `C:/xampp/apache/logs/error.log`
-- **PHP FPM Log:** `/var/log/php8.0-fpm.log`
+- **"Service temporarily unavailable" page:** the application cannot reach its database. The reason is in `logs/php_errors.log`. Check the `DB_*` values in `.env` and that the database service is running (`systemctl status mysql`).
+- **HTTP 500 right after setup:** make sure Apache has `mod_rewrite` and `mod_headers` enabled (`sudo a2enmod rewrite headers && sudo systemctl restart apache2`) and `AllowOverride All` is set.
+- **"We'll be right back" page:** maintenance mode is on (a `maintenance.flag` file exists). `bin/deploy.sh` turns it off when a release finishes; to reopen manually run `rm maintenance.flag` after `php health.php` reports `ok`.
+- **Something is wrong but you are not sure what:** run `php health.php` on the server. It checks the database, pending migrations, disk space, folder permissions, the encryption key and the age of the last backup.
+- **Web server logs:** Apache `/var/log/apache2/error.log` (Debian/Ubuntu) or `/var/log/httpd/error_log` (RHEL), PHP-FPM `/var/log/php8.x-fpm.log`.
 
 ---
 
