@@ -69,4 +69,23 @@ $_SESSION['userdata'] = ['type' => 1];
 check('super admin preview works', (P::context($c)['preview'] ?? false) === true);
 $_SESSION['userdata'] = ['type' => 2];
 check('non-super admin preview refused', P::context($c) === null);
+// --- change password from the sign-in page
+$cp = fn(array $p) => $call('customer_change_password', $p);
+$base = ['email' => 'alpha@example.com', 'current' => 'Passw0rd1', 'password' => 'NewPassw0rd2', 'confirm_password' => 'NewPassw0rd2'];
+check('change: wrong current password refused', ($cp(array_merge($base, ['current' => 'nope']))['status'] ?? '') === 'failed');
+check('change: unknown email refused (same message as wrong password)', ($cp(array_merge($base, ['email' => 'ghost@example.com']))['msg'] ?? '') === ($cp(array_merge($base, ['current' => 'nope']))['msg'] ?? 'x'));
+check('change: mismatched confirmation refused', ($cp(array_merge($base, ['confirm_password' => 'Other12345']))['status'] ?? '') === 'failed');
+check('change: weak new password refused', ($cp(array_merge($base, ['password' => 'short1', 'confirm_password' => 'short1']))['status'] ?? '') === 'failed');
+check('change: same password refused', ($cp(array_merge($base, ['password' => 'Passw0rd1', 'confirm_password' => 'Passw0rd1']))['status'] ?? '') === 'failed');
+check('change: nothing changed by refusals', password_verify('Passw0rd1', $row(1)['password']));
+$_SESSION = [];
+check('change: succeeds with the right current password', ($cp($base)['status'] ?? '') === 'success');
+check('change: new password works, old one does not', password_verify('NewPassw0rd2', $row(1)['password']) && !password_verify('Passw0rd1', $row(1)['password']));
+check('change: does not sign anyone in', empty($_SESSION['customer_portal']));
+check('change: signing in with the new password works', ($call('customer_login', ['email' => 'alpha@example.com', 'password' => 'NewPassw0rd2'])['status'] ?? '') === 'success');
+check('change: an inactive (not yet activated) account cannot use it', ($cp(array_merge($base, ['email' => "o'brien@example.com"]))['status'] ?? '') === 'failed');
+check('change: the change is logged', (int)$c->query("SELECT COUNT(*) FROM customer_portal_logs WHERE action='password_changed'")->fetch_row()[0] === 1);
+$c->query("DELETE FROM auth_attempts");
+for ($i = 0; $i < 12; $i++) { $cp(array_merge($base, ['current' => 'bad' . $i, 'email' => 'alpha@example.com'])); }
+check('change: repeated wrong attempts are locked out like sign-in', ($cp(array_merge($base, ['current' => 'NewPassw0rd2', 'password' => 'Another3Pass', 'confirm_password' => 'Another3Pass']))['status'] ?? '') === 'locked');
 nv_done();

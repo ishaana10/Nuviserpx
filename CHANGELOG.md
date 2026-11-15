@@ -12,6 +12,9 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
 
 ## [Unreleased] - 2026-11-16 (2)
 
+### Added
+- **Change password link on the customer sign-in page.** A new page lets a customer change their portal password by entering their email, current password and a new one (at least 8 characters with letters and numbers, different from the current one). It does not sign them in, is rate-limited like sign-in, and is recorded in the portal activity log.
+
 ### Changed
 - **Portals show the NuvisERPX logo when the company has none.** The customer and employee portals (sign-in, activation, headers, invoice view) show the company's own logo, and fall back to the NuvisERPX logo instead of a generic placeholder or nothing. The portal headers now show the logo too.
 
