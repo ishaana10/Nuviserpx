@@ -36,6 +36,7 @@ $bills = $conn->query("SELECT * FROM `vendor_bill_list` WHERE purchase_order_id 
 			<?php if($po['status'] != 'cancelled'): ?>
 			<a href="./?page=purchases/manage_bill&po_id=<?php echo $id ?>" class="btn btn-sm btn-primary bg-navy btn-flat"><i class="fas fa-file-invoice-dollar"></i> Create Bill</a>
 			<?php endif; ?>
+			<a href="<?php echo base_url ?>admin/purchases/po_pdf.php?id=<?php echo $id ?>&download=1" class="btn btn-sm btn-danger btn-flat"><i class="fas fa-file-pdf"></i> Download PDF</a>
 			<a href="./?page=purchases" class="btn btn-sm btn-default btn-flat"><i class="fas fa-arrow-left"></i> Back</a>
 		</div>
 	</div>
