@@ -71,6 +71,7 @@
 				                  </button>
 				                  <div class="dropdown-menu" role="menu">
 				                    <a class="dropdown-item" href="./?page=purchases/view&id=<?php echo $row['id'] ?>"><span class="fa fa-eye text-info"></span> View PO</a>
+				                    <a class="dropdown-item" href="<?php echo base_url ?>admin/purchases/po_pdf.php?id=<?php echo $row['id'] ?>&download=1"><span class="fa fa-file-pdf text-danger"></span> Download PDF</a>
 				                    <?php if(!in_array($row['status'], ['received','billed','cancelled'])): ?>
 				                    <a class="dropdown-item" href="./?page=purchases/receive&id=<?php echo $row['id'] ?>"><span class="fa fa-truck-loading text-success"></span> Receive Goods</a>
 				                    <a class="dropdown-item" href="./?page=purchases/manage_po&id=<?php echo $row['id'] ?>"><span class="fa fa-edit text-primary"></span> Edit</a>

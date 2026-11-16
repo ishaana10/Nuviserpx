@@ -171,6 +171,31 @@ class PurchaseService
         ]);
     }
 
+    /** The purchase order as a PDF for the signed-in company (name and bytes), or null if it is not theirs. */
+    public function pdf(int $id): ?array
+    {
+        $t = (int)$this->settings->active_tenant_id();
+        $stmt = $this->conn->prepare("SELECT po.*, p.name vendor_name, p.party_code vendor_code, p.email vendor_email, p.phone vendor_phone, p.address vendor_address
+            FROM `purchase_order_list` po INNER JOIN `party_list` p ON p.id = po.vendor_id AND p.tenant_id = po.tenant_id
+            WHERE po.id = ? AND po.tenant_id = ?");
+        $stmt->bind_param('ii', $id, $t);
+        $stmt->execute();
+        $po = $stmt->get_result()->fetch_assoc();
+        if (!$po) {
+            return null;
+        }
+        $items = $this->conn->prepare("SELECT * FROM `purchase_order_items` WHERE purchase_order_id = ? ORDER BY id");
+        $items->bind_param('i', $id);
+        $items->execute();
+        try {
+            return ['name' => \App\Support\PurchaseOrderPdf::filename((string)$po['po_no']),
+                'data' => \App\Support\PurchaseOrderPdf::render($po, $items->get_result()->fetch_all(MYSQLI_ASSOC), $this->settings->tenant_branding(), (string)$this->settings->base_currency($t))];
+        } catch (\Throwable $e) {
+            error_log('[purchase-order-pdf] ' . $e->getMessage());
+            return null;
+        }
+    }
+
     public function deletePurchaseOrder(int $id): string
     {
         $tenant_id = $this->settings->active_tenant_id();
