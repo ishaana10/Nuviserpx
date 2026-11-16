@@ -14,6 +14,7 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
 ## [Unreleased] - 2026-11-16 (2)
 
 ### Added
+- **Purchase forms: add a vendor or item without leaving the page.** On purchase orders, vendor bills and supplier payments the vendor box is now a search-and-add combo, and each line uses a single item combo (pick from the catalogue, create a new item, or type a one-off item) instead of a dropdown plus a name box. New vendors and items are saved to your company and appear in the lists straight away with no refresh. The vendor and item codes number themselves, and purchase orders and bills now refuse products or purchase orders that belong to another company.
 - **Forgot password link on the customer sign-in page.** Customers enter their email and are sent a one-hour link to choose a new password. The reply is the same whether or not the email has an account, only active portal accounts get a link, each link works once, and requests and resets are rate-limited and recorded in the portal activity log. Resetting does not sign the customer in.
 
 ### Changed

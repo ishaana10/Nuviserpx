@@ -127,7 +127,7 @@ class PurchaseService
                 $i_name = $this->conn->real_escape_string((string)$v2);
                 if (empty($i_name)) continue;
 
-                $p_id = isset($product_id[$k]) && $product_id[$k] !== '' ? (int)$product_id[$k] : 'NULL';
+                $p_id = $this->ownProductId($product_id[$k] ?? null, (int)$tenant_id);
                 $i_desc = isset($item_desc[$k]) ? $this->conn->real_escape_string((string)$item_desc[$k]) : '';
                 $i_qty = isset($item_qty[$k]) ? (float)$item_qty[$k] : 1.0;
                 $i_price = isset($item_price[$k]) ? (float)$item_price[$k] : 0.0;
@@ -412,6 +412,9 @@ class PurchaseService
         $bill_no = $bill_no !== '' ? $this->conn->real_escape_string($bill_no) : $this->nextNumber('vendor_bill_list', 'bill_no', 'BILL', (int)$tenant_id);
         $vendor_ref = isset($vendor_ref) ? $this->conn->real_escape_string((string)$vendor_ref) : '';
         $po_id = !empty($purchase_order_id) ? (int)$purchase_order_id : 'NULL';
+        if (is_int($po_id) && !$this->conn->query("SELECT 1 FROM `purchase_order_list` WHERE id = {$po_id} AND tenant_id = " . (int)$tenant_id)->num_rows) {
+            $po_id = 'NULL'; // another company's order (or none): never link a bill to it
+        }
         $vendor_id = $this->conn->real_escape_string((string)($vendor_id ?? 0));
         $bill_date = !empty($bill_date) ? $this->conn->real_escape_string((string)$bill_date) : date('Y-m-d');
         $due_date = !empty($due_date) ? $this->conn->real_escape_string((string)$due_date) : date('Y-m-d', strtotime('+30 days'));
@@ -595,7 +598,7 @@ class PurchaseService
             foreach ($item_name as $k => $v2) {
                 $i_name = $this->conn->real_escape_string((string)$v2);
                 if (empty($i_name)) continue;
-                $p_id = isset($product_id[$k]) && $product_id[$k] !== '' ? (int)$product_id[$k] : 'NULL';
+                $p_id = $this->ownProductId($product_id[$k] ?? null, (int)$tenant_id);
                 $i_desc = isset($item_desc[$k]) ? $this->conn->real_escape_string((string)$item_desc[$k]) : '';
                 $i_qty = isset($item_qty[$k]) ? (float)$item_qty[$k] : 1.0;
                 $i_price = isset($item_price[$k]) ? (float)$item_price[$k] : 0.0;
@@ -799,6 +802,21 @@ class PurchaseService
     }
 
     /** Net value of the bill lines that buy stock products (this company's products only). */
+    /**
+     * The catalogue product a line points at, or 'NULL' for a one-off line. The item combo posts a plain id for a
+     * catalogue item and "custom:Name" for a typed one; an id that is not this company's product is dropped too,
+     * so a line can never reference another tenant's product.
+     */
+    private function ownProductId($raw, int $tenantId)
+    {
+        if (!is_scalar($raw) || !ctype_digit((string)$raw) || (int)$raw <= 0) {
+            return 'NULL';
+        }
+        $id = (int)$raw;
+        $r = $this->conn->query("SELECT 1 FROM `product_list` WHERE id = {$id} AND tenant_id = " . (int)$tenantId . " AND delete_flag = 0 LIMIT 1");
+        return ($r && $r->num_rows) ? $id : 'NULL';
+    }
+
     private function stockNet(array $post, InventoryAccountingService $inv): float
     {
         $rows = [];

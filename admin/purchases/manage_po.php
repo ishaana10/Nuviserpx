@@ -126,19 +126,13 @@ if($wh_q){
 						?>
 						<tr>
 							<td>
-								<select name="product_id[]" class="form-control form-control-sm rounded-0 product-select">
-									<option value="">Custom Item</option>
-									<?php foreach($products_data as $pid => $prod): ?>
-									<option value="<?= $pid ?>"
-										data-price="<?= $prod['cost_price'] ?>"
-										data-name="<?= htmlspecialchars($prod['name']) ?>"
-										data-desc="<?= htmlspecialchars($prod['description'] ?? '') ?>"
-										<?= $item['product_id'] == $pid ? 'selected' : '' ?>>
-										<?= $prod['product_code'] ?> - <?= $prod['name'] ?> (Stock: <?= $prod['stock_quantity'] ?>)
-									</option>
-									<?php endforeach; ?>
+								<select name="product_id[]" class="form-control form-control-sm rounded-0 product-select nv-item-select" required>
+									<option value=""></option>
+									<?php if(!empty($item['product_id']) && isset($products_data[$item['product_id']])): $pp = $products_data[$item['product_id']]; ?>
+									<option value="<?= (int)$item['product_id'] ?>" data-price="<?= $pp['cost_price'] ?>" data-name="<?= htmlspecialchars($pp['name']) ?>" data-desc="<?= htmlspecialchars($pp['description'] ?? '') ?>" selected><?= htmlspecialchars($pp['product_code'] . ' - ' . $pp['name']) ?></option>
+									<?php endif; ?>
 								</select>
-								<input type="text" name="item_name[]" class="form-control form-control-sm rounded-0 mt-1 item-name" value="<?= htmlspecialchars($item['item_name']) ?>" placeholder="Item Name" required>
+								<input type="text" name="item_name[]" class="form-control form-control-sm rounded-0 mt-1 item-name" value="<?= htmlspecialchars($item['item_name']) ?>" placeholder="Item Name">
 								<input type="hidden" name="item_desc[]" class="item-desc" value="<?= htmlspecialchars($item['description'] ?? '') ?>">
 							</td>
 							<td><input type="number" step="any" name="item_qty[]" class="form-control form-control-sm rounded-0 text-center calc-item qty" value="<?= $item['qty'] ?>" required></td>
@@ -190,6 +184,7 @@ if($wh_q){
 	</div>
 </div>
 
+<?php include __DIR__ . '/_quick_add.php'; ?>
 <script>
 	function calculate_po_totals(){
 		var subtotal = 0, total_tax = 0;
@@ -210,26 +205,14 @@ if($wh_q){
 	}
 
 	$(document).ready(function(){
-		$('.select2').select2({ placeholder:"Select vendor", width:'100%' });
-
-		$(document).on('change', '.product-select', function(){
-			var option = $(this).find(':selected');
-			var row = $(this).closest('tr');
-			var price = option.attr('data-price');
-			var name = option.attr('data-name');
-			var desc = option.attr('data-desc');
-			if(price){ row.find('.price').val(parseFloat(price).toFixed(2)); }
-			if(name){ row.find('.item-name').val(name); }
-			if(desc){ row.find('.item-desc').val(desc); }
-			calculate_po_totals();
-		});
+		NvQuick.vendor($('#vendor_id'));
+		NvQuick.item($('#items-table .nv-item-select'));
 
 		$('#add_item_row').click(function(){
-			var first_select_options = $('.product-select').first().html();
-			var row = `<tr>
+			var tr = $(`<tr>
 				<td>
-					<select name="product_id[]" class="form-control form-control-sm rounded-0 product-select">${first_select_options}</select>
-					<input type="text" name="item_name[]" class="form-control form-control-sm rounded-0 mt-1 item-name" placeholder="Item Name" required>
+					<select name="product_id[]" class="form-control form-control-sm rounded-0 product-select nv-item-select" required><option value=""></option></select>
+					<input type="text" name="item_name[]" class="form-control form-control-sm rounded-0 mt-1 item-name" placeholder="Item Name">
 					<input type="hidden" name="item_desc[]" class="item-desc" value="">
 				</td>
 				<td><input type="number" step="any" name="item_qty[]" class="form-control form-control-sm rounded-0 text-center calc-item qty" value="1" required></td>
@@ -237,8 +220,9 @@ if($wh_q){
 				<td><input type="number" step="any" name="item_tax_rate[]" class="form-control form-control-sm rounded-0 text-center calc-item tax_rate" value="15.00"></td>
 				<td><input type="number" step="any" name="item_amount[]" class="form-control form-control-sm rounded-0 text-right amount bg-light" value="0.00" readonly></td>
 				<td class="text-center align-middle"><button type="button" class="btn btn-xs btn-danger remove_row"><i class="fas fa-trash"></i></button></td>
-			</tr>`;
-			$('#items-table tbody').append(row);
+			</tr>`);
+			$('#items-table tbody').append(tr);
+			NvQuick.item(tr.find('.nv-item-select'));
 		});
 
 		$(document).on('click', '.remove_row', function(){
