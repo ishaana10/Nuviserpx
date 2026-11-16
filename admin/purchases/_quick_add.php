@@ -94,6 +94,11 @@ window.NvQuick = (function () {
     function hasOption($sel, value) {
         return $sel.find('option').filter(function () { return String(this.value) === String(value); }).length > 0;
     }
+    /** Add an option to a combo, keeping the "+ Add/Create new…" entry last so Enter on an empty search never opens it. */
+    function addOption($sel, $opt, marker) {
+        var m = $sel.find('option').filter(function () { return String(this.value) === marker; });
+        if (m.length) { $opt.insertBefore(m.first()); } else { $sel.append($opt); }
+    }
     function post(action, data, done) {
         $.ajax({ url: _base_url_ + 'classes/Master.php?f=' + action, method: 'POST', data: data, dataType: 'json',
             error: function () { alert_toast('An error occurred.', 'error'); done(null); },
@@ -104,7 +109,7 @@ window.NvQuick = (function () {
     function vendor($sel) {
         $sel.addClass('nv-vendor-select').data('prev', $sel.val() || '');
         if (canVendor && !hasOption($sel, NEW_V)) {
-            $sel.find('option').first().after($('<option>').val(NEW_V).text('+ Add new vendor…'));
+            $sel.append($('<option>').val(NEW_V).text('+ Add new vendor…'));
         }
         $sel.select2({
             width: '100%',
@@ -133,7 +138,7 @@ window.NvQuick = (function () {
             openVendor(name, function (v) {
                 $('.nv-vendor-select').each(function () {
                     var s = $(this);
-                    if (!hasOption(s, v.id)) { s.append($('<option>').val(v.id).text(v.label)); }
+                    if (!hasOption(s, v.id)) { addOption(s, $('<option>').val(v.id).text(v.label), NEW_V); }
                 });
                 $sel.val(String(v.id)).trigger('change');
             });
@@ -158,10 +163,10 @@ window.NvQuick = (function () {
             var tr = $sel.closest('tr'), nameInp = tr.find('.item-name');
             $sel.addClass('nv-item-select');
             if (!$sel.find('option[value=""]').length) { $sel.prepend('<option value=""></option>'); }
-            if (canItem && !hasOption($sel, NEW_I)) {
-                $sel.find('option[value=""]').first().after($('<option>').val(NEW_I).text('+ Create new item…'));
-            }
             items.forEach(function (it) { if (!hasOption($sel, it.id)) { $sel.append(mkOption(it)); } });
+            if (canItem && !hasOption($sel, NEW_I)) {
+                $sel.append($('<option>').val(NEW_I).text('+ Create new item…'));
+            }
             var nm = $.trim(nameInp.val());
             if (!$sel.val() && nm) { $sel.append(new Option(nm, 'custom:' + nm, true, true)); }
             nameInp.addClass('d-none').prop('required', false);   // kept in the form, filled from the combo
@@ -235,7 +240,7 @@ window.NvQuick = (function () {
                     alert_toast('Item added.', 'success');
                     var it = { id: String(r.id), text: r.product_code + ' - ' + r.name, price: cost.toFixed(2), name: r.name, desc: desc };
                     items.push(it);
-                    $('.nv-item-select').each(function () { if (!hasOption($(this), it.id)) { $(this).append(mkOption(it)); } });
+                    $('.nv-item-select').each(function () { if (!hasOption($(this), it.id)) { addOption($(this), mkOption(it), NEW_I); } });
                     if (itemRow) { itemRow.find('.nv-item-select').val(it.id).trigger('change'); }
                 } else if (r) { alert_toast(r.msg || 'Could not save the item.', 'error'); }
             });
