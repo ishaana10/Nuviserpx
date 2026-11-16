@@ -117,15 +117,13 @@ while($p = $products_qry->fetch_assoc()){ $products_data[$p['id']] = $p; }
 						<?php foreach($prefill_items as $item): ?>
 						<tr>
 							<td>
-								<select name="product_id[]" class="form-control form-control-sm rounded-0 product-select">
-									<option value="">Custom Item</option>
-									<?php foreach($products_data as $pid => $prod): ?>
-									<option value="<?= $pid ?>" data-price="<?= $prod['cost_price'] ?>" data-name="<?= htmlspecialchars($prod['name']) ?>" data-desc="<?= htmlspecialchars($prod['description'] ?? '') ?>" <?= $item['product_id'] == $pid ? 'selected' : '' ?>>
-										<?= $prod['product_code'] ?> - <?= $prod['name'] ?>
-									</option>
-									<?php endforeach; ?>
+								<select name="product_id[]" class="form-control form-control-sm rounded-0 product-select nv-item-select" required>
+									<option value=""></option>
+									<?php if(!empty($item['product_id']) && isset($products_data[$item['product_id']])): $pp = $products_data[$item['product_id']]; ?>
+									<option value="<?= (int)$item['product_id'] ?>" data-price="<?= $pp['cost_price'] ?>" data-name="<?= htmlspecialchars($pp['name']) ?>" data-desc="<?= htmlspecialchars($pp['description'] ?? '') ?>" selected><?= htmlspecialchars($pp['product_code'] . ' - ' . $pp['name']) ?></option>
+									<?php endif; ?>
 								</select>
-								<input type="text" name="item_name[]" class="form-control form-control-sm rounded-0 mt-1 item-name" value="<?= htmlspecialchars($item['item_name']) ?>" placeholder="Item Name" required>
+								<input type="text" name="item_name[]" class="form-control form-control-sm rounded-0 mt-1 item-name" value="<?= htmlspecialchars($item['item_name']) ?>" placeholder="Item Name">
 								<input type="hidden" name="item_desc[]" class="item-desc" value="<?= htmlspecialchars($item['description'] ?? '') ?>">
 							</td>
 							<td><input type="number" step="any" name="item_qty[]" class="form-control form-control-sm rounded-0 text-center calc-item qty" value="<?= $item['qty'] ?>" required></td>
@@ -164,6 +162,7 @@ while($p = $products_qry->fetch_assoc()){ $products_data[$p['id']] = $p; }
 		</form>
 	</div>
 </div>
+<?php include __DIR__ . '/_quick_add.php'; ?>
 <script>
 	function calculate_bill_totals(){
 		var subtotal = 0, total_tax = 0;
@@ -182,25 +181,20 @@ while($p = $products_qry->fetch_assoc()){ $products_data[$p['id']] = $p; }
 		$('#total').val(((subtotal + total_tax) - discount).toFixed(2));
 	}
 	$(document).ready(function(){
-		$('.select2').select2({ placeholder:"Select vendor", width:'100%' });
-		$(document).on('change', '.product-select', function(){
-			var o = $(this).find(':selected'), row = $(this).closest('tr');
-			if(o.attr('data-price')) row.find('.price').val(parseFloat(o.attr('data-price')).toFixed(2));
-			if(o.attr('data-name')) row.find('.item-name').val(o.attr('data-name'));
-			if(o.attr('data-desc')) row.find('.item-desc').val(o.attr('data-desc'));
-			calculate_bill_totals();
-		});
+		NvQuick.vendor($('#vendor_id'));
+		NvQuick.item($('#items-table .nv-item-select'));
 		$('#add_item_row').click(function(){
-			var opts = $('.product-select').first().html();
-			$('#items-table tbody').append(`<tr>
-				<td><select name="product_id[]" class="form-control form-control-sm rounded-0 product-select">${opts}</select>
-				<input type="text" name="item_name[]" class="form-control form-control-sm rounded-0 mt-1 item-name" placeholder="Item Name" required>
+			var tr = $(`<tr>
+				<td><select name="product_id[]" class="form-control form-control-sm rounded-0 product-select nv-item-select" required><option value=""></option></select>
+				<input type="text" name="item_name[]" class="form-control form-control-sm rounded-0 mt-1 item-name" placeholder="Item Name">
 				<input type="hidden" name="item_desc[]" class="item-desc" value=""></td>
 				<td><input type="number" step="any" name="item_qty[]" class="form-control form-control-sm rounded-0 text-center calc-item qty" value="1" required></td>
 				<td><input type="number" step="any" name="item_price[]" class="form-control form-control-sm rounded-0 text-right calc-item price" value="0.00" required></td>
 				<td><input type="number" step="any" name="item_tax_rate[]" class="form-control form-control-sm rounded-0 text-center calc-item tax_rate" value="<?= $default_tax_rate ?>"></td>
 				<td><input type="number" step="any" name="item_amount[]" class="form-control form-control-sm rounded-0 text-right amount bg-light" value="0.00" readonly></td>
 				<td class="text-center align-middle"><button type="button" class="btn btn-xs btn-danger remove_row"><i class="fas fa-trash"></i></button></td></tr>`);
+			$('#items-table tbody').append(tr);
+			NvQuick.item(tr.find('.nv-item-select'));
 		});
 		$(document).on('click', '.remove_row', function(){
 			if($('#items-table tbody tr').length > 1){ $(this).closest('tr').remove(); calculate_bill_totals(); }

@@ -77,8 +77,10 @@ $preset_vendor = (int)($_GET['vendor_id'] ?? 0);
         </div>
     </div>
 </div>
+<?php if ($can_pay) { include __DIR__ . '/_quick_add.php'; } ?>
 <script>
 $(function () {
+    if (window.NvQuick) { NvQuick.vendor($('#bp_vendor')); }
     function load() {
         var v = $('#bp_vendor').val();
         if (!v) { return; }

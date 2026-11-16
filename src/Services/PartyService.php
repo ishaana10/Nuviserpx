@@ -52,6 +52,10 @@ class PartyService
         $limitSql = $limit['value'] === null ? 'NULL' : "'" . number_format($limit['value'], 2, '.', '') . "'";
         $termsSql = $terms['value'] === null ? 'NULL' : (string)$terms['value'];
 
+        // Quick-add from a purchase form sends no code: number it automatically.
+        if ($party_code === '' && empty($id)) {
+            $party_code = $this->conn->real_escape_string(SequenceService::documentNo($this->conn, (int)$tenant_id, 'party_list', 'party_code', 'VEN-', 'party_code'));
+        }
         $check = $this->conn->query("SELECT * FROM `party_list` WHERE `party_code` = '{$party_code}' AND tenant_id = '{$tenant_id}' AND delete_flag = 0 " . (!empty($id) ? " AND id != '{$id}'" : ""))->num_rows;
         if ($check > 0) {
             return json_encode(['status' => 'failed', 'msg' => 'Party Code already exists.']);
@@ -93,6 +97,10 @@ class PartyService
         if ($save) {
             $this->auditSave(empty($id), $savedId, $before, $post);
             $resp['status'] = 'success';
+            $resp['id'] = $savedId;
+            $resp['party_code'] = stripslashes($party_code);
+            $resp['name'] = stripslashes($name);
+            $resp['type'] = stripslashes($type);
             $resp['msg'] = empty($id) ? " Party successfully created." : " Party details updated successfully.";
             $this->settings->set_flashdata('success', $resp['msg']);
         } else {

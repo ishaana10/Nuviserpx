@@ -42,6 +42,10 @@ class InventoryService
         $status = isset($status) ? (int)$status : 1;
         $track_batches = !empty($post['track_batches']) ? 1 : 0;
 
+        // Quick-add from a purchase form sends no code: number it automatically.
+        if ($product_code === '' && empty($id)) {
+            $product_code = $this->conn->real_escape_string(SequenceService::documentNo($this->conn, (int)$tenant_id, 'product_list', 'product_code', 'ITEM-', 'product_code'));
+        }
         $check = $this->conn->query("SELECT * FROM `product_list` WHERE `product_code` = '{$product_code}' AND tenant_id = '{$tenant_id}' AND delete_flag = 0 " . (!empty($id) ? " AND id != '{$id}'" : ""))->num_rows;
         if ($check > 0) {
             return json_encode(['status' => 'failed', 'msg' => 'Product Code already exists.']);
@@ -107,6 +111,8 @@ class InventoryService
             }
             $resp['status'] = 'success';
             $resp['id'] = (int)(empty($id) ? $product_id : $id);
+            $resp['product_code'] = stripslashes($product_code);
+            $resp['name'] = stripslashes($name);
             $resp['msg'] = (empty($id) ? " Product added successfully." : " Product details updated successfully.") . ($openingWarning ?? '');
             $this->settings->set_flashdata('success', $resp['msg']);
         } else {
