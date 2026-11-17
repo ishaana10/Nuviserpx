@@ -10,7 +10,7 @@ namespace App\Support;
  */
 final class PortalBranding
 {
-    public const DEFAULT_LOGO = 'dist/img/nuviserpx-logo.svg';
+    public const DEFAULT_LOGO = 'dist/img/nuviserpx-logo.png';
 
     /**
      * Pure: the first of the candidate logo paths that points at a real image file, else the default.

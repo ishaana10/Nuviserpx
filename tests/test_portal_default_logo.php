@@ -7,7 +7,7 @@ $fail = 0;
 function check($n, $c) { global $fail; echo ($c ? 'PASS' : 'FAIL') . " - $n\n"; if (!$c) { $fail++; } }
 $has = fn(array $files) => fn(string $p) => in_array($p, $files, true);
 
-check('default logo file ships with the app', is_file(base_app . B::DEFAULT_LOGO) && strpos((string)file_get_contents(base_app . B::DEFAULT_LOGO), '<svg') !== false);
+check('default logo file ships with the app', is_file(base_app . B::DEFAULT_LOGO) && strncmp((string)file_get_contents(base_app . B::DEFAULT_LOGO), "\x89PNG", 4) === 0);
 check('no logo set: NuvisERPX logo', B::pick([null, null], $has([])) === B::DEFAULT_LOGO);
 check('empty strings: NuvisERPX logo', B::pick(['', '  '], $has([])) === B::DEFAULT_LOGO);
 check("company logo is used when the file exists", B::pick(['uploads/tenants/1.png', null], $has(['uploads/tenants/1.png'])) === 'uploads/tenants/1.png');
