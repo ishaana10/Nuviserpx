@@ -25,6 +25,12 @@ if(isset($_GET['id']) && is_numeric($_GET['id'])){
 			<label for="tenant_code" class="control-label">Tenant Code</label>
 			<input type="text" name="tenant_code" id="tenant_code" class="form-control form-control-sm rounded-0" value="<?php echo isset($tenant_code) ? $tenant_code : 'TNT-'.sprintf('%03d', rand(1, 999)); ?>" required/>
 		</div>
+		<?php if(!isset($id) || $id === ''): ?>
+		<div class="custom-control custom-checkbox mb-3">
+			<input type="checkbox" class="custom-control-input" name="create_invoice" id="create_invoice" value="1">
+			<label class="custom-control-label" for="create_invoice">Raise an invoice for this tenant after saving</label>
+		</div>
+		<?php endif; ?>
 		<div class="form-group">
 			<label for="name" class="control-label">Company / Tenant Name</label>
 			<input type="text" name="name" id="name" class="form-control form-control-sm rounded-0" value="<?php echo isset($name) ? $name : ''; ?>" required/>
@@ -118,6 +124,10 @@ if(isset($_GET['id']) && is_numeric($_GET['id'])){
 				},
 				success:function(resp){
 					if(typeof resp =='object' && resp.status == 'success'){
+						if($('#create_invoice').is(':checked') && resp.tenant_id){
+							location.href = _base_url_+'admin/?page=developer/platform_invoices&new_for='+resp.tenant_id;
+							return;
+						}
 						location.reload()
 					}else if(resp.status == 'failed' && !!resp.msg){
                         var el = $('<div>')

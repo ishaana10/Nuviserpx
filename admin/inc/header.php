@@ -44,6 +44,8 @@
     <link rel="stylesheet" href="<?php echo base_url ?>dist/css/nuvis-theme.css?v=<?php echo $assetVer ?>">
     <script>
       window.NUVIS_UID = <?php echo (int)($_SESSION['userdata']['id'] ?? 0) ?>;
+      window.NUVIS_PING = <?php echo json_encode(base_url . 'admin/session_ping.php') ?>;
+      window.NUVIS_LOGIN = <?php echo json_encode(base_url . 'admin/login.php') ?>;
       window.NUVIS_UI = <?php echo json_encode($__ui, JSON_HEX_TAG | JSON_HEX_AMP) ?>;
       // Settle "auto" before first paint so there is no flash of the wrong colour scheme.
       (function(){ var r = document.documentElement;

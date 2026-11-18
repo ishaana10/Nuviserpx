@@ -14,6 +14,7 @@
     </script>
     <!-- Bootstrap 4 -->
     <script src="<?php echo base_url ?>plugins/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="<?php echo base_url ?>dist/js/nuvis-session.js?v=<?php echo $assetVer ?? 1 ?>"></script>
     <!-- ChartJS -->
     <script src="<?php echo base_url ?>plugins/chart.js/Chart.min.js"></script>
     <!-- Sparkline -->

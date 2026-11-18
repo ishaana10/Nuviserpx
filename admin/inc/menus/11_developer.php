@@ -29,6 +29,12 @@
                                         </a>
                                     </li>
                                     <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=developer/platform_invoices" class="nav-link nav-developer_platform_invoices tree-item">
+                                            <i class="nav-icon fas fa-file-invoice-dollar text-success"></i>
+                                            <p>Tenant Invoices</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=developer/customer_requests" class="nav-link nav-developer_customer_requests tree-item">
                                             <i class="nav-icon fas fa-inbox text-warning"></i>
                                             <p>Customer Requests</p>

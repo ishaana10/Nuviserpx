@@ -11,6 +11,12 @@
                                 </a>
                                 <ul class="nav nav-treeview">
                                     <li class="nav-item">
+                                        <a href="<?php echo base_url ?>admin/?page=billing/my_plan" class="nav-link nav-billing_my_plan tree-item">
+                                            <i class="fas fa-id-card nav-icon"></i>
+                                            <p>My Plan &amp; Billing</p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=templates/manage_template" class="nav-link nav-templates_manage_template tree-item">
                                             <i class="fas fa-file-invoice nav-icon"></i>
                                             <p>Invoice Templates</p>
