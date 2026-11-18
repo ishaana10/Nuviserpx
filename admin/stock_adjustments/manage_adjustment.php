@@ -12,7 +12,7 @@ $preset_product_id = isset($_GET['product_id']) ? intval($_GET['product_id']) : 
 			<select name="product_id" id="product_id" class="form-control form-control-sm rounded-0 select2" required>
 				<option value="" disabled <?php echo empty($preset_product_id) ? 'selected' : '' ?>></option>
 				<?php
-				$products = $conn->query("SELECT * FROM `product_list` WHERE tenant_id = '{$tenant_id}' AND delete_flag = 0 ORDER BY name ASC");
+				$products = $conn->query("SELECT * FROM `product_list` WHERE tenant_id = '{$tenant_id}' AND delete_flag = 0 AND is_tracked = 1 ORDER BY name ASC");
 				while($p = $products->fetch_assoc()):
 				?>
 				<option value="<?php echo $p['id'] ?>" data-stock="<?php echo $p['stock_quantity'] ?>" data-cost="<?php echo $p['cost_price'] ?>" <?php echo $preset_product_id == $p['id'] ? 'selected' : '' ?>>

@@ -399,6 +399,41 @@ class InventoryAccountingService
      * =================================================================== */
 
     /**
+     * Which of these products are not stock: services and other items with "track inventory" off.
+     *
+     * @param  int[] $ids
+     * @return int[]
+     */
+    public function untrackedIds(array $ids): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids))));
+        if (!$ids) {
+            return [];
+        }
+        $t = $this->tenantId();
+        $res = $this->conn->query("SELECT id FROM product_list WHERE tenant_id = {$t} AND is_tracked = 0 AND id IN (" . implode(',', $ids) . ")");
+        $out = [];
+        while ($res && ($r = $res->fetch_assoc())) {
+            $out[] = (int)$r['id'];
+        }
+        return $out;
+    }
+
+    /**
+     * Drop the services from a list keyed by product id, so only stock is counted, issued or valued.
+     *
+     * @param  array<int,mixed> $byProduct
+     * @return array<int,mixed>
+     */
+    public function stockOnly(array $byProduct): array
+    {
+        foreach ($this->untrackedIds(array_keys($byProduct)) as $id) {
+            unset($byProduct[$id]);
+        }
+        return $byProduct;
+    }
+
+    /**
      * Products by id: name, on-hand total and average cost.
      *
      * @param  int[] $ids
@@ -435,6 +470,7 @@ class InventoryAccountingService
     /** Same check, whether or not inventory accounting is on: units can never go below zero. */
     public function shortageMessage(array $need, array $returning = []): ?string
     {
+        $need = $this->stockOnly($need);
         if (!$need) {
             return null;
         }
@@ -459,6 +495,7 @@ class InventoryAccountingService
     public function issue(array $need, string $date, string $reference, int $warehouseId = 0): array
     {
         $none = ['ok' => true, 'msg' => '', 'journal_id' => 0, 'costs' => []];
+        $need = $this->stockOnly($need);
         if (!$this->isEnabled() || !$need) {
             return $none;
         }
@@ -522,6 +559,7 @@ class InventoryAccountingService
      */
     public function issueUnits(array $need, string $reference, int $warehouseId, string $note): array
     {
+        $need = $this->stockOnly($need);
         if (!$need) {
             return ['ok' => true, 'msg' => '', 'costs' => []];
         }
@@ -746,7 +784,7 @@ class InventoryAccountingService
     public function valueChange(int $productId, float $deltaQty, ?float $incomingCost, string $date, string $reference): array
     {
         $none = ['ok' => true, 'msg' => '', 'journal_id' => 0, 'unit_cost' => 0.0];
-        if (!$this->isEnabled() || $deltaQty == 0.0) {
+        if (!$this->isEnabled() || $deltaQty == 0.0 || $this->untrackedIds([$productId])) {
             return $none;
         }
         $c = $this->config();
@@ -790,7 +828,7 @@ class InventoryAccountingService
      */
     public function postOpeningStock(int $productId, float $qty, float $unitCost, string $reference): ?string
     {
-        if (!$this->isEnabled() || $qty <= 0 || $unitCost <= 0) {
+        if (!$this->isEnabled() || $qty <= 0 || $unitCost <= 0 || $this->untrackedIds([$productId])) {
             return null;
         }
         $c = $this->config();

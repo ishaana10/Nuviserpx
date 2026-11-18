@@ -184,8 +184,8 @@ class SystemSettings extends DBConnection{
 	function tenant_branding(){
 		if($this->branding_cache !== null) return $this->branding_cache;
 		$t = (int)$this->active_tenant_id();
-		$b = ['name' => '', 'email' => '', 'phone' => '', 'address' => '', 'logo' => ''];
-		$q = @$this->conn->query("SELECT name, email, phone, address, logo FROM `tenants` WHERE id = '{$t}'");
+		$b = ['name' => '', 'email' => '', 'phone' => '', 'address' => '', 'logo' => '', 'tin' => '', 'vat_no' => '', 'website' => '', 'bank_details' => ''];
+		$q = @$this->conn->query("SELECT * FROM `tenants` WHERE id = '{$t}'");
 		if($q && $q->num_rows){
 			$r = $q->fetch_assoc();
 			$b['name'] = (string)$r['name'];
@@ -193,6 +193,7 @@ class SystemSettings extends DBConnection{
 			$b['phone'] = (string)($r['phone'] ?? '');
 			$b['address'] = (string)($r['address'] ?? '');
 			$b['logo'] = (string)($r['logo'] ?? '');
+			foreach(['tin', 'vat_no', 'website', 'bank_details'] as $k){ $b[$k] = (string)($r[$k] ?? ''); }
 		}
 		if($b['logo'] === ''){
 			$q2 = @$this->conn->query("SELECT logo_path FROM `invoice_templates` WHERE tenant_id = '{$t}' LIMIT 1");

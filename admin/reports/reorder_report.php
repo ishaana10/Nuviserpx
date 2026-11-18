@@ -16,7 +16,7 @@ $include_out = ($_GET['include_out'] ?? '1') === '1'; // include out-of-stock (d
 $rows = [];
 $stmt = $conn->prepare("SELECT id, product_code, name, category, unit, stock_quantity, reorder_level, cost_price
     FROM product_list
-    WHERE tenant_id = ? AND delete_flag = 0 AND status = 1
+    WHERE tenant_id = ? AND delete_flag = 0 AND status = 1 AND is_tracked = 1
       AND reorder_level > 0 AND stock_quantity <= reorder_level
     ORDER BY (stock_quantity <= 0) DESC, (reorder_level - stock_quantity) DESC, name");
 if ($stmt) {

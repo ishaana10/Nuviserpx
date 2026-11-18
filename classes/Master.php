@@ -418,22 +418,6 @@ class Master extends DBConnection
         return $this->expenses()->saveCategory($_POST);
     }
 
-    public function save_module_settings()
-    {
-        $modules = ['mod_accounting', 'mod_fixed_assets', 'mod_sales_crm', 'mod_tickets', 'mod_contracts', 'mod_warehouses', 'mod_expense_reports', 'mod_payroll'];
-        foreach ($modules as $m) {
-            $val = isset($_POST[$m]) ? '1' : '0';
-            $check = $this->conn->query("SELECT id FROM `system_info` WHERE `meta_field` = '{$m}'");
-            if ($check && $check->num_rows > 0) {
-                $this->conn->query("UPDATE `system_info` SET `meta_value` = '{$val}' WHERE `meta_field` = '{$m}'");
-            } else {
-                $this->conn->query("INSERT INTO `system_info` (`meta_field`, `meta_value`) VALUES ('{$m}', '{$val}')");
-            }
-        }
-        $this->settings->log_audit("Updated Module Configuration", "System Settings", "Module toggles updated.");
-        return json_encode(['status' => 'success', 'msg' => 'Module configuration updated successfully.']);
-    }
-
     /* Dolibarr Inspired Custom Extrafields Methods */
     public function save_extrafield()
     {
@@ -1601,7 +1585,7 @@ $allowed_actions = [
     'cancel_stock_count', 'import_parties', 'import_products', 'import_accounts',
     'generate_contract_invoices', 'save_warehouse', 'transfer_stock', 'save_expense_claim',
     'approve_expense_claim', 'reject_expense_claim', 'cancel_expense_claim', 'void_expense_claim',
-    'reimburse_expense_claims', 'reverse_expense_reimbursement', 'save_expense_category', 'save_module_settings',
+    'reimburse_expense_claims', 'reverse_expense_reimbursement', 'save_expense_category',
     'save_extrafield', 'delete_extrafield', 'delete_accounts_bulk', 'archive_accounts_bulk',
     'change_tax_rate_bulk', 'save_currency', 'delete_currency', 'optimize_db',
     'save_shift_type', 'save_shift_assignment', 'save_salary_component', 'delete_salary_component',

@@ -8,7 +8,7 @@ while($w = $warehouses->fetch_assoc()){
     $wh_list[] = $w;
 }
 
-$products = $conn->query("SELECT id, product_code, name, stock_quantity FROM `product_list` WHERE tenant_id = '{$tenant_id}' AND delete_flag = 0 ORDER BY name ASC");
+$products = $conn->query("SELECT id, product_code, name, stock_quantity FROM `product_list` WHERE tenant_id = '{$tenant_id}' AND delete_flag = 0 AND is_tracked = 1 ORDER BY name ASC");
 ?>
 
 <div class="container-fluid">

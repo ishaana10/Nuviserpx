@@ -606,7 +606,6 @@ final class Permissions
         // Settings & configuration (tenant-admin: settings_manage)
         'save_currency'         => ['settings_manage'],
         'delete_currency'       => ['settings_manage'],
-        'save_module_settings'  => ['settings_manage'],
         'save_extrafield'       => ['settings_manage'],
         'delete_extrafield'     => ['settings_manage'],
         'save_tenant_vms_settings' => ['settings_manage'],

@@ -33,7 +33,7 @@ if (!isset($order_no)) {
 }
 
 // Preload active product catalog for fast product select
-$products_qry = $conn->query("SELECT * FROM `product_list` WHERE tenant_id = '{$tenant_id}' AND delete_flag = 0 AND status = 1 ORDER BY name ASC");
+$products_qry = $conn->query("SELECT * FROM `product_list` WHERE tenant_id = '{$tenant_id}' AND delete_flag = 0 AND status = 1 AND is_sold = 1 ORDER BY name ASC");
 $products_data = [];
 while($p = $products_qry->fetch_assoc()){
     $products_data[$p['id']] = $p;
@@ -261,6 +261,7 @@ while($p = $products_qry->fetch_assoc()){
             </div>
             <form id="form_quick_product">
                 <input type="hidden" name="id" id="item_modal_id" value="">
+                <input type="hidden" name="is_tracked" value="0"><input type="hidden" name="is_sold" value="0"><input type="hidden" name="is_purchased" value="0">
                 <div class="modal-body p-4">
                     <div class="row mb-3">
                         <div class="col-md-5 form-group">

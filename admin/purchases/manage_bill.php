@@ -45,7 +45,7 @@ if (empty($prefill_items)) {
     $prefill_items[] = ['product_id'=>null,'item_name'=>'','description'=>'','qty'=>1,'unit_price'=>'0.00','tax_rate'=>$default_tax_rate,'amount'=>'0.00'];
 }
 
-$products_qry = $conn->query("SELECT * FROM `product_list` WHERE tenant_id = '{$tenant_id}' AND delete_flag = 0 AND status = 1 ORDER BY name ASC");
+$products_qry = $conn->query("SELECT * FROM `product_list` WHERE tenant_id = '{$tenant_id}' AND delete_flag = 0 AND status = 1 AND is_purchased = 1 ORDER BY name ASC");
 $products_data = [];
 while($p = $products_qry->fetch_assoc()){ $products_data[$p['id']] = $p; }
 ?>

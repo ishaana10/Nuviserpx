@@ -59,12 +59,6 @@
                                         </a>
                                     </li>
                                     <li class="nav-item">
-                                        <a href="<?php echo base_url ?>admin/?page=system_info/modules" class="nav-link nav-system_info_modules tree-item">
-                                            <i class="nav-icon fas fa-th-large"></i>
-                                            <p>Modules Manager</p>
-                                        </a>
-                                    </li>
-                                    <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=settings/extrafields" class="nav-link nav-settings_extrafields tree-item">
                                             <i class="nav-icon fas fa-sliders-h"></i>
                                             <p>Custom Extrafields</p>

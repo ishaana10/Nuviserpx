@@ -848,8 +848,8 @@ class DashboardService
 
     private function w_kpi_low_stock(array $r): array
     {
-        $n = $this->sumOne("SELECT COUNT(*) FROM product_list WHERE tenant_id = ? AND delete_flag = 0 AND status = 1 AND stock_quantity <= reorder_level", 'i', $this->tenantId);
-        $out = $this->sumOne("SELECT COUNT(*) FROM product_list WHERE tenant_id = ? AND delete_flag = 0 AND status = 1 AND stock_quantity <= 0", 'i', $this->tenantId);
+        $n = $this->sumOne("SELECT COUNT(*) FROM product_list WHERE tenant_id = ? AND delete_flag = 0 AND status = 1 AND is_tracked = 1 AND stock_quantity <= reorder_level", 'i', $this->tenantId);
+        $out = $this->sumOne("SELECT COUNT(*) FROM product_list WHERE tenant_id = ? AND delete_flag = 0 AND status = 1 AND is_tracked = 1 AND stock_quantity <= 0", 'i', $this->tenantId);
         return $this->kpi($n, null, ['format' => 'number', 'sub' => $out > 0 ? (int)$out . ' out of stock' : 'None out of stock', 'subTone' => $out > 0 ? 'down' : 'up', 'link' => './?page=products']);
     }
 
@@ -875,7 +875,7 @@ class DashboardService
     {
         $rows = $this->rows(
             "SELECT id, product_code, name, stock_quantity, reorder_level, unit
-             FROM product_list WHERE tenant_id = ? AND delete_flag = 0 AND status = 1 AND stock_quantity <= reorder_level
+             FROM product_list WHERE tenant_id = ? AND delete_flag = 0 AND status = 1 AND is_tracked = 1 AND stock_quantity <= reorder_level
              ORDER BY (stock_quantity / NULLIF(reorder_level,0)) ASC, stock_quantity ASC LIMIT 8",
             'i', $this->tenantId
         );
