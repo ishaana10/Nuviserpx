@@ -128,9 +128,12 @@ class TenantService
                 }
                 if (isset($post['owner_submitted'])) {
                     // Exactly one company bills the others.
-                    $this->conn->query(empty($post['is_platform_owner'])
+                    $okOwner = PlatformBillingService::ensureSchema($this->conn) && $this->conn->query(empty($post['is_platform_owner'])
                         ? "UPDATE `tenants` SET `is_platform_owner` = 0 WHERE id = {$tid}"
                         : "UPDATE `tenants` SET `is_platform_owner` = (id = {$tid})");
+                    if (!$okOwner) {
+                        return json_encode(['status' => 'failed', 'msg' => 'Saved, but the billing setting could not be stored: the database needs the latest update. Run php bin/migrate.php on the server, then tick it again.']);
+                    }
                 }
                 $resp['status'] = 'success';
                 $resp['tenant_id'] = $tid;

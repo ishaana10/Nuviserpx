@@ -4,6 +4,7 @@ if(!$_settings->is_super_admin()){
     echo '<div class="alert alert-danger m-3">Only the developer can manage tenants.</div>';
     return;
 }
+\App\Services\PlatformBillingService::ensureSchema($conn);
 $assigned_modules = null; // null = no restriction recorded yet (all modules on)
 if(isset($_GET['id']) && is_numeric($_GET['id'])){
     $id_clean = intval($_GET['id']);

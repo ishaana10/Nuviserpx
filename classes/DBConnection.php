@@ -75,6 +75,11 @@ class DBConnection{
         $latest = \App\Database\MigrationRunner::latestFile($dir);
         $done = (new \App\Database\MigrationRunner($this->conn))->latestApplied();
         if ($latest !== null && ($done === null || strcmp($done, $latest) < 0)) {
+            // The developer must be able to reach the one page that applies the update, or a behind database could
+            // never be fixed from the browser. Only that page, and only for a signed-in super administrator.
+            if (basename((string)($_SERVER['SCRIPT_NAME'] ?? '')) === 'update_database.php' && (int)($_SESSION['userdata']['type'] ?? 0) === 1) {
+                return;
+            }
             error_log("[nuviserpx] Database is behind the code (applied: " . ($done ?? 'none') . ", needed: {$latest}). Run: php bin/migrate.php");
             if (!headers_sent()) {
                 http_response_code(503);

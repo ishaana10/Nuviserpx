@@ -35,6 +35,13 @@
                                         </a>
                                     </li>
                                     <li class="nav-item">
+                                        <?php $nv_mig_behind = false; try { $nv_ml = \App\Database\MigrationRunner::latestFile(base_app . 'database/migrations'); $nv_md = (new \App\Database\MigrationRunner($conn))->latestApplied(); $nv_mig_behind = $nv_ml !== null && ($nv_md === null || strcmp($nv_md, $nv_ml) < 0); } catch (\Throwable $e) {} ?>
+                                        <a href="<?php echo base_url ?>admin/update_database.php" class="nav-link tree-item">
+                                            <i class="nav-icon fas fa-database text-danger"></i>
+                                            <p>Database Updates<?php if($nv_mig_behind): ?> <span class="badge badge-danger right">Pending</span><?php endif; ?></p>
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=developer/customer_requests" class="nav-link nav-developer_customer_requests tree-item">
                                             <i class="nav-icon fas fa-inbox text-warning"></i>
                                             <p>Customer Requests</p>
