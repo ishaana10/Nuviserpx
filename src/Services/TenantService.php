@@ -17,6 +17,16 @@ class TenantService
         $email = strtolower(trim((string)($post['email'] ?? '')));
         $phone = trim((string)($post['phone'] ?? ''));
         $address = trim((string)($post['address'] ?? ''));
+        $tin = mb_substr(trim((string)($post['tin'] ?? '')), 0, 50);
+        $vat_no = mb_substr(trim((string)($post['vat_no'] ?? '')), 0, 50);
+        $website = mb_substr(trim((string)($post['website'] ?? '')), 0, 190);
+        $bank = mb_substr(trim((string)($post['bank_details'] ?? '')), 0, 600);
+        if ($website !== '' && !preg_match('#^https?://#i', $website)) {
+            $website = 'https://' . $website;
+        }
+        if ($website !== '' && !filter_var($website, \FILTER_VALIDATE_URL)) {
+            return json_encode(['status' => 'failed', 'msg' => 'The website address is not valid.']);
+        }
         if ($name === '') {
             return json_encode(['status' => 'failed', 'msg' => 'The company name is required.']);
         }
@@ -52,7 +62,11 @@ class TenantService
             `name` = '" . $this->conn->real_escape_string($name) . "',
             `email` = '" . $this->conn->real_escape_string($email) . "',
             `phone` = '" . $this->conn->real_escape_string($phone) . "',
-            `address` = '" . $this->conn->real_escape_string($address) . "'
+            `address` = '" . $this->conn->real_escape_string($address) . "',
+            `tin` = '" . $this->conn->real_escape_string($tin) . "',
+            `vat_no` = '" . $this->conn->real_escape_string($vat_no) . "',
+            `website` = '" . $this->conn->real_escape_string($website) . "',
+            `bank_details` = '" . $this->conn->real_escape_string($bank) . "'
             {$logo_sql}
             WHERE id = '{$t}'");
         if (!$ok) {

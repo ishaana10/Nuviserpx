@@ -14,7 +14,7 @@ $qa_tenant = (int)$_settings->active_tenant_id();
 $qa_can_vendor = $_settings->can_access('parties_save');
 $qa_can_item = $_settings->can_access('products_save');
 $qa_items = [];
-$qa_q = $conn->query("SELECT id, product_code, name, description, cost_price FROM `product_list` WHERE tenant_id = {$qa_tenant} AND delete_flag = 0 AND status = 1 ORDER BY name ASC");
+$qa_q = $conn->query("SELECT id, product_code, name, description, cost_price FROM `product_list` WHERE tenant_id = {$qa_tenant} AND delete_flag = 0 AND status = 1 AND is_purchased = 1 ORDER BY name ASC");
 while ($qa_q && ($qa_p = $qa_q->fetch_assoc())) {
     $qa_items[] = [
         'id'    => (string)(int)$qa_p['id'],

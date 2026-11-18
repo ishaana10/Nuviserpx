@@ -41,6 +41,21 @@ class InventoryService
         $description = isset($description) ? $this->conn->real_escape_string((string)$description) : '';
         $status = isset($status) ? (int)$status : 1;
         $track_batches = !empty($post['track_batches']) ? 1 : 0;
+        // Services and other non-stock items: a form that does not send a flag leaves it as it was (new items: stock, sold and bought).
+        $flag = static fn (string $k): ?int => array_key_exists($k, $post) ? (empty($post[$k]) ? 0 : 1) : null;
+        $is_tracked = $flag('is_tracked');
+        $is_sold = $flag('is_sold');
+        $is_purchased = $flag('is_purchased');
+        if ($is_tracked === 0) {
+            $stock_quantity = 0.0;
+            $track_batches = 0;
+            if (!empty($id)) {
+                $had = $this->conn->query("SELECT stock_quantity FROM `product_list` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'")->fetch_assoc();
+                if ($had && abs((float)$had['stock_quantity']) > 0.00001) {
+                    return json_encode(['status' => 'failed', 'msg' => 'This item still has stock on hand. Take the stock to zero with a stock adjustment before treating it as a service.']);
+                }
+            }
+        }
 
         // Quick-add from a purchase form sends no code: number it automatically.
         if ($product_code === '' && empty($id)) {
@@ -64,6 +79,9 @@ class InventoryService
 				`stock_quantity` = '{$stock_quantity}',
 				`reorder_level` = '{$reorder_level}',
 				`track_batches` = '{$track_batches}',
+				`is_tracked` = '" . ($is_tracked ?? 1) . "',
+				`is_sold` = '" . ($is_sold ?? 1) . "',
+				`is_purchased` = '" . ($is_purchased ?? 1) . "',
 				`description` = '{$description}',
 				`status` = '{$status}'";
             $save = $this->conn->query($sql);
@@ -95,7 +113,7 @@ class InventoryService
 				`selling_price` = '{$selling_price}',
 				`reorder_level` = '{$reorder_level}',
 				`track_batches` = '{$track_batches}',
-				`description` = '{$description}',
+" . ($is_tracked === null ? '' : "				`is_tracked` = '{$is_tracked}',\n") . ($is_sold === null ? '' : "				`is_sold` = '{$is_sold}',\n") . ($is_purchased === null ? '' : "				`is_purchased` = '{$is_purchased}',\n") . "				`description` = '{$description}',
 				`status` = '{$status}'
 				WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'";
             $save = $this->conn->query($sql);
@@ -164,6 +182,9 @@ class InventoryService
         $absolute = $type === 'adjustment' && isset($is_absolute) && $is_absolute == 1;
         if (!in_array($type, ['in', 'out', 'adjustment'], true)) {
             return json_encode(['status' => 'failed', 'msg' => 'Choose a valid adjustment type.']);
+        }
+        if ($product_id > 0 && in_array($product_id, (new InventoryAccountingService($this->conn, $this->settings))->untrackedIds([$product_id]), true)) {
+            return json_encode(['status' => 'failed', 'msg' => 'This item is a service, so it has no stock to adjust.']);
         }
         if ($product_id <= 0 || $qty < 0 || ($qty == 0 && !$absolute)) {
             return json_encode(['status' => 'failed', 'msg' => 'Please select a product and enter a valid positive quantity.']);

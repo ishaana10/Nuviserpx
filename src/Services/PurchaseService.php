@@ -334,9 +334,10 @@ class PurchaseService
      */
     private function receiveStock(int $product_id, float $qty, float $unit_cost, int $tenant_id, int $user_id, string $reference, int $warehouse_id = 0): void
     {
-        $p = $this->conn->query("SELECT stock_quantity, cost_price FROM `product_list` WHERE id = '{$product_id}' AND tenant_id = '{$tenant_id}'");
+        $p = $this->conn->query("SELECT stock_quantity, cost_price, is_tracked FROM `product_list` WHERE id = '{$product_id}' AND tenant_id = '{$tenant_id}'");
         if (!$p || $p->num_rows == 0) return;
         $prod = $p->fetch_assoc();
+        if ((int)($prod['is_tracked'] ?? 1) === 0) return; // a service: nothing to put on a shelf
 
         $old_qty = (float)$prod['stock_quantity'];
         $old_cost = (float)$prod['cost_price'];
@@ -856,7 +857,8 @@ class PurchaseService
             ];
         }
         $known = $inv->products(array_column($rows, 'product_id'));
-        $rows = array_filter($rows, fn ($r) => isset($known[$r['product_id']]));
+        $services = $inv->untrackedIds(array_column($rows, 'product_id'));
+        $rows = array_filter($rows, fn ($r) => isset($known[$r['product_id']]) && !in_array($r['product_id'], $services, true));
         return InventoryAccountingService::stockNet($rows);
     }
 

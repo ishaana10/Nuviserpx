@@ -104,5 +104,13 @@ final class PdfDoc extends \FPDF
         if ($contact !== '') {
             $this->Cell(110, 4.5, self::t($contact), 0, 1);
         }
+        $web = trim((string)($brand['website'] ?? ''));
+        if ($web !== '') {
+            $this->Cell(110, 4.5, self::t(preg_replace('#^https?://#i', '', $web)), 0, 1);
+        }
+        $ids = trim(((string)($brand['tin'] ?? '') !== '' ? 'TIN ' . $brand['tin'] : '') . '   ' . ((string)($brand['vat_no'] ?? '') !== '' ? 'VAT reg. ' . $brand['vat_no'] : ''));
+        if ($ids !== '') {
+            $this->Cell(110, 4.5, self::t($ids), 0, 1);
+        }
     }
 }

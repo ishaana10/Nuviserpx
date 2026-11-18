@@ -160,8 +160,8 @@ final class InvoicePdf
             $line('Paid in full', '', true, [22, 163, 74]);
         }
 
-        // Notes and the company's footer text
-        foreach ([['Notes', (string)($invoice['notes'] ?? '')], ['', (string)($tmpl['footer_notes'] ?? '')]] as [$h, $txt]) {
+        // Notes, how to pay, and the company's footer text
+        foreach ([['Notes', (string)($invoice['notes'] ?? '')], ['How to pay', (string)($brand['bank_details'] ?? '')], ['', (string)($tmpl['footer_notes'] ?? '')]] as [$h, $txt]) {
             if (trim($txt) === '') {
                 continue;
             }

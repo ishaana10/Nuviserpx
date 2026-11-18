@@ -14,12 +14,29 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
     }
 }
 
+// Clone: start a new invoice from an existing one (same customer, lines, notes and terms; new number, dates and no payments).
+$clone_of = null;
+if (!isset($id) && isset($_GET['clone']) && is_numeric($_GET['clone']) && $_GET['clone'] > 0) {
+    $cl = $conn->query("SELECT * FROM `invoice_list` WHERE id = '" . intval($_GET['clone']) . "' AND tenant_id = '{$tenant_id}' LIMIT 1");
+    if ($cl && ($src = $cl->fetch_assoc())) {
+        $clone_of = (int)$src['id'];
+        $clone_no = $src['invoice_no'];
+        $terms_days = max(0, (int)round((strtotime($src['due_date'] ?: $src['invoice_date']) - strtotime($src['invoice_date'])) / 86400));
+        foreach (['party_id', 'reference', 'currency', 'fx_rate', 'tax_type', 'notes', 'discount'] as $k) {
+            if (array_key_exists($k, $src)) { $$k = $src[$k]; }
+        }
+        $invoice_date = date('Y-m-d');
+        $due_date = date('Y-m-d', strtotime("+{$terms_days} days"));
+        unset($fx_rate); // the rate on the new date applies
+    }
+}
+
 $fx_svc = new \App\Services\FxService($conn, $_settings);
 $fx_base = $fx_svc->baseCurrency();
 $fx_currencies = $fx_svc->foreignCurrencies();
 
 // Fetch products for line item dropdowns
-$products_qry = $conn->query("SELECT * FROM `product_list` WHERE tenant_id = '{$tenant_id}' AND delete_flag = 0 AND status = 1 ORDER BY name ASC");
+$products_qry = $conn->query("SELECT * FROM `product_list` WHERE tenant_id = '{$tenant_id}' AND delete_flag = 0 AND status = 1 AND is_sold = 1 ORDER BY name ASC");
 $products = [];
 while($pr = $products_qry->fetch_assoc()){
     $products[$pr['id']] = $pr;
@@ -120,7 +137,7 @@ while($ac = $accounts_qry->fetch_assoc()){
     <div class="invoice-header-bar">
         <h3 class="invoice-header-title">
             <i class="fas fa-file-invoice text-primary mr-2"></i>
-            <?php echo isset($id) ? 'Edit Sales Invoice #'.$invoice_no : 'Set Up New Sales Invoice' ?>
+            <?php echo isset($id) ? 'Edit Sales Invoice #'.$invoice_no : ($clone_of ? 'New invoice, copied from #'.htmlspecialchars($clone_no) : 'Set Up New Sales Invoice') ?>
         </h3>
         <div class="d-flex align-items-center gap-2">
             <a href="./?page=invoices" class="btn btn-sm btn-outline-secondary font-weight-bold mr-2">
@@ -251,8 +268,8 @@ while($ac = $accounts_qry->fetch_assoc()){
                     </thead>
                     <tbody>
                         <?php
-                        if(isset($id)):
-                            $items = $conn->query("SELECT * FROM `invoice_items` WHERE invoice_id = '{$id}' ORDER BY id ASC");
+                        if(isset($id) || $clone_of):
+                            $items = $conn->query("SELECT * FROM `invoice_items` WHERE invoice_id = '" . (isset($id) ? $id : $clone_of) . "' ORDER BY id ASC");
                             while($item = $items->fetch_assoc()):
                         ?>
                         <tr class="item-row">
@@ -433,6 +450,7 @@ while($ac = $accounts_qry->fetch_assoc()){
             </div>
             <form id="form_quick_product">
                 <input type="hidden" name="id" id="item_modal_id" value="">
+                <input type="hidden" name="is_tracked" value="0"><input type="hidden" name="is_sold" value="0"><input type="hidden" name="is_purchased" value="0">
                 <div class="modal-body p-4">
                     <div class="row mb-3">
                         <div class="col-md-5 form-group">

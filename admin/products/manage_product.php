@@ -47,7 +47,24 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
 			</div>
 		</div>
 
-		<div class="row">
+		<div class="form-group border rounded p-3 bg-light">
+			<input type="hidden" name="is_tracked" value="0"><input type="hidden" name="is_sold" value="0"><input type="hidden" name="is_purchased" value="0">
+			<div class="custom-control custom-checkbox mb-2">
+				<input type="checkbox" class="custom-control-input" id="is_tracked" name="is_tracked" value="1" <?php echo !isset($is_tracked) || (int)$is_tracked === 1 ? 'checked' : '' ?>>
+				<label for="is_tracked" class="custom-control-label font-weight-bold">Track inventory</label>
+				<small class="d-block text-muted">Counts quantity and value of stock on hand. Leave this off for services such as fumigation, labour or consulting.</small>
+			</div>
+			<div class="custom-control custom-checkbox d-inline-block mr-4">
+				<input type="checkbox" class="custom-control-input" id="is_sold" name="is_sold" value="1" <?php echo !isset($is_sold) || (int)$is_sold === 1 ? 'checked' : '' ?>>
+				<label for="is_sold" class="custom-control-label">Sell (invoices, quotes, orders)</label>
+			</div>
+			<div class="custom-control custom-checkbox d-inline-block">
+				<input type="checkbox" class="custom-control-input" id="is_purchased" name="is_purchased" value="1" <?php echo !isset($is_purchased) || (int)$is_purchased === 1 ? 'checked' : '' ?>>
+				<label for="is_purchased" class="custom-control-label">Purchase (bills, purchase orders)</label>
+			</div>
+		</div>
+
+		<div class="row" id="stock_fields">
 			<div class="col-md-6 form-group">
 				<label for="stock_quantity" class="control-label"><?php echo isset($id) ? 'Current Stock Quantity' : 'Initial Opening Stock Quantity' ?></label>
 				<input type="number" step="any" name="stock_quantity" id="stock_quantity" class="form-control form-control-sm rounded-0 text-center font-weight-bold" value="<?php echo isset($stock_quantity) ? $stock_quantity : '0.00'; ?>" <?php echo isset($id) ? 'readonly' : '' ?> required/>
@@ -82,6 +99,14 @@ if(isset($_GET['id']) && is_numeric($_GET['id']) && $_GET['id'] > 0){
 </div>
 <script>
 	$(document).ready(function(){
+		function syncTracked(){
+			var on = $('#is_tracked').is(':checked');
+			$('#stock_fields').toggle(on);
+			$('#stock_fields input').prop('required', on);
+			if (!on) { $('#stock_quantity').val('0'); $('#track_batches').prop('checked', false); }
+			$('#track_batches').closest('.form-group').toggle(on);
+		}
+		$('#is_tracked').on('change', syncTracked); syncTracked();
 		$('#product-form').submit(function(e){
 			e.preventDefault();
             var _this = $(this)

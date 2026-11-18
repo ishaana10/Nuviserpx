@@ -42,6 +42,11 @@ class WarehouseStockService
         if ($product_id <= 0 || $delta == 0.0) {
             return true;
         }
+        // Services have no stock.
+        $svc = $this->conn->query("SELECT 1 FROM `product_list` WHERE id = '{$product_id}' AND tenant_id = '{$tenant_id}' AND is_tracked = 0 LIMIT 1");
+        if ($svc && $svc->num_rows) {
+            return true;
+        }
         $warehouse_id = max(0, $warehouse_id);
 
         // Upsert the location row.

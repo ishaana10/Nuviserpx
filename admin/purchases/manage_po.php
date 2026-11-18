@@ -18,7 +18,7 @@ if (!isset($po_no)) {
 }
 
 // Preload active product catalog
-$products_qry = $conn->query("SELECT * FROM `product_list` WHERE tenant_id = '{$tenant_id}' AND delete_flag = 0 AND status = 1 ORDER BY name ASC");
+$products_qry = $conn->query("SELECT * FROM `product_list` WHERE tenant_id = '{$tenant_id}' AND delete_flag = 0 AND status = 1 AND is_purchased = 1 ORDER BY name ASC");
 $products_data = [];
 while($p = $products_qry->fetch_assoc()){
     $products_data[$p['id']] = $p;

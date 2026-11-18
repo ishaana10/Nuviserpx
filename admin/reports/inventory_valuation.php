@@ -16,7 +16,7 @@ $group_cat = ($_GET['group'] ?? '1') === '1';
 $rows = [];
 $stmt = $conn->prepare("SELECT id, product_code, name, category, unit, stock_quantity, cost_price, selling_price
     FROM product_list
-    WHERE tenant_id = ? AND delete_flag = 0" . ($show_zero ? '' : ' AND stock_quantity <> 0') . "
+    WHERE tenant_id = ? AND delete_flag = 0 AND is_tracked = 1" . ($show_zero ? '' : ' AND stock_quantity <> 0') . "
     ORDER BY category IS NULL, category, name");
 if ($stmt) {
     $stmt->bind_param('i', $tid);

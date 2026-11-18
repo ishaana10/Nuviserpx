@@ -3,6 +3,19 @@
 All notable changes to Nuvis ERPX. Versions are stamped automatically on each
 release build (see `src/Support/AppVersion.php`); dates are Fiji time.
 
+## [Unreleased] - 2026-11-19
+
+### Added
+- **Clone an invoice.** A Clone button on the invoice page and in the invoice list opens a new invoice with the same customer, lines, discount, tax setting, reference and notes. The number is new, the issue date is today and the due date keeps the original terms. Nothing is saved until you press Save.
+- **Company profile: more details and a live preview.** Tax (TIN) and VAT registration numbers, website and "how to pay" bank details can now be set. They print in the document header and on invoices ("How to pay"), and a preview beside the form shows how the letterhead will look. The logo can be dragged in and previews before saving, and a completeness bar shows what is still missing.
+- **Items can be services.** The Track inventory, Sell and Purchase options on an item are now saved (the full item form has them too).
+
+### Fixed
+- **A service added from an invoice was still counted as stock.** The Track inventory tick in the New item pop-up was never saved, so every item was treated as stock and showed 0.00 pcs with a Low Stock warning. Items without Track inventory are now services: no stock quantity, no low-stock warning, no stock check when you sell them, no stock movement on purchase or adjustment, and they are left out of the inventory valuation and reorder reports. Items that are not marked Sell stay off sales forms, and items not marked Purchase stay off purchase forms. Existing items stay as stock; open one and untick Track inventory to make it a service (its stock must be zero first).
+
+### Removed
+- **Modules Manager (Settings).** It saved company-wide switches that nothing in the app read, so it did nothing, and it duplicated the module assignment each company already has on the Tenants page. The read-only Modules & Features page stays.
+
 ## [Unreleased] - 2026-11-15 (3)
 
 ### Fixed

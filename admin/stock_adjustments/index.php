@@ -27,7 +27,7 @@ $prod_where = ($product_filter != 'all' && $product_filter > 0) ? " AND l.produc
 						<select name="product_id" id="product_id" class="form-control form-control-sm rounded-0 select2">
 							<option value="all" <?php echo $product_filter == 'all' ? 'selected' : '' ?>>All Products</option>
 							<?php
-							$prods = $conn->query("SELECT * FROM `product_list` WHERE tenant_id = '{$tenant_id}' AND delete_flag = 0 ORDER BY name ASC");
+							$prods = $conn->query("SELECT * FROM `product_list` WHERE tenant_id = '{$tenant_id}' AND delete_flag = 0 AND is_tracked = 1 ORDER BY name ASC");
 							while($p = $prods->fetch_assoc()):
 							?>
 							<option value="<?php echo $p['id'] ?>" <?php echo $product_filter == $p['id'] ? 'selected' : '' ?>>

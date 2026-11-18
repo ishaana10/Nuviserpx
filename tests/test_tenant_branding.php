@@ -32,7 +32,7 @@ check('emails fall back to the company name, not the platform name', strpos($em,
 check('profile save validates, stores one logo per company and audits without credentials', strpos($ts, 'function saveProfile') !== false && strpos($ts, 'getimagesize') !== false && strpos($ts, "2 * 1024 * 1024") !== false && strpos($ts, "log_audit('Updated Company Profile'") !== false);
 check('remove-logo deletes the stored file', strpos($ts, 'remove_logo') !== false && strpos($ts, '@unlink(base_app . $cur)') !== false);
 check('action wired and gated by settings_manage', Permissions::forAction('save_company_profile') === 'settings_manage' && strpos(file_get_contents($root.'/classes/Master.php'), "'save_company_profile'") !== false);
-check('Company Profile page uploads via multipart with preview', strpos($cp, 'enctype="multipart/form-data"') !== false && strpos($cp, 'save_company_profile') !== false && strpos($cp, 'Current Logo') !== false);
+check('Company Profile page uploads via multipart with preview', strpos($cp, 'enctype="multipart/form-data"') !== false && strpos($cp, 'save_company_profile') !== false && strpos($cp, 'cp_logo_img') !== false && strpos($cp, 'How it looks on your documents') !== false);
 check('menu links the page for settings managers', strpos(file_get_contents($root.'/admin/inc/menus/09_access_users.php'), 'page=settings/company') !== false);
 check('help topic covers it', strpos(file_get_contents($root.'/src/Support/HelpContent.php'), "'settings/company'") !== false);
 

@@ -41,7 +41,8 @@
 						$tenant_id = $_settings->active_tenant_id();
 						$qry = $conn->query("SELECT * from `product_list` where tenant_id = '{$tenant_id}' and delete_flag = 0 order by name asc ");
 						while($row = $qry->fetch_assoc()):
-							$is_low = (float)$row['stock_quantity'] <= (float)$row['reorder_level'];
+							$is_service = (int)($row['is_tracked'] ?? 1) === 0;
+							$is_low = !$is_service && (float)$row['stock_quantity'] <= (float)$row['reorder_level'];
 					?>
 						<tr>
 							<td class="text-center"><?php echo $i++; ?></td>
@@ -58,9 +59,14 @@
 							<td class="text-right">$<?php echo number_format($row['cost_price'], 2) ?></td>
 							<td class="text-right font-weight-bold text-success">$<?php echo number_format($row['selling_price'], 2) ?></td>
 							<td class="text-center">
+                                <?php if($is_service): ?>
+                                <span class="badge badge-light border text-muted px-3 py-1 font-weight-bold">Service</span>
+                                <small class="d-block text-muted">Not tracked</small>
+                                <?php else: ?>
                                 <span class="badge badge-<?php echo $is_low ? 'danger' : 'success' ?> px-3 py-1 font-weight-bold">
                                     <?php echo number_format($row['stock_quantity'], 2) . ' ' . $row['unit'] ?>
                                 </span>
+                                <?php endif; ?>
                                 <?php if($is_low): ?>
 					<small class="d-block text-danger font-weight-bold"><i class="fas fa-exclamation-triangle"></i> Low Stock</small>
                                 <?php endif; ?>

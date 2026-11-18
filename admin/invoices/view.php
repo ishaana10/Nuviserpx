@@ -169,6 +169,9 @@ $status_class = [
             <a href="invoices/invoice_pdf.php?id=<?= (int)$invoice['id'] ?>&download=1" class="btn btn-sm btn-outline-info">
                 <i class="fa fa-download"></i> Download
             </a>
+            <a href="./?page=invoices/manage_invoice&clone=<?= (int)$invoice['id'] ?>" class="btn btn-sm btn-outline-secondary" title="Start a new invoice with the same customer and lines">
+                <i class="fa fa-clone"></i> Clone
+            </a>
             <button onclick="window.print()" class="btn btn-sm btn-secondary">
                 <i class="fa fa-print"></i> Print Invoice
             </button>
@@ -192,6 +195,10 @@ $status_class = [
                     <p class="mb-0 text-muted small">
                         <b>Email:</b> <?= htmlspecialchars($nv_brand['email']) ?> | <b>Phone:</b> <?= htmlspecialchars($nv_brand['phone']) ?>
                     </p>
+                    <?php if(!empty($nv_brand['website'])): ?><p class="mb-0 text-muted small"><?= htmlspecialchars(preg_replace('#^https?://#i', '', $nv_brand['website'])) ?></p><?php endif; ?>
+                    <?php if(!empty($nv_brand['tin']) || !empty($nv_brand['vat_no'])): ?>
+                    <p class="mb-0 text-muted small"><?php if(!empty($nv_brand['tin'])): ?><b>TIN:</b> <?= htmlspecialchars($nv_brand['tin']) ?><?php endif; ?><?php if(!empty($nv_brand['tin']) && !empty($nv_brand['vat_no'])): ?> | <?php endif; ?><?php if(!empty($nv_brand['vat_no'])): ?><b>VAT reg.:</b> <?= htmlspecialchars($nv_brand['vat_no']) ?><?php endif; ?></p>
+                    <?php endif; ?>
                 </div>
             </div>
             <div class="col-md-6 text-right">
@@ -270,6 +277,13 @@ $status_class = [
                 <div class="border p-3 rounded mb-3 bg-light">
                     <h6 class="font-weight-bold text-inv-label mb-1"><i class="fas fa-sticky-note"></i> Notes & Terms:</h6>
                     <p class="mb-0 small text-muted"><?= nl2br(htmlspecialchars($invoice['notes'])) ?></p>
+                </div>
+                <?php endif; ?>
+
+                <?php if(!empty($nv_brand['bank_details'])): ?>
+                <div class="border p-3 rounded mb-3 bg-light">
+                    <h6 class="font-weight-bold text-inv-label mb-1"><i class="fas fa-university"></i> How to pay:</h6>
+                    <p class="mb-0 small text-muted"><?= nl2br(htmlspecialchars($nv_brand['bank_details'])) ?></p>
                 </div>
                 <?php endif; ?>
 
