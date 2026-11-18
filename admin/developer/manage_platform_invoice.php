@@ -2,7 +2,7 @@
 require_once(dirname(__DIR__, 2) . '/config.php');
 if ($_settings->userdata('type') != 1) { echo '<div class="alert alert-danger">Access denied.</div>'; return; }
 $pre = (int)($_GET['tenant_id'] ?? 0);
-$tenants = $conn->query("SELECT t.id, t.name, t.tenant_code, p.name pname, p.price FROM tenants t LEFT JOIN tenant_plans p ON p.id = t.plan_id WHERE t.delete_flag = 0 ORDER BY t.name");
+$tenants = $conn->query("SELECT t.id, t.name, t.tenant_code, p.name pname, p.price FROM tenants t LEFT JOIN tenant_plans p ON p.id = t.plan_id WHERE t.delete_flag = 0 AND t.is_platform_owner = 0 ORDER BY t.name");
 $tl = []; while ($tenants && $r = $tenants->fetch_assoc()) { $tl[] = $r; }
 $sel = null; foreach ($tl as $r) { if ($r['id'] == $pre) $sel = $r; }
 $products = ['Nuvis ERPX subscription', 'Nuvis MedcareX subscription', 'Nuvis StudioX subscription', 'Setup and onboarding', 'Training', 'Support and maintenance', 'Customisation'];
@@ -14,8 +14,9 @@ $products = ['Nuvis ERPX subscription', 'Nuvis MedcareX subscription', 'Nuvis St
         <option value="">Choose a tenant</option>
         <?php foreach ($tl as $r): ?><option value="<?= $r['id'] ?>" data-plan="<?= htmlspecialchars((string)$r['pname']) ?>" data-price="<?= htmlspecialchars((string)$r['price']) ?>" <?= $r['id'] == $pre ? 'selected' : '' ?>><?= htmlspecialchars($r['name']) ?> (<?= htmlspecialchars($r['tenant_code']) ?>)</option><?php endforeach; ?>
       </select></div>
-    <div class="col-md-3 form-group"><label>Date</label><input type="date" name="issue_date" class="form-control form-control-sm" value="<?= date('Y-m-d') ?>"></div>
-    <div class="col-md-3 form-group"><label>Due</label><input type="date" name="due_date" class="form-control form-control-sm" value="<?= date('Y-m-d', strtotime('+14 days')) ?>"></div>
+    <div class="col-md-3 form-group"><label>Product</label><select name="product_code" class="form-control form-control-sm"><?php foreach (\App\Services\PlatformBillingService::PRODUCTS as $k => $v): ?><option value="<?= $k ?>"><?= htmlspecialchars($v) ?></option><?php endforeach; ?></select></div>
+    <div class="col-md-6 form-group"><label>Date</label><input type="date" name="issue_date" class="form-control form-control-sm" value="<?= date('Y-m-d') ?>"></div>
+    <div class="col-md-6 form-group"><label>Due</label><input type="date" name="due_date" class="form-control form-control-sm" value="<?= date('Y-m-d', strtotime('+14 days')) ?>"></div>
   </div>
   <table class="table table-sm" id="pi_lines">
     <thead><tr><th>Product or service</th><th width="12%">Qty</th><th width="18%">Unit price</th><th width="16%" class="text-right">Amount</th><th width="4%"></th></tr></thead>

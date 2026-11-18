@@ -8,7 +8,12 @@ function nv_pb_badge(array $inv): string
     $cls = $overdue ? 'danger' : ($map[$inv['status']] ?? 'secondary');
     return '<span class="badge badge-' . $cls . '">' . $label . '</span>';
 }
+function nv_pb_svc(): \App\Services\PlatformBillingService
+{
+    global $conn, $_settings;
+    return new \App\Services\PlatformBillingService($conn, $_settings);
+}
 function nv_pb_money($v, $cur = null): string
 {
-    global $_settings; return htmlspecialchars((string)($cur ?: $_settings->base_currency())) . ' ' . number_format((float)$v, 2);
+    global $_settings; return htmlspecialchars((string)($cur ?: $_settings->base_currency(nv_pb_svc()->ownerId() ?: null))) . ' ' . number_format((float)$v, 2);
 }

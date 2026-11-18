@@ -6,10 +6,13 @@ $t = $conn->query("SELECT t.*, p.name plan_name, p.price plan_price, p.billing_c
                    FROM tenants t LEFT JOIN tenant_plans p ON p.id = t.plan_id WHERE t.id = {$tid}");
 $tn = $t ? $t->fetch_assoc() : null;
 if (!$tn) { echo '<div class="alert alert-warning">Company not found.</div>'; return; }
-$invs = $conn->query("SELECT * FROM platform_invoices WHERE tenant_id = {$tid} AND status <> 'void' ORDER BY issue_date DESC, id DESC");
-$rows = []; $billed = 0; $paid = 0;
-while ($invs && $r = $invs->fetch_assoc()) { $rows[] = $r; $billed += (float)$r['total']; $paid += (float)$r['paid_amount']; }
-$pays = $conn->query("SELECT pp.*, pi.invoice_no FROM platform_payments pp JOIN platform_invoices pi ON pi.id = pp.invoice_id WHERE pp.tenant_id = {$tid} ORDER BY pp.pay_date DESC, pp.id DESC");
+$rows = []; $billed = 0; $paid = 0; $pays = [];
+foreach (nv_pb_svc()->rows($tid) as $r) {
+    if ($r['status'] === 'void') continue;
+    $rows[] = $r; $billed += (float)$r['total']; $paid += (float)$r['paid_amount'];
+    foreach (nv_pb_svc()->receipts((int)$r['owner_invoice_id']) as $pp) { $pp['invoice_no'] = $r['invoice_no']; $pays[] = $pp; }
+}
+usort($pays, fn($a, $b) => strcmp($b['pay_date'], $a['pay_date']));
 $status = (string)($tn['plan_status'] ?: 'active');
 $sc = ['active' => 'success', 'trial' => 'info', 'past_due' => 'warning', 'suspended' => 'danger', 'cancelled' => 'dark'][$status] ?? 'secondary';
 $feat = json_decode((string)($tn['features'] ?? ''), true);
@@ -75,9 +78,9 @@ $feat = json_decode((string)($tn['features'] ?? ''), true);
         <table class="table table-sm mb-0">
           <thead><tr><th>Date</th><th>Invoice</th><th>Method</th><th>Reference</th><th class="text-right">Amount</th></tr></thead>
           <tbody>
-          <?php $n = 0; while ($pays && $p = $pays->fetch_assoc()): $n++; ?>
+          <?php $n = 0; foreach ($pays as $p): $n++; ?>
             <tr><td><?= date('d M Y', strtotime($p['pay_date'])) ?></td><td><?= htmlspecialchars($p['invoice_no']) ?></td><td><?= htmlspecialchars((string)$p['method']) ?></td><td><?= htmlspecialchars((string)$p['reference']) ?></td><td class="text-right"><?= number_format($p['amount'], 2) ?></td></tr>
-          <?php endwhile; if (!$n): ?>
+          <?php endforeach; if (!$n): ?>
             <tr><td colspan="5" class="text-center text-muted py-3">No payments recorded yet.</td></tr>
           <?php endif; ?>
           </tbody>
