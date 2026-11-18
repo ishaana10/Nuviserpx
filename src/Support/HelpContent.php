@@ -254,7 +254,7 @@ class HelpContent
         'my_plan' => [
             'title' => 'My Plan & Billing', 'icon' => 'fa-id-card', 'perm' => 'settings_manage',
             'pages' => ['billing/my_plan', 'billing/invoice'],
-            'intro' => 'The plan your company is on with Nuvis Technologies, the invoices raised against it and the payments received.',
+            'intro' => 'The plan your company is on with Nuvis Technologies, the invoices raised against it and the payments received. Developers: raise and record these under Developer, Tenant Invoices; they post to the owner company\'s sales and journals.',
             'sections' => [
                 ['h' => 'Viewing and printing invoices', 'steps' => [
                     'Click the plan badge at the top of any page, or open Settings, then My Plan & Billing.',

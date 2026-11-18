@@ -126,6 +126,12 @@ class TenantService
                     $mods = isset($post['modules_submitted']) ? '; ' . \App\Support\AuditDiff::listChanges((string)($before['modules'] ?? ''), implode(',', \App\Support\Permissions::sanitizeTenantModules($post['modules'] ?? []))) . ' (modules)' : '';
                     $this->settings->log_audit('Updated Tenant', 'Tenants', "Updated company '" . ($before['name'] ?? '') . "' (#{$tid}): {$diff}{$mods}.");
                 }
+                if (isset($post['owner_submitted'])) {
+                    // Exactly one company bills the others.
+                    $this->conn->query(empty($post['is_platform_owner'])
+                        ? "UPDATE `tenants` SET `is_platform_owner` = 0 WHERE id = {$tid}"
+                        : "UPDATE `tenants` SET `is_platform_owner` = (id = {$tid})");
+                }
                 $resp['status'] = 'success';
                 $resp['tenant_id'] = $tid;
                 $resp['msg'] = empty($id) ? " Tenant added successfully." : " Tenant details updated successfully.";

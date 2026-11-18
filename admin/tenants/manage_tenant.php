@@ -25,7 +25,13 @@ if(isset($_GET['id']) && is_numeric($_GET['id'])){
 			<label for="tenant_code" class="control-label">Tenant Code</label>
 			<input type="text" name="tenant_code" id="tenant_code" class="form-control form-control-sm rounded-0" value="<?php echo isset($tenant_code) ? $tenant_code : 'TNT-'.sprintf('%03d', rand(1, 999)); ?>" required/>
 		</div>
-		<?php if(!isset($id) || $id === ''): ?>
+		<?php if(isset($id) && $id !== ''): ?>
+		<input type="hidden" name="owner_submitted" value="1">
+		<div class="custom-control custom-checkbox mb-3">
+			<input type="checkbox" class="custom-control-input" name="is_platform_owner" id="is_platform_owner" value="1" <?php echo !empty($is_platform_owner) ? 'checked' : '' ?>>
+			<label class="custom-control-label" for="is_platform_owner">This company bills the other tenants (platform owner)</label>
+		</div>
+		<?php else: ?>
 		<div class="custom-control custom-checkbox mb-3">
 			<input type="checkbox" class="custom-control-input" name="create_invoice" id="create_invoice" value="1">
 			<label class="custom-control-label" for="create_invoice">Raise an invoice for this tenant after saving</label>

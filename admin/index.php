@@ -37,7 +37,13 @@ ob_start();
                     $nvLabel = $nvNames[$nvSeg] ?? ucwords(str_replace(['_', '-'], ' ', $nvSeg));
                     echo '<span class="nv-crumb-sep">/</span>';
                     if($nvIx < $nvLast){
-                      echo '<a href="./?page=' . htmlspecialchars(implode('/', array_slice($nvSegs, 0, $nvIx + 1))) . '">' . htmlspecialchars($nvLabel) . '</a>';
+                      // A folder with no index page of its own is a grouping, not a place: plain text, never a dead link.
+                      $nvPath = implode('/', array_slice($nvSegs, 0, $nvIx + 1));
+                      if(file_exists($nvPath . '.php') || file_exists($nvPath . '/index.php')){
+                        echo '<a href="./?page=' . htmlspecialchars($nvPath) . '">' . htmlspecialchars($nvLabel) . '</a>';
+                      } else {
+                        echo '<span>' . htmlspecialchars($nvLabel) . '</span>';
+                      }
                     } else {
                       echo '<span class="nv-crumb-current">' . htmlspecialchars($nvLabel) . '</span>';
                       echo '</nav><h1 class="nv-page-title">' . htmlspecialchars($nvLabel) . '</h1></div>';
