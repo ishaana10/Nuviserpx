@@ -6,6 +6,9 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
 ## [Unreleased] - 2026-11-19
 
 ### Added
+- **Session-expired warning.** When you are signed out (session ended, or you signed out in another tab), clicking a menu item or link now shows a "Your session has ended" box with Sign in again, instead of a page that hangs. The check is a read-only ping that does not extend the session.
+- **My Plan & Billing.** The plan badge in the top bar (and Settings, My Plan & Billing) opens the tenant's plan, status and renewal date, invoices from Nuvis Technologies, payments received and the outstanding balance. Each invoice can be viewed and printed with its payment status.
+- **Tenant invoices for the developer.** Developer, Tenant Invoices lets you raise an invoice for any tenant (product/service lines, tax, due date), record payments (part or full) and void unpaid invoices. Ticking "Raise an invoice for this tenant after saving" on a new tenant opens the invoice form for it. Migration 053 adds the billing tables.
 - **Clone an invoice.** A Clone button on the invoice page and in the invoice list opens a new invoice with the same customer, lines, discount, tax setting, reference and notes. The number is new, the issue date is today and the due date keeps the original terms. Nothing is saved until you press Save.
 - **Company profile: more details and a live preview.** Tax (TIN) and VAT registration numbers, website and "how to pay" bank details can now be set. They print in the document header and on invoices ("How to pay"), and a preview beside the form shows how the letterhead will look. The logo can be dragged in and previews before saving, and a completeness bar shows what is still missing.
 - **Items can be services.** The Track inventory, Sell and Purchase options on an item are now saved (the full item form has them too).

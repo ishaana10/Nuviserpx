@@ -122,6 +122,19 @@ if(preg_match_all('/class="dropdown-item[^"]*"/', $__create_html) > 0) echo $__c
               </form>
             </div>
           </li> -->
+          <?php
+          $nv_pl = $conn->query("SELECT p.name, t.plan_status FROM tenants t LEFT JOIN tenant_plans p ON p.id = t.plan_id WHERE t.id = " . (int)$_settings->active_tenant_id());
+          $nv_pl = $nv_pl ? $nv_pl->fetch_assoc() : null;
+          if ($nv_pl && $_settings->can_access('settings_manage')):
+            $nv_ps = (string)($nv_pl['plan_status'] ?: 'active');
+            $nv_pc = ['active' => 'success', 'trial' => 'info', 'past_due' => 'warning', 'suspended' => 'danger', 'cancelled' => 'dark'][$nv_ps] ?? 'secondary';
+          ?>
+          <li class="nav-item d-none d-md-inline-block mr-2">
+            <a class="badge badge-<?php echo $nv_pc ?> p-2" style="color:#fff;font-size:.8rem" href="<?php echo base_url ?>admin/?page=billing/my_plan" title="View plan, invoices and payments">
+              <i class="fas fa-id-card mr-1"></i><?php echo htmlspecialchars($nv_pl['name'] ?: 'No plan') ?><?php echo $nv_ps !== 'active' ? ' &middot; ' . ucfirst(str_replace('_', ' ', $nv_ps)) : '' ?>
+            </a>
+          </li>
+          <?php endif; ?>
           <?php if(isset($__ui)): ?>
           <li class="nav-item">
             <a class="nav-link" href="#" data-nv-open="personalise" role="button" title="Personalise theme and menu" aria-label="Personalise theme and menu"><i class="fas fa-palette"></i></a>

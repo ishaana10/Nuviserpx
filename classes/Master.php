@@ -913,6 +913,21 @@ class Master extends DBConnection
         return $this->container->make(PlanService::class)->assignPlan($_POST);
     }
 
+    public function save_platform_invoice()
+    {
+        return $this->container->make(\App\Services\PlatformBillingService::class)->createInvoice($_POST);
+    }
+
+    public function record_platform_payment()
+    {
+        return $this->container->make(\App\Services\PlatformBillingService::class)->recordPayment($_POST);
+    }
+
+    public function void_platform_invoice()
+    {
+        return $this->container->make(\App\Services\PlatformBillingService::class)->voidInvoice(intval($_POST['id'] ?? 0));
+    }
+
     /* Invoice Actions */
     /* Developer error logs */
     public function log_js_error()
@@ -1594,6 +1609,7 @@ $allowed_actions = [
     'reject_payroll_remittance', 'pay_payroll_salaries', 'reverse_payroll_payment', 'remit_payroll_liability',
     'reverse_payroll_remittance', 'cancel_retro_pay', 'apply_retro_pay', 'save_tenant_vms_settings',
     'test_sdc_ping', 'simulate_vms_fiscalization', 'upload_tenant_vsdc_cert',
+    'save_platform_invoice', 'record_platform_payment', 'void_platform_invoice',
 ];
 
 if ($action === 'backup_db') {

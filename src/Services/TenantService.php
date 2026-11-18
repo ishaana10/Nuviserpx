@@ -127,6 +127,7 @@ class TenantService
                     $this->settings->log_audit('Updated Tenant', 'Tenants', "Updated company '" . ($before['name'] ?? '') . "' (#{$tid}): {$diff}{$mods}.");
                 }
                 $resp['status'] = 'success';
+                $resp['tenant_id'] = $tid;
                 $resp['msg'] = empty($id) ? " Tenant added successfully." : " Tenant details updated successfully.";
             } else {
                 $resp['status'] = 'failed';

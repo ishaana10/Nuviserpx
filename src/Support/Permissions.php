@@ -632,6 +632,9 @@ final class Permissions
         'save_plan'             => [self::SUPER_ONLY],
         'delete_plan'           => [self::SUPER_ONLY],
         'assign_plan'           => [self::SUPER_ONLY],
+        'save_platform_invoice' => [self::SUPER_ONLY],
+        'record_platform_payment' => [self::SUPER_ONLY],
+        'void_platform_invoice' => [self::SUPER_ONLY],
         'backup_db'             => [self::SUPER_ONLY],
         'optimize_db'           => [self::SUPER_ONLY],
         'git_pull'              => [self::SUPER_ONLY],
@@ -741,6 +744,7 @@ final class Permissions
         'user/permissions'  => self::SUPER_ONLY,
         'tenants'           => self::SUPER_ONLY,
         'developer'         => self::SUPER_ONLY,
+        'billing'           => 'settings_manage', // My Plan: the tenant's plan, invoices and payments
     ];
 
     /**
