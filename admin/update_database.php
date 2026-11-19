@@ -18,7 +18,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $before = $runner->status($dir)['pending'];
     try {
         (new LegacySchemaCatchup($conn))->run();
-        $done = $runner->run($dir, 60);
+        $done = $runner->run($dir, 60); unset($_SESSION["nv_mig_chk"]);
         $_settings->log_audit('Ran Database Updates', 'Developer', $done ? 'Applied: ' . implode(', ', $done) : 'Nothing pending');
         $result = ['ok' => true, 'done' => $done, 'was' => $before];
     } catch (MigrationFailed $e) {

@@ -3,7 +3,11 @@
 All notable changes to Nuvis ERPX. Versions are stamped automatically on each
 release build (see `src/Support/AppVersion.php`); dates are Fiji time.
 
-## [Unreleased] - 2026-11-19
+## [Unreleased]
+
+### Fixed
+- Pages felt slow after the session-expiry check was added: a link click after ~15s idle waited for a server round trip before navigating. The check now runs in the background and never delays a click.
+- Developer menu no longer checks for pending database updates on every page; the result is cached for 5 minutes. - 2026-11-19
 
 ### Fixed
 - **Phone layout.** The account photo was an oversized pill that spilled off the right of the top bar and hid behind the help button. It is now a small round photo; the palette moves into the account menu, "Create new" and the company picker get the room, the help button sits low in the corner, and My Plan's invoice and payment lists become stacked cards instead of cut-off columns.
