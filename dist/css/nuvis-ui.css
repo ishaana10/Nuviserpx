@@ -521,9 +521,16 @@ table.nv-table.dtr-inline.collapsed > tbody > tr > th.dtr-control::before {
   .main-header #tenant-switcher { max-width: 112px; text-overflow: ellipsis; }
   .main-header .user-name { display: none; }
   .main-header .user-img { position: static; left: auto; top: auto; height: 32px; width: 32px; display: block; }
-  .main-header .btn-rounded { padding: 2px; }
-  .main-header .btn-group.nav-link { padding-left: .25rem; padding-right: .25rem; }
-  .content-wrapper { padding-top: .5rem !important; }
+  /* Account button: just the photo, a small round tap target, no pill, shadow or caret. */
+  .main-header .btn-group.nav-link { padding: 0 .2rem; }
+  .main-header .btn-group.nav-link > .btn { min-height: 0; height: 36px; width: 36px; padding: 0; border: 0; border-radius: 50%; background: transparent !important; box-shadow: none; display: flex; align-items: center; justify-content: center; }
+  .main-header .btn-group.nav-link > .btn::after { display: none; }
+  .main-header .btn-group.nav-link .user-img { height: 30px; width: 30px; box-shadow: none !important; border: 1px solid var(--nv-border, #e2e8f0); }
+  /* Make room: the palette is in the account menu, "Create new" drops its caret, the company picker gets what is left. */
+  .main-header .nav-item:has(> [data-nv-open="personalise"]) { display: none; }
+  .main-header .navbar-nav:first-child > .nav-item .dropdown-toggle::after { display: none; }
+  .main-header #tenant-switcher { max-width: 132px; }
+  .content-wrapper { padding-top: .85rem !important; }
   .content-wrapper > .content { padding: 0 .25rem; }
   .content-wrapper .container-fluid { padding-left: .5rem; padding-right: .5rem; }
 }
