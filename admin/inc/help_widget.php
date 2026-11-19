@@ -53,6 +53,8 @@ if ($hw_page !== 'help'):
         font-size: .75rem; line-height: 1;
         display: flex; align-items: center; justify-content: center;
     }
+    /* On phones the top bar is full: the help button sits low in the corner instead of over the account photo. */
+    @media (max-width: 767.98px) { #nv-help-btn { top: auto; bottom: 14px; right: 12px; width: 38px; height: 38px; font-size: .9rem; } }
     @media print { #nv-help-btn, #nv-help-modal { display: none !important; } }
 </style>
 <?php endif; ?>

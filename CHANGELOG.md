@@ -5,6 +5,9 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
 
 ## [Unreleased] - 2026-11-19
 
+### Fixed
+- **Phone layout.** The account photo was an oversized pill that spilled off the right of the top bar and hid behind the help button. It is now a small round photo; the palette moves into the account menu, "Create new" and the company picker get the room, the help button sits low in the corner, and My Plan's invoice and payment lists become stacked cards instead of cut-off columns.
+
 ### Added
 - **Tenant invoices open in a window, as the real sales invoice.** On My Plan & Billing (and the developer's Tenant Invoices), View / print opens the invoice in a window with Download and Print. It is the same PDF the owner company prints from Sales, with its letterhead, TIN/VAT and "How to pay".
 - **Receipts for tenants.** Every payment on a tenant invoice, including ones recorded from the owner's Sales or Payments screen, has a Receipt button that opens a receipt PDF (amount, method, reference, invoice and balance after) with Download and Print.
