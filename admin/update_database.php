@@ -32,7 +32,7 @@ $h = fn($v) => htmlspecialchars((string)$v);
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Database updates</title>
 <link rel="stylesheet" href="<?= base_url ?>plugins/fontawesome-free/css/all.min.css">
-<link rel="stylesheet" href="<?= base_url ?>plugins/bootstrap/css/bootstrap.min.css">
+<link rel="stylesheet" href="<?= base_url ?>dist/css/adminlte.min.css">
 </head>
 <body class="bg-light"><div class="container py-4" style="max-width:720px">
   <div class="mb-3"><a href="<?= base_url ?>admin/?page=developer/dashboard"><i class="fas fa-arrow-left"></i> Developer dashboard</a></div>
