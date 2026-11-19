@@ -33,8 +33,40 @@ class PlatformBillingService
         return (int)$this->settings->userdata('type') === 1;
     }
 
+    /**
+     * Make sure the billing schema exists (the same statements as migration 054, all idempotent), so a server that
+     * has pulled the code but not yet run bin/migrate.php still works. Returns false if it could not be created.
+     */
+    public static function ensureSchema(mysqli $conn): bool
+    {
+        static $ok = null;
+        if ($ok !== null) {
+            return $ok;
+        }
+        $has = fn(string $table, string $col): bool => (bool)@$conn->query("SHOW COLUMNS FROM `{$table}` LIKE '{$col}'")?->num_rows;
+        if ($has('tenants', 'is_platform_owner') && $has('party_list', 'linked_tenant_id') && $has('invoice_list', 'product_code') && $has('platform_invoices', 'owner_invoice_id')) {
+            return $ok = true;
+        }
+        $sql = file_get_contents(dirname(__DIR__, 2) . '/database/migrations/054_platform_billing_owner_books.sql');
+        $sql = preg_replace('/^\s*--.*$/m', '', (string)$sql);
+        $linked = $has('platform_invoices', 'owner_invoice_id');
+        foreach (array_filter(array_map('trim', explode(";\n", (string)$sql))) as $stmt) {
+            if ($linked && stripos($stmt, 'DROP TABLE') === 0) {
+                continue;   // never drop links that already exist; the drops are only for the first-version table
+            }
+            if ($linked && stripos($stmt, 'CREATE TABLE') === 0) {
+                continue;
+            }
+            @$conn->query($stmt);
+        }
+        return $ok = ($has('tenants', 'is_platform_owner') && $has('party_list', 'linked_tenant_id') && $has('invoice_list', 'product_code') && $has('platform_invoices', 'owner_invoice_id'));
+    }
+
     public function ownerId(): int
     {
+        if (!self::ensureSchema($this->conn)) {
+            return 0;
+        }
         $r = $this->conn->query("SELECT id FROM tenants WHERE is_platform_owner = 1 AND delete_flag = 0 ORDER BY id LIMIT 1");
         return $r && ($row = $r->fetch_assoc()) ? (int)$row['id'] : 0;
     }

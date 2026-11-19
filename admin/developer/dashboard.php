@@ -8,6 +8,7 @@ if ($_settings->userdata('type') != 1) {
     return;
 }
 
+$nvPending = (new \App\Database\MigrationRunner($conn))->status(base_app . 'database/migrations')['pending'];
 $svc = new DeveloperService($conn);
 $totals = $svc->platformTotals();
 $app = $svc->applicationPerformance();
@@ -23,6 +24,10 @@ function fmt_bytes($b){
 }
 $cur = $_settings->info('currency') ?: '$';
 ?>
+<?php if ($nvPending): ?>
+<div class="alert alert-warning d-flex justify-content-between align-items-center"><span><i class="fas fa-database mr-1"></i> <?php echo count($nvPending) ?> database update(s) pending after the last code update.</span>
+  <a class="btn btn-sm btn-warning" href="<?php echo base_url ?>admin/update_database.php">Run updates</a></div>
+<?php endif; ?>
 <style>
 .dev-kpi{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.03);height:100%}
 .dev-kpi .lbl{font-size:.72rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px}
