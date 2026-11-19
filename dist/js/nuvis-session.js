@@ -46,12 +46,11 @@
   function show() { if (!document.body) return; var d = el(); if (!shown) { d.style.display = 'flex'; shown = true; var g = d.querySelector('#nv-sess-go'); if (g) g.focus(); } }
   function hide() { var d = document.getElementById('nv-session-modal'); if (d) { d.style.display = 'none'; } shown = false; }
 
-  // Navigation and form clicks: block when already known to be expired; when the last check is stale, check first.
-  function guard(e, proceed) {
+  // Navigation and form clicks: block only when already known to be expired. A stale check runs in the
+  // background and never delays the click; a dead session is caught by the page that loads next.
+  function guard(e) {
     if (expired) { e.preventDefault(); e.stopImmediatePropagation(); show(); return; }
-    if (Date.now() - lastOk < 15000) return;
-    e.preventDefault(); e.stopImmediatePropagation();
-    ping(function (ok) { if (ok) proceed(); });
+    if (Date.now() - lastOk >= 15000) ping();
   }
 
   document.addEventListener('click', function (e) {
@@ -62,9 +61,9 @@
       var h = t.getAttribute('href') || '';
       if (h === '' || h.charAt(0) === '#' || /^(javascript|mailto|tel):/i.test(h) || t.target === '_blank' || t.hasAttribute('data-toggle') || t.hasAttribute('data-widget') || t.hasAttribute('download')) return;
       if (/login\.php/.test(h)) return;
-      guard(e, function () { window.location.href = t.href; });
+      guard(e);
     } else if (expired) {
-      guard(e, function () {});
+      guard(e);
     }
   }, true);
 
