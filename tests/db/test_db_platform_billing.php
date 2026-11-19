@@ -4,12 +4,15 @@ require __DIR__ . '/_harness.php';
 
 class SystemSettings {
     public static int $type = 1;
-    public function active_tenant_id() { return (int)($_SESSION['userdata']['active_tenant_id'] ?? 2); }   // the developer is "in" tenant 2
+    public static int $tenant = 2;
+    public function active_tenant_id() { return (int)($_SESSION['userdata']['active_tenant_id'] ?? self::$tenant); }   // the developer is "in" tenant 2
     public function userdata($k = '') { return $k === 'id' ? 1 : ($k === 'type' ? self::$type : null); }
     public function is_super_admin() { return self::$type === 1; }
     public function log_audit(...$a) {}
     public function set_flashdata(...$a) {}
     public function base_currency($t = null) { return 'FJD'; }
+    public function currency_tag() { return 'FJD'; }
+    public function tenant_branding() { return ['name' => 'Owner Co', 'email' => '', 'phone' => '', 'address' => '', 'logo' => '']; }
 }
 $_SESSION['userdata'] = ['id' => 1, 'type' => 1];
 use App\Services\PlatformBillingService;
@@ -58,7 +61,19 @@ check('revenue by product counts live invoices only', count($rev) === 1 && $rev[
 check('overdue shows for unpaid past due only', PlatformBillingService::isOverdue(['status' => 'unpaid', 'due_date' => '2000-01-01'])
     && !PlatformBillingService::isOverdue(['status' => 'paid', 'due_date' => '2000-01-01']));
 
+$pdf = $svc->invoicePdf($lid);
+check('the developer gets the invoice as the same PDF Sales prints', $pdf && strpos($pdf['data'], '%PDF') === 0 && strpos($pdf['name'], '.pdf') !== false);
+$rc = $svc->receipts((int)$rows[1]['owner_invoice_id']);
+$rpdf = $svc->receiptPdf($lid, (int)$rc[0]['payment_id']);
+check('a receipt PDF is built for a payment on the invoice', $rpdf && strpos($rpdf['data'], '%PDF') === 0 && strpos($rpdf['name'], 'Receipt-') === 0);
+check('a receipt for a payment that is not on this invoice is refused', $svc->receiptPdf($lid, 999999) === null);
 SystemSettings::$type = 2;
+$tp = $svc->invoicePdf($lid);
+check('the customer tenant can get its own invoice and receipt PDFs', $tp && strpos($tp['data'], '%PDF') === 0 && $svc->receiptPdf($lid, (int)$rc[0]['payment_id']) !== null);
+$c->query("INSERT INTO tenants (id, tenant_code, name) VALUES (3, 'T3', 'Third Co')");
+SystemSettings::$tenant = 3;
+check('another tenant cannot get it', $svc->invoicePdf($lid) === null && $svc->receiptPdf($lid, (int)$rc[0]['payment_id']) === null);
+SystemSettings::$tenant = 2;
 check('a non-developer cannot create, pay or void', ($res($svc->createInvoice($post))['status'] ?? '') === 'failed'
     && ($res($svc->recordPayment(['invoice_id' => $lid, 'amount' => '1', 'bank_account_id' => $bank]))['status'] ?? '') === 'failed' && ($res($svc->voidInvoice($lid))['status'] ?? '') === 'failed');
 nv_done();

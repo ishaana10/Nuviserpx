@@ -186,6 +186,70 @@ class PlatformBillingService
         return $r ? ($r->fetch_assoc() ?: null) : null;
     }
 
+
+    /** The invoice link a signed-in user may see: any for the developer, only their own company's for a tenant. */
+    public function viewable(int $linkId): ?array
+    {
+        $uid = (int)$this->settings->userdata('id');
+        if ($uid <= 0) {
+            return null;
+        }
+        $inv = $this->link($linkId);
+        if (!$inv) {
+            return null;
+        }
+        if (!$this->guard() && (int)$inv['customer_tenant_id'] !== (int)$this->settings->active_tenant_id()) {
+            return null;
+        }
+        return $inv;
+    }
+
+    private function brandFor(int $owner): array
+    {
+        $b = $this->conn->query("SELECT * FROM tenants WHERE id = {$owner}")->fetch_assoc() ?: [];
+        if (trim((string)($b['logo'] ?? '')) === '') {
+            $l = $this->conn->query("SELECT logo_path FROM invoice_templates WHERE tenant_id = {$owner} LIMIT 1");
+            $b['logo'] = (string)(($l ? $l->fetch_assoc() : null)['logo_path'] ?? '');
+        }
+        return $b;
+    }
+
+    /** The same PDF the owner company prints from Sales, so the tenant sees exactly the sales invoice. */
+    public function invoicePdf(int $linkId): ?array
+    {
+        $inv = $this->viewable($linkId);
+        if (!$inv) {
+            return null;
+        }
+        $svc = new InvoiceService($this->conn, $this->settings);
+        if ($this->guard()) {
+            return $this->asOwner((int)$inv['tenant_id'], fn () => $svc->pdf((int)$inv['id']));
+        }
+        return $svc->pdfForPortal((int)$inv['id'], (int)$inv['party_id'], (int)$inv['tenant_id']);
+    }
+
+    /** A receipt for one payment that was applied to this invoice. */
+    public function receiptPdf(int $linkId, int $paymentId): ?array
+    {
+        $inv = $this->viewable($linkId);
+        if (!$inv) {
+            return null;
+        }
+        $owner = (int)$inv['tenant_id'];
+        $q = $this->conn->query("SELECT p.payment_no, p.payment_date, p.method, p.reference, a.amount FROM payment_allocations a
+            JOIN payment_list p ON p.id = a.payment_id WHERE p.tenant_id = {$owner} AND p.status <> 'cancelled' AND a.payment_id = {$paymentId} AND a.invoice_id = " . (int)$inv['id']);
+        $pay = $q ? $q->fetch_assoc() : null;
+        if (!$pay) {
+            return null;
+        }
+        $cust = $this->conn->query("SELECT name, address, tin FROM party_list WHERE tenant_id = {$owner} AND id = " . (int)$inv['party_id'])->fetch_assoc() ?: ['name' => ''];
+        $balance = (float)$inv['total'] - (float)$inv['paid_amount'] - (float)$inv['credited_amount'];
+        $status = $inv['status'] === 'partially_paid' ? 'partial' : (string)$inv['status'];
+        $data = \App\Support\ReceiptPdf::render($pay, ['invoice_no' => $inv['invoice_no'], 'total' => $inv['total'], 'balance' => $balance, 'status' => $status],
+            $cust, $this->brandFor($owner), (string)$this->settings->base_currency($owner));
+        return ['name' => \App\Support\ReceiptPdf::filename((string)$pay['payment_no']), 'data' => $data];
+    }
+
     /** Receipts are recorded in the owner's books against the invoice. */
     public function recordPayment(array $post): string
     {
@@ -274,7 +338,7 @@ class PlatformBillingService
     /** Receipts applied to an owner invoice. */
     public function receipts(int $ownerInvoiceId): array
     {
-        $q = $this->conn->query("SELECT p.payment_date AS pay_date, a.amount, p.method, p.reference, p.payment_no FROM payment_allocations a
+        $q = $this->conn->query("SELECT p.id AS payment_id, p.payment_date AS pay_date, a.amount, p.method, p.reference, p.payment_no FROM payment_allocations a
             JOIN payment_list p ON p.id = a.payment_id WHERE p.tenant_id = " . $this->ownerId() . " AND a.invoice_id = {$ownerInvoiceId} AND p.status <> 'cancelled' ORDER BY p.payment_date, p.id");
         return $q ? $q->fetch_all(MYSQLI_ASSOC) : [];
     }

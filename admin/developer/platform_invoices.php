@@ -35,7 +35,7 @@ $list = $svc->rows(); $rev = $owner ? $svc->revenueByProduct($owner) : [];
           <td class="text-right"><?= number_format($r['paid_amount'], 2) ?></td>
           <td><?= nv_pb_badge($r) ?></td>
           <td>
-            <a class="btn btn-xs btn-outline-primary" target="_blank" href="<?= base_url ?>admin/?page=billing/invoice&id=<?= (int)$r['id'] ?>">View / print</a>
+            <button class="btn btn-xs btn-outline-primary" onclick="uni_modal('Invoice <?= htmlspecialchars($r['invoice_no'], ENT_QUOTES) ?>','billing/doc_modal.php?type=invoice&id=<?= (int)$r['id'] ?>','large')">View / print</button>
             <?php if (in_array($r['status'], ['unpaid', 'partial'], true)): ?>
               <button class="btn btn-xs btn-outline-success" onclick="uni_modal('Record payment — <?= htmlspecialchars($r['invoice_no'], ENT_QUOTES) ?>','developer/record_platform_payment.php?id=<?= (int)$r['id'] ?>')">Record payment</button>
             <?php endif; ?>

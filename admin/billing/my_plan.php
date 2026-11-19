@@ -10,7 +10,7 @@ $rows = []; $billed = 0; $paid = 0; $pays = [];
 foreach (nv_pb_svc()->rows($tid) as $r) {
     if ($r['status'] === 'void') continue;
     $rows[] = $r; $billed += (float)$r['total']; $paid += (float)$r['paid_amount'];
-    foreach (nv_pb_svc()->receipts((int)$r['owner_invoice_id']) as $pp) { $pp['invoice_no'] = $r['invoice_no']; $pays[] = $pp; }
+    foreach (nv_pb_svc()->receipts((int)$r['owner_invoice_id']) as $pp) { $pp['invoice_no'] = $r['invoice_no']; $pp['link_id'] = (int)$r['id']; $pays[] = $pp; }
 }
 usort($pays, fn($a, $b) => strcmp($b['pay_date'], $a['pay_date']));
 $status = (string)($tn['plan_status'] ?: 'active');
@@ -63,7 +63,7 @@ $feat = json_decode((string)($tn['features'] ?? ''), true);
               <td class="text-right"><?= number_format($r['total'], 2) ?></td>
               <td class="text-right"><?= number_format($r['total'] - $r['paid_amount'], 2) ?></td>
               <td><?= nv_pb_badge($r) ?></td>
-              <td class="text-right"><a class="btn btn-xs btn-outline-primary" target="_blank" href="<?= base_url ?>admin/?page=billing/invoice&id=<?= (int)$r['id'] ?>"><i class="fa fa-eye"></i> View / print</a></td>
+              <td class="text-right"><button type="button" class="btn btn-xs btn-outline-primary" onclick="uni_modal('Invoice <?= htmlspecialchars($r['invoice_no'], ENT_QUOTES) ?>','billing/doc_modal.php?type=invoice&id=<?= (int)$r['id'] ?>','large')"><i class="fa fa-eye"></i> View / print</button></td>
             </tr>
           <?php endforeach; if (!$rows): ?>
             <tr><td colspan="7" class="text-center text-muted py-4">No invoices yet. When Nuvis Technologies bills you, they will appear here.</td></tr>
@@ -76,12 +76,12 @@ $feat = json_decode((string)($tn['features'] ?? ''), true);
       <div class="card-header"><h3 class="card-title">Payments received</h3></div>
       <div class="card-body p-0">
         <table class="table table-sm mb-0">
-          <thead><tr><th>Date</th><th>Invoice</th><th>Method</th><th>Reference</th><th class="text-right">Amount</th></tr></thead>
+          <thead><tr><th>Date</th><th>Invoice</th><th>Method</th><th>Reference</th><th class="text-right">Amount</th><th></th></tr></thead>
           <tbody>
           <?php $n = 0; foreach ($pays as $p): $n++; ?>
-            <tr><td><?= date('d M Y', strtotime($p['pay_date'])) ?></td><td><?= htmlspecialchars($p['invoice_no']) ?></td><td><?= htmlspecialchars((string)$p['method']) ?></td><td><?= htmlspecialchars((string)$p['reference']) ?></td><td class="text-right"><?= number_format($p['amount'], 2) ?></td></tr>
+            <tr><td><?= date('d M Y', strtotime($p['pay_date'])) ?></td><td><?= htmlspecialchars($p['invoice_no']) ?></td><td><?= htmlspecialchars((string)$p['method']) ?></td><td><?= htmlspecialchars((string)$p['reference']) ?></td><td class="text-right"><?= number_format($p['amount'], 2) ?></td><td class="text-right"><button type="button" class="btn btn-xs btn-outline-success" onclick="uni_modal('Receipt <?= htmlspecialchars((string)$p['payment_no'], ENT_QUOTES) ?>','billing/doc_modal.php?type=receipt&id=<?= $p['link_id'] ?>&payment=<?= (int)$p['payment_id'] ?>','large')"><i class="fa fa-receipt"></i> Receipt</button></td></tr>
           <?php endforeach; if (!$n): ?>
-            <tr><td colspan="5" class="text-center text-muted py-3">No payments recorded yet.</td></tr>
+            <tr><td colspan="6" class="text-center text-muted py-3">No payments recorded yet.</td></tr>
           <?php endif; ?>
           </tbody>
         </table>

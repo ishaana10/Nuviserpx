@@ -253,13 +253,13 @@ class HelpContent
         ],
         'my_plan' => [
             'title' => 'My Plan & Billing', 'icon' => 'fa-id-card', 'perm' => 'settings_manage',
-            'pages' => ['billing/my_plan', 'billing/invoice'],
+            'pages' => ['billing/my_plan'],
             'intro' => 'The plan your company is on with Nuvis Technologies, the invoices raised against it and the payments received. Developers: raise and record these under Developer, Tenant Invoices; they post to the owner company\'s sales and journals.',
             'sections' => [
                 ['h' => 'Viewing and printing invoices', 'steps' => [
                     'Click the plan badge at the top of any page, or open Settings, then My Plan & Billing.',
                     'Check the plan status, renewal date and what is outstanding.',
-                    'Click View / print beside an invoice, then Print. Each invoice shows its payment status.',
+                    'Click View / print beside an invoice to see it as a window, with Download and Print. Each invoice shows its payment status; click Receipt beside a payment for its receipt.',
                 ], 'tips' => ['Overdue means the due date has passed and a balance is still owing.']],
             ],
         ],
