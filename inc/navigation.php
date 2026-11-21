@@ -69,7 +69,7 @@
       <script>
         var page;
     $(document).ready(function(){
-      page = '<?php echo isset($_GET['page']) ? $_GET['page'] : 'home' ?>';
+      page = <?php echo json_encode(isset($_GET['page']) ? (string)$_GET['page'] : 'home', JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
       page = page.replace(/\//gi,'_');
 
       if($('.nav-link.nav-'+page).length > 0){
