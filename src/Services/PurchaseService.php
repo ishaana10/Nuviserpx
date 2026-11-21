@@ -514,8 +514,13 @@ class PurchaseService
         }
 
         // GL accounts: Dr Purchases/Inventory/Expense, Cr Accounts Payable.
-        $ap_acc_id = $this->findAccount(['payable', 'liabilit'], 3, (int)$tenant_id);
-        $exp_acc_id = $this->findAccount(['purchase', 'inventory', 'cost of goods', 'expense'], 5, (int)$tenant_id);
+        // Chosen by account TYPE first (a bill is never debited to an asset such as Inventory because of its name),
+        // and only from this company's own chart.
+        $ap_acc_id = $this->accountOfClass('liability', ['payable', 'creditor'], (int)$tenant_id);
+        $exp_acc_id = $this->accountOfClass('expense', ['purchase', 'cost of goods', 'general'], (int)$tenant_id);
+        if ($ap_acc_id === 0 || $exp_acc_id === 0) {
+            return json_encode(['status' => 'failed', 'msg' => 'Your chart of accounts needs an Accounts Payable (liability) account and a Purchases or expense account before bills can be posted.']);
+        }
         // With inventory accounting on, the part of the bill that buys stock products is an asset (Inventory), not
         // an expense: the cost reaches the profit and loss only when the goods are sold.
         $invSvc = new InventoryAccountingService($this->conn, $this->settings);
@@ -780,19 +785,33 @@ class PurchaseService
      *
      * @param array<int,string> $keywords
      */
-    private function findAccount(array $keywords, int $default, int $tenant_id): int
+    /**
+     * The company's account of a class (liability / expense), taken from its own chart by what the account IS (its type),
+     * never by its name alone: a bill must not land in Inventory because the name matched. Among several, the first name hint
+     * that matches wins, then the lowest code. 0 when the chart has none.
+     */
+    private function accountOfClass(string $class, array $nameHints, int $tenant_id): int
     {
-        $clauses = [];
-        foreach ($keywords as $kw) {
-            $kw = $this->conn->real_escape_string($kw);
-            $clauses[] = "`name` LIKE '%{$kw}%'";
+        $q = $this->conn->query("SELECT id, code, name, type FROM `account_list` WHERE tenant_id = '{$tenant_id}' AND delete_flag = 0 AND status = 1 ORDER BY code, id");
+        $best = 0;
+        $bestRank = -1;
+        foreach ($q ? $q->fetch_all(MYSQLI_ASSOC) : [] as $a) {
+            if (LedgerService::classify((string)$a['type'])['class'] !== $class) {
+                continue;
+            }
+            $rank = 0;
+            foreach ($nameHints as $i => $h) {
+                if (stripos((string)$a['name'], $h) !== false) {
+                    $rank = count($nameHints) - $i;
+                    break;
+                }
+            }
+            if ($rank > $bestRank) {
+                $best = (int)$a['id'];
+                $bestRank = $rank;
+            }
         }
-        $where = implode(' OR ', $clauses);
-        $q = $this->conn->query("SELECT id FROM `account_list` WHERE ({$where}) AND tenant_id = '{$tenant_id}' AND delete_flag = 0 LIMIT 1");
-        if ($q && $q->num_rows > 0) {
-            return (int)$q->fetch_assoc()['id'];
-        }
-        return $default;
+        return $best;
     }
 
     /**

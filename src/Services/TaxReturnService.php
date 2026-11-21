@@ -112,6 +112,25 @@ class TaxReturnService
         }
         $ledger = new LedgerService($this->conn, $t);
         $jv = LedgerService::vatFromJournalLines($ledger->vatJournalLines($from, $to));
+        // Credit notes to customers reduce output VAT and sales; debit notes to suppliers reduce input VAT and purchases.
+        // Without this the return would overstate both, while the VAT ledger accounts (which the notes post to) would not agree.
+        $stmt = $this->conn->prepare("SELECT id, note_no, note_type, note_date, subtotal, tax_amount, journal_id, reason FROM credit_notes
+            WHERE tenant_id = ? AND status = 'issued' AND note_date BETWEEN ? AND ? AND tax_amount > 0 ORDER BY note_date, id");
+        if ($stmt) {
+            $stmt->bind_param('iss', $t, $from, $to);
+            $stmt->execute();
+            $res = $stmt->get_result();
+            foreach ($res ? $res->fetch_all(MYSQLI_ASSOC) : [] as $n) {
+                $kind = $n['note_type'] === 'debit' ? 'input' : 'output';
+                $net = -round((float)$n['subtotal'], 2);
+                $tax = -round((float)$n['tax_amount'], 2);
+                $jv[$kind][] = ['journal_id' => (int)$n['journal_id'], 'code' => (string)$n['note_no'], 'date' => (string)$n['note_date'],
+                    'description' => ($kind === 'output' ? 'Credit note' : 'Debit note') . ($n['reason'] !== '' ? ' - ' . $n['reason'] : ''),
+                    'label' => 'VAT', 'net' => $net, 'tax' => $tax, 'inclusive' => false];
+                $jv[$kind . '_net'] = round($jv[$kind . '_net'] + $net, 2);
+                $jv[$kind . '_tax'] = round($jv[$kind . '_tax'] + $tax, 2);
+            }
+        }
         return [
             'invoices' => $invoices, 'bills' => $bills, 'jv' => $jv,
             'totals' => self::totals($invoices, $bills, $jv),

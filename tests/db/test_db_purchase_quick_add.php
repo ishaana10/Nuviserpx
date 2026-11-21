@@ -11,6 +11,7 @@ class SystemSettings {
 }
 use App\Services\{PartyService, InventoryService, PurchaseService};
 [$c, $db] = nv_fresh_db();
+$c->query("DELETE FROM account_list WHERE tenant_id = 1"); \App\Services\ChartProvisioner::provision($c, 1);   // a real chart: bills post to its payable and expense accounts
 $c->query("INSERT INTO users (id, firstname, lastname, username, password) VALUES (1,'A','B','u','x')");
 $c->query("INSERT INTO tenants (id, tenant_code, name) VALUES (2, 'T2', 'Second Co')");
 $s = new SystemSettings();
