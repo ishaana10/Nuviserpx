@@ -96,12 +96,27 @@ function isMobileDevice(){
 
 // Central authorisation for admin view files requested directly (modal forms,
 // exports, sub-pages): the router's page gate cannot see these requests.
+// 1) Every file under /admin/ needs a signed-in staff session. Without it a modal form such as
+//    manage_invoice.php?id=1 would answer an anonymous request with a company's data.
+//    Only the sign-in page, the session ping, the router (which shows the sign-in itself) and the
+//    update page (which checks for a super administrator itself) are reachable without one.
+// 2) Signed-in staff are then checked against the permission of the page they asked for.
 (function () use (&$_settings) {
-	if (!isset($_settings) || !isset($_SESSION['userdata']) || ($_SESSION['userdata']['login_type'] ?? 1) != 1) return;
+	if (php_sapi_name() === 'cli' || !isset($_settings)) return;
 	$script = str_replace('\\', '/', (string)($_SERVER['SCRIPT_FILENAME'] ?? ''));
 	$root = str_replace('\\', '/', rtrim(base_app, '/\\')) . '/admin/';
-	if (strpos($script, $root) !== 0 || isset($_GET['f'])) return;
-	$msg = \App\Support\Permissions::guardDirectView(substr($script, strlen($root)), $_settings, $_GET);
+	if (strpos($script, $root) !== 0) return;
+	$rel = substr($script, strlen($root));
+	$open = ['index.php', 'login.php', 'session_ping.php', 'update_database.php'];
+	$staff = isset($_SESSION['userdata']) && ($_SESSION['userdata']['login_type'] ?? 1) == 1;
+	if (!$staff) {
+		if (in_array($rel, $open, true)) return;
+		http_response_code(401);
+		while (ob_get_level() > 0) { ob_end_clean(); }
+		die('<div class="alert alert-warning m-3"><i class="fas fa-lock mr-2"></i>Your session has ended. Please sign in again.</div>');
+	}
+	if (isset($_GET['f'])) return;
+	$msg = \App\Support\Permissions::guardDirectView($rel, $_settings, $_GET);
 	if ($msg !== null) {
 		http_response_code(403);
 		while (ob_get_level() > 0) { ob_end_clean(); }
