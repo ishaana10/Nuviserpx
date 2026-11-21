@@ -99,7 +99,7 @@ class PayrollService
         $tenant = (int)$this->settings->active_tenant_id();
         $taxYear = PayrollEngine::tax_year_start($payDate, $rules['tax_year_start_month']);
         $n = PayrollEngine::period_number($frequency, $taxYear, $payDate);
-        $q = $this->conn->prepare("SELECT gross_salary, retro_pay, paye_tax, srt_tax, paye_lump FROM payroll_list
+        $q = $this->conn->prepare("SELECT gross_salary, retro_pay, leave_payout, redundancy_pay, paye_tax, srt_tax, paye_lump FROM payroll_list
             WHERE tenant_id = ? AND employee_id = ? AND status NOT IN ('rejected','voided') AND id <> ? AND pay_date >= ? AND pay_date < ?");
         $q->bind_param('iiiss', $tenant, $employeeId, $excludeId, $taxYear, $payDate);
         $q->execute();
@@ -119,7 +119,7 @@ class PayrollService
             $og = (float)($emp['ytd_opening_gross'] ?? 0);
             $ot = (float)($emp['ytd_opening_paye'] ?? 0);
         }
-        [$g, $t] = PayrollEngine::ytd_prior($rows, $og, $ot);
+        [$g, $t] = PayrollEngine::ytd_prior($rows, $og, $ot, $rules);
         return [$n, $g, $t];
     }
 

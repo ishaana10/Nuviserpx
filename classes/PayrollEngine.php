@@ -239,7 +239,13 @@ class PayrollEngine {
     public static function rules_on($setting, $asAt = null) {
         $asAt = ($asAt && preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$asAt)) ? (string)$asAt : date('Y-m-d');
         $versions = $setting['versions'] ?? [];
-        if (!$versions) return self::default_rules();
+        if (!$versions) {
+            // Preset: the FNPF employer rate was cut from 10% to 8% for wages
+            // from 1 Aug 2026 to 31 Jul 2027 (Budget 2026-27), 10% either side.
+            $d = self::default_rules();
+            $d['pension']['employer_rate'] = ($asAt >= '2026-08-01' && $asAt <= '2027-07-31') ? 0.08 : 0.10;
+            return $d;
+        }
         $pick = $versions[0];
         foreach ($versions as $v) {
             if ($v['effective_from'] <= $asAt) $pick = $v;
@@ -306,12 +312,16 @@ class PayrollEngine {
      * Opening balances brought forward from a previous system are added when $openings is given.
      * Returns [prior gross, prior tax].
      */
-    public static function ytd_prior($rows, $openGross = 0.0, $openTax = 0.0) {
+    public static function ytd_prior($rows, $openGross = 0.0, $openTax = 0.0, $rules = null) {
         $g = (float)$openGross;
         $t = (float)$openTax;
+        $red = ($rules ?: self::default_rules())['redundancy'];
         foreach ($rows as $r) {
-            $g += (float)($r['gross_salary'] ?? 0) - (float)($r['retro_pay'] ?? 0);
-            $t += (float)($r['paye_tax'] ?? 0) + (float)($r['srt_tax'] ?? 0) - (float)($r['paye_lump'] ?? 0);
+            // One-off pay (back pay, leave paid out, redundancy) and its tax are taxed on their own, so they stay out of the regular-pay position.
+            $redundancy = (float)($r['redundancy_pay'] ?? 0);
+            $redTax = $redundancy > $red['exempt_up_to'] ? round(($redundancy - $red['exempt_up_to']) * $red['rate'], 2) : 0.0;
+            $g += (float)($r['gross_salary'] ?? 0) - (float)($r['retro_pay'] ?? 0) - (float)($r['leave_payout'] ?? 0) - $redundancy;
+            $t += (float)($r['paye_tax'] ?? 0) + (float)($r['srt_tax'] ?? 0) - (float)($r['paye_lump'] ?? 0) - $redTax;
         }
         return [round($g, 2), round(max(0.0, $t), 2)];
     }
