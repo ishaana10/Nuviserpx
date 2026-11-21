@@ -12,6 +12,10 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
 
 ### Added
 - `tests/db/test_db_accounting_scenario.php`: an end-to-end accountant's walk-through (VAT-exclusive/inclusive/no-tax sales, receipts, bills, payments, credit and debit notes, edits, cancels, voids, period lock, stock and COGS, foreign currency with realised gain, fixed-asset depreciation, bank reconciliation, tenant isolation) asserting after each step that every journal balances, AR/AP/VAT/inventory sub-ledgers equal their control accounts, and the trial balance, income statement, balance sheet and cash flow reconcile.
+### Security
+- Admin form, modal and export files (e.g. `admin/invoices/manage_invoice.php?id=1`) could be opened without signing in and returned the default company's data. Every file under `/admin/` now needs a staff session (401 otherwise); employee-portal sessions are no longer treated as staff there either.
+- Legacy `inc/navigation.php` echoed `?page=` into JavaScript unescaped (reflected XSS); now JSON-encoded.
+- Fiscalisation `.p12`/`.pfx` certificates are stored with a random name in a web-closed, non-world-writable folder, and `uploads/.htaccess` refuses key/certificate extensions (protects certificates already uploaded).
 
 ### Fixed
 - Pages felt slow after the session-expiry check was added: a link click after ~15s idle waited for a server round trip before navigating. The check now runs in the background and never delays a click.

@@ -105,10 +105,14 @@ class FiscalizationService
             return json_encode(['status' => 'failed', 'msg' => 'Invalid file type. Only .p12 or .pfx files allowed.']);
         }
 
-        $fname = 'uploads/vms/cert_tenant_' . $tenant_id . '_' . time() . '.' . $ext;
+        // A certificate holds a private key: random name, folder closed to the web, never world-writable.
+        $fname = 'uploads/vms/cert_tenant_' . (int)$tenant_id . '_' . bin2hex(random_bytes(12)) . '.' . $ext;
         $dir_path = base_app . 'uploads/vms';
         if (!is_dir($dir_path)) {
-            mkdir($dir_path, 0777, true);
+            mkdir($dir_path, 0750, true);
+        }
+        if (!is_file($dir_path . '/.htaccess')) {
+            @file_put_contents($dir_path . '/.htaccess', "# Certificates: never served directly.\n<IfModule mod_authz_core.c>\n  Require all denied\n</IfModule>\n<IfModule !mod_authz_core.c>\n  Deny from all\n</IfModule>\n");
         }
 
         if (move_uploaded_file($_FILES['p12_cert']['tmp_name'], base_app . $fname)) {
