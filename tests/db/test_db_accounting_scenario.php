@@ -193,9 +193,9 @@ $r = $pur->saveVendorBill($stockBill);
 check('a bill for stock saves (' . $why($r) . ')', $ok($r));
 $bStock = (int)$q1("SELECT id FROM vendor_bill_list WHERE tenant_id = 1 ORDER BY id DESC LIMIT 1");
 check('the bill debits Inventory with the net 200, not an expense (inventory ' . $inv_->ledgerBalance() . ')', $near($inv_->ledgerBalance(), 200));
-// Goods arrive (what a goods receipt does to the product: quantity up, average cost recomputed)
-$c->query("UPDATE product_list SET stock_quantity = 10, cost_price = 20 WHERE id = 1");
-check('stock ledger (200) = valuation (' . $inv_->valuation() . ') once the goods are received', $near($inv_->ledgerBalance(), $inv_->valuation()));
+// The bill itself put the goods on the shelf (no purchase order, so no goods receipt will)
+check('the stock bill brought 10 units in at cost 20 (qty ' . $q1("SELECT stock_quantity FROM product_list WHERE id = 1") . ', cost ' . $q1("SELECT cost_price FROM product_list WHERE id = 1") . ')', $near($q1("SELECT stock_quantity FROM product_list WHERE id = 1"), 10) && $near($q1("SELECT cost_price FROM product_list WHERE id = 1"), 20));
+check('stock ledger (200) = valuation (' . $inv_->valuation() . ') straight after the bill', $near($inv_->ledgerBalance(), $inv_->valuation()));
 $invariants('after stock bill');
 
 // Sell 4 at 50 + VAT: Dr COGS 80 / Cr Inventory 80 alongside the sale
@@ -219,13 +219,56 @@ check('stock is back to 10 and COGS to 0', $near($q1("SELECT stock_quantity FROM
 check('inventory ledger back to 200 = valuation', $near($inv_->ledgerBalance(), 200) && $near($inv_->valuation(), 200));
 $invariants('after cancelling stock sale');
 
+// Editing the stock bill moves the shelf with it: 10 -> 8 units
+$r = $pur->saveVendorBill(array_replace($stockBill, ['id' => $bStock, 'item_qty' => [8], 'subtotal' => 160, 'tax_amount' => 20, 'total' => 180]));
+check('the stock bill can be reduced to 8 units (' . $why($r) . ')', $ok($r));
+check('stock fell to 8 and the ledger to 160, still equal (' . $q1("SELECT stock_quantity FROM product_list WHERE id = 1") . ' / ' . $inv_->ledgerBalance() . ' / ' . $inv_->valuation() . ')', $near($q1("SELECT stock_quantity FROM product_list WHERE id = 1"), 8) && $near($inv_->ledgerBalance(), 160) && $near($inv_->valuation(), 160));
+// Sell 5, then try to cancel the bill that brought them in: refused, because 5 of the 8 are gone
+$r = $inv->saveInvoice(array_replace($sale, ['invoice_date' => '2026-04-12', 'item_qty' => [5], 'subtotal' => 250, 'tax_amount' => 31.25, 'total' => 281.25]));
+check('selling 5 works', $ok($r));
+$r = $pur->cancelVendorBill($bStock);
+check('the bill cannot be cancelled once its stock is sold (' . $why($r) . ')', !$ok($r) && $q1("SELECT status FROM vendor_bill_list WHERE id = $bStock") !== 'cancelled');
+$r = $pur->saveVendorBill(array_replace($stockBill, ['id' => $bStock, 'item_qty' => [2], 'subtotal' => 40, 'tax_amount' => 5, 'total' => 45]));
+check('nor reduced below what was sold', !$ok($r));
+check('and nothing moved: stock 3, ledger = valuation', $near($q1("SELECT stock_quantity FROM product_list WHERE id = 1"), 3) && $near($inv_->ledgerBalance(), $inv_->valuation()));
+$invariants('after refused stock bill changes');
+// Cancel the sale, then the bill can be cancelled and the shelf empties
+$iSold = (int)$q1("SELECT id FROM invoice_list WHERE tenant_id = 1 ORDER BY id DESC LIMIT 1");
+$inv->saveInvoice(['id' => $iSold, 'status' => 'cancelled', 'party_id' => 1] + $base);
+$r = $pur->cancelVendorBill($bStock);
+check('with the sale cancelled the stock bill cancels (' . $why($r) . ')', $ok($r));
+check('stock is 0 and the inventory ledger is 0 (' . $q1("SELECT stock_quantity FROM product_list WHERE id = 1") . ' / ' . $inv_->ledgerBalance() . ')', $near($q1("SELECT stock_quantity FROM product_list WHERE id = 1"), 0) && $near($inv_->ledgerBalance(), 0) && $near($inv_->valuation(), 0));
+$invariants('after cancelling the stock bill');
+// A draft bill puts nothing on the shelf; issuing it does
+$r = $pur->saveVendorBill(array_replace($stockBill, ['status' => 'draft', 'bill_date' => '2026-04-20', 'due_date' => '2026-05-20']));
+$bDraft = (int)$q1("SELECT id FROM vendor_bill_list WHERE tenant_id = 1 ORDER BY id DESC LIMIT 1");
+check('a draft stock bill does not touch the shelf', $near($q1("SELECT stock_quantity FROM product_list WHERE id = 1"), 0));
+$r = $pur->saveVendorBill(array_replace($stockBill, ['id' => $bDraft, 'status' => 'unpaid', 'bill_date' => '2026-04-20', 'due_date' => '2026-05-20']));
+check('issuing the draft brings the 10 units in', $ok($r) && $near($q1("SELECT stock_quantity FROM product_list WHERE id = 1"), 10) && $near($inv_->ledgerBalance(), $inv_->valuation()) && $near($inv_->ledgerBalance(), 200));
+$r = $pur->saveVendorBill(array_replace($stockBill, ['id' => $bDraft, 'status' => 'unpaid', 'bill_date' => '2026-04-20', 'due_date' => '2026-05-20']));
+check('saving it again does not bring them in twice', $near($q1("SELECT stock_quantity FROM product_list WHERE id = 1"), 10));
+$invariants('after issuing the draft stock bill');
+
+// A stock bill held for approval is not on the shelf; approving it puts it there (once)
+$c->query("INSERT INTO approval_policies (tenant_id, doc_type, enabled, threshold, allow_self) VALUES (1, 'vendor_bill', 1, 100, 1) ON DUPLICATE KEY UPDATE enabled = 1, threshold = 100, allow_self = 1");
+$r = $pur->saveVendorBill(array_replace($stockBill, ['bill_date' => '2026-04-22', 'due_date' => '2026-05-22', 'item_qty' => [5], 'subtotal' => 100, 'tax_amount' => 12.5, 'total' => 112.5]));
+$bPend = (int)$q1("SELECT id FROM vendor_bill_list WHERE tenant_id = 1 ORDER BY id DESC LIMIT 1");
+check('a bill over the threshold waits for approval (' . $q1("SELECT status FROM vendor_bill_list WHERE id = $bPend") . ')', $q1("SELECT status FROM vendor_bill_list WHERE id = $bPend") === 'pending_approval');
+check('and has not touched the shelf (stock ' . $q1("SELECT stock_quantity FROM product_list WHERE id = 1") . ')', $near($q1("SELECT stock_quantity FROM product_list WHERE id = 1"), 10));
+$appr = new \App\Services\ApprovalService($c, $s);
+$r = $appr->approveBill($bPend);
+check('approving it works (' . $why($r) . ')', $ok($r));
+check('the 5 units reach the shelf: stock 15, ledger = valuation (' . $q1("SELECT stock_quantity FROM product_list WHERE id = 1") . ' / ' . $inv_->ledgerBalance() . ' / ' . $inv_->valuation() . ')', $near($q1("SELECT stock_quantity FROM product_list WHERE id = 1"), 15) && $near($inv_->ledgerBalance(), 300) && $near($inv_->valuation(), 300));
+$invariants('after approving a stock bill');
+$c->query("UPDATE approval_policies SET enabled = 0 WHERE tenant_id = 1");
+
 
 // ---------- 12. Notes, edits and voids -------------------------------------------------------------------------------------
 $r = $cn->issue(['note_type' => 'credit', 'document_id' => $i2, 'note_date' => '2026-04-12', 'reason' => 'too much', 'line_desc' => ['Over'], 'line_qty' => [1], 'line_price' => [500], 'line_tax' => [12.5], 'line_product' => [0], 'line_return' => [0]]);
 check('a credit note bigger than what is owed is refused', !$ok($r));
 $r = $cn->issue(['note_type' => 'debit', 'document_id' => $b1, 'note_date' => '2026-04-12', 'reason' => 'short delivery', 'line_desc' => ['Short'], 'line_qty' => [1], 'line_price' => [40], 'line_tax' => [12.5], 'line_product' => [0], 'line_return' => [0]]);
 check('a debit note against the bill issues (' . $why($r) . ')', $ok($r));
-check('AP fell by 45 (debit note 40 + VAT 5) and input VAT by 5', $near($q1("SELECT credited_amount FROM vendor_bill_list WHERE id = $b1"), 45) && $near($bal($VATIN), 50 + 25 - 5));
+check('AP fell by 45 (debit note 40 + VAT 5) and input VAT by 5', $near($q1("SELECT credited_amount FROM vendor_bill_list WHERE id = $b1"), 45) && $near($bal($VATIN), 50 + 25 + 12.5 - 5));
 $invariants('after debit note');
 $nid = (int)$q1("SELECT id FROM credit_notes WHERE tenant_id = 1 AND note_type = 'debit' ORDER BY id DESC LIMIT 1");
 $r = $cn->void($nid);

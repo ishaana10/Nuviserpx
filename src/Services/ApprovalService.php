@@ -266,6 +266,7 @@ class ApprovalService
             $this->conn->rollback();
             return $this->fail('That bill was already dealt with by someone else.');
         }
+        (new PurchaseService($this->conn, $this->settings))->receiveStockForApprovedBill($id);   // an approved stock bill reaches the shelf as well as the books
         $this->settings->log_audit('Approved vendor bill', 'Approvals', "{$bill['bill_no']} dated {$bill['bill_date']}, total " . number_format((float)$bill['total'], 2) . '.');
         $this->settings->set_flashdata('success', "Bill {$bill['bill_no']} approved.");
         return json_encode(['status' => 'success', 'msg' => "Bill {$bill['bill_no']} approved."]);

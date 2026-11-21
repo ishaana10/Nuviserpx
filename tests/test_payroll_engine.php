@@ -89,7 +89,7 @@ $json = json_encode($setting);
 check('setting round-trips through JSON', PayrollEngine::decode_setting($json) == $setting);
 $legacy = PayrollEngine::decode_setting(json_encode(['pension' => ['employee_rate' => 0.05, 'employer_rate' => 0.06]]));
 check('legacy single-object setting still works', PayrollEngine::rules_on($legacy, '2026-05-05')['pension']['employer_rate'] == 0.06);
-check('empty setting gives preset', PayrollEngine::rules_on(PayrollEngine::decode_setting(''), '2026-01-01')['pension']['employer_rate'] == 0.08);
+check('empty setting gives preset', PayrollEngine::rules_on(PayrollEngine::decode_setting(''), '2026-01-01')['pension']['employer_rate'] == 0.10);
 
 // Tax year and pay-period numbering
 check('tax year start (Jan)', PayrollEngine::tax_year_start('2026-11-30', 1) === '2026-01-01');

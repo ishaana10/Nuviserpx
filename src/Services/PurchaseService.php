@@ -531,6 +531,21 @@ class PurchaseService
             $stockNet = $this->stockNet($post, $invSvc);
         }
 
+        // Stock this bill brings in (inventory accounting on, bill posted, no purchase order): worked out now so a change that
+        // would take back stock already sold is refused before anything is booked.
+        $stockLines = [];
+        foreach ((array)($item_name ?? []) as $k => $nm) {
+            if (trim((string)$nm) === '') {
+                continue;
+            }
+            $stockLines[] = ['product_id' => isset($product_id[$k]) && is_numeric($product_id[$k]) ? (int)$product_id[$k] : 0,
+                'qty' => isset($item_qty[$k]) ? (float)$item_qty[$k] : 1.0, 'unit_price' => isset($item_price[$k]) ? (float)$item_price[$k] : 0.0];
+        }
+        $stockWanted = $this->stockWanted($stockLines, $status, is_int($po_id), (int)$tenant_id);
+        if (!empty($id) && ($problem = $this->stockTakeBackProblem($this->stockReceived((int)$id, (int)$tenant_id), $stockWanted, (int)$tenant_id))) {
+            return json_encode(['status' => 'failed', 'msg' => $problem]);
+        }
+
         $vendorName = $vendor['name'] ?? '';
         $description = $this->conn->real_escape_string("Vendor Bill {$bill_no} from {$vendorName} - Total: \${$total}");
         $journal_date = $bill_date;
@@ -650,6 +665,8 @@ class PurchaseService
             }
         }
 
+        $this->applyBillStock((int)$bill_id, $stockWanted, 'Bill ' . $bill_no, (int)$tenant_id, (int)$user_id);
+
         // If bill is linked to a PO, flag the PO as billed.
         if (is_int($po_id)) {
             $this->conn->query("UPDATE `purchase_order_list` SET `status` = 'billed' WHERE id = '{$po_id}' AND tenant_id = '{$tenant_id}'");
@@ -719,6 +736,9 @@ class PurchaseService
         if ($lockMsg = \App\Services\PeriodLockService::guardDocument($this->conn, $tenant_id, null, 'vendor_bill_list', $id)) {
             return json_encode(['status' => 'failed', 'msg' => $lockMsg]);
         }
+        if ($problem = $this->stockTakeBackProblem($this->stockReceived((int)$id, (int)$tenant_id), [], (int)$tenant_id)) {
+            return json_encode(['status' => 'failed', 'msg' => $problem]);
+        }
         $reversed = false;
         if (!empty($b['journal_id'])) {
             $js = $this->conn->query("SELECT status FROM `journal_entries` WHERE id = '{$b['journal_id']}' AND tenant_id = '{$tenant_id}'")->fetch_assoc()['status'] ?? '';
@@ -735,6 +755,7 @@ class PurchaseService
         if (!$ok || $this->conn->affected_rows !== 1) {
             return json_encode(['status' => 'failed', 'msg' => 'The bill changed while it was being cancelled. Reload and check it.']);
         }
+        $this->applyBillStock((int)$id, [], 'Bill ' . $b['bill_no'], (int)$tenant_id, (int)$this->settings->userdata('id'));
         $this->settings->log_audit('Cancelled Vendor Bill', 'Purchasing', "Bill {$b['bill_no']} (#{$id}), total {$b['total']}" . ($reversed ? ', ledger entry reversed.' : '.'));
         $this->settings->set_flashdata('success', ' Vendor bill cancelled and its ledger entry reversed.');
         return json_encode(['status' => 'success', 'msg' => ' Vendor bill cancelled.']);
@@ -860,6 +881,128 @@ class PurchaseService
         $id = (int)$raw;
         $r = $this->conn->query("SELECT 1 FROM `product_list` WHERE id = {$id} AND tenant_id = " . (int)$tenantId . " AND delete_flag = 0 LIMIT 1");
         return ($r && $r->num_rows) ? $id : 'NULL';
+    }
+
+    /**
+     * The stock a bill brings in, per product: [product_id => ['qty','cost']]. Only when inventory accounting is on, the bill is
+     * posted (not draft, waiting for approval or cancelled) and is not tied to a purchase order (a goods receipt brings those in).
+     * $lines: [product_id, qty, unit_price] rows; services and unknown products are dropped.
+     */
+    private function stockWanted(array $lines, string $status, bool $hasPo, int $tenantId): array
+    {
+        $inv = new InventoryAccountingService($this->conn, $this->settings);
+        if ($hasPo || !$inv->isEnabled() || !in_array($status, ['unpaid', 'partially_paid', 'paid'], true)) {
+            return [];
+        }
+        $ids = array_values(array_unique(array_filter(array_map(fn ($l) => (int)$l['product_id'], $lines))));
+        $known = $inv->products($ids);
+        $services = $inv->untrackedIds($ids);
+        $out = [];
+        foreach ($lines as $l) {
+            $pid = (int)$l['product_id'];
+            if ($pid <= 0 || !isset($known[$pid]) || in_array($pid, $services, true) || (float)$l['qty'] <= 0) {
+                continue;
+            }
+            $out[$pid]['qty'] = ($out[$pid]['qty'] ?? 0.0) + (float)$l['qty'];
+            $out[$pid]['value'] = ($out[$pid]['value'] ?? 0.0) + (float)$l['qty'] * (float)$l['unit_price'];
+        }
+        foreach ($out as $pid => $o) {
+            $out[$pid] = ['qty' => round($o['qty'], 4), 'cost' => $o['qty'] > 0 ? round($o['value'] / $o['qty'], 4) : 0.0];
+        }
+        return $out;
+    }
+
+    /** What this bill has already put on the shelf: [product_id => ['qty','cost']]. */
+    private function stockReceived(int $billId, int $tenantId): array
+    {
+        $out = [];
+        $q = $this->conn->query("SELECT product_id, qty, unit_cost FROM `vendor_bill_stock` WHERE bill_id = " . (int)$billId . " AND tenant_id = " . (int)$tenantId);
+        foreach ($q ? $q->fetch_all(MYSQLI_ASSOC) : [] as $r) {
+            $out[(int)$r['product_id']] = ['qty' => (float)$r['qty'], 'cost' => (float)$r['unit_cost']];
+        }
+        return $out;
+    }
+
+    /** Why the stock this bill brought in cannot be taken back (some of it already sold or moved), or null. */
+    private function stockTakeBackProblem(array $received, array $wanted, int $tenantId): ?string
+    {
+        foreach ($received as $pid => $r) {
+            $drop = round($r['qty'] - ($wanted[$pid]['qty'] ?? 0.0), 4);
+            if ($drop <= 0) {
+                continue;
+            }
+            $pidI = (int)$pid; $tidI = (int)$tenantId;
+            $p = $this->conn->query("SELECT name, stock_quantity FROM `product_list` WHERE id = {$pidI} AND tenant_id = {$tidI}")->fetch_assoc();
+            if ($p && (float)$p['stock_quantity'] + 0.00001 < $drop) {
+                return "This bill brought in {$r['qty']} of \"{$p['name']}\" but only " . (float)$p['stock_quantity'] . ' are on hand now, so it cannot be reduced or cancelled. Some of that stock has been sold or moved.';
+            }
+        }
+        return null;
+    }
+
+    /** Bring the shelf in line with $wanted: receive what is new, take back what was reduced. Records what the bill holds. */
+    private function applyBillStock(int $billId, array $wanted, string $reference, int $tenantId, int $userId): void
+    {
+        $received = $this->stockReceived($billId, $tenantId);
+        foreach ($wanted + $received as $pid => $_) {
+            $have = $received[$pid] ?? ['qty' => 0.0, 'cost' => 0.0];
+            $want = $wanted[$pid] ?? ['qty' => 0.0, 'cost' => 0.0];
+            $dq = round($want['qty'] - $have['qty'], 4);
+            if ($dq > 0) {
+                $this->receiveStock((int)$pid, $dq, $want['cost'], $tenantId, $userId, $reference, 0);
+            } elseif ($dq < 0) {
+                $this->unreceiveStock((int)$pid, -$dq, $have['cost'], $tenantId, $userId, $reference);
+            }
+        }
+        $this->conn->query("DELETE FROM `vendor_bill_stock` WHERE bill_id = " . (int)$billId . " AND tenant_id = " . (int)$tenantId);
+        foreach ($wanted as $pid => $w) {
+            $this->conn->query("INSERT INTO `vendor_bill_stock` (tenant_id, bill_id, product_id, qty, unit_cost) VALUES ("
+                . (int)$tenantId . ', ' . (int)$billId . ', ' . (int)$pid . ", '{$w['qty']}', '{$w['cost']}')");
+        }
+    }
+
+    /** The exact inverse of receiveStock(): quantity down, weighted-average cost put back as it was before that receipt. */
+    private function unreceiveStock(int $productId, float $qty, float $unitCost, int $tenantId, int $userId, string $reference): void
+    {
+        $pidI = (int)$productId; $tidI = (int)$tenantId;
+        $p = $this->conn->query("SELECT stock_quantity, cost_price FROM `product_list` WHERE id = {$pidI} AND tenant_id = {$tidI}")->fetch_assoc();
+        if (!$p) {
+            return;
+        }
+        $oldQty = (float)$p['stock_quantity'];
+        $oldCost = (float)$p['cost_price'];
+        $newQty = max(0.0, $oldQty - $qty);
+        $newCost = $newQty > 0 ? max(0.0, round(($oldQty * $oldCost - $qty * $unitCost) / $newQty, 4)) : $oldCost;
+        $this->conn->query("UPDATE `product_list` SET `stock_quantity` = '{$newQty}', `cost_price` = '{$newCost}' WHERE id = {$pidI} AND tenant_id = {$tidI}");
+        try {
+            \App\Core\Container::getInstance()->make(\App\Services\WarehouseStockService::class)->adjustLocation($productId, 0, -$qty, false);
+        } catch (\Throwable $e) {
+            // location tracking must not break the correction
+        }
+        $ref = $this->conn->real_escape_string($reference);
+        $this->conn->query("INSERT INTO `inventory_logs` SET `warehouse_id` = '0', `tenant_id` = '{$tenantId}', `product_id` = '{$productId}', `type` = 'out', `qty` = '{$qty}',
+            `unit_cost` = '{$unitCost}', `reference` = '{$ref}', `notes` = 'Vendor bill reduced or cancelled', `created_by` = '{$userId}'");
+    }
+
+    /**
+     * Put a bill's stock on the shelf once it has been approved (a bill waiting for approval has not reached the books or the shelf).
+     * Called by the approval step. Returns null, or why it could not.
+     */
+    public function receiveStockForApprovedBill(int $billId): ?string
+    {
+        $t = (int)$this->settings->active_tenant_id();
+        $b = $this->conn->query("SELECT bill_no, status, purchase_order_id FROM `vendor_bill_list` WHERE id = " . (int)$billId . " AND tenant_id = {$t}")->fetch_assoc();
+        if (!$b) {
+            return 'Bill not found.';
+        }
+        $lines = [];
+        $q = $this->conn->query("SELECT product_id, qty, unit_price FROM `vendor_bill_items` WHERE vendor_bill_id = " . (int)$billId);
+        foreach ($q ? $q->fetch_all(MYSQLI_ASSOC) : [] as $r) {
+            $lines[] = ['product_id' => (int)$r['product_id'], 'qty' => (float)$r['qty'], 'unit_price' => (float)$r['unit_price']];
+        }
+        $wanted = $this->stockWanted($lines, (string)$b['status'], !empty($b['purchase_order_id']), $t);
+        $this->applyBillStock($billId, $wanted, 'Bill ' . $b['bill_no'], $t, (int)$this->settings->userdata('id'));
+        return null;
     }
 
     private function stockNet(array $post, InventoryAccountingService $inv): float
