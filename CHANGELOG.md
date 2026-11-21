@@ -5,6 +5,13 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
 
 ## [Unreleased]
 
+### Fixed (accounting audit)
+- Bank reconciliation could not be started: the bank/cash account lookup used a table alias that did not exist, so every account was refused and the account list was empty.
+- Vendor bills chose their expense and payable accounts by name only; on a standard chart an ordinary expense bill (e.g. electricity) was debited to the Inventory asset. They now pick by account type (Purchases, then other expense accounts), only from the company's own chart, and refuse to post if the chart has no payable or expense account instead of falling back to a fixed account id.
+- The VAT return ignored credit notes and debit notes, so output/input VAT and taxable sales/purchases disagreed with the VAT accounts in the ledger. Notes now reduce them and show as negative lines on the VAT report.
+
+### Added
+- `tests/db/test_db_accounting_scenario.php`: an end-to-end accountant's walk-through (VAT-exclusive/inclusive/no-tax sales, receipts, bills, payments, credit and debit notes, edits, cancels, voids, period lock, stock and COGS, foreign currency with realised gain, fixed-asset depreciation, bank reconciliation, tenant isolation) asserting after each step that every journal balances, AR/AP/VAT/inventory sub-ledgers equal their control accounts, and the trial balance, income statement, balance sheet and cash flow reconcile.
 ### Security
 - Admin form, modal and export files (e.g. `admin/invoices/manage_invoice.php?id=1`) could be opened without signing in and returned the default company's data. Every file under `/admin/` now needs a staff session (401 otherwise); employee-portal sessions are no longer treated as staff there either.
 - Legacy `inc/navigation.php` echoed `?page=` into JavaScript unescaped (reflected XSS); now JSON-encoded.

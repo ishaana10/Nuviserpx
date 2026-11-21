@@ -31,9 +31,11 @@ class BankReconciliationService
     ) {}
 
     /** account_list types that are bank/cash accounts, mirroring LedgerService::classify. */
-    private function bankAccountWhere(string $alias = 'a'): string
+    /** Condition for bank/cash accounts. The queries that use it read `account_list` without an alias, so the default is unqualified. */
+    private function bankAccountWhere(string $alias = ''): string
     {
-        return "(LOWER({$alias}.`type`) = 'bank' OR LOWER({$alias}.`type`) LIKE '%cash%')";
+        $p = $alias === '' ? '' : "{$alias}.";
+        return "(LOWER({$p}`type`) = 'bank' OR LOWER({$p}`type`) LIKE '%cash%')";
     }
 
     /**
