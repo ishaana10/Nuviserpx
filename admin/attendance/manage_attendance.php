@@ -39,7 +39,7 @@ if($id > 0){
 				$emp_qry = $conn->query("SELECT *, concat(firstname, ' ', lastname) as name FROM `employee_list` where tenant_id = '{$tenant_id}' and status = 1 and delete_flag = 0 order by firstname asc");
 				while($row = $emp_qry->fetch_assoc()):
 				?>
-				<option value="<?php echo $row['id'] ?>" <?php echo isset($employee_id) && $employee_id == $row['id'] ? 'selected' : '' ?>><?php echo $row['employee_code'] . ' - ' . $row['name'] ?></option>
+				<option value="<?php echo $row['id'] ?>" <?php echo isset($employee_id) && $employee_id == $row['id'] ? 'selected' : '' ?>><?php echo htmlspecialchars((string)($row['employee_code'] . ' - ' . $row['name']), ENT_QUOTES) ?></option>
 				<?php endwhile; ?>
 			</select>
 		</div>

@@ -375,13 +375,18 @@ class LeaveBalanceService
             if ($custom) {
                 $p['annual_days'] = $own[$type];
             }
+            // Read each result in full before the next statement is prepared (an unread result blocks the connection).
             $lq = $this->conn->prepare("SELECT start_date, end_date, day_fraction FROM leave_list WHERE tenant_id = ? AND employee_id = ? AND leave_type = ? AND status = 'approved' AND id <> ?");
             $lq->bind_param('iisi', $t, $employeeId, $type, $excludeLeaveId);
             $lq->execute();
+            $approved = $lq->get_result()->fetch_all(MYSQLI_ASSOC);
+            $lq->close();
             $aq = $this->conn->prepare("SELECT effective_date, days FROM leave_adjustments WHERE tenant_id = ? AND employee_id = ? AND leave_type = ?");
             $aq->bind_param('iis', $t, $employeeId, $type);
             $aq->execute();
-            $bal = self::balance($p, $join, $term, $asOf, self::takenByYear($lq->get_result()->fetch_all(MYSQLI_ASSOC), $dpw, $holidays), $aq->get_result()->fetch_all(MYSQLI_ASSOC));
+            $adjustments = $aq->get_result()->fetch_all(MYSQLI_ASSOC);
+            $aq->close();
+            $bal = self::balance($p, $join, $term, $asOf, self::takenByYear($approved, $dpw, $holidays), $adjustments);
             $out[$type] = $bal + ['policy' => $p, 'label' => self::TYPES[$type], 'custom' => $custom];
         }
         return $out;

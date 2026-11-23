@@ -67,15 +67,15 @@ try {
 					?>
 						<tr>
 							<td class="text-center"><?php echo $i++; ?></td>
-							<td><b><?php echo $row['employee_code'] ?></b></td>
-							<td><?php echo $row['name'] ?></td>
+							<td><b><?php echo htmlspecialchars((string)($row['employee_code']), ENT_QUOTES) ?></b></td>
+							<td><?php echo htmlspecialchars((string)($row['name']), ENT_QUOTES) ?></td>
 							<td>
-								<small class="d-block"><b>TIN:</b> <?php echo !empty($row['tin']) ? $row['tin'] : 'N/A' ?></small>
-								<small class="d-block text-muted"><b>FNPF:</b> <?php echo !empty($row['fnpf_no']) ? $row['fnpf_no'] : 'N/A' ?></small>
+								<small class="d-block"><b>TIN:</b> <?php echo !empty($row['tin']) ? htmlspecialchars((string)($row['tin']), ENT_QUOTES) : 'N/A' ?></small>
+								<small class="d-block text-muted"><b>FNPF:</b> <?php echo !empty($row['fnpf_no']) ? htmlspecialchars((string)($row['fnpf_no']), ENT_QUOTES) : 'N/A' ?></small>
 							</td>
 							<td>
-								<p class="m-0"><?php echo $row['department'] ?></p>
-								<small class="text-muted"><?php echo $row['designation'] ?></small>
+								<p class="m-0"><?php echo htmlspecialchars((string)($row['department']), ENT_QUOTES) ?></p>
+								<small class="text-muted"><?php echo htmlspecialchars((string)($row['designation']), ENT_QUOTES) ?></small>
 							</td>
 							<td class="text-right font-weight-bold"><?php echo number_format((float)($row['annual_salary'] ?? 0) > 0 ? (float)$row['annual_salary'] : (float)$row['salary'] * 12, 2) ?> <?php echo htmlspecialchars($_settings->base_currency()) ?></td>
 							<td class="text-center">

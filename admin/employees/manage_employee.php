@@ -39,16 +39,16 @@ $readonly = isset($id) && !$can_edit && $scope !== null;
 		<input type="hidden" name="id" value="<?php echo isset($id) ? $id : '' ?>">
 		<div class="form-group">
 			<label for="employee_code" class="control-label">Employee Code / Staff No</label>
-			<input type="text" name="employee_code" id="employee_code" class="form-control form-control-sm rounded-0" value="<?php echo isset($employee_code) ? $employee_code : ''; ?>" required/>
+			<input type="text" name="employee_code" id="employee_code" class="form-control form-control-sm rounded-0" value="<?php echo isset($employee_code) ? htmlspecialchars((string)($employee_code), ENT_QUOTES) : ''; ?>" required/>
 		</div>
 		<div class="row">
 			<div class="col-md-6 form-group">
 				<label for="firstname" class="control-label">First Name</label>
-				<input type="text" name="firstname" id="firstname" class="form-control form-control-sm rounded-0" value="<?php echo isset($firstname) ? $firstname : ''; ?>" required/>
+				<input type="text" name="firstname" id="firstname" class="form-control form-control-sm rounded-0" value="<?php echo isset($firstname) ? htmlspecialchars((string)($firstname), ENT_QUOTES) : ''; ?>" required/>
 			</div>
 			<div class="col-md-6 form-group">
 				<label for="lastname" class="control-label">Last Name</label>
-				<input type="text" name="lastname" id="lastname" class="form-control form-control-sm rounded-0" value="<?php echo isset($lastname) ? $lastname : ''; ?>" required/>
+				<input type="text" name="lastname" id="lastname" class="form-control form-control-sm rounded-0" value="<?php echo isset($lastname) ? htmlspecialchars((string)($lastname), ENT_QUOTES) : ''; ?>" required/>
 			</div>
 		</div>
 		<div class="row">
@@ -58,7 +58,7 @@ $readonly = isset($id) && !$can_edit && $scope !== null;
 			</div>
 			<div class="col-md-6 form-group">
 				<label for="phone" class="control-label">Phone</label>
-				<input type="text" name="phone" id="phone" class="form-control form-control-sm rounded-0" value="<?php echo isset($phone) ? $phone : ''; ?>" />
+				<input type="text" name="phone" id="phone" class="form-control form-control-sm rounded-0" value="<?php echo isset($phone) ? htmlspecialchars((string)($phone), ENT_QUOTES) : ''; ?>" />
 			</div>
 		</div>
 		<div class="row">
@@ -154,11 +154,11 @@ $readonly = isset($id) && !$can_edit && $scope !== null;
 		<div class="row">
 			<div class="col-md-6 form-group">
 				<label for="tin" class="control-label">Tax Identification Number (TIN)</label>
-				<input type="text" name="tin" id="tin" class="form-control form-control-sm rounded-0" value="<?php echo isset($tin) ? $tin : ''; ?>" placeholder="e.g. 99-99999-9" />
+				<input type="text" name="tin" id="tin" class="form-control form-control-sm rounded-0" value="<?php echo isset($tin) ? htmlspecialchars((string)($tin), ENT_QUOTES) : ''; ?>" placeholder="e.g. 99-99999-9" />
 			</div>
 			<div class="col-md-6 form-group">
 				<label for="fnpf_no" class="control-label">FNPF Number</label>
-				<input type="text" name="fnpf_no" id="fnpf_no" class="form-control form-control-sm rounded-0" value="<?php echo isset($fnpf_no) ? $fnpf_no : ''; ?>" placeholder="e.g. 1234567" />
+				<input type="text" name="fnpf_no" id="fnpf_no" class="form-control form-control-sm rounded-0" value="<?php echo isset($fnpf_no) ? htmlspecialchars((string)($fnpf_no), ENT_QUOTES) : ''; ?>" placeholder="e.g. 1234567" />
 			</div>
 		</div>
 
@@ -195,7 +195,7 @@ $readonly = isset($id) && !$can_edit && $scope !== null;
 			</div>
 			<div class="col-md-6 form-group">
 				<label for="bank_account" class="control-label">Bank Account Number</label>
-				<input type="text" name="bank_account" id="bank_account" class="form-control form-control-sm rounded-0" value="<?php echo isset($bank_account) ? $bank_account : ''; ?>" placeholder="Account Number" />
+				<input type="text" name="bank_account" id="bank_account" class="form-control form-control-sm rounded-0" value="<?php echo isset($bank_account) ? htmlspecialchars((string)($bank_account), ENT_QUOTES) : ''; ?>" placeholder="Account Number" />
 			</div>
 		</div>
 
@@ -204,15 +204,15 @@ $readonly = isset($id) && !$can_edit && $scope !== null;
 		<div class="row">
 			<div class="col-md-4 form-group">
 				<label for="department" class="control-label">Department</label>
-				<input type="text" name="department" id="department" class="form-control form-control-sm rounded-0" value="<?php echo isset($department) ? $department : ''; ?>" />
+				<input type="text" name="department" id="department" class="form-control form-control-sm rounded-0" value="<?php echo isset($department) ? htmlspecialchars((string)($department), ENT_QUOTES) : ''; ?>" />
 			</div>
 			<div class="col-md-4 form-group">
 				<label for="designation" class="control-label">Designation</label>
-				<input type="text" name="designation" id="designation" class="form-control form-control-sm rounded-0" value="<?php echo isset($designation) ? $designation : ''; ?>" />
+				<input type="text" name="designation" id="designation" class="form-control form-control-sm rounded-0" value="<?php echo isset($designation) ? htmlspecialchars((string)($designation), ENT_QUOTES) : ''; ?>" />
 			</div>
 			<div class="col-md-4 form-group">
 				<label for="date_of_joining" class="control-label">Date of Joining</label>
-				<input type="date" name="date_of_joining" id="date_of_joining" class="form-control form-control-sm rounded-0" value="<?php echo isset($date_of_joining) ? $date_of_joining : ''; ?>" />
+				<input type="date" name="date_of_joining" id="date_of_joining" class="form-control form-control-sm rounded-0" value="<?php echo isset($date_of_joining) ? htmlspecialchars((string)($date_of_joining), ENT_QUOTES) : ''; ?>" />
 				<small class="text-muted">Used for leave accrual and to pay a new starter only from this date.</small>
 			</div>
 			<div class="col-md-4 form-group">
