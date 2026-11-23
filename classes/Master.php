@@ -1536,6 +1536,11 @@ $action = !isset($_GET['f']) ? 'none' : strtolower($_GET['f']);
  * administrators (the developer tier) bypass permission checks. Public portal
  * actions (customer login/registration) are exempt.
  * ------------------------------------------------------------------------- */
+if ($action !== 'none' && $_SERVER['REQUEST_METHOD'] === 'POST'
+    && in_array($action, ['employee_portal_leave_apply', 'employee_portal_leave_cancel', 'employee_portal_leave_preview', 'employee_portal_change_password'], true)) {
+    // Signed-in employee actions are public to the staff gate but still need the page's own security token.
+    $_settings->require_csrf();
+}
 if ($action !== 'none' && !in_array($action, \App\Support\Permissions::PUBLIC_ACTIONS, true)) {
     $_settings->require_login();
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {

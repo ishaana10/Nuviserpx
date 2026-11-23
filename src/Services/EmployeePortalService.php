@@ -42,6 +42,9 @@ class EmployeePortalService
         if (strlen($password) > 72) $err[] = 'Use no more than 72 characters.';
         if (!preg_match('/[A-Za-z]/', $password) || !preg_match('/\d/', $password)) $err[] = 'Include at least one letter and one number.';
         if ($email !== '' && strcasecmp($password, $email) === 0) $err[] = 'The password cannot be your email address.';
+        $local = strtolower(strstr($email, '@', true) ?: '');
+        if (strlen($local) >= 4 && stripos($password, $local) !== false) $err[] = 'The password cannot contain your email name.';
+        if (in_array(strtolower($password), ['password1', 'password12', 'password123', 'password1234', 'welcome1', 'welcome123', 'qwerty123', 'abc12345', '12345678a', 'letmein123', 'admin123', 'iloveyou1', 'changeme1'], true)) $err[] = 'That password is too common. Choose another.';
         return $err;
     }
 
@@ -153,7 +156,7 @@ class EmployeePortalService
         }
         $hash = self::tokenHash($token);
         $q = $this->conn->prepare("SELECT u.id, u.tenant_id, u.employee_id, u.email, CONCAT(e.firstname, ' ', e.lastname) name
-            FROM employee_portal_users u JOIN employee_list e ON e.id = u.employee_id AND e.tenant_id = u.tenant_id
+            FROM employee_portal_users u JOIN employee_list e ON e.id = u.employee_id AND e.tenant_id = u.tenant_id AND e.delete_flag = 0 AND e.status = 1
             WHERE u.invite_token_hash = ? AND u.invite_expires_at >= NOW() AND u.status = 0 LIMIT 1");
         $q->bind_param('s', $hash);
         $q->execute();
@@ -163,8 +166,14 @@ class EmployeePortalService
     /** @return array{ok:bool,msg:string,session?:array} */
     public function activate(string $token, string $password, string $ip): array
     {
+        $throttle = new AuthThrottleService($this->conn);
+        $wait = $throttle->check('employee_activate', $ip, $ip);
+        if ($wait > 0) {
+            return ['ok' => false, 'msg' => 'Too many attempts. Try again in ' . AuthThrottleService::waitText($wait) . '.'];
+        }
         $inv = $this->invitation($token);
         if (!$inv) {
+            $throttle->record('employee_activate', $ip, $ip);
             return ['ok' => false, 'msg' => 'This invitation link is invalid or has expired. Ask HR to send a new one.'];
         }
         if ($err = self::passwordErrors($password, (string)$inv['email'])) {
@@ -191,17 +200,29 @@ class EmployeePortalService
         if (!self::validEmail($email) || $password === '' || strlen($password) > 200) {
             return $generic;
         }
+        // Wrong guesses from one address, or against one username, are slowed down across every account.
+        $throttle = new AuthThrottleService($this->conn);
+        $wait = $throttle->check('employee_login', $email, $ip);
+        if ($wait > 0) {
+            return ['ok' => false, 'msg' => 'Too many failed attempts. Try again in ' . AuthThrottleService::waitText($wait) . '.'];
+        }
         $q = $this->conn->prepare("SELECT u.id, u.tenant_id, u.employee_id, u.email, u.password, u.locked_until FROM employee_portal_users u
             INNER JOIN employee_list e ON e.id = u.employee_id AND e.tenant_id = u.tenant_id AND e.delete_flag = 0 AND e.status = 1
             WHERE u.email = ? AND u.status = 1");
         $q->bind_param('s', $email);
         $q->execute();
         $now = time();
-        foreach ($q->get_result()->fetch_all(MYSQLI_ASSOC) as $u) {
+        $found = $q->get_result()->fetch_all(MYSQLI_ASSOC);
+        if (!$found) {
+            // An unknown username costs the same time as a wrong password.
+            password_verify($password, '$2y$10$4atYI/I54Zf2duldz2eoGeLt85rsTV2yvoQVc7oLbm1JwmpyG6aDK');
+        }
+        foreach ($found as $u) {
             if (self::isLocked($u['locked_until'], $now)) {
                 continue;
             }
             if (!empty($u['password']) && password_verify($password, $u['password'])) {
+                $throttle->clear('employee_login', $email, $ip);
                 $id = (int)$u['id'];
                 $this->conn->query("UPDATE employee_portal_users SET failed_attempts = 0, locked_until = NULL, last_login = NOW() WHERE id = {$id}");
                 $this->log((int)$u['tenant_id'], (int)$u['employee_id'], 'login', 'Signed in', $ip);
@@ -209,6 +230,7 @@ class EmployeePortalService
             }
             $this->fail_attempt((int)$u['id'], (int)$u['tenant_id'], (int)$u['employee_id'], $ip);
         }
+        $throttle->record('employee_login', $email, $ip);
         return $generic;
     }
 

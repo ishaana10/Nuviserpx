@@ -16,7 +16,7 @@ check('blocked for at least a second', T::retryAfter(array_fill(0, 5, $now), $no
 check('no failures, no wait', T::retryAfter([], $now, 5) === 0);
 check('identifier is case-insensitive and trimmed', T::identifier('  Admin@X.com ') === 'admin@x.com');
 check('wait text', T::waitText(30) === '30 seconds' && T::waitText(60) === '1 minute' && T::waitText(901) === '16 minutes');
-check('every scope has three tiers, user limit above pair limit', count(T::LIMITS) === 6 && count(array_filter(T::LIMITS, fn($l) => isset($l['pair'], $l['user'], $l['ip']))) === 6 && T::LIMITS['login']['user'] > T::LIMITS['login']['pair']);
+check('every scope has three tiers, user limit above pair limit', count(T::LIMITS) === 8 && count(array_filter(T::LIMITS, fn($l) => isset($l['pair'], $l['user'], $l['ip']))) === 8 && T::LIMITS['login']['user'] > T::LIMITS['login']['pair']);
 
 $login = file_get_contents("$root/classes/Login.php");
 check('login is throttled and records failures', strpos($login, "check('login'") !== false && strpos($login, "record('login'") !== false && strpos($login, "clear('login'") !== false);

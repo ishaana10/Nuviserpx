@@ -88,6 +88,15 @@ class PortalLeaveService
             $out['msg'] = 'The end date cannot be before the start date.';
             return $out;
         }
+        // The form limits dates in the browser; the server enforces the same window.
+        if ($start < date('Y-m-d', strtotime('-60 days'))) {
+            $out['msg'] = 'Leave can be requested for up to 60 days back. For earlier dates, ask HR.';
+            return $out;
+        }
+        if ($end > date('Y-m-d', strtotime('+2 years'))) {
+            $out['msg'] = 'Leave can be requested up to 2 years ahead.';
+            return $out;
+        }
         if ($err = LeaveBalanceService::fractionError($start, $end, $frac)) {
             $out['msg'] = $err;
             return $out;
