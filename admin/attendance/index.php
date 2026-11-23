@@ -46,8 +46,8 @@
 							<td class="text-center"><?php echo $i++; ?></td>
 							<td><?php echo date("M d, Y", strtotime($row['attendance_date'])) ?></td>
 							<td>
-								<p class="m-0"><?php echo $row['emp_name'] ?></p>
-								<small class="text-muted"><?php echo $row['employee_code'] ?></small>
+								<p class="m-0"><?php echo htmlspecialchars((string)($row['emp_name']), ENT_QUOTES) ?></p>
+								<small class="text-muted"><?php echo htmlspecialchars((string)($row['employee_code']), ENT_QUOTES) ?></small>
 							</td>
 							<td class="text-center"><?php echo !empty($row['check_in']) ? date("h:i A", strtotime($row['check_in'])) : '-' ?></td>
 							<td class="text-center"><?php echo !empty($row['check_out']) ? date("h:i A", strtotime($row['check_out'])) : '-' ?></td>

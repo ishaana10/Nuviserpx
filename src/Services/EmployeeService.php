@@ -20,6 +20,12 @@ class EmployeeService
         $employee_code = $post['employee_code'] ?? null;
         $tenant_id = $this->settings->active_tenant_id();
         $id = isset($id) ? intval($id) : 0;
+        if (isset($post['employee_code'])) {
+            $post['employee_code'] = $employee_code = trim((string)$post['employee_code']);
+        }
+        if ($bad = $this->employeeProblem($post, $id, (int)$tenant_id)) {
+            return json_encode(['status' => 'failed', 'msg' => ' ' . $bad]);
+        }
         $dataStr = "";
         $before = $id > 0 ? ($this->conn->query("SELECT * FROM `employee_list` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'")->fetch_assoc() ?: []) : [];
         // Pay is captured as annual gross; the monthly figure is derived and
@@ -91,12 +97,80 @@ class EmployeeService
         return json_encode($resp);
     }
 
+    /**
+     * Why this employee record cannot be saved, or null. A new record needs a code and both names; an edit is
+     * checked only for the fields it carries. Approvers must be current staff of the same company.
+     */
+    private function employeeProblem(array $post, int $id, int $tenant): ?string
+    {
+        $new = $id <= 0;
+        $before = $new ? [] : ($this->conn->query("SELECT * FROM `employee_list` WHERE id = '{$id}' AND tenant_id = '{$tenant}'")->fetch_assoc() ?: []);
+        if (!$new && !$before) {
+            return 'Employee not found.';
+        }
+        $has = fn($k) => array_key_exists($k, $post);
+        if (($new || $has('employee_code')) && trim((string)($post['employee_code'] ?? '')) === '') {
+            return 'Enter an employee code.';
+        }
+        foreach (['firstname' => 'first name', 'lastname' => 'last name'] as $k => $label) {
+            if (($new || $has($k)) && trim((string)($post[$k] ?? '')) === '') {
+                return "Enter the employee's {$label}.";
+            }
+        }
+        $dateOk = fn($d) => preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$d) === 1 && strtotime((string)$d) !== false && date('Y-m-d', strtotime((string)$d)) === (string)$d;
+        foreach (['date_of_joining' => 'joining date', 'termination_date' => 'leaving date'] as $k => $label) {
+            if ($has($k) && trim((string)$post[$k]) !== '' && !$dateOk($post[$k])) {
+                return "Enter a valid {$label}.";
+            }
+        }
+        $join = $has('date_of_joining') ? trim((string)$post['date_of_joining']) : (string)($before['date_of_joining'] ?? '');
+        $term = $has('termination_date') ? trim((string)$post['termination_date']) : (string)($before['termination_date'] ?? '');
+        if ($join !== '' && $term !== '' && $term < $join) {
+            return 'The leaving date cannot be before the joining date.';
+        }
+        foreach (['annual_salary' => 'annual salary', 'salary' => 'salary'] as $k => $label) {
+            if ($has($k) && trim((string)$post[$k]) !== '' && (!is_numeric($post[$k]) || (float)$post[$k] < 0 || (float)$post[$k] > 100000000)) {
+                return "Enter a valid {$label} (zero or more).";
+            }
+        }
+        if ($has('approver_id') && trim((string)$post['approver_id']) !== '') {
+            $ap = (int)$post['approver_id'];
+            if ($ap === $id && $id > 0) {
+                return 'An employee cannot be their own leave approver.';
+            }
+            $q = $this->conn->query("SELECT status, termination_date FROM `employee_list` WHERE id = '{$ap}' AND tenant_id = '{$tenant}' AND delete_flag = 0");
+            $a = $q ? $q->fetch_assoc() : null;
+            if (!$a) {
+                return 'Choose an approver from this company.';
+            }
+            if ((int)$a['status'] !== 1 || (!empty($a['termination_date']) && $a['termination_date'] < date('Y-m-d'))) {
+                return 'The approver has left or is inactive. Choose a current employee.';
+            }
+        }
+        $email = trim((string)($post['email'] ?? ''));
+        if ($email !== '') {
+            $e = $this->conn->real_escape_string($email);
+            $dup = $this->conn->query("SELECT id FROM `employee_list` WHERE LOWER(email) = LOWER('{$e}') AND tenant_id = '{$tenant}' AND delete_flag = 0" . ($id > 0 ? " AND id != '{$id}'" : '') . " LIMIT 1");
+            if ($dup && $dup->num_rows > 0) {
+                return 'Another employee already uses this email address.';
+            }
+        }
+        return null;
+    }
+
     public function deleteEmployee(int $id): string
     {
         $tenant_id = $this->settings->active_tenant_id();
+        $hist = $this->conn->query("SELECT 1 FROM `payroll_list` WHERE employee_id = '{$id}' AND tenant_id = '{$tenant_id}' AND status <> 'voided' LIMIT 1");
+        if ($hist && $hist->num_rows > 0) {
+            return json_encode(['status' => 'failed', 'msg' => 'This employee has payroll history, so the record is kept for your books. Set a leaving date and make them inactive instead.']);
+        }
         $was = $this->conn->query("SELECT employee_code, firstname, lastname FROM `employee_list` WHERE id = '{$id}' AND tenant_id = '{$tenant_id}'")->fetch_assoc() ?: [];
         $del = $this->conn->query("UPDATE `employee_list` set delete_flag = 1 where id = '{$id}' and tenant_id = '{$tenant_id}'");
         if ($del) {
+            // Nobody keeps self-service access or approver rights through a deleted record.
+            $this->conn->query("UPDATE `employee_portal_users` SET status = 0, password = NULL, invite_token_hash = NULL, invite_expires_at = NULL WHERE employee_id = '{$id}' AND tenant_id = '{$tenant_id}'");
+            $this->conn->query("UPDATE `employee_list` SET approver_id = NULL WHERE approver_id = '{$id}' AND tenant_id = '{$tenant_id}'");
             $this->settings->log_audit('Deleted Employee', 'HR & Attendance', "Deleted {$was['firstname']} {$was['lastname']} ({$was['employee_code']}), #{$id}.");
             $resp['status'] = 'success';
             $this->settings->set_flashdata('success', " Employee has been deleted successfully.");
@@ -124,9 +198,37 @@ class EmployeeService
         $check_out = $post['check_out'] ?? null;
         $tenant_id = $this->settings->active_tenant_id();
         $id = isset($id) ? intval($id) : 0;
-        $employee_id = isset($employee_id) ? $this->conn->real_escape_string((string)$employee_id) : '0';
-        $attendance_date = isset($attendance_date) ? $this->conn->real_escape_string((string)$attendance_date) : date('Y-m-d');
-        $status = isset($status) ? $this->conn->real_escape_string((string)$status) : 'Present';
+        $status = strtolower(trim((string)($status ?? 'present')));
+        if (!in_array($status, ['present', 'absent', 'late', 'half_day'], true)) {
+            return json_encode(['status' => 'failed', 'msg' => 'Choose a valid attendance status.']);
+        }
+        $attendance_date = trim((string)($attendance_date ?? date('Y-m-d')));
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $attendance_date) !== 1 || date('Y-m-d', strtotime($attendance_date)) !== $attendance_date) {
+            return json_encode(['status' => 'failed', 'msg' => 'Enter a valid date.']);
+        }
+        if ($attendance_date > date('Y-m-d')) {
+            return json_encode(['status' => 'failed', 'msg' => 'Attendance cannot be recorded for a future date.']);
+        }
+        $timeOk = fn($t) => $t === null || $t === '' || preg_match('/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/', (string)$t) === 1;
+        if (!$timeOk($check_in) || !$timeOk($check_out)) {
+            return json_encode(['status' => 'failed', 'msg' => 'Enter check-in and check-out as times (for example 08:00).']);
+        }
+        if (!empty($check_in) && !empty($check_out) && substr((string)$check_out, 0, 5) < substr((string)$check_in, 0, 5)) {
+            return json_encode(['status' => 'failed', 'msg' => 'Check-out is earlier than check-in. Check the times, or leave check-out blank.']);
+        }
+        $eid = (int)$employee_id;
+        $emp = $this->conn->query("SELECT date_of_joining, termination_date FROM `employee_list` WHERE id = '{$eid}' AND tenant_id = '{$tenant_id}' AND delete_flag = 0")->fetch_assoc();
+        if (!$emp) {
+            return json_encode(['status' => 'failed', 'msg' => 'Choose an employee from this company.']);
+        }
+        if (!empty($emp['date_of_joining']) && $attendance_date < $emp['date_of_joining']) {
+            return json_encode(['status' => 'failed', 'msg' => 'That date is before the employee joined.']);
+        }
+        if (!empty($emp['termination_date']) && $attendance_date > $emp['termination_date']) {
+            return json_encode(['status' => 'failed', 'msg' => 'That date is after the employee left.']);
+        }
+        $employee_id = (string)$eid;
+        $attendance_date = $this->conn->real_escape_string($attendance_date);
 
         $check = $this->conn->query("SELECT * FROM `attendance_list` where `employee_id` = '{$employee_id}' and `attendance_date` = '{$attendance_date}' and tenant_id = '{$tenant_id}' " . (!empty($id) && $id > 0 ? " and id != '{$id}'" : ""))->num_rows;
         if ($check > 0) {
@@ -199,12 +301,15 @@ class EmployeeService
                     return json_encode(['status' => 'failed', 'msg' => 'This leave request has already been processed and can no longer be edited.']);
                 }
             }
-        } elseif (!empty($post['employee_id'])) {
-            $eid = (int)$post['employee_id'];
-            $chk = $this->conn->query("SELECT id FROM `employee_list` WHERE id = '{$eid}' AND tenant_id = '{$tenant_id}'");
-            if (!$chk || $chk->num_rows === 0) {
-                return json_encode(['status' => 'failed', 'msg' => 'Invalid employee.']);
-            }
+        }
+        $eid = (int)($post['employee_id'] ?? 0);
+        $chk = $this->conn->query("SELECT date_of_joining, termination_date FROM `employee_list` WHERE id = '{$eid}' AND tenant_id = '{$tenant_id}' AND delete_flag = 0");
+        $empRow = $chk ? $chk->fetch_assoc() : null;
+        if (!$empRow) {
+            return json_encode(['status' => 'failed', 'msg' => 'Choose an employee from this company.']);
+        }
+        if (isset($post['status']) && !in_array(strtolower((string)$post['status']), ['pending', 'approved', 'rejected', 'cancelled'], true)) {
+            return json_encode(['status' => 'failed', 'msg' => 'Invalid status.']);
         }
         $dateOk = fn($d) => preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$d) === 1 && strtotime((string)$d) !== false;
         if (!$dateOk($post['start_date'] ?? '') || !$dateOk($post['end_date'] ?? '') || $post['end_date'] < $post['start_date']) {
@@ -212,6 +317,21 @@ class EmployeeService
         }
         if (!in_array((string)($post['leave_type'] ?? ''), ['casual', 'sick', 'paid', 'unpaid'], true)) {
             return json_encode(['status' => 'failed', 'msg' => 'Choose a leave type.']);
+        }
+        if (!empty($empRow['date_of_joining']) && $post['start_date'] < $empRow['date_of_joining']) {
+            return json_encode(['status' => 'failed', 'msg' => 'Leave cannot start before the employee joined (' . $empRow['date_of_joining'] . ').']);
+        }
+        if (!empty($empRow['termination_date']) && $post['end_date'] > $empRow['termination_date']) {
+            return json_encode(['status' => 'failed', 'msg' => 'Leave cannot run past the employee\'s leaving date (' . $empRow['termination_date'] . ').']);
+        }
+        if (in_array(strtolower((string)($post['status'] ?? 'pending')), ['pending', 'approved'], true)) {
+            $s0 = $this->conn->real_escape_string((string)$post['start_date']);
+            $e0 = $this->conn->real_escape_string((string)$post['end_date']);
+            $own = $id > 0 ? " AND id != '{$id}'" : '';
+            $ov = $this->conn->query("SELECT 1 FROM `leave_list` WHERE tenant_id = '{$tenant_id}' AND employee_id = '{$eid}' AND status IN ('pending','approved') AND start_date <= '{$e0}' AND end_date >= '{$s0}'{$own} LIMIT 1");
+            if ($ov && $ov->num_rows > 0) {
+                return json_encode(['status' => 'failed', 'msg' => 'This employee already has a pending or approved leave request on some of those dates.']);
+            }
         }
         $post['day_fraction'] = LeaveBalanceService::fraction($post['day_fraction'] ?? 1);
         if ($err = LeaveBalanceService::fractionError((string)$post['start_date'], (string)$post['end_date'], $post['day_fraction'])) {
@@ -373,12 +493,20 @@ class EmployeeService
         $my_emp   = (int)$this->settings->own_employee_id();
         $is_super = $this->settings->is_super_admin();
         $is_owner = ($my_emp > 0 && (int)$leave['employee_id'] === $my_emp);
+        $leaveEmp = (int)$leave['employee_id'];
+        $ap = $this->conn->query("SELECT approver_id FROM `employee_list` WHERE id = '{$leaveEmp}' AND tenant_id = '{$tenant_id}'")->fetch_assoc();
+        $is_approver = $my_emp > 0 && !$is_owner && (int)($ap['approver_id'] ?? 0) === $my_emp;
+        $state = strtolower($leave['status']);
 
-        if (!$is_owner && !$is_super) {
+        if ($state === 'approved') {
+            // Plans change: the approver or an administrator can withdraw approved leave (the days go back to the balance).
+            if (!$is_super && !$is_approver) {
+                return json_encode(['status' => 'failed', 'msg' => 'Only the approver or an administrator can cancel approved leave.']);
+            }
+        } elseif ($state !== 'pending') {
+            return json_encode(['status' => 'failed', 'msg' => 'Only a pending or approved leave request can be cancelled.']);
+        } elseif (!$is_owner && !$is_super) {
             return json_encode(['status' => 'failed', 'msg' => 'You can only cancel your own leave request.']);
-        }
-        if (strtolower($leave['status']) !== 'pending') {
-            return json_encode(['status' => 'failed', 'msg' => 'Only a pending leave request can be cancelled.']);
         }
 
         $update = $this->conn->query("UPDATE `leave_list` set `status` = 'cancelled' where id = '{$id}' and tenant_id = '{$tenant_id}'");

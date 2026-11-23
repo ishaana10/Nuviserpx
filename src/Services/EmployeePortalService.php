@@ -67,12 +67,15 @@ class EmployeePortalService
     public function invite(int $employeeId): string
     {
         $t = (int)$this->settings->active_tenant_id();
-        $q = $this->conn->prepare("SELECT id, firstname, lastname, email FROM employee_list WHERE id = ? AND tenant_id = ? AND delete_flag = 0");
+        $q = $this->conn->prepare("SELECT id, firstname, lastname, email, status, termination_date FROM employee_list WHERE id = ? AND tenant_id = ? AND delete_flag = 0");
         $q->bind_param('ii', $employeeId, $t);
         $q->execute();
         $emp = $q->get_result()->fetch_assoc();
         if (!$emp) {
             return $this->fail('Employee not found.');
+        }
+        if ((int)$emp['status'] !== 1 || (!empty($emp['termination_date']) && $emp['termination_date'] < date('Y-m-d'))) {
+            return $this->fail('This employee has left or is inactive, so self-service cannot be offered.');
         }
         $email = trim((string)$emp['email']);
         if (!self::validEmail($email)) {
@@ -188,7 +191,9 @@ class EmployeePortalService
         if (!self::validEmail($email) || $password === '' || strlen($password) > 200) {
             return $generic;
         }
-        $q = $this->conn->prepare("SELECT id, tenant_id, employee_id, email, password, locked_until FROM employee_portal_users WHERE email = ? AND status = 1");
+        $q = $this->conn->prepare("SELECT u.id, u.tenant_id, u.employee_id, u.email, u.password, u.locked_until FROM employee_portal_users u
+            INNER JOIN employee_list e ON e.id = u.employee_id AND e.tenant_id = u.tenant_id AND e.delete_flag = 0 AND e.status = 1
+            WHERE u.email = ? AND u.status = 1");
         $q->bind_param('s', $email);
         $q->execute();
         $now = time();
@@ -266,7 +271,9 @@ class EmployeePortalService
     /** Is this portal account still switched on? (HR can revoke access while an employee is signed in.) */
     public function stillActive(int $portalUserId, int $tenantId, int $employeeId): bool
     {
-        $q = $this->conn->prepare("SELECT 1 FROM employee_portal_users WHERE id = ? AND tenant_id = ? AND employee_id = ? AND status = 1 LIMIT 1");
+        $q = $this->conn->prepare("SELECT 1 FROM employee_portal_users u
+            INNER JOIN employee_list e ON e.id = u.employee_id AND e.tenant_id = u.tenant_id AND e.delete_flag = 0 AND e.status = 1
+            WHERE u.id = ? AND u.tenant_id = ? AND u.employee_id = ? AND u.status = 1 LIMIT 1");
         $q->bind_param('iii', $portalUserId, $tenantId, $employeeId);
         $q->execute();
         return $q->get_result()->num_rows === 1;

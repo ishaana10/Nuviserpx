@@ -61,7 +61,7 @@
 
 							// Owner may edit/cancel only while still pending; managers may always edit; approver can approve/reject pending.
 							$can_edit_row    = $is_leave_mgr || ($is_owner && $is_pending);
-							$can_cancel_row  = $is_owner && $is_pending;
+							$can_cancel_row  = (($is_owner || $is_super) && $is_pending) || ($is_approver && !$is_owner && $status === 'approved'); // approved leave can be withdrawn by the approver
 							$can_approve_row = $is_approver && $is_pending && !$is_owner; // can't approve your own request
 							$can_delete_row  = $is_super || $can_del;
 							$has_action = $can_edit_row || $can_cancel_row || $can_approve_row || $can_delete_row;
@@ -69,16 +69,16 @@
 						<tr>
 							<td class="text-center"><?php echo $i++; ?></td>
 							<td>
-								<p class="m-0"><?php echo $row['emp_name'] ?></p>
-								<small class="text-muted"><?php echo $row['employee_code'] ?></small>
+								<p class="m-0"><?php echo htmlspecialchars((string)($row['emp_name']), ENT_QUOTES) ?></p>
+								<small class="text-muted"><?php echo htmlspecialchars((string)($row['employee_code']), ENT_QUOTES) ?></small>
 							</td>
-							<td class="text-capitalize"><?php echo $row['leave_type'] ?> Leave</td>
+							<td class="text-capitalize"><?php echo htmlspecialchars((string)($row['leave_type']), ENT_QUOTES) ?> Leave</td>
 							<td>
 								<small><b>From:</b> <?php echo date("M d, Y", strtotime($row['start_date'])) ?></small><br>
 								<small><b>To:</b> <?php echo date("M d, Y", strtotime($row['end_date'])) ?></small>
 								<?php if(isset($row['day_fraction']) && (float)$row['day_fraction'] == 0.5): ?><small class="d-block text-info">Half day</small><?php endif; ?>
 							</td>
-							<td><p class="m-0 text-truncate" style="max-width: 200px;"><?php echo $row['reason'] ?></p>
+							<td><p class="m-0 text-truncate" style="max-width: 200px;"><?php echo htmlspecialchars((string)($row['reason']), ENT_QUOTES) ?></p>
 								<?php if(!empty($row['attachment_path'])): ?><a class="small" href="leaves/leave_doc.php?id=<?php echo (int)$row['id'] ?>" target="_blank" rel="noopener"><span class="fa fa-paperclip"></span> <?php echo htmlspecialchars($row['attachment_name'] ?: 'Attachment') ?></a><?php endif; ?>
 							</td>
 							<td class="text-center">
