@@ -15,6 +15,8 @@ if ($scope !== null) {
 
 $portal_status = [];
 try {
+    // Staff whose leaving date has passed are switched to inactive (once a day) before the list is read.
+    \App\Services\LeaverService::sweepIfDue($conn);
     $portal_status = (new \App\Services\EmployeePortalService($conn, $_settings))->statusMap();
 } catch (\Throwable $e) {
     $portal_status = [];

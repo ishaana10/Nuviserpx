@@ -98,6 +98,50 @@ check("another company's payslip is refused", $svc->payslip(1, 1, 30) === null);
 check('voided and draft payslips are refused', $svc->payslip(1, 1, 11) === null && $svc->payslip(1, 1, 12) === null);
 check('viewing a payslip is logged', (int)$c->query("SELECT COUNT(*) n FROM employee_portal_logs WHERE action='payslip_viewed'")->fetch_assoc()['n'] === 1);
 
+// ---- session is bound to the password: changing it ends every other session
+$s1 = $svc->login('ana@x.fj', 'Brand#New1234', '10.0.0.8')['session'];
+check('session carries a password version', !empty($s1['pv']) && $svc->stillActive($pu, 1, 1, $s1['pv']));
+check('a wrong password version is not accepted', !$svc->stillActive($pu, 1, 1, 'deadbeef'));
+check('password change ends the other sessions', $chg('Brand#New1234', 'Fourth#Pass5678', 'Fourth#Pass5678')['ok'] && !$svc->stillActive($pu, 1, 1, $s1['pv']));
+$s2 = $svc->login('ana@x.fj', 'Fourth#Pass5678', '10.0.0.8')['session'];
+check('a fresh sign-in has a new version that is valid', $s2['pv'] !== $s1['pv'] && $svc->stillActive($pu, 1, 1, $s2['pv']));
+$c->query("UPDATE employee_portal_users SET password='" . password_hash('Brand#New1234', PASSWORD_DEFAULT) . "' WHERE id=$pu");
+// idle and absolute time-outs
+$t0 = 1000000;
+check('a session in use is not expired', !\App\Services\EmployeePortalService::sessionExpired(['started' => $t0, 'last_seen' => $t0 + 60], $t0 + 600));
+check('an idle session expires', \App\Services\EmployeePortalService::sessionExpired(['started' => $t0, 'last_seen' => $t0 + 60], $t0 + 60 + 31 * 60));
+check('a very old session expires even if busy', \App\Services\EmployeePortalService::sessionExpired(['started' => $t0, 'last_seen' => $t0 + 9 * 3600 - 10], $t0 + 9 * 3600));
+check('a session with no clock is treated as expired', \App\Services\EmployeePortalService::sessionExpired([], $t0));
+
+// ---- leaving date has passed: deactivated automatically
+$c->query("INSERT INTO employee_list (id,tenant_id,employee_code,firstname,lastname,email,date_of_joining,salary,annual_salary,status,delete_flag,termination_date) VALUES
+ (4,1,'E4','Dan','Past','dan@x.fj','2024-01-01',2000,24000,1,0,DATE_SUB(CURDATE(),INTERVAL 1 DAY)),
+ (5,1,'E5','Eve','Today','eve@x.fj','2024-01-01',2000,24000,1,0,CURDATE()),
+ (6,1,'E6','Fay','Future','fay@x.fj','2024-01-01',2000,24000,1,0,DATE_ADD(CURDATE(),INTERVAL 30 DAY)),
+ (7,2,'E7','Gus','OtherPast','gus@y.fj','2024-01-01',2000,24000,1,0,DATE_SUB(CURDATE(),INTERVAL 5 DAY))");
+$ph = password_hash('Leaver#Pass123', PASSWORD_DEFAULT);
+$c->query("INSERT INTO employee_portal_users (id,tenant_id,employee_id,email,password,status) VALUES (91,1,4,'dan@x.fj','$ph',1),(92,1,5,'eve@x.fj','$ph',1),(93,1,6,'fay@x.fj','$ph',1)");
+check('a leaver cannot sign in even before the sweep runs', !$svc->login('dan@x.fj', 'Leaver#Pass123', '10.0.1.1')['ok']);
+check('a leaver\'s open session ends even before the sweep runs', !$svc->stillActive(91, 1, 4));
+check('the last day of employment still works', $svc->login('eve@x.fj', 'Leaver#Pass123', '10.0.1.2')['ok']);
+check('a future leaving date still works', $svc->login('fay@x.fj', 'Leaver#Pass123', '10.0.1.3')['ok']);
+$n = \App\Services\LeaverService::sweep($c, 1);
+check('sweep reports one leaver in this company', $n === 1);
+check('leaver is marked inactive', (int)$c->query("SELECT status FROM employee_list WHERE id=4")->fetch_assoc()['status'] === 0);
+check('leaver\'s portal access is revoked', (function () use ($c) { $r = $c->query("SELECT status, password FROM employee_portal_users WHERE id=91")->fetch_assoc(); return (int)$r['status'] === 0 && $r['password'] === null; })());
+check('last-day and future employees stay active', (int)$c->query("SELECT COUNT(*) n FROM employee_list WHERE id IN (5,6) AND status=1")->fetch_assoc()['n'] === 2);
+check('the deactivation is logged', (int)$c->query("SELECT COUNT(*) n FROM employee_portal_logs WHERE employee_id=4 AND action='revoked'")->fetch_assoc()['n'] === 1);
+check('another company is untouched by this company\'s sweep', (int)$c->query("SELECT status FROM employee_list WHERE id=7")->fetch_assoc()['status'] === 1);
+check('sweeping again changes nothing', \App\Services\LeaverService::sweep($c, 1) === 0);
+check('the all-company sweep catches the other company', \App\Services\LeaverService::sweepAll($c) === 1 && (int)$c->query("SELECT status FROM employee_list WHERE id=7")->fetch_assoc()['status'] === 0);
+check('an employee with no leaving date is never swept', (int)$c->query("SELECT status FROM employee_list WHERE id=1")->fetch_assoc()['status'] === 1);
+
+$c->query("INSERT INTO employee_list (id,tenant_id,employee_code,firstname,lastname,email,date_of_joining,salary,annual_salary,status,delete_flag,termination_date) VALUES (8,1,'E8','Hal','Late','hal@x.fj','2024-01-01',2000,24000,1,0,DATE_SUB(CURDATE(),INTERVAL 2 DAY))");
+check('the daily trigger sweeps when due', \App\Services\LeaverService::sweepIfDue($c) === 1 && (int)$c->query("SELECT status FROM employee_list WHERE id=8")->fetch_assoc()['status'] === 0);
+$c->query("UPDATE employee_list SET status=1 WHERE id=8");
+check('the daily trigger runs only once a day', \App\Services\LeaverService::sweepIfDue($c) === 0 && (int)$c->query("SELECT status FROM employee_list WHERE id=8")->fetch_assoc()['status'] === 1);
+$c->query("UPDATE employee_list SET status=0 WHERE id=8");
+
 // ---- HR switches access off while signed in
 check('active session is valid', $svc->stillActive($pu, 1, 1));
 (new \App\Services\EmployeePortalService($c, new class extends SystemSettings {}))->revoke(1);

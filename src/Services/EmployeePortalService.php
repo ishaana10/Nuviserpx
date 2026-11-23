@@ -29,6 +29,27 @@ class EmployeePortalService
 
     /* ------------------------------ pure helpers ------------------------------ */
 
+    /** Idle time after which a portal session ends, and the longest a session may last. */
+    public const IDLE_SECONDS = 1800;
+    public const MAX_SESSION_SECONDS = 28800;
+
+    /** Short fingerprint of the stored password hash. A session carries it, so changing or removing the password ends every other session. */
+    public static function passwordVersion(?string $hash): string
+    {
+        return substr(hash('sha256', (string)$hash), 0, 16);
+    }
+
+    /** Has this portal session been idle too long, or lasted too long? A session without a clock counts as expired. */
+    public static function sessionExpired(array $session, int $now): bool
+    {
+        $started = (int)($session['started'] ?? 0);
+        $seen = (int)($session['last_seen'] ?? 0);
+        if ($started <= 0 || $seen <= 0) {
+            return true;
+        }
+        return ($now - $seen) > self::IDLE_SECONDS || ($now - $started) > self::MAX_SESSION_SECONDS;
+    }
+
     public static function tokenHash(string $token): string
     {
         return hash('sha256', $token);
@@ -156,7 +177,7 @@ class EmployeePortalService
         }
         $hash = self::tokenHash($token);
         $q = $this->conn->prepare("SELECT u.id, u.tenant_id, u.employee_id, u.email, CONCAT(e.firstname, ' ', e.lastname) name
-            FROM employee_portal_users u JOIN employee_list e ON e.id = u.employee_id AND e.tenant_id = u.tenant_id AND e.delete_flag = 0 AND e.status = 1
+            FROM employee_portal_users u JOIN employee_list e ON e.id = u.employee_id AND e.tenant_id = u.tenant_id AND e.delete_flag = 0 AND e.status = 1 AND (e.termination_date IS NULL OR e.termination_date >= CURDATE())
             WHERE u.invite_token_hash = ? AND u.invite_expires_at >= NOW() AND u.status = 0 LIMIT 1");
         $q->bind_param('s', $hash);
         $q->execute();
@@ -189,7 +210,7 @@ class EmployeePortalService
             return ['ok' => false, 'msg' => 'This invitation has already been used.'];
         }
         $this->log((int)$inv['tenant_id'], (int)$inv['employee_id'], 'activated', 'Account activated', $ip);
-        return ['ok' => true, 'msg' => 'Your account is ready.', 'session' => $this->sessionFor($inv)];
+        return ['ok' => true, 'msg' => 'Your account is ready.', 'session' => $this->sessionFor($inv, $hash)];
     }
 
     /** @return array{ok:bool,msg:string,session?:array} */
@@ -207,7 +228,7 @@ class EmployeePortalService
             return ['ok' => false, 'msg' => 'Too many failed attempts. Try again in ' . AuthThrottleService::waitText($wait) . '.'];
         }
         $q = $this->conn->prepare("SELECT u.id, u.tenant_id, u.employee_id, u.email, u.password, u.locked_until FROM employee_portal_users u
-            INNER JOIN employee_list e ON e.id = u.employee_id AND e.tenant_id = u.tenant_id AND e.delete_flag = 0 AND e.status = 1
+            INNER JOIN employee_list e ON e.id = u.employee_id AND e.tenant_id = u.tenant_id AND e.delete_flag = 0 AND e.status = 1 AND (e.termination_date IS NULL OR e.termination_date >= CURDATE())
             WHERE u.email = ? AND u.status = 1");
         $q->bind_param('s', $email);
         $q->execute();
@@ -246,9 +267,11 @@ class EmployeePortalService
         }
     }
 
-    private function sessionFor(array $u): array
+    private function sessionFor(array $u, ?string $hash = null): array
     {
-        return ['id' => (int)$u['id'], 'tenant_id' => (int)$u['tenant_id'], 'employee_id' => (int)$u['employee_id'], 'email' => (string)$u['email']];
+        $now = time();
+        return ['id' => (int)$u['id'], 'tenant_id' => (int)$u['tenant_id'], 'employee_id' => (int)$u['employee_id'], 'email' => (string)$u['email'],
+            'pv' => self::passwordVersion($hash ?? ($u['password'] ?? null)), 'started' => $now, 'last_seen' => $now];
     }
 
     /**
@@ -287,18 +310,25 @@ class EmployeePortalService
         $up->bind_param('sii', $hash, $portalUserId, $tenantId);
         $up->execute();
         $this->log($tenantId, $employeeId, 'password_changed', 'Employee changed their own password', $ip);
-        return ['ok' => true, 'msg' => 'Your password has been changed.'];
+        return ['ok' => true, 'msg' => 'Your password has been changed.', 'pv' => self::passwordVersion($hash)];
     }
 
-    /** Is this portal account still switched on? (HR can revoke access while an employee is signed in.) */
-    public function stillActive(int $portalUserId, int $tenantId, int $employeeId): bool
+    /**
+     * Is this portal account still switched on, and is the employee still employed? HR can revoke access, a leaving date can pass
+     * and the password can change while someone is signed in. With $pv the session must also carry the current password version.
+     */
+    public function stillActive(int $portalUserId, int $tenantId, int $employeeId, ?string $pv = null): bool
     {
-        $q = $this->conn->prepare("SELECT 1 FROM employee_portal_users u
-            INNER JOIN employee_list e ON e.id = u.employee_id AND e.tenant_id = u.tenant_id AND e.delete_flag = 0 AND e.status = 1
+        $q = $this->conn->prepare("SELECT u.password FROM employee_portal_users u
+            INNER JOIN employee_list e ON e.id = u.employee_id AND e.tenant_id = u.tenant_id AND e.delete_flag = 0 AND e.status = 1 AND (e.termination_date IS NULL OR e.termination_date >= CURDATE())
             WHERE u.id = ? AND u.tenant_id = ? AND u.employee_id = ? AND u.status = 1 LIMIT 1");
         $q->bind_param('iii', $portalUserId, $tenantId, $employeeId);
         $q->execute();
-        return $q->get_result()->num_rows === 1;
+        $row = $q->get_result()->fetch_assoc();
+        if (!$row) {
+            return false;
+        }
+        return $pv === null || ($pv !== '' && hash_equals(self::passwordVersion($row['password']), $pv));
     }
 
     /** The employee's payslips, newest first: posted payroll only. */
