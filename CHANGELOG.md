@@ -14,6 +14,14 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
 - Payroll: after redundancy pay or a leave payout, the following months' PAYE was overstated because the one-off pay was counted as regular year-to-date salary. One-off pay and its tax are now left out of the year-to-date position.
 - Payroll: with no rules configured, the preset FNPF employer rate was a flat 8%. It now follows the law by pay date: 10%, 8% for wages from 1 Aug 2026 to 31 Jul 2027 (Budget 2026-27), then 10% again. Companies with their own Payroll Rules Settings are unaffected.
 
+### Fixed (employee portal audit)
+- Sign-in was only limited per account. Wrong guesses are now also limited per address and per username across all accounts (the same limits as the customer portal), and an unknown username takes as long to answer as a wrong password. Invitation links are limited the same way.
+- An invitation link could still be activated for an employee who had become inactive or been deleted; it is now refused.
+- Signed-in portal actions (request leave, cancel, change password) skipped the security-token check. They now require it, like the rest of the app.
+- The server now enforces the leave date window the form already showed (up to 60 days back and 2 years ahead), so a request cannot be backdated or set far in the future.
+- Passwords that are common, or contain the part of the email before the @, are refused.
+- Portal pages (payslips, details) are marked do-not-cache, so they cannot be shown again from the browser's back button after signing out.
+
 ### Fixed (HR audit)
 - Leave balances could fail with a database "commands out of sync" error: a result was left unread while the next query was prepared. Each result is now read in full first.
 - Employee form: a blank employee code or name, a leaving date before the joining date, a negative salary, an approver who is the employee themselves, from another company or who has left, and an email already used by another employee are now refused.
@@ -24,6 +32,7 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
 - Security: leave reasons (typed by employees in self-service), names, codes, TIN/FNPF, department and other HR fields were printed unescaped on the employee, leave and attendance pages, so a crafted entry could run script in an administrator's browser. They are now escaped.
 
 ### Added
+- `tests/db/test_db_employee_portal_scenario.php`: the portal from the employee's side (activation, sign-in and lock-outs, password change, own posted payslips only, own leave only, cancelling, revoked access, date window).
 - `tests/db/test_db_hr_scenario.php` and `tests/test_hr_output_escaping.php`: HR end to end (employee records, leave requests, overlaps, approval rights, cancelling approved leave and balances, attendance, rosters, leavers and self-service).
 - `tests/db/test_db_payroll_scenario.php`: payroll end to end on a real chart: twelve monthly runs whose PAYE adds up to the annual tax, balanced journals, payment, tax and pension remittances clearing their liabilities, reversal and void rules, duplicate-run and period-lock protection, unpaid days, overtime tiers, redundancy, termination, tenant isolation and the dated FNPF rate.
 - `tests/db/test_db_accounting_scenario.php`: an end-to-end accountant's walk-through (VAT-exclusive/inclusive/no-tax sales, receipts, bills, payments, credit and debit notes, edits, cancels, voids, period lock, stock and COGS, foreign currency with realised gain, fixed-asset depreciation, bank reconciliation, tenant isolation) asserting after each step that every journal balances, AR/AP/VAT/inventory sub-ledgers equal their control accounts, and the trial balance, income statement, balance sheet and cash flow reconcile.

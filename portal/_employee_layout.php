@@ -9,6 +9,9 @@ require_once(__DIR__ . '/../config.php');
 use App\Services\EmployeePortalService;
 use App\Services\PortalLeaveService;
 
+// Payslips and personal details must not be kept by the browser or shown again from the back button after sign-out.
+header('Cache-Control: no-store, no-cache, must-revalidate, private');
+header('Pragma: no-cache');
 if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     unset($_SESSION['employee_portal']);
     header('Location: ' . base_url . 'portal/employee_login.php');
