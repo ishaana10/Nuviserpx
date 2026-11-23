@@ -1248,6 +1248,7 @@ class Master extends DBConnection
 
     public function employee_portal_login()
     {
+        try { \App\Services\LeaverService::sweepIfDue($this->conn); } catch (\Throwable $e) { error_log('leaver sweep: ' . $e->getMessage()); }
         $svc = new \App\Services\EmployeePortalService($this->conn, $this->settings);
         return $this->employee_portal_start($svc->login((string)($_POST['email'] ?? ''), (string)($_POST['password'] ?? ''), (string)($_SERVER['REMOTE_ADDR'] ?? '')));
     }
@@ -1270,8 +1271,13 @@ class Master extends DBConnection
             return null;
         }
         $svc = new \App\Services\EmployeePortalService($this->conn, $this->settings);
-        return $svc->stillActive((int)$p['id'], (int)$p['tenant_id'], (int)$p['employee_id'])
-            ? [(int)$p['id'], (int)$p['tenant_id'], (int)$p['employee_id']] : null;
+        if (\App\Services\EmployeePortalService::sessionExpired($p, time())
+            || !$svc->stillActive((int)$p['id'], (int)$p['tenant_id'], (int)$p['employee_id'], (string)($p['pv'] ?? ''))) {
+            unset($_SESSION['employee_portal']);
+            return null;
+        }
+        $_SESSION['employee_portal']['last_seen'] = time();
+        return [(int)$p['id'], (int)$p['tenant_id'], (int)$p['employee_id']];
     }
 
     /**
@@ -1314,6 +1320,8 @@ class Master extends DBConnection
         $r = $svc->changePassword($who[0], $who[1], $who[2], (string)($_POST['current'] ?? ''), (string)($_POST['password'] ?? ''), (string)($_POST['confirm'] ?? ''), (string)($_SERVER['REMOTE_ADDR'] ?? ''));
         if ($r['ok']) {
             session_regenerate_id(true);
+            // This session stays signed in; every other one carries the old password version and ends.
+            $_SESSION['employee_portal']['pv'] = $r['pv'];
         }
         return json_encode(['status' => $r['ok'] ? 'success' : 'failed', 'msg' => $r['msg']]);
     }

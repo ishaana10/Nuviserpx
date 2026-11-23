@@ -3,6 +3,12 @@
 All notable changes to Nuvis ERPX. Versions are stamped automatically on each
 release build (see `src/Support/AppVersion.php`); dates are Fiji time.
 
+## [Unreleased] - 2026-11-23
+
+### Fixed / Security
+- Employees whose leaving date has passed are now deactivated automatically: they cannot sign in to the portal and any open portal session ends the day after the leaving date, without waiting for anyone to run a job. The record is tidied (status set to inactive, portal access removed and logged) by a sweep that runs at most once a day from the HR employee list and portal sign-in, or on demand with `php bin/deactivate-leavers.php` (optional cron).
+- Portal sessions are now validated on every request: they end after 30 minutes idle or 8 hours total, and are tied to the password, so changing the password (or HR removing access) signs out every other session while the one that changed it stays signed in.
+
 ## [Unreleased]
 
 ### Fixed (accounting audit)

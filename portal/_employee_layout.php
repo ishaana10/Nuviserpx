@@ -20,11 +20,14 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
 $__p = $_SESSION['employee_portal'] ?? null;
 $svc = new EmployeePortalService($conn, $_settings);
 // Signed in, and HR has not switched the account off since.
-if (!is_array($__p) || empty($__p['employee_id']) || empty($__p['id']) || !$svc->stillActive((int)$__p['id'], (int)$__p['tenant_id'], (int)$__p['employee_id'])) {
+// Also: not idle or open too long, the password has not changed since sign-in, and the employee has not left.
+if (!is_array($__p) || empty($__p['employee_id']) || empty($__p['id']) || EmployeePortalService::sessionExpired($__p, time())
+    || !$svc->stillActive((int)$__p['id'], (int)$__p['tenant_id'], (int)$__p['employee_id'], (string)($__p['pv'] ?? ''))) {
     unset($_SESSION['employee_portal']);
     header('Location: ' . base_url . 'portal/employee_login.php');
     exit;
 }
+$_SESSION['employee_portal']['last_seen'] = time();
 // Employee and company come from the session only, never from the request.
 $tenantId = (int)$__p['tenant_id'];
 $employeeId = (int)$__p['employee_id'];
