@@ -597,21 +597,33 @@ class Master extends DBConnection
 
     public function save_tenant_vms_settings()
     {
+        if (!\App\Support\Features::vms()) {
+            return json_encode(['status' => 'failed', 'msg' => \App\Support\Features::REFUSED]);
+        }
         return $this->container->make(\App\Services\FiscalizationService::class)->save_tenant_vms_settings();
     }
 
     public function test_sdc_ping()
     {
+        if (!\App\Support\Features::vms()) {
+            return json_encode(['status' => 'failed', 'msg' => \App\Support\Features::REFUSED]);
+        }
         return $this->container->make(\App\Services\FiscalizationService::class)->test_sdc_ping();
     }
 
     public function simulate_vms_fiscalization()
     {
+        if (!\App\Support\Features::vms()) {
+            return json_encode(['status' => 'failed', 'msg' => \App\Support\Features::REFUSED]);
+        }
         return $this->container->make(\App\Services\FiscalizationService::class)->simulate_vms_fiscalization();
     }
 
     public function upload_tenant_vsdc_cert()
     {
+        if (!\App\Support\Features::vms()) {
+            return json_encode(['status' => 'failed', 'msg' => \App\Support\Features::REFUSED]);
+        }
         return $this->container->make(\App\Services\FiscalizationService::class)->upload_tenant_vsdc_cert();
     }
     public function save_journal()

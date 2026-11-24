@@ -33,7 +33,7 @@ $staff = new Stub(2, []);
 $dev = new Stub(1);
 
 $m = render('10_settings.php', $admin);
-foreach (['My Plan', 'Invoice Templates', 'Financial Settings', 'Import Data', 'Currencies', 'Exchange Rates', 'FRCS VMS', 'Custom Extrafields', 'Audit Trail', 'Webhooks', 'Automation Workflows'] as $item) {
+foreach (['My Plan', 'Invoice Templates', 'Financial Settings', 'Import Data', 'Currencies', 'Exchange Rates', 'Custom Extrafields', 'Audit Trail', 'Webhooks', 'Automation Workflows'] as $item) {
     check("company administrator sees: $item", strpos($m, $item) !== false);
 }
 foreach (['Tenants / Companies', 'System &amp; Branding', 'System & Branding', 'DB Backup', 'Security &', 'Email Templates', 'Active User Sessions'] as $item) {

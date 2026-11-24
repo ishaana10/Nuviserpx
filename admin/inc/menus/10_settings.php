@@ -66,6 +66,7 @@
                                         </a>
                                     </li>
                                     <?php endif; ?>
+                                    <?php if(\App\Support\Features::vms()): ?>
                                     <?php if($_settings->can_access('settings_manage')): ?>
                                     <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=settings/vms_settings" class="nav-link nav-settings_vms_settings tree-item">
@@ -73,6 +74,7 @@
                                             <p>FRCS VMS v3.0 Config</p>
                                         </a>
                                     </li>
+                                    <?php endif; ?>
                                     <?php endif; ?>
                                     <?php if($_settings->is_super_admin()): ?>
                                     <li class="nav-item">

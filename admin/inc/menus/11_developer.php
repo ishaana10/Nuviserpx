@@ -53,12 +53,14 @@
                                             <p>Customer Portal Inspector</p>
                                         </a>
                                     </li>
+                                    <?php if(\App\Support\Features::vms()): ?>
                                     <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=developer/vms_inspector" class="nav-link nav-developer_vms_inspector tree-item">
                                             <i class="nav-icon fas fa-microchip text-warning"></i>
                                             <p>VMS v3.0 SDC Inspector</p>
                                         </a>
                                     </li>
+                                    <?php endif; ?>
                                     <li class="nav-item">
                                         <a href="<?php echo base_url ?>admin/?page=developer/git_update" class="nav-link nav-developer_git_update tree-item">
                                             <i class="nav-icon fas fa-code-branch text-info"></i>
