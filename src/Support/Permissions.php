@@ -736,6 +736,11 @@ final class Permissions
         'webhooks'          => 'webhooks_manage',
         'workflows'         => 'workflows_manage',
         'settings'          => 'settings_manage',
+        // These pages read or write the installation-wide settings that every company shares, so only the developer opens them.
+        'settings/security'        => self::SUPER_ONLY,
+        'settings/email_templates' => self::SUPER_ONLY,
+        'settings/backup'          => self::SUPER_ONLY,
+        'settings/active_sessions' => self::SUPER_ONLY,
         'system_info'       => self::SUPER_ONLY, // the platform's own branding & settings belong to the developer
         'tax'               => 'settings_manage',
         'templates'         => 'settings_manage',

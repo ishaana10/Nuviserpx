@@ -103,10 +103,13 @@ if(isset($meta['employee_id']) && (int)$meta['employee_id'] > 0){
 						<label for="type" class="control-label font-weight-bold text-navy">User Privilege Level</label>
 						<select name="type" id="type" class="form-control form-control-sm rounded-0" required>
 							<?php if($_settings->is_super_admin()): ?>
-							<option value="1" <?php echo isset($meta['type']) && $meta['type'] == 1 ? 'selected': '' ?>>Super Administrator (Full System Access)</option>
+							<option value="1" <?php echo isset($meta['type']) && $meta['type'] == 1 ? 'selected': '' ?>>Super Administrator (Developer: every company + Developer tools)</option>
 							<?php endif; ?>
-							<option value="2" <?php echo !isset($meta['type']) || $meta['type'] == 2 ? 'selected': '' ?>>Staff User (Role-Based Permissions)</option>
+							<option value="2" <?php echo !isset($meta['type']) || $meta['type'] == 2 ? 'selected': '' ?>>Staff User / Company Administrator (Role-Based Permissions)</option>
 						</select>
+						<?php if($_settings->is_super_admin()): ?>
+						<small class="text-muted d-block"><i>For a company's own administrator choose <b>Staff User</b> and assign a role that has <b>Select all</b> ticked (Access &amp; Users &rarr; Roles). They see only their company, with no company switcher, Tenants or Developer menu. Super Administrator is for the developer only.</i></small>
+						<?php endif; ?>
 						<?php if(!$_settings->is_super_admin()): ?>
 						<small class="text-muted"><i>Only super administrators can grant full system access.</i></small>
 						<?php endif; ?>

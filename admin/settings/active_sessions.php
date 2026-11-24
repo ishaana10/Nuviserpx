@@ -1,12 +1,16 @@
 <?php
 $tenant_id = $_settings->active_tenant_id();
 
+// A company administrator sees only their own company's accounts, never the developer's or another company's.
+$nv_who = $_settings->is_super_admin()
+    ? "(u.tenant_id = '{$tenant_id}' OR u.tenant_id = 1 OR u.tenant_id = 0 OR u.type = 1)"
+    : "u.tenant_id = '{$tenant_id}' AND u.type != 1";
 $users_qry = $conn->query("
     SELECT u.*, r.name as role_name, t.name as tenant_name
     FROM `users` u
     LEFT JOIN `roles` r ON u.role_id = r.id
     LEFT JOIN `tenants` t ON u.tenant_id = t.id
-    WHERE (u.tenant_id = '{$tenant_id}' OR u.tenant_id = 1 OR u.tenant_id = 0 OR u.type = 1)
+    WHERE u.tenant_id = u.tenant_id AND {$nv_who}
     ORDER BY u.last_login DESC
 ");
 ?>
