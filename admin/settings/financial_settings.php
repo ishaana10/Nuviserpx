@@ -4,6 +4,7 @@
 </script>
 <?php endif;?>
 
+<?php if ($_settings->is_super_admin()): /* these defaults are installation-wide (shared by every company): developer only */ ?>
 <div class="card card-outline card-primary shadow-sm rounded-0">
     <div class="card-header d-flex align-items-center justify-content-between">
         <h3 class="card-title font-weight-bold"><i class="fas fa-calculator text-primary mr-2"></i> Financial & Accounting Settings</h3>
@@ -100,6 +101,8 @@
     </div>
 </div>
 
+<?php endif; ?>
+
 <?php
 $pl_tenant = (int)$_settings->active_tenant_id();
 $pl_current = \App\Services\PeriodLockService::lockDate($conn, $pl_tenant);
@@ -160,6 +163,7 @@ $(document).ready(function(){
 });
 </script>
 
+<?php if ($_settings->is_super_admin()): ?>
 <script>
 $(document).ready(function(){
     $('#financial-settings-form').submit(function(e){
@@ -183,3 +187,4 @@ $(document).ready(function(){
     });
 });
 </script>
+<?php endif; ?>

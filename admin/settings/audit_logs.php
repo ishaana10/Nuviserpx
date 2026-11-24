@@ -1,7 +1,9 @@
 <?php
 $tenant_id = $_settings->active_tenant_id();
 
-$where = "WHERE (al.tenant_id = '{$tenant_id}' OR al.tenant_id = 0 OR al.tenant_id IS NULL)";
+// Entries with no company (platform-level events) are for the developer; a company administrator sees only their own company's trail.
+$nv_platform = $_settings->is_super_admin();
+$where = $nv_platform ? "WHERE (al.tenant_id = '{$tenant_id}' OR al.tenant_id = 0 OR al.tenant_id IS NULL)" : "WHERE al.tenant_id = '{$tenant_id}'";
 
 $module = isset($_GET['module']) ? $_GET['module'] : '';
 if(!empty($module) && $module != 'all'){
@@ -40,7 +42,7 @@ $qry_error = $qry === false ? $conn->error : '';
 
 // Module filter choices come from what has actually been logged.
 $modules = [];
-$mq = $conn->query("SELECT DISTINCT `module` FROM `audit_logs` WHERE (tenant_id = '{$tenant_id}' OR tenant_id = 0 OR tenant_id IS NULL) ORDER BY `module`");
+$mq = $conn->query("SELECT DISTINCT `module` FROM `audit_logs` WHERE (tenant_id = '{$tenant_id}'" . ($nv_platform ? " OR tenant_id = 0 OR tenant_id IS NULL" : "") . ") ORDER BY `module`");
 if($mq){ while($m = $mq->fetch_assoc()){ if($m['module'] !== '') $modules[] = $m['module']; } }
 ?>
 
