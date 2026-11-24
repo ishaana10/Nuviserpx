@@ -252,7 +252,7 @@ $working_status = trim((string)shell_exec('git status --short 2>&1'));
                             <i class="fas fa-cube text-warning mr-2"></i> A2 Hosting Turbo Max Redis Daemon Initialization
                         </h6>
                         <small class="text-muted">
-                            Socket Path: <code id="redis-socket-path-display" class="bg-white px-2 py-1 rounded font-monospace border text-dark">/home/ictfjcom/.redis/redis.sock</code>
+                            Socket Path: <code id="redis-socket-path-display" class="bg-white px-2 py-1 rounded font-monospace border text-dark">checking...</code>
                         </small>
                     </div>
                     <div class="d-flex gap-2 mt-2 mt-md-0">
@@ -333,7 +333,7 @@ function fetchRedisDiagnostics() {
             if(d.is_connected) {
                 statusCard.html('<span class="text-success font-weight-bold"><i class="fas fa-circle text-success mr-2" style="font-size: 0.8rem;"></i> Connected & Operational</span>');
             } else {
-                statusCard.html('<span class="text-warning font-weight-bold"><i class="fas fa-exclamation-circle text-warning mr-2"></i> Socket Offline (~/.redis.on)</span>');
+                statusCard.html('<span class="text-warning font-weight-bold"><i class="fas fa-exclamation-circle text-warning mr-2"></i> ' + (d.redis_extension === false ? 'PHP redis extension is not enabled' : (d.socket_exists ? 'Socket found but not answering' : 'Socket not started yet (click Start, then wait about 5 minutes)')) + '</span>');
             }
 
             $('#redis-card-memory').text(d.used_memory || '528.26K');
@@ -394,7 +394,7 @@ function triggerStartRedisDaemon() {
         },
         success: function(d){
             end_loader();
-            alert_toast(d.message || 'Created ~/.redis.on flag.', 'success');
+            alert_toast(d.message || 'Created ~/.redis.on flag.', d.success ? 'success' : 'error');
             fetchRedisDiagnostics();
         }
     });

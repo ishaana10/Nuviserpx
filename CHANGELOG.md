@@ -3,6 +3,11 @@
 All notable changes to Nuvis ERPX. Versions are stamped automatically on each
 release build (see `src/Support/AppVersion.php`); dates are Fiji time.
 
+## [Unreleased] - 2026-11-25 (4)
+
+### Fixed
+- Redis showed "Socket Offline" after moving to the new A2 Hosting server because the socket path and the `~/.redis.on` start flag were fixed to the old account name. They now follow the account the app runs under (or a `redis_socket` setting if you need to override it). "Start A2 Hosting Redis Daemon" creates the flag in the real home folder and says plainly if it could not, that A2 starts Redis about five minutes later, and if the PHP redis extension is missing. The offline message now says which of these applies.
+
 ## [Unreleased] - 2026-11-25 (3)
 
 ### Changed
