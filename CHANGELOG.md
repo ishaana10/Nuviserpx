@@ -3,6 +3,11 @@
 All notable changes to Nuvis ERPX. Versions are stamped automatically on each
 release build (see `src/Support/AppVersion.php`); dates are Fiji time.
 
+## [Unreleased] - 2026-11-25 (5)
+
+### Fixed
+- Redis "Socket found but not answering" after the server move: a dead socket file copied over from the old server can sit in the home folder with nothing listening, which stops a fresh Redis from starting. The Redis tab now says so ("Dead socket file left from the old server"), and "Start A2 Hosting Redis Daemon" removes such a file (only when nothing is listening on it, never a live one) before creating the start flag. The benchmark result box is readable (white, not red on teal).
+
 ## [Unreleased] - 2026-11-25 (4)
 
 ### Fixed
