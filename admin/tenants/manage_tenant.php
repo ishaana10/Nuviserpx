@@ -56,6 +56,19 @@ if(isset($_GET['id']) && is_numeric($_GET['id'])){
 			<label for="address" class="control-label">Address</label>
 			<textarea name="address" id="address" rows="2" class="form-control form-control-sm rounded-0"><?php echo isset($address) ? $address : ''; ?></textarea>
 		</div>
+		<?php if(!(isset($id) && $id !== '')): ?>
+		<div class="border rounded p-2 mb-3 bg-light">
+			<label class="control-label font-weight-bold"><i class="fas fa-user-shield mr-1"></i> Company administrator</label>
+			<small class="text-muted d-block mb-2">This person runs the company: all its modules, users and settings. They see only this company and have no access to other companies, the company switcher or the Developer tools.</small>
+			<div class="row">
+				<div class="col-md-6 form-group"><label class="control-label" for="admin_firstname">First name</label><input type="text" name="admin_firstname" id="admin_firstname" class="form-control form-control-sm rounded-0" required></div>
+				<div class="col-md-6 form-group"><label class="control-label" for="admin_lastname">Last name</label><input type="text" name="admin_lastname" id="admin_lastname" class="form-control form-control-sm rounded-0" required></div>
+				<div class="col-md-6 form-group"><label class="control-label" for="admin_email">Email</label><input type="email" name="admin_email" id="admin_email" class="form-control form-control-sm rounded-0" required autocomplete="off"></div>
+				<div class="col-md-6 form-group"><label class="control-label" for="admin_username">Username</label><input type="text" name="admin_username" id="admin_username" class="form-control form-control-sm rounded-0" required autocomplete="off"></div>
+				<div class="col-12 form-group mb-0"><label class="control-label" for="admin_password">Temporary password</label><input type="password" name="admin_password" id="admin_password" class="form-control form-control-sm rounded-0" required autocomplete="new-password"><small class="text-muted">At least 8 characters with a letter and a number. They can change it after signing in.</small></div>
+			</div>
+		</div>
+		<?php endif; ?>
 		<div class="form-group">
 			<label for="status" class="control-label">Status</label>
 			<select name="status" id="status" class="form-control form-control-sm rounded-0" required>

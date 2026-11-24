@@ -101,6 +101,11 @@ class TenantService
         }
         $tenant_code = $post['tenant_code'] ?? '';
         $id = intval($post['id'] ?? 0);
+        // A new company always gets its own administrator (a Staff User with the Company Administrator role,
+        // never the developer tier). Checked before anything is created so a mistake leaves nothing half-made.
+        if (empty($id) && ($problem = CompanyAdminService::problem($this->conn, $post)) !== null) {
+            return json_encode(['status' => 'failed', 'msg' => $problem]);
+        }
         if (empty($id)) {
             $sql = "INSERT INTO `tenants` set {$dataStr} ";
         } else {
@@ -118,6 +123,8 @@ class TenantService
                 $tid = empty($id) ? (int)$this->conn->insert_id : $id;
                 if (empty($id)) {
                     ChartProvisioner::provision($this->conn, $tid);
+                    $adminId = CompanyAdminService::create($this->conn, $tid, $post);
+                    $this->settings->log_audit('Created Company Administrator', 'Tenants', "Created administrator '" . trim((string)($post['admin_username'] ?? '')) . "' (#{$adminId}) for company #{$tid}.");
                 }
                 if (empty($id)) {
                     $this->settings->log_audit('Created Tenant', 'Tenants', "Created company '" . ($post['name'] ?? '') . "' (" . ($post['tenant_code'] ?? '') . ", #{$tid}).");
