@@ -9,20 +9,64 @@ class RedisCacheService
     protected SystemSettings $settings;
     protected mixed $redis = null;
     protected bool $connected = false;
-    protected string $socketPath = '/home/ictfjcom/.redis/redis.sock';
+    protected string $socketPath = '';
     protected string $prefix = 'nuviserpxssid:';
 
     public function __construct(SystemSettings $settings)
     {
         $this->settings = $settings;
+        $this->socketPath = self::resolveSocketPath(self::homeCandidates(), (string)($settings->info('redis_socket') ?: ''));
         $this->connect();
+    }
+
+    /* ------------------------------ where Redis lives ------------------------------ */
+
+    /** Home folders this account may have, most likely first (the account name is different on every server). */
+    public static function homeCandidates(): array
+    {
+        $homes = [];
+        if (function_exists('posix_getpwuid') && function_exists('posix_geteuid')) {
+            $pw = @posix_getpwuid(posix_geteuid());
+            if (!empty($pw['dir'])) $homes[] = rtrim((string)$pw['dir'], '/');
+        }
+        if (($h = getenv('HOME')) !== false && $h !== '') $homes[] = rtrim($h, '/');
+        if (defined('base_app') && ($h = self::homeFromAppPath((string)base_app)) !== null) $homes[] = $h;
+        return array_values(array_unique(array_filter($homes)));
+    }
+
+    /** "/home/acct/public_html/app/" -> "/home/acct"; null when the path is not under a home folder. */
+    public static function homeFromAppPath(string $path): ?string
+    {
+        return preg_match('#^(/home\d*/[^/]+)/#', $path, $m) ? $m[1] : null;
+    }
+
+    /** The socket to use: a path saved in settings, else the live one in a candidate home, else the first home's. '' when no home is known. */
+    public static function resolveSocketPath(array $homes, string $override): string
+    {
+        if ($override !== '') return $override;
+        foreach ($homes as $h) {
+            if (file_exists($h . '/.redis/redis.sock')) return $h . '/.redis/redis.sock';
+        }
+        return $homes ? $homes[0] . '/.redis/redis.sock' : '';
+    }
+
+    /**
+     * A2 Hosting starts Redis for an account when ~/.redis.on exists (it checks about every five minutes).
+     * @return array{created:string[],failed:string[]}
+     */
+    public static function touchStartFlag(array $homes): array
+    {
+        $created = $failed = [];
+        foreach (array_unique($homes) as $h) {
+            $flag = $h . '/.redis.on';
+            if (is_file($flag) || @touch($flag)) { $created[] = $flag; } else { $failed[] = $flag; }
+        }
+        return ['created' => $created, 'failed' => $failed];
     }
 
     protected function connect(): void
     {
-        $homeDir = getenv('HOME') ?: '/home/ictfjcom';
-        @touch($homeDir . '/.redis.on');
-        @touch('/home/ictfjcom/.redis.on');
+        self::touchStartFlag(self::homeCandidates());
 
         $host = $this->settings->info('redis_host') ?: '127.0.0.1';
         $port = intval($this->settings->info('redis_port') ?: 6379);
@@ -34,7 +78,7 @@ class RedisCacheService
                 $r = new \Redis();
 
                 // Check socket path first if exists
-                if (file_exists($this->socketPath)) {
+                if ($this->socketPath !== '' && file_exists($this->socketPath)) {
                     if (@$r->connect($this->socketPath)) {
                         if (!empty($pass)) $r->auth($pass);
                         if ($db > 0) $r->select($db);
@@ -55,7 +99,7 @@ class RedisCacheService
             }
 
             // Stream socket fallback
-            if (file_exists($this->socketPath)) {
+            if ($this->socketPath !== '' && file_exists($this->socketPath)) {
                 $fp = @fsockopen('unix://' . $this->socketPath, -1, $errno, $errstr, 1.5);
                 if ($fp) {
                     $this->redis = $fp;
@@ -89,10 +133,6 @@ class RedisCacheService
 
     public function getStatus(): array
     {
-        $homeDir = getenv('HOME') ?: '/home/ictfjcom';
-        @touch($homeDir . '/.redis.on');
-        @touch('/home/ictfjcom/.redis.on');
-
         $socketExists = file_exists($this->socketPath);
         $redisVersion = 'N/A';
         $usedMemory = 'N/A';
@@ -175,15 +215,23 @@ class RedisCacheService
 
     public function startDaemon(): array
     {
-        $homeDir = getenv('HOME') ?: '/home/ictfjcom';
-        @touch($homeDir . '/.redis.on');
-        @touch('/home/ictfjcom/.redis.on');
-
+        $flag = self::touchStartFlag(self::homeCandidates());
+        $socketNow = $this->socketPath !== '' && file_exists($this->socketPath);
+        if (!$flag['created']) {
+            return [
+                'success' => false,
+                'socket_exists' => $socketNow,
+                'is_connected' => $this->connected,
+                'message' => 'Could not create the ~/.redis.on start flag (tried: ' . implode(', ', $flag['failed'] ?: ['no home folder found']) . '). Create it yourself over SSH or the cPanel Terminal with: touch ~/.redis.on'
+            ];
+        }
         return [
             'success' => true,
-            'socket_exists' => file_exists($this->socketPath),
+            'socket_exists' => $socketNow,
             'is_connected' => $this->connected,
-            'message' => 'Created ~/.redis.on flag on disk. A2 Hosting background daemon will initialize ' . $this->socketPath . '.'
+            'message' => ($socketNow ? 'The Redis socket exists. ' : '')
+                . 'Start flag created at ' . implode(', ', $flag['created']) . '. A2 Hosting checks for it about every five minutes and then starts Redis; the socket will appear at ' . ($this->socketPath ?: 'your home folder\'s .redis/redis.sock') . '. Refresh in five minutes.'
+                . (extension_loaded('redis') ? '' : ' The PHP "redis" extension is not enabled on this server: enable it in cPanel (Select PHP Version / Extensions) or Redis cannot be used.')
         ];
     }
 
