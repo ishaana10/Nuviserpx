@@ -61,6 +61,9 @@ check('webhooks need webhooks_manage', P::forPage('webhooks') === 'webhooks_mana
 $top = file_get_contents(dirname(__DIR__) . '/admin/inc/topBarNav.php');
 check('company switcher is for super administrators only', (bool)preg_match('/Tenant Switcher[^\n]*\n\s*<\?php if\(\$_settings->is_super_admin\(\)\)/', $top));
 
+// the top bar names the company the user is working in, not a fixed word
+check('top bar shows the company name instead of "Admin"', strpos($top, '- Admin</b>') === false && strpos($top, 'tenant_branding()') !== false);
+
 // a company administrator's views never include other companies' or platform records
 $al = file_get_contents(dirname(__DIR__) . '/admin/settings/audit_logs.php');
 check('audit trail hides platform-level entries from company administrators', strpos($al, '$nv_platform') !== false);

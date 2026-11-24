@@ -78,7 +78,7 @@ $__create_html = \App\Support\MenuFilter::filter((string)ob_get_clean(), $_setti
 if(preg_match_all('/class="dropdown-item[^"]*"/', $__create_html) > 0) echo $__create_html;
 ?>
           <li class="nav-item d-none d-sm-inline-block">
-            <a href="<?php echo base_url ?>" class="nav-link"><b><?php echo (!isMobileDevice()) ? $_settings->info('name'):$_settings->info('short_name'); ?> - Admin</b></a>
+            <a href="<?php echo base_url ?>" class="nav-link"><b><?php echo (!isMobileDevice()) ? $_settings->info('name'):$_settings->info('short_name'); ?> - <?php $nv_co = trim((string)($_settings->tenant_branding()['name'] ?? '')); echo htmlspecialchars($nv_co !== '' ? $nv_co : 'Admin'); ?></b></a>
           </li>
         </ul>
         <!-- Right navbar links -->

@@ -3,6 +3,11 @@
 All notable changes to Nuvis ERPX. Versions are stamped automatically on each
 release build (see `src/Support/AppVersion.php`); dates are Fiji time.
 
+## [Unreleased] - 2026-11-25 (3)
+
+### Changed
+- The top bar shows the company you are working in ("Nuvis ERPX - Demo") instead of a fixed "Admin", which was wrong for accountants and other staff.
+
 ## [Unreleased] - 2026-11-25 (2)
 
 ### Changed
