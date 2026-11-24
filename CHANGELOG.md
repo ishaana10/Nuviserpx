@@ -3,6 +3,11 @@
 All notable changes to Nuvis ERPX. Versions are stamped automatically on each
 release build (see `src/Support/AppVersion.php`); dates are Fiji time.
 
+## [Unreleased] - 2026-11-25 (2)
+
+### Changed
+- FRCS VMS v3.0 is removed from this release and will return in a later version: no Settings menu entry, no VMS card in System & Branding, no VMS SDC Inspector in the Developer menu, the two pages are refused by direct URL, and the VMS actions (save settings, test connection, simulate, upload certificate) refuse. The code stays in place behind a single switch, `App\Support\Features::vms()`.
+
 ## [Unreleased] - 2026-11-25
 
 ### Fixed / Security

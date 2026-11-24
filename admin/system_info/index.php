@@ -195,7 +195,7 @@
                     <a href="#section-branding" class="nav-link active"><i class="fas fa-building text-primary"></i> Branding & Identification</a>
                     <a href="#section-portal" class="nav-link"><i class="fas fa-user-shield text-success"></i> Customer Portal Controls</a>
                     <a href="#section-smtp" class="nav-link"><i class="fas fa-envelope-open-text text-info"></i> Email & SMTP Settings</a>
-                    <a href="#section-vms" class="nav-link"><i class="fas fa-microchip text-warning"></i> FRCS VMS Integration</a>
+                    <?php if(\App\Support\Features::vms()): ?><a href="#section-vms" class="nav-link"><i class="fas fa-microchip text-warning"></i> FRCS VMS Integration</a><?php endif; ?>
                     <a href="#section-redis" class="nav-link"><i class="fas fa-database text-danger"></i> Redis Cache Store</a>
                     <a href="#section-navigation" class="nav-link"><i class="fas fa-bars text-secondary"></i> Sidebar Navigation</a>
                 </div>
@@ -417,6 +417,7 @@
                     </div>
                 </div>
 
+                <?php if(\App\Support\Features::vms()): ?>
                 <!-- CARD 3: FRCS VMS INTEGRATION -->
                 <div class="settings-card" id="section-vms">
                     <div class="settings-card-header">
@@ -447,6 +448,8 @@
                         </div>
                     </div>
                 </div>
+
+                <?php endif; /* FRCS VMS: not in this release */ ?>
 
                 <!-- CARD 4: NAVIGATION CUSTOMIZATION -->
                 <div class="settings-card" id="section-navigation">

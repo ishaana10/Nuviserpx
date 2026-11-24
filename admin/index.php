@@ -67,6 +67,10 @@ ob_start();
                 $page_allowed = $_settings->can_access($page_perm);
               }
 
+              if(!\App\Support\Features::pageAvailable($page)){
+                $page_allowed = false; // a page of a feature that is not in this release
+              }
+
               if(!$page_allowed){
                 echo '<div class="alert alert-danger m-3 shadow-sm"><i class="fas fa-ban mr-2"></i>'
                    . 'You don\'t have permission to access this page. Contact your administrator if you believe this is a mistake.'
