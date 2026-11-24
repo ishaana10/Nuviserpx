@@ -9,7 +9,8 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
 - A company (tenant) administrator no longer sees developer-level screens. The Settings menu now shows only company-level pages (My Plan, Invoice Templates, Financial Settings, Import, Currencies, Exchange Rates, FRCS VMS, Custom Extrafields, Audit Trail, Webhooks, Automation Workflows), each gated by the matching permission. Security & 2FA policy, Email Templates, System & Branding, Active User Sessions, DB Backup and Tenants / Companies are developer-only in the menu and by direct URL. The company switcher and Developer menu were already developer-only.
 - Financial Settings: the installation-wide defaults (shared by every company) show for the developer only; a company administrator gets "Close the books" for their own company.
 - Audit Trail hides platform-level entries from company administrators; the session list hides developer accounts.
-- User form explains how to create a company administrator: Staff User with a role that has Select all ticked. Super Administrator is the developer tier.
+- User form explains how to create a company administrator: Staff User with the Company Administrator role. Super Administrator is the developer tier.
+- Creating a company now creates its administrator too: a Staff User (never the developer tier) holding a "Company Administrator" role of that company (all modules plus users, settings, API keys, webhooks, workflows). The form asks for the administrator's details and checks them before anything is created. Older companies get the role on demand when the developer opens the user form; to fix a company administrator who was created as Super Administrator, edit the user, choose Staff User and the Company Administrator role.
 
 ## [Unreleased] - 2026-11-23
 

@@ -108,7 +108,8 @@ if(isset($meta['employee_id']) && (int)$meta['employee_id'] > 0){
 							<option value="2" <?php echo !isset($meta['type']) || $meta['type'] == 2 ? 'selected': '' ?>>Staff User / Company Administrator (Role-Based Permissions)</option>
 						</select>
 						<?php if($_settings->is_super_admin()): ?>
-						<small class="text-muted d-block"><i>For a company's own administrator choose <b>Staff User</b> and assign a role that has <b>Select all</b> ticked (Access &amp; Users &rarr; Roles). They see only their company, with no company switcher, Tenants or Developer menu. Super Administrator is for the developer only.</i></small>
+						<div id="super-warning" class="alert alert-danger py-1 px-2 mt-1 mb-1 text-sm" style="<?php echo isset($meta['type']) && $meta['type'] == 1 ? '' : 'display:none' ?>"><i class="fas fa-exclamation-triangle mr-1"></i> <b>Developer level.</b> This account can open every company, switch between them and use the Developer tools. For a company's own administrator choose Staff User and the Company Administrator role.</div>
+						<small class="text-muted d-block"><i>For a company's own administrator choose <b>Staff User</b> and assign the <b>Company Administrator</b> role. They see only their company, with no company switcher, Tenants or Developer menu. Super Administrator is for the developer only.</i></small>
 						<?php endif; ?>
 						<?php if(!$_settings->is_super_admin()): ?>
 						<small class="text-muted"><i>Only super administrators can grant full system access.</i></small>
@@ -120,6 +121,8 @@ if(isset($meta['employee_id']) && (int)$meta['employee_id'] > 0){
 						<select name="role_id" id="role_id" class="form-control form-control-sm rounded-0 select2">
 							<option value="0">Default Staff Permissions</option>
 							<?php
+							// Every company has a Company Administrator role to give its administrator (created here for older companies).
+							if($_settings->is_super_admin()){ \App\Services\CompanyAdminService::ensureRole($conn, (int)$user_tenant_id); }
 							$roles = $conn->query("SELECT * FROM `roles` WHERE tenant_id = '{$user_tenant_id}' AND delete_flag = 0 AND status = 1 ORDER BY name ASC");
 							while($r = $roles->fetch_assoc()):
 							?>
@@ -305,6 +308,7 @@ if(isset($meta['employee_id']) && (int)$meta['employee_id'] > 0){
 		}
 
 		$('#type').change(function(){
+			$('#super-warning').toggle($(this).val() == 1);
 			if($(this).val() == 1){
 				$('#role-group').slideUp();
 			} else {

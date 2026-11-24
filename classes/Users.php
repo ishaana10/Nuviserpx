@@ -483,6 +483,8 @@ Class Users extends DBConnection {
 			? (int)$_POST['tenant_id']
 			: (int)$this->settings->active_tenant_id();
 
+		// Every company has a Company Administrator role to give its administrator (older companies get it here).
+		if($is_super){ \App\Services\CompanyAdminService::ensureRole($this->conn, $tenant_id); }
 		$roles = [];
 		$rq = $this->conn->query("SELECT id, name FROM `roles` WHERE tenant_id = {$tenant_id} AND delete_flag = 0 AND status = 1 ORDER BY name ASC");
 		if($rq){ while($r = $rq->fetch_assoc()){ $roles[] = ['id' => (int)$r['id'], 'name' => $r['name']]; } }
