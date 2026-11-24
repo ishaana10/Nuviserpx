@@ -239,7 +239,7 @@ $working_status = trim((string)shell_exec('git status --short 2>&1'));
             </div>
 
             <!-- Latency Benchmark Result Console Card (hidden by default) -->
-            <div id="redis-benchmark-result" class="alert alert-info border border-info rounded-lg shadow-sm mb-4" style="display: none;">
+            <div id="redis-benchmark-result" class="bg-white border border-info rounded-lg shadow-sm mb-4" style="display: none;">
                 <div class="font-weight-bold text-navy mb-1"><i class="fas fa-stopwatch text-primary mr-1"></i> Latency Benchmark Results:</div>
                 <div id="redis-benchmark-text" class="font-monospace small"></div>
             </div>
@@ -333,7 +333,7 @@ function fetchRedisDiagnostics() {
             if(d.is_connected) {
                 statusCard.html('<span class="text-success font-weight-bold"><i class="fas fa-circle text-success mr-2" style="font-size: 0.8rem;"></i> Connected & Operational</span>');
             } else {
-                statusCard.html('<span class="text-warning font-weight-bold"><i class="fas fa-exclamation-circle text-warning mr-2"></i> ' + (d.redis_extension === false ? 'PHP redis extension is not enabled' : (d.socket_exists ? 'Socket found but not answering' : 'Socket not started yet (click Start, then wait about 5 minutes)')) + '</span>');
+                statusCard.html('<span class="text-warning font-weight-bold"><i class="fas fa-exclamation-circle text-warning mr-2"></i> ' + (d.redis_extension === false ? 'PHP redis extension is not enabled' : (d.socket_state === 'stale' ? 'Dead socket file left from the old server - click Start to clear it' : (d.socket_state === 'permission' ? 'Socket found but this site is not allowed to use it' : d.socket_exists ? 'Socket found but not answering' + (d.socket_error ? ' (' + d.socket_error + ')' : '') : 'Socket not started yet (click Start, then wait about 5 minutes)'))) + '</span>');
             }
 
             $('#redis-card-memory').text(d.used_memory || '528.26K');

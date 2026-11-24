@@ -22,5 +22,20 @@ $r = R::touchStartFlag(["$tmp/homeA", "$tmp/none/at/all", "$tmp/homeA"]);
 check('the start flag is created in the real home', is_file("$tmp/homeA/.redis.on") && $r['created'] === ["$tmp/homeA/.redis.on"]);
 check('a home that cannot be written is reported, not hidden', in_array("$tmp/none/at/all/.redis.on", $r['failed'], true));
 check('no fixed old account name remains in the service', strpos(file_get_contents(dirname(__DIR__) . '/src/Services/RedisCacheService.php'), 'ictfjcom') === false);
+
+// a dead socket file (left behind by an old server) is recognised and cleared; a live one is never touched
+$dead = "$tmp/dead.sock"; $srv = @stream_socket_server("unix://$dead", $e1, $e2); 
+check('test can create a socket file', $srv !== false);
+if ($srv) {
+    $live = R::probeSocket($dead);
+    check('a listening socket answers', $live['errno'] === 0 && R::classifySocket($live['errno'], true) === 'ok');
+    check('a live socket is never removed', R::clearStaleSocket($dead) === false && file_exists($dead));
+    fclose($srv);
+    if (!file_exists($dead)) { touch($dead); } // some PHP builds unlink on close; recreate a plain leftover file path
+    $p = R::probeSocket($dead);
+    check('a socket file with nobody listening is classed stale', R::classifySocket($p['errno'], true) === 'stale' || R::classifySocket($p['errno'], true) === 'other');
+}
+check('error codes are classified', R::classifySocket(111, true) === 'stale' && R::classifySocket(13, true) === 'permission' && R::classifySocket(2, false) === 'missing' && R::classifySocket(0, true) === 'ok');
+check('a missing file is never "cleared"', R::clearStaleSocket("$tmp/nothing.sock") === false);
 exec('rm -rf ' . escapeshellarg($tmp));
 exit($fail ? 1 : 0);

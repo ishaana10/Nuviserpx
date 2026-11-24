@@ -50,6 +50,33 @@ class RedisCacheService
         return $homes ? $homes[0] . '/.redis/redis.sock' : '';
     }
 
+    /** Try to open the socket. errno 0 = something is listening; 111 = a file with nobody behind it. */
+    public static function probeSocket(string $path): array
+    {
+        $errno = 0; $errstr = '';
+        $fp = @stream_socket_client('unix://' . $path, $errno, $errstr, 1.5);
+        if ($fp) { fclose($fp); return ['errno' => 0, 'errstr' => '']; }
+        return ['errno' => (int)$errno ?: -1, 'errstr' => (string)$errstr];
+    }
+
+    /** 'ok' | 'stale' (file, nobody listening) | 'permission' | 'missing' | 'other' */
+    public static function classifySocket(int $errno, bool $fileExists): string
+    {
+        if ($errno === 0) return $fileExists ? 'ok' : 'missing';
+        if (!$fileExists) return 'missing';
+        if ($errno === 111) return 'stale';
+        if ($errno === 13) return 'permission';
+        return 'other';
+    }
+
+    /** Remove a socket file that nothing is listening on (e.g. copied over from the old server). Never touches a live one. */
+    public static function clearStaleSocket(string $path): bool
+    {
+        if ($path === '' || !file_exists($path) || @filetype($path) !== 'socket') return false;
+        $p = self::probeSocket($path);
+        return self::classifySocket($p['errno'], true) === 'stale' && @unlink($path);
+    }
+
     /**
      * A2 Hosting starts Redis for an account when ~/.redis.on exists (it checks about every five minutes).
      * @return array{created:string[],failed:string[]}
@@ -170,8 +197,13 @@ class RedisCacheService
             }
         }
 
+        $probe = ($socketExists && !$this->connected) ? self::probeSocket($this->socketPath) : ['errno' => 0, 'errstr' => ''];
+        $socketState = $this->connected ? 'ok' : self::classifySocket($probe['errno'], $socketExists);
+
         return [
             'success' => true,
+            'socket_state' => $socketState,
+            'socket_error' => $probe['errstr'],
             'redis_extension' => extension_loaded('redis'),
             'is_connected' => $this->connected,
             'scheme' => file_exists($this->socketPath) ? 'unix' : 'tcp',
@@ -215,6 +247,8 @@ class RedisCacheService
 
     public function startDaemon(): array
     {
+        // A leftover socket file with nobody listening (copied from the old server) keeps a fresh Redis from starting.
+        $cleared = self::clearStaleSocket($this->socketPath);
         $flag = self::touchStartFlag(self::homeCandidates());
         $socketNow = $this->socketPath !== '' && file_exists($this->socketPath);
         if (!$flag['created']) {
@@ -229,7 +263,7 @@ class RedisCacheService
             'success' => true,
             'socket_exists' => $socketNow,
             'is_connected' => $this->connected,
-            'message' => ($socketNow ? 'The Redis socket exists. ' : '')
+            'message' => ($cleared ? 'Removed a dead socket file nothing was listening on (left over from the old server). ' : ($socketNow ? 'The Redis socket exists. ' : ''))
                 . 'Start flag created at ' . implode(', ', $flag['created']) . '. A2 Hosting checks for it about every five minutes and then starts Redis; the socket will appear at ' . ($this->socketPath ?: 'your home folder\'s .redis/redis.sock') . '. Refresh in five minutes.'
                 . (extension_loaded('redis') ? '' : ' The PHP "redis" extension is not enabled on this server: enable it in cPanel (Select PHP Version / Extensions) or Redis cannot be used.')
         ];
