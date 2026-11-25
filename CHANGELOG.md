@@ -3,6 +3,11 @@
 All notable changes to Nuvis ERPX. Versions are stamped automatically on each
 release build (see `src/Support/AppVersion.php`); dates are Fiji time.
 
+## [Unreleased] - 2026-11-25 (8)
+
+### Changed
+- A2 Hosting confirmed its current shared platform does not run Redis server processes (the old `~/.redis.on` start daemon is gone; Redis needs a Managed VPS or an external Redis service). The automatic Redis check now gives up for good after one logged explanation instead of retrying and repeating the error, and the wording no longer talks about Turbo plans. Turning the checks on from Developer > Redis makes it try again.
+
 ## [Unreleased] - 2026-11-25 (7)
 
 ### Changed

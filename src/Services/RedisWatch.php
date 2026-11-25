@@ -13,7 +13,8 @@ namespace App\Services;
  *   - if not: clears a dead socket file left over from an old server, makes sure ~/.redis.on exists, and logs it;
  *   - if it is still not running well after A2's normal start delay, logs an error saying what to check.
  * The same message is logged at most once every six hours, so the log is not flooded.
- * Switch it off by saving a setting redis_auto = 0.
+ * If Redis is still not running after that grace period it gives up (A2's shared platform does not run Redis servers); saving redis_auto = 1 from the
+ * Developer page makes it try again. Switch it off by saving redis_auto = 0.
  */
 final class RedisWatch
 {
@@ -33,6 +34,13 @@ final class RedisWatch
         }
         $file = $opt['state'] ?? (self::logDir() . '/redis_watch.json');
         $st = is_file($file) ? (json_decode((string)@file_get_contents($file), true) ?: []) : [];
+        if (!empty($st['gave_up'])) {
+            // Stopped after the host never started Redis. Only an explicit "turn the checks on" (redis_auto = 1) starts it again.
+            if ($settings === null || (string)$settings->info('redis_auto') !== '1') {
+                return null;
+            }
+            $st = ['logged' => $st['logged'] ?? []];
+        }
         if (isset($st['checked']) && $now - (int)$st['checked'] < self::EVERY) {
             return null;
         }
@@ -84,7 +92,8 @@ final class RedisWatch
             return ['state' => 'starting'];
         }
         self::log($st, 'stuck', 'Redis is still not running ' . intdiv($now - (int)$st['flag_at'], 60) . ' minutes after ' . implode(', ', $flag['created'])
-            . ' was created, so A2 Hosting did not start it. Redis is provided only on A2 Turbo shared/reseller and managed plans: check this account\'s plan in the A2 customer portal or ask A2 support to enable Redis for it. Expected socket: ' . ($socket ?: 'unknown') . '.', self::REPEAT, $now);
+            . ' was created, so this hosting account will not start it: the A2 Hosting shared platform does not run Redis server processes. Nuvis ERPX does not need Redis (it runs on file sessions), so the automatic Redis check has stopped. Redis needs an A2 Managed VPS or an external Redis service; to try again later, turn the checks on from Developer > Redis.', self::REPEAT, $now);
+        $st['gave_up'] = true;
         return ['state' => 'not_running'];
     }
 
