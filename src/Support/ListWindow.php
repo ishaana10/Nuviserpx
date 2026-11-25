@@ -50,7 +50,7 @@ final class ListWindow
     /** Count of a tenant's rows in a list table (table name is checked against a fixed list). */
     public static function total(\mysqli $conn, string $table, int $tenantId): int
     {
-        if (!in_array($table, ['invoice_list', 'sales_order_list', 'payment_list'], true)) {
+        if (!in_array($table, ['invoice_list', 'sales_order_list', 'payment_list', 'vendor_bill_list'], true)) {
             throw new \InvalidArgumentException("Not a capped list: {$table}");
         }
         $stmt = $conn->prepare("SELECT COUNT(*) FROM `{$table}` WHERE tenant_id = ?");

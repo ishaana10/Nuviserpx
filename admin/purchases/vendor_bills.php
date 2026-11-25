@@ -14,6 +14,7 @@
 	</div>
 	<div class="card-body">
 		<div class="container-fluid">
+			<?= \App\Support\ListWindow::banner($conn, 'vendor_bill_list', (int)$_settings->active_tenant_id(), 'purchases/vendor_bills') ?>
 			<table class="table table-hover table-striped table-bordered" id="list" data-nv-cards>
 				<thead>
 					<tr>
@@ -32,7 +33,7 @@
 					<?php
 					$i = 1;
 						$tenant_id = $_settings->active_tenant_id();
-						$qry = $conn->query("SELECT b.*, p.name as vendor_name, p.party_code from `vendor_bill_list` b inner join `party_list` p on b.vendor_id = p.id where b.tenant_id = '{$tenant_id}' order by b.id desc ");
+						$qry = $conn->query("SELECT b.*, p.name as vendor_name, p.party_code from `vendor_bill_list` b inner join `party_list` p on b.vendor_id = p.id where b.tenant_id = '{$tenant_id}' order by b.id desc " . \App\Support\ListWindow::limitSql());
 						while($row = $qry->fetch_assoc()):
 							$badge_class = 'secondary';
 							switch($row['status']){

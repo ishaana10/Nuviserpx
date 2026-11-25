@@ -12,7 +12,7 @@ $n = ListWindow::notice(2000, 20000, './?page=invoices&all=1');
 check('banner says how many are shown and links to all', strpos($n, '2,000 of 20,000') !== false && strpos($n, 'page=invoices&amp;all=1') !== false);
 check('banner escapes the link', strpos(ListWindow::notice(1, 2, '"><script>'), '<script>') === false);
 try { ListWindow::total(new class extends mysqli { public function __construct() {} }, 'users; DROP', 1); check('only known tables can be counted', false); } catch (InvalidArgumentException $e) { check('only known tables can be counted', true); }
-foreach (['admin/invoices/index.php', 'admin/sales_orders/index.php', 'admin/payments/index.php'] as $p) {
+foreach (['admin/invoices/index.php', 'admin/sales_orders/index.php', 'admin/payments/index.php', 'admin/purchases/vendor_bills.php'] as $p) {
     $s = file_get_contents(__DIR__ . '/../' . $p);
     check("$p applies the cap and shows the banner", strpos($s, 'ListWindow::limitSql()') !== false && strpos($s, 'ListWindow::banner(') !== false);
 }
