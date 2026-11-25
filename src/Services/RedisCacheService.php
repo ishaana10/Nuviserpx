@@ -200,8 +200,13 @@ class RedisCacheService
         $probe = ($socketExists && !$this->connected) ? self::probeSocket($this->socketPath) : ['errno' => 0, 'errstr' => ''];
         $socketState = $this->connected ? 'ok' : self::classifySocket($probe['errno'], $socketExists);
 
+        $flagFile = (self::homeCandidates()[0] ?? '') . '/.redis.on';
+        $flagAge = ($flagFile !== '/.redis.on' && is_file($flagFile)) ? max(0, (int)floor((time() - (int)filemtime($flagFile)) / 60)) : null;
+
         return [
             'success' => true,
+            'flag_path' => $flagFile,
+            'flag_age_min' => $flagAge,
             'socket_state' => $socketState,
             'socket_error' => $probe['errstr'],
             'redis_extension' => extension_loaded('redis'),
@@ -250,6 +255,7 @@ class RedisCacheService
         // A leftover socket file with nobody listening (copied from the old server) keeps a fresh Redis from starting.
         $cleared = self::clearStaleSocket($this->socketPath);
         $flag = self::touchStartFlag(self::homeCandidates());
+        error_log('[Redis] Start requested from the Developer page: ' . ($cleared ? 'removed a dead socket file; ' : '') . ($flag['created'] ? 'flag at ' . implode(', ', $flag['created']) : 'could not create the flag (' . implode(', ', $flag['failed']) . ')') . '.');
         $socketNow = $this->socketPath !== '' && file_exists($this->socketPath);
         if (!$flag['created']) {
             return [
