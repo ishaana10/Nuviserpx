@@ -3,6 +3,12 @@
 All notable changes to Nuvis ERPX. Versions are stamped automatically on each
 release build (see `src/Support/AppVersion.php`); dates are Fiji time.
 
+## [Unreleased] - 2026-11-25 (7)
+
+### Performance
+- Load-tested with 50 tenants (177,000 invoices, 354,000 journal lines, 492,000 audit rows; one tenant 12 times the size of the rest). A normal tenant's pages answer in 5 to 50 ms and the largest tenant's reports in 0.4 s; no tenant's data appeared in another's, and 40 simultaneous requests all succeeded.
+- Audit Logs: the Module filter list scanned every audit row of a busy company (0.55 s at 100,000 rows). A new index (migration 056) brings it to 0.05 s; the page drops from 1.07 s to 0.23 s.
+- Vendor Bills now shows the newest 2,000 bills with a "Show all" link, like Invoices, Payments and Sales Orders. For a company with 40,000 bills the page was 12.6 MB; it is now 2.6 MB. Run Database Updates (or `php bin/migrate.php`) for migration 056.
 ## [Unreleased] - 2026-11-25 (8)
 
 ### Changed
