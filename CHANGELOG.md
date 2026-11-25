@@ -3,6 +3,11 @@
 All notable changes to Nuvis ERPX. Versions are stamped automatically on each
 release build (see `src/Support/AppVersion.php`); dates are Fiji time.
 
+## [Unreleased] - 2026-11-25 (7)
+
+### Changed
+- Redis is optional and the Redis tab now says so. The app itself never used Redis (sessions are files); only the Developer monitor looks at it. When the start flag has been in place 15+ minutes and the host has not started Redis (the usual sign the hosting plan does not include it), the tab shows a calm "Redis is not running, and that is OK" note with **Stop checking for Redis**, which saves `redis_auto = 0` (also turns the automatic starter and its log lines off). When off, the card reads "Not in use (checks are off)" with a button to turn the checks back on.
+
 ## [Unreleased] - 2026-11-25 (6)
 
 ### Fixed

@@ -205,6 +205,7 @@ class RedisCacheService
 
         return [
             'success' => true,
+            'auto' => (string)$this->settings->info('redis_auto') !== '0',
             'flag_path' => $flagFile,
             'flag_age_min' => $flagAge,
             'socket_state' => $socketState,
