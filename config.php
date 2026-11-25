@@ -123,5 +123,10 @@ function isMobileDevice(){
 		die('<div class="alert alert-danger m-3"><i class="fas fa-ban mr-2"></i>' . htmlspecialchars($msg) . '</div>');
 	}
 })();
+// Redis (A2 Hosting): started automatically, and any trouble is written to logs/php_errors.log (Developer > Error Logs).
+// Does real work at most once every five minutes; never lets a problem here break a page.
+if (php_sapi_name() !== 'cli') {
+	try { \App\Services\RedisWatch::tick($_settings ?? null); } catch (\Throwable $e) { error_log('[Redis] watcher failed: ' . $e->getMessage()); }
+}
 ob_end_flush();
 ?>

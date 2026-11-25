@@ -254,6 +254,8 @@ $working_status = trim((string)shell_exec('git status --short 2>&1'));
                         <small class="text-muted">
                             Socket Path: <code id="redis-socket-path-display" class="bg-white px-2 py-1 rounded font-monospace border text-dark">checking...</code>
                         </small>
+                        <div class="small text-muted mt-1" id="redis-flag-display">Start flag: checking...</div>
+                        <div class="small text-muted">It starts automatically: the app checks every few minutes and writes any problem to <a href="./?page=developer/error_logs">Error Logs</a> (lines starting [Redis]).</div>
                     </div>
                     <div class="d-flex gap-2 mt-2 mt-md-0">
                         <button type="button" onclick="triggerStartRedisDaemon()" class="btn btn-sm btn-warning font-weight-bold mr-2 text-white shadow-sm" style="background-color: #b45309; border-color: #b45309;">
@@ -328,6 +330,7 @@ function fetchRedisDiagnostics() {
         },
         success: function(d){
             if(d.socket_path) $('#redis-socket-path-display').text(d.socket_path);
+            $('#redis-flag-display').text('Start flag ' + (d.flag_path || '~/.redis.on') + ': ' + (d.flag_age_min === null || d.flag_age_min === undefined ? 'not created yet' : 'present, created/refreshed ' + d.flag_age_min + ' min ago'));
             if(d.scheme) $('#redis-card-scheme').text('Scheme: ' + d.scheme);
 
             if(d.is_connected) {

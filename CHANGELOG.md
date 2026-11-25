@@ -3,6 +3,11 @@
 All notable changes to Nuvis ERPX. Versions are stamped automatically on each
 release build (see `src/Support/AppVersion.php`); dates are Fiji time.
 
+## [Unreleased] - 2026-11-25 (6)
+
+### Fixed
+- Redis now starts by itself. A watcher (RedisWatch, run from config.php, at most once every five minutes) checks whether Redis answers, clears a dead socket file, makes sure the A2 start flag `~/.redis.on` exists, and logs everything to `logs/php_errors.log` so it shows on Developer > Error Logs as `[Redis] ...` lines: what it did, recovery, a missing PHP redis extension, a flag that cannot be created, and - if A2 has not started Redis 15 minutes after the flag exists - an error saying Redis is only provided on A2 Turbo/managed plans and to check the plan or ask A2 support. Each message is logged at most once every six hours. Turn it off with a `redis_auto` setting of 0. The Redis tab shows the start-flag state.
+
 ## [Unreleased] - 2026-11-25 (5)
 
 ### Fixed
