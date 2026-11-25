@@ -24,12 +24,11 @@ check('runs again within five minutes do nothing', W::tick(null, $t + 120, $opt)
 $r2 = W::tick(null, $t + 400, $opt);
 check('still waiting after a normal start delay is not an error yet', $r2['state'] === 'starting' && strpos($logText(), 'still not running') === false);
 $r3 = W::tick(null, $t + 1200, $opt);
-check('not running 20 minutes after the flag is an error with a reason', $r3['state'] === 'not_running' && strpos($logText(), 'still not running') !== false && stripos($logText(), 'Turbo') !== false);
-$n = substr_count($logText(), 'still not running');
-W::tick(null, $t + 1800, $opt);
-check('the same error is not repeated every five minutes', substr_count($logText(), 'still not running') === $n);
-W::tick(null, $t + 1200 + 22000, $opt);
-check('it is repeated after six hours', substr_count($logText(), 'still not running') === $n + 1);
+check('not running 20 minutes after the flag is an error with a reason', $r3['state'] === 'not_running' && strpos($logText(), 'still not running') !== false && stripos($logText(), 'Managed VPS') !== false);
+check('after the error it gives up instead of retrying forever', W::tick(null, $t + 1800, $opt) === null && W::tick(null, $t + 1200 + 22000, $opt) === null);
+check('the error is logged only once', substr_count($logText(), 'still not running') === 1);
+class OnSettings { public function info($k = '') { return $k === 'redis_auto' ? '1' : false; } }
+check('turning the checks on again makes it try again', W::tick(new OnSettings(), $t + 30000, $opt) !== null);
 
 // a live socket: recovery is logged and nothing is touched
 $sock = "$tmp/home/.redis/redis.sock";

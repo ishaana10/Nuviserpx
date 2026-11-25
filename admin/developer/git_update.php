@@ -244,12 +244,15 @@ $working_status = trim((string)shell_exec('git status --short 2>&1'));
                 <div id="redis-benchmark-text" class="font-monospace small"></div>
             </div>
 
+            <!-- Redis is optional: say so, and let it be switched off -->
+            <div id="redis-optional-note" class="alert alert-secondary border rounded-lg mb-4" style="display:none;"></div>
+
             <!-- A2 Hosting Socket & Daemon Controls Card (Matching image screenshot) -->
             <div class="card bg-light border p-3 mb-4 rounded-lg">
                 <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
                     <div>
                         <h6 class="font-weight-bold text-navy m-0 d-flex align-items-center">
-                            <i class="fas fa-cube text-warning mr-2"></i> A2 Hosting Turbo Max Redis Daemon Initialization
+                            <i class="fas fa-cube text-warning mr-2"></i> A2 Hosting Redis start flag (legacy A2 platform only)
                         </h6>
                         <small class="text-muted">
                             Socket Path: <code id="redis-socket-path-display" class="bg-white px-2 py-1 rounded font-monospace border text-dark">checking...</code>
@@ -316,6 +319,17 @@ function append_log(text, is_err) {
     console_box.scrollTop(console_box[0].scrollHeight);
 }
 
+function setRedisAuto(on) {
+    start_loader();
+    $.ajax({
+        url: _base_url_ + 'classes/SystemSettings.php?f=update_settings',
+        method: 'POST', dataType: 'json',
+        data: { redis_auto: on ? '1' : '0' },
+        error: function(){ end_loader(); alert_toast('Could not save the setting.', 'error'); },
+        success: function(){ end_loader(); alert_toast(on ? 'Redis checks are on again.' : 'Redis checks are off.', 'success'); fetchRedisDiagnostics(); }
+    });
+}
+
 function fetchRedisDiagnostics() {
     var statusCard = $('#redis-card-status');
     statusCard.html('<span class="spinner-border spinner-border-sm text-secondary mr-2"></span><span class="text-muted text-xs font-weight-normal">Connecting...</span>');
@@ -333,10 +347,21 @@ function fetchRedisDiagnostics() {
             $('#redis-flag-display').text('Start flag ' + (d.flag_path || '~/.redis.on') + ': ' + (d.flag_age_min === null || d.flag_age_min === undefined ? 'not created yet' : 'present, created/refreshed ' + d.flag_age_min + ' min ago'));
             if(d.scheme) $('#redis-card-scheme').text('Scheme: ' + d.scheme);
 
+            var note = $('#redis-optional-note').hide().empty();
+            if(d.auto === false) {
+                note.html('<b><i class="fas fa-info-circle mr-1"></i> Redis checks are off.</b> Nuvis ERPX is running normally on file sessions; Redis is an optional speed-up and is not needed. <button type="button" class="btn btn-sm btn-outline-secondary ml-2" onclick="setRedisAuto(1)">Turn Redis checks back on</button>').show();
+            } else if(!d.is_connected && d.flag_age_min !== null && d.flag_age_min !== undefined && d.flag_age_min >= 15) {
+                note.html('<b><i class="fas fa-info-circle mr-1"></i> Redis is not running, and that is OK.</b> The start flag has been in place for ' + d.flag_age_min + ' minutes and the server has not started Redis, which means this hosting account cannot run a Redis server: A2 confirmed its shared platform does not host Redis (that needs a Managed VPS or an external Redis service). Nuvis ERPX runs on file sessions and works fully without it. <button type="button" class="btn btn-sm btn-outline-secondary ml-2" onclick="setRedisAuto(0)">Stop checking for Redis</button>').show();
+            }
+
             if(d.is_connected) {
                 statusCard.html('<span class="text-success font-weight-bold"><i class="fas fa-circle text-success mr-2" style="font-size: 0.8rem;"></i> Connected & Operational</span>');
             } else {
                 statusCard.html('<span class="text-warning font-weight-bold"><i class="fas fa-exclamation-circle text-warning mr-2"></i> ' + (d.redis_extension === false ? 'PHP redis extension is not enabled' : (d.socket_state === 'stale' ? 'Dead socket file left from the old server - click Start to clear it' : (d.socket_state === 'permission' ? 'Socket found but this site is not allowed to use it' : d.socket_exists ? 'Socket found but not answering' + (d.socket_error ? ' (' + d.socket_error + ')' : '') : 'Socket not started yet (click Start, then wait about 5 minutes)'))) + '</span>');
+            }
+
+            if(d.auto === false && !d.is_connected) {
+                statusCard.html('<span class="text-muted font-weight-bold"><i class="fas fa-minus-circle mr-2"></i> Not in use (checks are off)</span>');
             }
 
             $('#redis-card-memory').text(d.used_memory || '528.26K');

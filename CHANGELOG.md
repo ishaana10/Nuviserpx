@@ -9,6 +9,15 @@ release build (see `src/Support/AppVersion.php`); dates are Fiji time.
 - Load-tested with 50 tenants (177,000 invoices, 354,000 journal lines, 492,000 audit rows; one tenant 12 times the size of the rest). A normal tenant's pages answer in 5 to 50 ms and the largest tenant's reports in 0.4 s; no tenant's data appeared in another's, and 40 simultaneous requests all succeeded.
 - Audit Logs: the Module filter list scanned every audit row of a busy company (0.55 s at 100,000 rows). A new index (migration 056) brings it to 0.05 s; the page drops from 1.07 s to 0.23 s.
 - Vendor Bills now shows the newest 2,000 bills with a "Show all" link, like Invoices, Payments and Sales Orders. For a company with 40,000 bills the page was 12.6 MB; it is now 2.6 MB. Run Database Updates (or `php bin/migrate.php`) for migration 056.
+## [Unreleased] - 2026-11-25 (8)
+
+### Changed
+- A2 Hosting confirmed its current shared platform does not run Redis server processes (the old `~/.redis.on` start daemon is gone; Redis needs a Managed VPS or an external Redis service). The automatic Redis check now gives up for good after one logged explanation instead of retrying and repeating the error, and the wording no longer talks about Turbo plans. Turning the checks on from Developer > Redis makes it try again.
+
+## [Unreleased] - 2026-11-25 (7)
+
+### Changed
+- Redis is optional and the Redis tab now says so. The app itself never used Redis (sessions are files); only the Developer monitor looks at it. When the start flag has been in place 15+ minutes and the host has not started Redis (the usual sign the hosting plan does not include it), the tab shows a calm "Redis is not running, and that is OK" note with **Stop checking for Redis**, which saves `redis_auto = 0` (also turns the automatic starter and its log lines off). When off, the card reads "Not in use (checks are off)" with a button to turn the checks back on.
 
 ## [Unreleased] - 2026-11-25 (6)
 
