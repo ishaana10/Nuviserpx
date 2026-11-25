@@ -252,7 +252,7 @@ $working_status = trim((string)shell_exec('git status --short 2>&1'));
                 <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
                     <div>
                         <h6 class="font-weight-bold text-navy m-0 d-flex align-items-center">
-                            <i class="fas fa-cube text-warning mr-2"></i> A2 Hosting Turbo Max Redis Daemon Initialization
+                            <i class="fas fa-cube text-warning mr-2"></i> A2 Hosting Redis start flag (legacy A2 platform only)
                         </h6>
                         <small class="text-muted">
                             Socket Path: <code id="redis-socket-path-display" class="bg-white px-2 py-1 rounded font-monospace border text-dark">checking...</code>
@@ -351,7 +351,7 @@ function fetchRedisDiagnostics() {
             if(d.auto === false) {
                 note.html('<b><i class="fas fa-info-circle mr-1"></i> Redis checks are off.</b> Nuvis ERPX is running normally on file sessions; Redis is an optional speed-up and is not needed. <button type="button" class="btn btn-sm btn-outline-secondary ml-2" onclick="setRedisAuto(1)">Turn Redis checks back on</button>').show();
             } else if(!d.is_connected && d.flag_age_min !== null && d.flag_age_min !== undefined && d.flag_age_min >= 15) {
-                note.html('<b><i class="fas fa-info-circle mr-1"></i> Redis is not running, and that is OK.</b> The start flag has been in place for ' + d.flag_age_min + ' minutes and the server has not started Redis, which usually means this hosting plan does not include it (A2 provides Redis on Turbo and managed plans). Nuvis ERPX runs on file sessions and works fully without it. <button type="button" class="btn btn-sm btn-outline-secondary ml-2" onclick="setRedisAuto(0)">Stop checking for Redis</button>').show();
+                note.html('<b><i class="fas fa-info-circle mr-1"></i> Redis is not running, and that is OK.</b> The start flag has been in place for ' + d.flag_age_min + ' minutes and the server has not started Redis, which means this hosting account cannot run a Redis server: A2 confirmed its shared platform does not host Redis (that needs a Managed VPS or an external Redis service). Nuvis ERPX runs on file sessions and works fully without it. <button type="button" class="btn btn-sm btn-outline-secondary ml-2" onclick="setRedisAuto(0)">Stop checking for Redis</button>').show();
             }
 
             if(d.is_connected) {
