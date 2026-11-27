@@ -60,6 +60,14 @@ $permissions_list = isset($permissions) ? explode(',', $permissions) : ['*'];
 						<label class="custom-control-label" for="perm_write_invoices">Create Sales Invoices</label>
 					</div>
 					<div class="custom-control custom-checkbox mb-2">
+						<input type="checkbox" class="custom-control-input perm-item" id="perm_read_parties" name="permissions[]" value="read_parties" <?php echo in_array('read_parties', $permissions_list) ? 'checked' : '' ?>>
+						<label class="custom-control-label" for="perm_read_parties">Look up Customers</label>
+					</div>
+					<div class="custom-control custom-checkbox mb-2">
+						<input type="checkbox" class="custom-control-input perm-item" id="perm_write_parties" name="permissions[]" value="write_parties" <?php echo in_array('write_parties', $permissions_list) ? 'checked' : '' ?>>
+						<label class="custom-control-label" for="perm_write_parties">Find or Create Customers</label>
+					</div>
+					<div class="custom-control custom-checkbox mb-2">
 						<input type="checkbox" class="custom-control-input perm-item" id="perm_read_payments" name="permissions[]" value="read_payments" <?php echo in_array('read_payments', $permissions_list) ? 'checked' : '' ?>>
 						<label class="custom-control-label" for="perm_read_payments">Read Payment Receipts</label>
 					</div>

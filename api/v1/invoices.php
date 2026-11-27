@@ -6,7 +6,8 @@
  *   GET    /api/v1/invoices.php?id=123          fetch one invoice with line items
  *   POST   /api/v1/invoices.php                 create invoice (fires invoice.created)
  *   PUT    /api/v1/invoices.php?id=123          update invoice (fires invoice.updated)
- *   PATCH  /api/v1/invoices.php?id=123          partial update (fires invoice.updated)
+ *   PATCH  /api/v1/invoices.php?id=123          partial update (fires invoice.updated); {"status":"unpaid"} releases a draft
+ *   POST body may carry external_ref (unique per tenant; a repeat returns the first invoice with duplicate:true) and status draft|unpaid
  *   POST   /api/v1/invoices.php?id=123&action=pay   record a payment against the invoice
  *   DELETE /api/v1/invoices.php?id=123          delete invoice (fires invoice.deleted)
  *
@@ -16,6 +17,7 @@
 require_once(__DIR__ . '/auth.php');
 
 use App\Support\IntegrationEvents;
+use App\Services\ExternalInvoiceRef;
 
 $method = $_SERVER['REQUEST_METHOD'];
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
@@ -179,6 +181,20 @@ if ($method === 'POST') {
         api_respond(400, ['status' => 'failed', 'message' => 'Valid party_id and total amount are required.']);
     }
 
+    $new_status = isset($input['status']) ? (string)$input['status'] : null;
+    if (!ExternalInvoiceRef::validStatus($new_status)) {
+        api_respond(400, ['status' => 'failed', 'message' => "status must be 'draft' or 'unpaid'."]);
+    }
+    $new_status = $new_status ?? 'unpaid';
+    $ext_ref = ExternalInvoiceRef::clean($input['external_ref'] ?? null);
+    if ($ext_ref !== null) {
+        $dup = ExternalInvoiceRef::find($conn, (int)$api_tenant_id, $ext_ref);
+        if ($dup) {
+            api_respond(200, ['status' => 'success', 'duplicate' => true, 'invoice_id' => (int)$dup['id'], 'invoice_no' => $dup['invoice_no']]);
+        }
+    }
+    $ext_sql = $ext_ref !== null ? "'" . $conn->real_escape_string($ext_ref) . "'" : 'NULL';
+
     // Verify party belongs to this tenant
     $party_q = $conn->query("SELECT id, name, email FROM `party_list` WHERE id = '{$party_id}' AND tenant_id = '{$api_tenant_id}'");
     if (!$party_q || $party_q->num_rows === 0) {
@@ -190,8 +206,15 @@ if ($method === 'POST') {
         `tenant_id` = '{$api_tenant_id}', `invoice_no` = '{$invoice_no}', `party_id` = '{$party_id}',
         `invoice_date` = '{$invoice_date}', `due_date` = '{$due_date}', `subtotal` = '{$subtotal}',
         `tax_amount` = '{$tax_amount}', `discount` = '{$discount}', `total` = '{$total}',
-        `balance` = '{$total}', `status` = 'unpaid', `notes` = '{$notes}'");
+        `balance` = '{$total}', `status` = '{$new_status}', `notes` = '{$notes}', `external_ref` = {$ext_sql}");
 
+    if ($conn->errno === 1062 && $ext_ref !== null) {
+        // A concurrent request with the same external_ref won the race: return its invoice.
+        $dup = ExternalInvoiceRef::find($conn, (int)$api_tenant_id, $ext_ref);
+        if ($dup) {
+            api_respond(200, ['status' => 'success', 'duplicate' => true, 'invoice_id' => (int)$dup['id'], 'invoice_no' => $dup['invoice_no']]);
+        }
+    }
     if ($conn->error) {
         \App\Support\Db::log($conn);
         api_respond(500, ['status' => 'failed', 'message' => 'Failed to create invoice.']);
@@ -217,7 +240,7 @@ if ($method === 'POST') {
         'invoice_id' => $inv_id, 'invoice_no' => $invoice_no, 'party_id' => $party_id,
         'party_name' => $party['name'], 'party_email' => $party['email'],
         'subtotal' => $subtotal, 'tax_amount' => $tax_amount, 'discount' => $discount,
-        'total' => $total, 'balance' => $total, 'status' => 'unpaid',
+        'total' => $total, 'balance' => $total, 'status' => $new_status,
         'invoice_date' => $invoice_date, 'due_date' => $due_date,
     ]);
 
